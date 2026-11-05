@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 2,
+  "device": {
+    "capture": {
+      "timeoutMs": 1500,
+      "maxNodes": 3000,
+      "emptyTreeRetries": 3,
+      "emptyTreeRetryDelayMs": 200
+    },
+    "events": {
+      "buffer": 256
+    },
+    "stabilize": {
+      "quietMs": 300,
+      "maxWaitMs": 3000,
+      "pollMs": 50,
+      "firstEventTimeoutMs": 800
+    },
+    "serializer": {
+      "textMaxChars": -1,
+      "maxMergedLabels": 4,
+      "maxListItems": -1,
+      "diffMaxRatio": 0.4,
+      "semanticPoorMinInteractive": 3,
+      "semanticPoorAreaRatio": 0.5,
+      "hideSystemDecoration": true
+    },
+    "screenshot": {
+      "maxEdge": 1024,
+      "jpegQuality": 80,
+      "minIntervalMs": 1000,
+      "retryDelayMs": 400,
+      "retries": 3,
+      "vision": {
+        "blockSize": 28,
+        "maxBlocks": 1500,
+        "maxLongEdge": 1568
+      }
+    },
+    "observe": {
+      "priority": ["a11y", "visual", "llm"],
+      "modes": {
+        "a11y": { "enabled": true },
+        "visual": { "enabled": true },
+        "llm": { "enabled": true }
+      },
+      "llm": {
+        "maxEdge": 1280,
+        "maxElements": 120,
+        "retries": 1,
+        "timeoutMs": 120000,
+        "cacheTtlMs": 10000,
+        "minAreaRatio": 0.0001,
+        "dupIou": 0.7
+      }
+    },
+    "vision": {
+      "enabled": true,
+      "degenerateNodeThreshold": 5,
+      "diffEnabled": true,
+      "roiRatio": 0.5,
+      "minConfidence": 0.35,
+      "uncertainConf": 0.6,
+      "modelPack": "basic",
+      "timeoutMs": 30000,
+      "icon": {
+        "enabled": true,
+        "categories": ["icon", "button", "input", "tab", "item"],
+        "minIconSide": 0.6
+      },
+      "rescan": {
+        "enabled": true,
+        "maxBoxes": 6,
+        "padRatio": 0.1,
+        "targetTextPx": 32,
+        "maxScale": 3.0,
+        "lowConf": 0.6,
+        "dupIou": 0.5,
+        "spanOverlap": 0.3,
+        "mosaic": true,
+        "mosaicGap": 24,
+        "hintContrast": 60,
+        "cacheSize": 64
+      }
+    },
+    "overlay": {
+      "hideSettleMs": 120
+    },
+    "touch": {
+      "enabled": true,
+      "sources": ["outside_touch", "a11y_events"],
+      "selfActionGraceMs": 400,
+      "shieldEnabled": true,
+      "shieldRelayoutTimeoutMs": 500
+    },
+    "tap": {
+      "durationMs": 100,
+      "longPressMs": 600,
+      "jitterMaxPx": 10,
+      "jitterRatio": 0.15
+    },
+    "scroll": {
+      "pageRatio": 0.8,
+      "halfRatio": 0.45,
+      "swipeDurationMs": 350,
+      "endpointJitterPx": 12,
+      "trajectoryJitterPx": 8
+    },
+    "wait": {
+      "pollMs": 500,
+      "defaultTimeoutMs": 10000
+    },
+    "notifications": {
+      "ignoreOngoing": true,
+      "maxMessages": 5,
+      "recentBuffer": 200
+    },
+    "replay": {
+      "maxKeys": 200
+    }
+  }
+}

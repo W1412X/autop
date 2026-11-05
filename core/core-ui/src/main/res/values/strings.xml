@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- core-ui 通用文案（docs/tech/08 §6）：组件内部固定文案，页面业务文案在各 feature 的 strings.xml -->
+<resources>
+    <string name="core_ui_retry">重试</string>
+    <string name="core_ui_list_end">— 已经到底啦 —</string>
+    <string name="core_ui_back">返回</string>
+    <string name="core_ui_close">关闭</string>
+    <string name="core_ui_confirm">确定</string>
+    <string name="core_ui_cancel">取消</string>
+    <string name="core_ui_loading">加载中…</string>
+    <string name="core_ui_cd_selected">已选中</string>
+</resources>

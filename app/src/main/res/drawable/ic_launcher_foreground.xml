@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  启动图标前景：轨道（线条极简，斜椭圆 + 恒星 + 行星）。
+  线色 #17171A，viewport 108（自适应图标画布），内容收在 66dp 安全区内；
+  背景层全透明（见 ic_launcher_background），monochrome 主题图标同用本矢量。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- 轨道：椭圆 rx31 ry13 绕中心 -30°（弧段用 x-axis-rotation 直接表达） -->
+    <path
+        android:pathData="M27.2,69.5 A31,13 -30 0 1 80.9,38.5 A31,13 -30 0 1 27.2,69.5"
+        android:fillColor="#00000000"
+        android:strokeColor="#17171A"
+        android:strokeWidth="6.5"
+        android:strokeLineCap="round" />
+    <!-- 中心恒星 -->
+    <path
+        android:pathData="M47.5,54 A6.5,6.5 0 1 1 60.5,54 A6.5,6.5 0 1 1 47.5,54 Z"
+        android:fillColor="#17171A" />
+    <!-- 行星（落在轨道上） -->
+    <path
+        android:pathData="M67.5,56 A5.5,5.5 0 1 1 78.5,56 A5.5,5.5 0 1 1 67.5,56 Z"
+        android:fillColor="#17171A" />
+</vector>

@@ -1,0 +1,10 @@
+<resources>
+    <!-- 最小窗口主题：只管窗口背景与状态栏（docs/tech/01 第 6 节）。界面由 Compose 绘制，
+         界面颜色/尺寸只用 core-ui 的 token（docs/tech/08）。 -->
+    <style name="Theme.Autop" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/window_background</item>
+        <item name="android:statusBarColor">@color/window_background</item>
+        <item name="android:navigationBarColor">@color/window_background</item>
+        <item name="android:windowLightStatusBar">true</item>
+    </style>
+</resources>

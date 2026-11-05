@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 2,
+  "policy": {
+    "builtinRules": {},
+    "userRules": [],
+    "blockedPackages": [],
+    "overrides": {
+      "allowCategories": []
+    },
+    "subject": {
+      "maxScreenTexts": 80,
+      "secureCacheMs": 5000
+    }
+  }
+}

@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 浏览页 -->
+    <string name="memory_browse_title">记忆</string>
+    <string name="memory_create_new">新建</string>
+    <string name="memory_create_item">新建条目</string>
+    <string name="memory_create_dir">新建目录</string>
+    <string name="memory_confirm_create">创建</string>
+    <string name="memory_cancel">取消</string>
+    <string name="memory_confirm">确认</string>
+    <string name="memory_name_placeholder">名称</string>
+    <string name="memory_search_placeholder">搜索记忆</string>
+    <string name="memory_searching">搜索中…</string>
+    <string name="memory_search_empty">没有匹配的记忆</string>
+    <string name="memory_recent_changes">最近变更</string>
+    <string name="memory_recent_changes_hint">agent 最近写入 %1$d 条</string>
+    <string name="memory_loading">加载中…</string>
+    <string name="memory_empty_dir">这个目录还没有内容</string>
+    <string name="memory_child_count">%1$d 项</string>
+    <string name="memory_agent_badge">agent</string>
+    <string name="memory_root_label">根目录</string>
+
+    <!-- 条目编辑页 -->
+    <string name="memory_version_history">版本历史</string>
+    <string name="memory_more">更多</string>
+    <string name="memory_field_title">标题</string>
+    <string name="memory_field_summary">摘要</string>
+    <string name="memory_field_content">正文</string>
+    <string name="memory_section_content">内容</string>
+    <string name="memory_section_tags">标签</string>
+    <string name="memory_section_info">信息</string>
+    <string name="memory_tag_add">添加</string>
+    <string name="memory_tag_name_placeholder">标签名</string>
+    <string name="memory_summary_chars">摘要 %1$d / %2$d 字</string>
+    <string name="memory_version_value">v%1$d</string>
+    <string name="memory_deleted_hint">这条记忆已删除</string>
+    <string name="memory_info_source">来源</string>
+    <string name="memory_info_version">版本</string>
+    <string name="memory_info_updated">更新时间</string>
+    <string name="memory_save">保存</string>
+    <string name="memory_agent_banner">这条记忆由 agent 写入</string>
+    <string name="memory_undo_write">撤销此次写入</string>
+    <string name="memory_revert_this">撤销此变更</string>
+    <string name="memory_revert">撤销</string>
+    <string name="memory_revert_all">全部撤销</string>
+    <string name="memory_move">移动</string>
+    <string name="memory_move_placeholder">目标路径，如 /people/李四</string>
+    <string name="memory_delete_title">删除</string>
+    <string name="memory_delete_text">删除这条记忆及其全部子条目，删除记录可在最近变更中撤销。</string>
+    <string name="memory_source_user">用户</string>
+    <string name="memory_source_agent">agent</string>
+
+    <!-- 最近变更页 -->
+    <string name="memory_changes_empty">最近没有变更</string>
+    <string name="memory_changes_manual_group">手动变更</string>
+    <string name="memory_run_title">Run %1$s</string>
+</resources>

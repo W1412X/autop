@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="fgs_special_use_reason">执行自动化任务与对话时保持运行，展示进度并允许暂停或停止</string>
+    <string name="host_channel_name">Agent 运行状态</string>
+    <string name="host_notification_title">AutoP</string>
+    <string name="host_idle_text">已启用 %1$d 个触发任务</string>
+    <string name="host_running_title">正在执行（%1$d 步）</string>
+    <string name="host_running">执行中…</string>
+    <string name="host_running_step">当前：%1$s</string>
+    <string name="host_action_pause">暂停</string>
+    <string name="host_action_stop">停止</string>
+    <string name="notify_channel_result">任务结果</string>
+    <string name="notify_channel_alert">重要提醒</string>
+    <string name="notify_result_title">任务已完成</string>
+    <string name="notify_blocked_title">任务被拦截</string>
+    <string name="notify_blocked_continue">我已手动完成，继续</string>
+    <string name="notify_blocked_end">结束</string>
+    <string name="notify_a11y_title">需要无障碍服务</string>
+    <string name="notify_resume_note">用户选择继续执行</string>
+    <string name="reminder_channel_name">锁屏任务提醒</string>
+    <string name="reminder_channel_desc">定时或条件任务在锁屏等待执行时提醒</string>
+    <string name="reminder_title">有任务等待执行</string>
+    <string name="reminder_title_many">有 %1$d 个任务等待执行</string>
+    <string name="reminder_title_unlocked">已解锁，点击执行</string>
+    <string name="reminder_action_execute">执行</string>
+    <string name="reminder_action_snooze">稍后</string>
+    <string name="reminder_action_skip">跳过</string>
+    <string name="reminder_snooze_minutes">%1$d 分钟后</string>
+    <string name="reminder_body_hint">解锁后执行，或选择稍后提醒</string>
+</resources>

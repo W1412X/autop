@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- WP5 验收用假支付页（docs/tech/10 WP5），仅 debug 构建；exported 供 adb 拉起。 -->
+    <application>
+        <activity
+            android:name=".PaymentTestActivity"
+            android:exported="true"
+            android:label="@string/payment_test_title" />
+    </application>
+
+</manifest>

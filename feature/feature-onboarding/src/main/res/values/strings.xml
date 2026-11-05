@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 引导页标题与底部按钮（docs/tech/08 §4.7） -->
+    <string name="onboarding_title">开始之前</string>
+    <string name="onboarding_health_title">权限检查</string>
+    <string name="onboarding_start">开始使用</string>
+    <string name="onboarding_go_settings">去设置</string>
+
+    <!-- 检查卡片（顺序见 docs/tech/08 §4.7） -->
+    <string name="onboarding_check_model_title">模型配置</string>
+    <string name="onboarding_check_model_desc">选择一个主模型，AutoP 才能理解并执行你的指令。</string>
+    <string name="onboarding_check_accessibility_title">无障碍服务</string>
+    <string name="onboarding_check_accessibility_desc">这是使用 AutoP 的前提：开启无障碍服务后，AutoP 才能读取屏幕并代你操作。</string>
+    <string name="onboarding_restricted_settings_note">提示：若系统提示“允许受限设置”，请先在应用信息页打开该开关，再回来启用无障碍服务。</string>
+    <string name="onboarding_check_overlay_title">悬浮窗权限</string>
+    <string name="onboarding_check_overlay_desc">推荐开启：无障碍断开时悬浮球仍能提醒你。</string>
+    <string name="onboarding_check_notifications_title">通知权限</string>
+    <string name="onboarding_check_notifications_desc">允许 AutoP 发送运行状态与提醒通知。</string>
+    <string name="onboarding_check_listener_title">通知使用权</string>
+    <string name="onboarding_check_listener_desc">允许 AutoP 读取通知，用于通知触发的任务。</string>
+    <string name="onboarding_check_full_screen_intent_title">全屏提醒权限</string>
+    <string name="onboarding_check_full_screen_intent_desc">锁屏提醒时全屏展示，便于直接处理任务。</string>
+    <string name="onboarding_check_battery_title">电池优化白名单</string>
+    <string name="onboarding_check_battery_desc">避免后台任务被系统休眠中断。</string>
+    <string name="onboarding_check_vendor_title">厂商后台设置</string>
+    <string name="onboarding_check_vendor_desc">允许 AutoP 后台自启动，定时任务才能按时执行。</string>
+</resources>

@@ -1,0 +1,58 @@
+# detekt 阈值：docs/standards/coding-standards.md 第 1 节；调整须走 ADR（现行依据 ADR-0011）。
+# buildUponDefaultConfig=true，这里只覆盖与规范相关的差异项。
+build:
+  maxIssues: 0
+
+complexity:
+  LongMethod:
+    active: true
+    threshold: 60
+  LongParameterList:
+    active: true
+    # 规范第 1 节“函数参数 ≤ 6 个”：detekt 的 threshold 为触发值，取 7 表示超过 6 才报。
+    functionThreshold: 7
+    # ADR-0011：注入构造函数的参数个数只反映依赖数量，放宽到 ≤ 10。
+    constructorThreshold: 11
+    # ADR-0011：带默认值的参数不计数；Compose 的 modifier/回调参数是框架惯例，豁免 @Composable。
+    ignoreDefaultParameters: true
+    ignoreAnnotated: ['Composable']
+  TooManyFunctions:
+    active: true
+    # ADR-0011：上限 30，私有辅助函数与 override 不计数（避免为凑数拆碎文件）。
+    thresholdInFiles: 30
+    thresholdInClasses: 30
+    thresholdInObjects: 30
+    ignorePrivate: true
+    ignoreOverridden: true
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 15
+  NestedBlockDepth:
+    active: true
+    threshold: 4
+  LargeClass:
+    # ADR-0011：规范“文件/类长度不作硬性检查”（questions.md N176），关闭。
+    active: false
+
+style:
+  ReturnCount:
+    active: true
+    # ADR-0011：最多 4 个 return，前置守卫语句不计。
+    max: 4
+    excludeGuardClauses: true
+  MagicNumber:
+    active: true
+    ignoreNumbers: ['0', '1', '-1', '2']
+    # 具名常量/属性与具名参数不是“魔法数字”（规范第 3 节针对的是散落的裸字面量）；
+    # 测试数据同样按具名处理。见 docs/tech/questions.md N4。
+    ignorePropertyDeclaration: true
+    ignoreNamedArgument: true
+    excludes: ['**/test/**', '**/androidTest/**']
+  MaxLineLength:
+    active: true
+    maxLineLength: 120
+
+naming:
+  FunctionNaming:
+    active: true
+    ignoreAnnotated: ['Composable']

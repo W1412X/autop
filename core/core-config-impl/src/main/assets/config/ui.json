@@ -1,0 +1,48 @@
+{
+  "schemaVersion": 2,
+  "ui": {
+    "appearance": {
+      "darkMode": "SYSTEM",
+      "dynamicColor": false,
+      "seedIndex": 0,
+      "fontScale": 1.0,
+      "iconScale": 1.0,
+      "density": "STANDARD",
+      "motionEnabled": true
+    },
+    "nav": {
+      "showLabels": false
+    },
+    "chat": {
+      "inputMaxLines": 6,
+      "stepGroupThreshold": 3,
+      "backgroundOnSend": false,
+      "autoTitle": true
+    },
+    "banner": {
+      "durationMs": 3000
+    },
+    "memory": {
+      "searchDebounceMs": 300
+    },
+    "overlay": {
+      "enabled": true,
+      "windowType": "auto",
+      "edgeHideRatio": 0.8,
+      "breathMs": 1600,
+      "doubleTapStops": true,
+      "attachScreenDefault": true
+    },
+    "motion": {
+      "expandMs": 200,
+      "shimmerMs": 900
+    },
+    "debug": {
+      "logBufferSize": 2000,
+      "verboseLogging": false
+    },
+    "onboarding": {
+      "completed": false
+    }
+  }
+}

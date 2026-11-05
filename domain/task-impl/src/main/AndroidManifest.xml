@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- 锁屏全屏提醒（docs/tech/07 §4.4）：未声明时 Android 14+ 系统开关灰置且 canUseFullScreenIntent 恒 false。 -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- 电池优化白名单申请（docs/tech/10 WP11 健康检查"去修复"）：ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS 必需。 -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <!-- 定时任务：开机重排与精确闹钟（docs/tech/07 §4.1，WP9）。 -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <application>
+        <service
+            android:name="com.example.autop.task.impl.host.AgentHostService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="@string/fgs_special_use_reason" />
+        </service>
+
+        <receiver
+            android:name="com.example.autop.task.impl.host.AgentHostActionsReceiver"
+            android:exported="false" />
+
+        <!-- 定时触发与系统事件重排（docs/tech/07 §4.1）。 -->
+        <receiver
+            android:name="com.example.autop.task.impl.schedule.AlarmReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.autop.task.ACTION_SCHEDULED" />
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- 锁屏提醒三动作与稍后到期（docs/tech/07 §4.4）；通知动作按钮（§7）。 -->
+        <receiver
+            android:name="com.example.autop.task.impl.reminder.ReminderActionReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="com.example.autop.task.impl.reminder.SnoozeReceiver"
+            android:exported="false" />
+        <receiver
+            android:name="com.example.autop.task.impl.notify.NotifyActionReceiver"
+            android:exported="false" />
+
+        <!-- 锁屏全屏提醒页（docs/tech/07 §4.4）。 -->
+        <activity
+            android:name="com.example.autop.task.impl.reminder.ReminderActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:showWhenLocked="true"
+            android:taskAffinity=""
+            android:turnScreenOn="true" />
+    </application>
+
+</manifest>

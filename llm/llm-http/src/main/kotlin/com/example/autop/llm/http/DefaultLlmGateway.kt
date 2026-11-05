@@ -1,0 +1,139 @@
+/**
+ * [LlmGateway] 默认实现（docs/tech/10 WP3）：注入全部 [LlmProviderFactory]（扩展点多绑定），
+ * 按 `profile.protocol` 匹配 [LlmProviderFactory.protocolId] 并缓存 provider 实例；
+ * 模型配置（[ModelProfileStore]）变化时缓存失效重建。
+ */
+package com.example.autop.llm.http
+
+import com.example.autop.core.common.AppError
+import com.example.autop.core.common.DispatcherProvider
+import com.example.autop.core.common.Logger
+import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.exceptionHandler
+import com.example.autop.llm.LlmErrorCodes
+import com.example.autop.llm.LlmGateway
+import com.example.autop.llm.LlmProvider
+import com.example.autop.llm.LlmProviderFactory
+import com.example.autop.llm.LlmRequestLog
+import com.example.autop.llm.ModelProfile
+import com.example.autop.llm.ModelProfileStore
+import com.example.autop.llm.ModelRole
+import com.example.autop.llm.ModelRoles
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import javax.inject.Inject
+
+public class DefaultLlmGateway
+    @Inject
+    constructor(
+        private val factories: Set<@JvmSuppressWildcards LlmProviderFactory>,
+        private val store: ModelProfileStore,
+        private val requestLog: LlmRequestLog,
+        private val logger: Logger,
+        dispatchers: DispatcherProvider,
+    ) : LlmGateway {
+        private val scope = CoroutineScope(SupervisorJob() + dispatchers.io + logger.exceptionHandler("LlmGateway"))
+        private val lock = Any()
+        private var profiles: Map<String, ModelProfile>? = null
+        private var roles: ModelRoles = ModelRoles()
+        private val cache = mutableMapOf<String, LlmProvider>()
+
+        init {
+            scope.launch {
+                combine(store.profiles, store.roles) { list, newRoles -> list to newRoles }
+                    .collect { (list, newRoles) ->
+                        synchronized(lock) {
+                            profiles = list.associateBy { it.id }
+                            roles = newRoles
+                            cache.clear()
+                        }
+                    }
+            }
+        }
+
+        override fun forRole(role: ModelRole): Outcome<LlmProvider> {
+            val state = ensureLoaded()
+            val profileId =
+                when (role) {
+                    ModelRole.MAIN -> state.roles.main
+                    ModelRole.VISION -> state.roles.vision
+                    ModelRole.LIGHT -> state.roles.light
+                }
+            return if (profileId == null) {
+                Outcome.Err(
+                    AppError(code = LlmErrorCodes.NOT_CONFIGURED, message = "no model assigned to role $role"),
+                )
+            } else {
+                providerFor(profileId, state.profiles)
+            }
+        }
+
+        override fun forProfile(profileId: String): Outcome<LlmProvider> =
+            providerFor(profileId, ensureLoaded().profiles)
+
+        private fun providerFor(
+            profileId: String,
+            profiles: Map<String, ModelProfile>,
+        ): Outcome<LlmProvider> {
+            val profile = profiles[profileId]
+            return if (profile == null) {
+                Outcome.Err(
+                    AppError(code = LlmErrorCodes.NOT_CONFIGURED, message = "model profile not found: $profileId"),
+                )
+            } else {
+                cachedOrCreate(profile)
+            }
+        }
+
+        private fun cachedOrCreate(profile: ModelProfile): Outcome<LlmProvider> =
+            synchronized(lock) {
+                val cached = cache[profile.id]
+                val factory = factories.firstOrNull { it.protocolId == profile.protocol }
+                when {
+                    cached != null -> Outcome.Ok(cached)
+                    factory == null ->
+                        Outcome.Err(
+                            AppError(
+                                code = LlmErrorCodes.NOT_CONFIGURED,
+                                message = "no provider factory for protocol: ${profile.protocol}",
+                            ),
+                        )
+                    else -> {
+                        // 装饰记录请求（docs/tech/08 §4.6 调试页“查看上次请求”）。
+                        val provider = RecordingLlmProvider(factory.create(profile), requestLog)
+                        cache[profile.id] = provider
+                        Outcome.Ok(provider)
+                    }
+                }
+            }
+
+        /**
+         * 非 suspend 查询的确定性保证：首次访问同步读一次配置快照（questions.md N34），
+         * 之后由后台收集保持最新（配置变化同时清空缓存）。
+         */
+        private fun ensureLoaded(): State =
+            synchronized(lock) {
+                val current = profiles
+                if (current != null) {
+                    State(current, roles)
+                } else {
+                    val loaded =
+                        runBlocking {
+                            combine(store.profiles, store.roles) { list, newRoles -> list to newRoles }.first()
+                        }
+                    val loadedProfiles = loaded.first.associateBy { it.id }
+                    profiles = loadedProfiles
+                    roles = loaded.second
+                    State(loadedProfiles, loaded.second)
+                }
+            }
+
+        private data class State(
+            val profiles: Map<String, ModelProfile>,
+            val roles: ModelRoles,
+        )
+    }

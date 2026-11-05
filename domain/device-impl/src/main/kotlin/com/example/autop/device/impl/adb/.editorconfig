@@ -1,0 +1,5 @@
+# 搬运的第三方源码（Shizuku adb 协议，N199）保持上游原样便于对照，
+# 此目录整体豁免 ktlint 规则（N203：ktlintFormat 任务不受 AutopQualityPlugin 的
+# task 级 exclude 稳定覆盖，改用 ktlint 原生目录级 .editorconfig 禁用，确定性最高）。
+[*.{kt,kts}]
+ktlint_standard = disabled

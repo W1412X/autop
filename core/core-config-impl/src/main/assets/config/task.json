@@ -1,0 +1,60 @@
+{
+  "schemaVersion": 2,
+  "task": {
+    "idleBeforeStartMs": 10000,
+    "returnToOriginApp": true,
+    "conditions": {
+      "enabled": true,
+      "evaluator": "evaluator.llm",
+      "onEvaluatorError": "skip",
+      "maxPerHour": 20
+    },
+    "dedupe": {
+      "window": 50
+    },
+    "queue": {
+      "originWeights": {
+        "CHAT": 100,
+        "TASK_MANUAL": 80,
+        "RESUME": 60,
+        "FORK": 60,
+        "SCHEDULE": 40,
+        "CONDITION": 20
+      }
+    },
+    "limits": {
+      "minCooldownMs": 60000,
+      "maxDailyLimit": 100
+    },
+    "reminder": {
+      "previewChars": 60,
+      "snoozeMinutes": 10,
+      "snoozeOptions": [5, 10, 30],
+      "expireMinutes": {
+        "schedule": 60,
+        "condition": 15
+      }
+    },
+    "notify": {
+      "summaryChars": 120
+    },
+    "draft": {
+      "retries": 2
+    },
+    "audit": {
+      "retentionDays": 30
+    },
+    "host": {
+      "persistent": false
+    },
+    "replay": {
+      "enabled": true,
+      "maxSteps": 20,
+      "preStateWaitMs": 3000,
+      "pollMs": 500,
+      "threshold": 0.85,
+      "keysWeight": 0.85,
+      "appWeight": 0.15
+    }
+  }
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 内置根目录（docs/tech/06 §2.2）：标题与摘要来自资源，不在 SQL 中写死 -->
+    <string name="memory_root_profile_title">我的资料</string>
+    <string name="memory_root_profile_summary">用户身份、偏好与个人情况</string>
+    <string name="memory_root_people_title">人物</string>
+    <string name="memory_root_people_summary">联系人、关系与备注名</string>
+    <string name="memory_root_apps_title">应用手册</string>
+    <string name="memory_root_apps_summary">各应用的操作说明与经验</string>
+    <string name="memory_root_tasks_title">任务经验</string>
+    <string name="memory_root_tasks_summary">任务相关的做法与结论</string>
+</resources>

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 2,
+  "features": {
+    "experienceExtraction": false,
+    "subtasks": false
+  }
+}

@@ -1,0 +1,35 @@
+{
+  "schemaVersion": 2,
+  "llm": {
+    "http": {
+      "connectTimeoutMs": 15000,
+      "readTimeoutMs": 60000,
+      "writeTimeoutMs": 30000
+    },
+    "retry": {
+      "maxAttempts": 3,
+      "baseDelayMs": 800,
+      "maxDelayMs": 8000,
+      "retryStatus": [408, 409, 429, 500, 502, 503, 504, 529]
+    },
+    "errors": {
+      "contextExceededPatterns": "context_length_exceeded|maximum context length|prompt is too long|too many tokens"
+    },
+    "anthropic": {
+      "apiVersion": "2023-06-01"
+    },
+    "image": {
+      "maxEdge": 1568
+    },
+    "probe": {
+      "timeoutMs": 30000
+    },
+    "embedding": {
+      "provider": "none",
+      "profileId": null,
+      "model": null,
+      "dimension": null,
+      "batchSize": 16
+    }
+  }
+}

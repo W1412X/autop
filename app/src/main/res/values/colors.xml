@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 窗口级颜色（仅窗口背景/状态栏使用）；界面颜色一律用 core-ui 的 token（docs/tech/08）。 -->
+    <color name="window_background">#FFFFFFFF</color>
+    <color name="window_background_night">#FF000000</color>
+</resources>

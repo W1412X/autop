@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 1,
+  "quirks": [
+    {
+      "id": "xiaomi.autostart",
+      "match": { "manufacturer": ["xiaomi", "redmi"], "minSdk": 30 },
+      "values": {
+        "autostartIntent": "component:com.miui.securitycenter/com.miui.permcenter.autostart.AutoStartManagementActivity",
+        "backgroundGuideKey": "guide_xiaomi"
+      }
+    },
+    {
+      "id": "huawei.autostart",
+      "match": { "manufacturer": ["huawei", "honor"], "minSdk": 30 },
+      "values": {
+        "autostartIntent": "component:com.huawei.systemmanager/com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity",
+        "backgroundGuideKey": "guide_huawei"
+      }
+    }
+  ]
+}

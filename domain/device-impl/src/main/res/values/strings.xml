@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="a11y_service_label">AutoP 无障碍服务</string>
+    <string name="a11y_service_description">AutoP 需要无障碍服务来读取屏幕内容并代为操作。开启后，AutoP 才能观察界面、执行点击与输入。屏幕内容仅在本机处理，不会上传。</string>
+    <string name="notification_listener_label">AutoP 通知读取</string>
+</resources>

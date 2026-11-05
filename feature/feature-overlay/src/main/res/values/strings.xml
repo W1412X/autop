@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 悬浮球（docs/tech/08 §5） -->
+    <string name="overlay_ball_description">AutoP 悬浮球，双击停止任务</string>
+    <string name="overlay_ball_running_description">AutoP 悬浮球，任务运行中，双击停止任务</string>
+    <string name="overlay_ball_waiting_description">AutoP 悬浮球，正在等待你的回答</string>
+    <string name="overlay_ball_paused_description">AutoP 悬浮球，任务已暂停</string>
+    <string name="overlay_ball_blocked_description">AutoP 悬浮球，任务被安全规则拦截</string>
+    <string name="overlay_ball_accessibility_lost_description">AutoP 悬浮球，无障碍服务已断开，点按打开无障碍设置</string>
+
+    <!-- 面板（docs/tech/08 搂5.2） -->
+    <string name="panel_input_placeholder">输入任务，回车发送…</string>
+    <string name="panel_attach_screen">针对当前屏幕</string>
+    <string name="panel_send">发送</string>
+    <string name="panel_mic_description">语音输入</string>
+    <string name="panel_steer_placeholder">补充指令…</string>
+    <string name="panel_steer_send">发送补充指令</string>
+    <string name="panel_action_pause">暂停</string>
+    <string name="panel_action_resume">继续</string>
+    <string name="panel_action_stop">停止</string>
+    <string name="panel_action_open_chat">打开对话</string>
+    <string name="panel_ask_self">自己输入</string>
+    <string name="panel_blocked_reason_default">需要你确认如何继续</string>
+    <string name="panel_blocked_continue">我已手动完成，继续</string>
+    <string name="panel_blocked_finish">结束</string>
+    <string name="panel_status_queued">排队中</string>
+    <string name="panel_status_waiting">等待回答</string>
+    <string name="panel_status_running">运行中</string>
+    <string name="panel_status_paused">已暂停</string>
+    <string name="panel_status_succeeded">已完成</string>
+    <string name="panel_status_failed">失败</string>
+    <string name="panel_status_budget">步数用尽</string>
+    <string name="panel_status_stopped">已停止</string>
+    <string name="panel_status_blocked">被拦截</string>
+
+    <!-- 圆弧菜单（docs/tech/08 §5.1，N182） -->
+    <string name="ball_menu_create">即时创建</string>
+    <string name="ball_menu_open_app">打开应用</string>
+    <string name="ball_menu_progress">任务进度</string>
+    <string name="ball_menu_abort">中止任务</string>
+    <string name="ball_menu_tool_test">工具测试</string>
+
+    <!-- 任务进度悬浮窗（docs/tech/08 §5.3，N182） -->
+    <string name="progress_title">任务进度</string>
+    <string name="progress_close">关闭</string>
+    <string name="progress_thinking">思考 · %1$d 字</string>
+    <string name="progress_plan_title">计划</string>
+    <string name="progress_steer_tag">补充指令</string>
+    <string name="progress_tool_duration">%1$d ms</string>
+    <string name="progress_outcome_succeeded">已完成</string>
+    <string name="progress_outcome_failed">失败</string>
+    <string name="progress_outcome_cancelled">已中止</string>
+    <string name="progress_outcome_budget">步数用尽</string>
+    <string name="progress_outcome_interrupted">已中断</string>
+    <string name="progress_result_stats">%1$d 步 · %2$s · %3$d token</string>
+    <string name="progress_hint_waiting">正在等待你的回答</string>
+    <string name="progress_hint_paused">已暂停，处理完后可继续</string>
+    <string name="progress_hint_blocked">被安全规则拦截，等待你的决定</string>
+    <string name="progress_duration_sec">%1$d 秒</string>
+    <string name="progress_duration_min_sec">%1$d 分 %2$d 秒</string>
+    <string name="progress_duration_hour_min">%1$d 小时 %2$d 分</string>
+</resources>

@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 2,
+  "categories": {
+    "payment":   {"overridable": false, "reasonKey": "policy_reason_payment"},
+    "password":  {"overridable": false, "reasonKey": "policy_reason_password"},
+    "biometric": {"overridable": false, "reasonKey": "policy_reason_biometric"},
+    "transfer":  {"overridable": false, "reasonKey": "policy_reason_transfer"},
+    "system_security": {"overridable": true, "reasonKey": "policy_reason_system_security"},
+    "account_danger":  {"overridable": true, "reasonKey": "policy_reason_account_danger"},
+    "install":   {"overridable": true, "reasonKey": "policy_reason_install"}
+  },
+  "rules": [
+    {"id": "pwd.target", "type": "password_field", "category": "password", "scope": "TARGET", "params": {}},
+    {"id": "pay.keywords.target", "type": "text_any", "category": "payment", "scope": "TARGET",
+     "params": {"keywords": ["确认付款", "立即支付", "确认支付", "免密支付", "支付密码", "去支付"]}},
+    {"id": "pay.keywords.screen", "type": "text_any", "category": "payment", "scope": "SCREEN",
+     "params": {"keywords": ["输入支付密码", "请输入6位支付密码", "收银台"], "minHits": 1}},
+    {"id": "transfer.keywords", "type": "text_any", "category": "transfer", "scope": "TARGET",
+     "params": {"keywords": ["确认转账", "转账", "确认提现"]}},
+    {"id": "pay.activity", "type": "activity_regex", "category": "payment", "scope": "SCREEN",
+     "params": {"patterns": ["(?i).*(cashier|pay(ment)?desk|checkout).*"]}},
+    {"id": "secure.window.payment", "type": "secure_with_text", "category": "payment", "scope": "SCREEN",
+     "params": {"keywords": ["支付", "付款", "密码"]}},
+    {"id": "sys.a11y.settings", "type": "text_any", "category": "system_security", "scope": "SCREEN",
+     "params": {"keywords": ["无障碍", "设备管理器", "安装未知应用"], "packages": ["com.android.settings"]}},
+    {"id": "bio.prompt", "type": "text_any", "category": "biometric", "scope": "SCREEN",
+     "params": {"keywords": ["指纹验证", "面容验证", "验证指纹"]}}
+  ]
+}

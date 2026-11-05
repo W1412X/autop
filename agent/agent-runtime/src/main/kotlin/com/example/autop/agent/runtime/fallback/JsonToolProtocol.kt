@@ -1,0 +1,175 @@
+/**
+ * JSON 回退协议（docs/tech/04 §3.8）：模型不支持原生 tools 时，
+ * 用文本 JSON 表达工具调用；历史里的 ToolCall/ToolResult 降级为 USER 文本。
+ */
+package com.example.autop.agent.runtime.fallback
+
+import com.example.autop.core.common.CommonErrorCodes
+import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.catchingAsError
+import com.example.autop.core.common.getOrNull
+import com.example.autop.core.prompt.PromptRepository
+import com.example.autop.llm.Block
+import com.example.autop.llm.Msg
+import com.example.autop.llm.Role
+import com.example.autop.llm.ToolSchema
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+
+/** JSON 协议的解析结果。 */
+internal sealed interface JsonParsed {
+    /** `{"tool_calls":[{"name","arguments"}]}`。 */
+    data class Calls(
+        val calls: List<Block.ToolCall>,
+    ) : JsonParsed
+
+    /** `{"final":"…"}`。 */
+    data class Final(
+        val text: String,
+    ) : JsonParsed
+
+    data class Invalid(
+        val error: String,
+    ) : JsonParsed
+}
+
+/** JSON 回退协议工具。 */
+internal object JsonToolProtocol {
+    private val json = Json { ignoreUnknownKeys = true }
+
+    /**
+     * 解析模型文本：提取第一个顶层 JSON 对象（容忍前后说明文字与 ``` 包裹），
+     * 转为工具调用（id = `fb_<turn>_<i>`）或最终文本。
+     */
+    fun parse(
+        text: String,
+        turn: Int,
+    ): JsonParsed {
+        val raw = extractJsonObject(text)
+        if (raw == null) return JsonParsed.Invalid("no top-level JSON object found")
+        val parsed =
+            catchingAsError(CommonErrorCodes.SERIALIZATION) {
+                json.parseToJsonElement(raw).jsonObject
+            }
+        val obj = parsed.getOrNull()
+        val final = obj?.get("final") as? JsonPrimitive
+        return when {
+            obj == null -> JsonParsed.Invalid((parsed as? Outcome.Err)?.error?.message.orEmpty())
+            obj["tool_calls"] is JsonArray -> JsonParsed.Calls(toCalls(obj["tool_calls"] as JsonArray, turn))
+            final != null && final.isString -> JsonParsed.Final(final.content)
+            else -> JsonParsed.Invalid("JSON must contain tool_calls or final")
+        }
+    }
+
+    /** `tool_calls` 数组转工具调用（id = `fb_<turn>_<i>`）。 */
+    private fun toCalls(
+        calls: JsonArray,
+        turn: Int,
+    ): List<Block.ToolCall> =
+        calls.mapIndexed { i, item ->
+            val one = item.jsonObject
+            Block.ToolCall(
+                id = "fb_${turn}_$i",
+                name = one["name"]?.jsonPrimitive?.content.orEmpty(),
+                argsJson = one["arguments"]?.toString() ?: "{}",
+            )
+        }
+
+    /** 历史降级：ToolResult → USER 文本（模板 `agent.fallback.tool_result`），ToolCall → 其 JSON 文本。 */
+    fun downgrade(
+        messages: List<Msg>,
+        prompts: PromptRepository,
+    ): List<Msg> {
+        val namesByCallId = mutableMapOf<String, String>()
+        for (msg in messages) {
+            for (block in msg.blocks) {
+                if (block is Block.ToolCall) namesByCallId[block.id] = block.name
+            }
+        }
+        return messages.map { msg ->
+            when (msg.role) {
+                Role.ASSISTANT ->
+                    Msg(
+                        Role.ASSISTANT,
+                        msg.blocks.map { block ->
+                            if (block is Block.ToolCall) Block.Text(callJsonText(block)) else block
+                        },
+                    )
+                Role.TOOL ->
+                    Msg(
+                        Role.USER,
+                        msg.blocks.map { block ->
+                            val result = block as? Block.ToolResult ?: return@map block
+                            val name = namesByCallId[result.callId] ?: result.callId
+                            val body = result.content.filterIsInstance<Block.Text>().joinToString("\n") { it.text }
+                            val text =
+                                prompts
+                                    .render("agent.fallback.tool_result", mapOf("name" to name, "result" to body))
+                                    .getOrNull()
+                                    ?.text
+                                    .orEmpty()
+                            Block.Text(text)
+                        },
+                    )
+                Role.USER -> msg
+            }
+        }
+    }
+
+    /** 工具清单文本：每个工具一行 `name(参数: 类型, …): 描述首句`。 */
+    fun toolListText(tools: List<ToolSchema>): String =
+        tools.joinToString("\n") { tool ->
+            val params =
+                tool.parameters["properties"]
+                    ?.jsonObject
+                    .orEmpty()
+                    .entries
+                    .joinToString(", ") { (name, schema) ->
+                        "$name: ${schema.jsonObject["type"]?.jsonPrimitive?.content ?: "any"}"
+                    }
+            val firstLine = tool.description.substringBefore("\n").substringBefore("。")
+            "${tool.name}($params): $firstLine"
+        }
+
+    /** 某个 ToolCall 的 JSON 文本（历史降级用）。 */
+    fun callJsonText(call: Block.ToolCall): String =
+        buildJsonObject {
+            put("name", call.name)
+            put("arguments", json.parseToJsonElement(call.argsJson.ifEmpty { "{}" }))
+        }.toString()
+
+    /** 提取第一个顶层 JSON 对象（跳过 ``` 包裹与前后文字，括号配对且跳过字符串字面量）。 */
+    private fun extractJsonObject(text: String): String? {
+        val start = text.indexOf('{')
+        return if (start < 0) null else scanObject(text, start)
+    }
+
+    /** 从 [start] 起扫描括号配对；不完整时返回 null。 */
+    private fun scanObject(
+        text: String,
+        start: Int,
+    ): String? {
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (i in start until text.length) {
+            val ch = text[i]
+            when {
+                escaped -> escaped = false
+                ch == '\\' && inString -> escaped = true
+                ch == '"' -> inString = !inString
+                !inString && ch == '{' -> depth++
+                !inString && ch == '}' -> {
+                    depth--
+                    if (depth == 0) return text.substring(start, i + 1)
+                }
+            }
+        }
+        return null
+    }
+}

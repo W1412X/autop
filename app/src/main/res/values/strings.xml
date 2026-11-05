@@ -1,0 +1,9 @@
+<resources>
+    <string name="app_name">AutoP</string>
+    <!-- 底栏与占位页（docs/tech/08 §3） -->
+    <string name="nav_chat">对话</string>
+    <string name="nav_tasks">任务</string>
+    <string name="nav_memory">记忆</string>
+    <string name="nav_me">我的</string>
+    <string name="app_placeholder_soon">即将推出</string>
+</resources>

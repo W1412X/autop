@@ -1,0 +1,143 @@
+{
+  "schemaVersion": 2,
+  "agent": {
+    "context": {
+      "contributors": [
+        "context.role",
+        "context.safety",
+        "context.tool_guide",
+        "context.run_mode",
+        "context.memory_index",
+        "context.user_profile",
+        "context.environment",
+        "context.trigger",
+        "context.trigger_memory",
+        "context.goal"
+      ]
+    },
+    "tools": {
+      "enabled": [
+        "tool.observe",
+        "tool.screenshot",
+        "tool.tap",
+        "tool.input_text",
+        "tool.scroll",
+        "tool.swipe",
+        "tool.global_action",
+        "tool.open_app",
+        "tool.open_uri",
+        "tool.wait",
+        "tool.list_apps",
+        "tool.read_notifications",
+        "tool.device_state",
+        "tool.clipboard_get",
+        "tool.clipboard_set",
+        "tool.notify_user",
+        "tool.memory_list",
+        "tool.memory_read",
+        "tool.memory_search",
+        "tool.memory_write",
+        "tool.update_plan",
+        "tool.finish",
+        "tool.ask_user",
+        "tool.history_recall",
+        "tool.note"
+      ],
+      "defaultTimeoutMs": 30000,
+      "timeoutMs": {
+        "tool.observe": 300000,
+        "tool.wait": 120000,
+        "tool.ask_user": 600000
+      }
+    },
+    "history": {
+      "rules": [
+        "history.observation_degrade",
+        "history.image_retention",
+        "history.long_text_truncate"
+      ],
+      "observation": {
+        "keepFull": -1
+      },
+      "image": {
+        "keep": 1
+      },
+      "truncate": {
+        "maxChars": -1,
+        "headChars": 2500,
+        "tailChars": 1500
+      }
+    },
+    "tokens": {
+      "cjkFactor": 1.5,
+      "charsPerToken": 4.0,
+      "imageTokens": 1000,
+      "perMessageOverhead": 4
+    },
+    "compaction": {
+      "thresholdRatio": 0.75,
+      "strategies": [
+        "compaction.handoff",
+        "compaction.deterministic"
+      ],
+      "retries": 2,
+      "maxConsecutiveFailures": 3,
+      "keepUserMessageTokens": 4000,
+      "deterministicRecentCalls": 12
+    },
+    "budget": {
+      "maxSteps": 0,
+      "maxTotalTokens": 0,
+      "maxDurationMs": 0,
+      "maxScreenshots": 0
+    },
+    "breaker": {
+      "sameErrorWarn": 3,
+      "sameErrorStop": 5,
+      "stuckWarn": 3,
+      "stuckStop": 6,
+      "repeatWarn": 3
+    },
+    "plan": {
+      "blockFinishOnce": true
+    },
+    "thinking": {
+      "enabled": true,
+      "budgetTokens": 2048
+    },
+    "fallback": {
+      "parseRetries": 2
+    },
+    "recall": {
+      "maxChars": 4000,
+      "channels": [
+        "recall.fts",
+        "recall.vector"
+      ],
+      "weights": {
+        "recall.fts": 1.0,
+        "recall.vector": 1.0
+      },
+      "rrfK": 60,
+      "perChannelLimit": 20,
+      "defaultK": 8,
+      "snippetChars": 80,
+      "vector": {
+        "chunkChars": 400
+      },
+      "indexQueueCapacity": 500
+    },
+    "ui": {
+      "eventReplay": 64
+    },
+    "store": {
+      "inlineMaxChars": 65536,
+      "ftsToolResultChars": 500
+    },
+    "notes": {
+      "maxItems": 20,
+      "maxTokens": 800,
+      "maxCharsPerNote": 400
+    }
+  }
+}

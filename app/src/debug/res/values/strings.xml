@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- PaymentTestActivity（docs/tech/10 WP5 验收，仅 debug 构建） -->
+    <string name="payment_test_title">支付测试</string>
+    <string name="payment_test_confirm">确认付款</string>
+</resources>

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  启动图标背景层：近白圆角卡片 #F5F5F7（内缩 10、圆角 22，四周留出壁纸内边距）。
+  卡片外圈透明 → 壁纸透出；角落最远点距画布中心 53.1 < 54，圆形遮罩下不被裁角。
+  minSdk 30 下不存在旧式位图回退路径。
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:fillColor="#F5F5F7"
+        android:pathData="M32,10 L76,10 A22,22 0 0 1 98,32 L98,76 A22,22 0 0 1 76,98 L32,98 A22,22 0 0 1 10,76 L10,32 A22,22 0 0 1 32,10 Z" />
+</vector>
