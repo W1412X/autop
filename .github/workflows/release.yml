@@ -18,17 +18,23 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Set up JDK 21
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "21"
           cache: gradle
 
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install SDK components
-        run: sdkmanager "platforms;android-37" "build-tools;36.0.0"
+      # 不引第三方 setup-android（首跑在该步失败；Ubuntu 26 新镜像 + node20 老动作被强制
+      # 跑 node24 是嫌疑点，且日志接口要 admin 才能读）。镜像自带 SDK，缺的
+      # platform/build-tools（android-37.0 这类小版本平台包名也在变）交给 AGP 自动下载。
+      - name: Check Android SDK
+        run: |
+          if [ -z "${ANDROID_HOME:-}" ] || [ ! -d "$ANDROID_HOME" ]; then
+            echo "::error::runner 缺少 ANDROID_HOME（镜像未预装 Android SDK）"
+            exit 1
+          fi
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          ls "$ANDROID_HOME"
 
       - name: Restore release keystore
         env:
@@ -48,15 +54,24 @@ jobs:
           fi
 
       - name: Quality gate (test / detekt / ktlint)
-        run: ./gradlew test detekt ktlintCheck --console=plain
+        run: |
+          ./gradlew test detekt ktlintCheck --console=plain \
+            || { echo "::error::质量门禁未过（test/detekt/ktlint），见 run 日志"; exit 1; }
 
       - name: Build release APK
-        run: ./gradlew :app:assembleRelease --console=plain
+        run: |
+          ./gradlew :app:assembleRelease --console=plain \
+            || { echo "::error::assembleRelease 失败，见 run 日志"; exit 1; }
 
       - name: Verify signature (when signed)
         run: |
           apk=$(ls app/build/outputs/apk/release/*.apk)
-          apksigner verify --print-certs "$apk" | head -4 || echo "::warning::未签名包（缺 secrets）"
+          bin=$(command -v apksigner || ls "$ANDROID_HOME"/build-tools/*/apksigner 2>/dev/null | tail -n1 || true)
+          if [ -n "$bin" ]; then
+            "$bin" verify --print-certs "$apk" | head -4 || echo "::warning::未签名包（缺 secrets）或校验失败"
+          else
+            echo "::warning::apksigner 不可用，跳过签名校验"
+          fi
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
