@@ -1,17 +1,20 @@
 /**
- * 输入区（docs/tech/08 §4.2 InputArea）："附带当前屏幕"Chip + 输入栏；
- * 尾部空闲显示发送，运行中显示停止（error 色）+ 发送（steer）。
+ * 输入区（docs/tech/08 §4.2 InputArea）："附带当前屏幕"Chip + 输入栏。
+ * 尾部只有一个按钮（与 AI 创建流程页一致的无底色图标按钮）：空闲或输入了内容时是发送，
+ * 运行中且输入为空时换成停止图标；运行中输入了补充指令则回到发送（steer），不会两个按钮并排。
  * `ui.chat.backgroundOnSend` 的让屏行为由 ViewModel 经 navEvents 交给 app。
  */
 package com.example.autop.feature.chat.thread
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.LocalContentColor
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
@@ -23,8 +26,15 @@ import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.theme.AutopAlpha
+import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.chat.R
+
+/** 发送与停止图标互换的淡入淡出时长（毫秒）。 */
+private const val SWAP_MS: Int = 150
+
+/** 尾部按钮当前是发送还是停止。 */
+private enum class TrailingMode { SEND, STOP }
 
 /**
  * 输入区。
@@ -72,22 +82,43 @@ internal fun InputArea(
                     .fillMaxWidth()
                     .padding(top = LocalSpacing.current.sm)
                     .focusRequester(focusRequester),
-            trailing = {
-                if (state.running) {
-                    StopButton(onClick = { onAction(ChatThreadAction.Stop) })
-                }
-                SendButton(enabled = enabled, running = state.running, onAction = onAction)
-            },
+            trailing = { TrailingButton(state = state, enabled = enabled, onAction = onAction) },
         )
     }
 }
 
-/** 发送按钮（docs/tech/08 §4.2：selected 实心；禁用时降透明、点击空转）。 */
+/** 尾部唯一的按钮：发送与停止互换，两者同为 44dp 图标按钮，切换时不会跳动布局。 */
+@Composable
+private fun TrailingButton(
+    state: ChatThreadUiState,
+    enabled: Boolean,
+    onAction: (ChatThreadAction) -> Unit,
+) {
+    val mode = if (state.running && state.input.isBlank()) TrailingMode.STOP else TrailingMode.SEND
+    val duration = if (LocalMotionEnabled.current) SWAP_MS else 0
+    AnimatedContent(
+        targetState = mode,
+        transitionSpec = { fadeIn(tween(duration)) togetherWith fadeOut(tween(duration)) },
+        label = "chat_input_trailing",
+    ) { target ->
+        when (target) {
+            TrailingMode.STOP -> StopButton(onClick = { onAction(ChatThreadAction.Stop) })
+            TrailingMode.SEND ->
+                SendButton(
+                    sendable = enabled && state.input.isNotBlank(),
+                    running = state.running,
+                    onClick = { if (enabled) onAction(ChatThreadAction.Send) },
+                )
+        }
+    }
+}
+
+/** 发送按钮：无底色图标；输入为空或无障碍未连接时降透明（点击仍交给 ViewModel 校验）。 */
 @Composable
 private fun SendButton(
-    enabled: Boolean,
+    sendable: Boolean,
     running: Boolean,
-    onAction: (ChatThreadAction) -> Unit,
+    onClick: () -> Unit,
 ) {
     AutopIconButton(
         icon = AutopIcons.Send,
@@ -95,28 +126,17 @@ private fun SendButton(
             stringResource(
                 if (running) R.string.thread_send_steer else R.string.thread_send,
             ),
-        onClick = { if (enabled) onAction(ChatThreadAction.Send) },
-        modifier =
-            if (enabled) {
-                Modifier
-            } else {
-                Modifier.alpha(AutopAlpha.DISABLED_CONTENT)
-            },
-        selected = true,
+        onClick = onClick,
+        modifier = if (sendable) Modifier else Modifier.alpha(AutopAlpha.DISABLED_CONTENT),
     )
 }
 
-/**
- * 停止按钮（运行中显示）：与发送同为 [AutopIconButton]（44dp 统一尺寸），
- * 图标 error 色（IconButtons 文档：自定义色包 [LocalContentColor]，N172）。
- */
+/** 停止按钮（运行中、输入为空时取代发送）：与 AI 创建页一致的无底色停止图标。 */
 @Composable
 private fun StopButton(onClick: () -> Unit) {
-    CompositionLocalProvider(LocalContentColor provides MaterialTheme.colorScheme.error) {
-        AutopIconButton(
-            icon = AutopIcons.Stop,
-            contentDescription = stringResource(R.string.thread_stop),
-            onClick = onClick,
-        )
-    }
+    AutopIconButton(
+        icon = AutopIcons.Stop,
+        contentDescription = stringResource(R.string.thread_stop),
+        onClick = onClick,
+    )
 }
