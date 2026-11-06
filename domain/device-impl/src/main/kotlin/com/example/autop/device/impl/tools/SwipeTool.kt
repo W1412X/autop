@@ -132,7 +132,7 @@ public class SwipeTool
             ctx: ToolContext,
         ): ToolOutput {
             val swipe = action.payload as SwipeGesture
-            val pre = epilogue.begin()
+            val pre = epilogue.begin(ctx)
             val ok =
                 gestures.swipe(
                     swipe.from.x,

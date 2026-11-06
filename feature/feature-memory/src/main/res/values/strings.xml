@@ -48,7 +48,7 @@
     <string name="memory_delete_title">删除</string>
     <string name="memory_delete_text">删除这条记忆及其全部子条目，删除记录可在最近变更中撤销。</string>
     <string name="memory_source_user">用户</string>
-    <string name="memory_source_agent">agent</string>
+    <string name="memory_source_agent">智能体 / 流程</string>
 
     <!-- 最近变更页 -->
     <string name="memory_changes_empty">最近没有变更</string>

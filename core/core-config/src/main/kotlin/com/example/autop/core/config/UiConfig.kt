@@ -60,6 +60,30 @@ public data class UiOverlaySection(
     @SerialName("attachScreenDefault") val attachScreenDefault: Boolean = true,
 ) : ConfigSection
 
+/** `ui.indicator`：执行期状态指示（屏幕边缘光 + 顶部胶囊；ADR-0014）。颜色取自主题，不在配置里。 */
+@Serializable
+public data class UiIndicatorSection(
+    /** 总开关：关闭后执行期不显示任何指示。 */
+    @SerialName("enabled") val enabled: Boolean = true,
+    /** 屏幕边缘光。 */
+    @SerialName("edgeGlow") val edgeGlow: Boolean = true,
+    /** 顶部胶囊（步数与阶段）。 */
+    @SerialName("capsule") val capsule: Boolean = true,
+    /** 呼吸周期（毫秒）；动效关闭时不呼吸。 */
+    @SerialName("pulseMs") val pulseMs: Long = 1800,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (pulseMs !in INDICATOR_PULSE_MIN_MS..INDICATOR_PULSE_MAX_MS) {
+                add("pulseMs must be in $INDICATOR_PULSE_MIN_MS..$INDICATOR_PULSE_MAX_MS, was $pulseMs")
+            }
+        }
+}
+
+/** `ui.indicator.pulseMs` 的取值范围（毫秒）。 */
+private const val INDICATOR_PULSE_MIN_MS: Long = 300
+private const val INDICATOR_PULSE_MAX_MS: Long = 10000
+
 /** `ui.motion`：动效时长。 */
 @Serializable
 public data class UiMotionSection(
@@ -95,6 +119,8 @@ public object UiConfig {
         ConfigKey("ui.memory", UiMemorySection.serializer()) { UiMemorySection() }
     public val OVERLAY: ConfigKey<UiOverlaySection> =
         ConfigKey("ui.overlay", UiOverlaySection.serializer()) { UiOverlaySection() }
+    public val INDICATOR: ConfigKey<UiIndicatorSection> =
+        ConfigKey("ui.indicator", UiIndicatorSection.serializer()) { UiIndicatorSection() }
     public val MOTION: ConfigKey<UiMotionSection> =
         ConfigKey("ui.motion", UiMotionSection.serializer()) { UiMotionSection() }
     public val DEBUG: ConfigKey<UiDebugSection> =
@@ -103,5 +129,5 @@ public object UiConfig {
         ConfigKey("ui.onboarding", UiOnboardingSection.serializer()) { UiOnboardingSection() }
 
     public val ALL: List<ConfigKey<*>> =
-        listOf(APPEARANCE, NAV, CHAT, BANNER, MEMORY, OVERLAY, MOTION, DEBUG, ONBOARDING)
+        listOf(APPEARANCE, NAV, CHAT, BANNER, MEMORY, OVERLAY, INDICATOR, MOTION, DEBUG, ONBOARDING)
 }

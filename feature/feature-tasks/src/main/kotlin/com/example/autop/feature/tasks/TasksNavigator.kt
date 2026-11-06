@@ -14,6 +14,9 @@ public interface TasksNavigator {
     /** 打开 Run 详情页。 */
     public fun openRun(runId: String)
 
+    /** 打开流程创建入口（AI 创建 / 手动创建 / 导入，由 app 连接 feature-flows）。 */
+    public fun openFlowCreate()
+
     /** 返回上一页。 */
     public fun navigateBack()
 }

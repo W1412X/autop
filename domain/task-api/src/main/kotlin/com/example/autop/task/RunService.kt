@@ -6,11 +6,16 @@ package com.example.autop.task
 import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.RunState
+import com.example.autop.core.common.FlowId
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
+import com.example.autop.flow.FlowDebugControl
+import com.example.autop.flow.FlowProgress
+import com.example.autop.flow.FlowRunOptions
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.JsonObject
 
 /** 运行服务：发起、控制与观察 Run（端口门面：方法数是服务面的自然结果）。 */
 @Suppress("TooManyFunctions")
@@ -53,6 +58,13 @@ public interface RunService {
     /** 立即运行一个任务（任务详情页“立即运行”，docs/tech/08 §4.3）。 */
     public suspend fun runTaskNow(task: Task): Outcome<RunRecord>
 
+    /** 立即运行一个流程（流程页「运行」与调试，docs/design/flows.md §9.2）。 */
+    public suspend fun runFlow(
+        flowId: FlowId,
+        params: JsonObject,
+        options: FlowRunOptions,
+    ): Outcome<RunRecord>
+
     /** 中断恢复：同一 Thread 新起 Run 接着做（docs/tech/07 §1.3、04 §3.11）。 */
     public suspend fun resumeInterrupted(runId: RunId): Outcome<RunRecord>
 
@@ -67,6 +79,12 @@ public interface RunService {
 
     /** 等待中 Run 跳过收口。 */
     public fun skipWaiting(runId: RunId)
+
+    /** 流程 Run 的调试控制（单步、断点、失败暂停后的处理）；非流程 Run 或未在运行返回 null。 */
+    public fun flowDebug(runId: RunId): FlowDebugControl?
+
+    /** 流程 Run 的执行进度；非流程 Run 或未在运行返回 null。 */
+    public fun flowProgress(runId: RunId): StateFlow<FlowProgress>?
 
     /** 当前活跃 Run（悬浮球与对话页使用）。 */
     public fun observeActive(): StateFlow<ActiveRunInfo?>

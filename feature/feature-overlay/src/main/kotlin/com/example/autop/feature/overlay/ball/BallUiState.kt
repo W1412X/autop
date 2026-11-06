@@ -30,6 +30,9 @@ public sealed interface BallMode {
 
     /** 无障碍已断开（仅 application 通道下球仍可见时）：单击跳系统无障碍设置。 */
     public data object AccessibilityLost : BallMode
+
+    /** 流程录制中：单击展开圆弧菜单（录制面板在菜单中打开）。 */
+    public data object Recording : BallMode
 }
 
 /** 当前工具类别（悬浮球中心图标，docs/tech/08 §5.1"中心图标换成当前工具类别图标"）。 */

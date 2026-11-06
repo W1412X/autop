@@ -22,6 +22,20 @@ public data class A11yEventLite(
     val time: Long,
     /** 是否由本应用自身界面产生（触摸检测需排除）。 */
     val isSelfOrigin: Boolean,
+    /** 事件源节点的快照；只在录制期间采集（见 [RecordingGate]），其他情况为 null。 */
+    val source: EventSource? = null,
+    /** 滚动事件的纵向增量（正数为向下滚动内容）；非滚动事件或未采集时为 null。 */
+    val scrollDeltaY: Int? = null,
+)
+
+/** 事件源节点快照（在 AccessibilityEvent 被回收前复制）。 */
+public data class EventSource(
+    val className: String?,
+    val viewId: String?,
+    val text: String?,
+    val contentDescription: String?,
+    val bounds: com.example.autop.device.Rect?,
+    val isPassword: Boolean,
 )
 
 /** 无障碍事件总线：容量取 `device.events.buffer`，溢出丢最旧。 */

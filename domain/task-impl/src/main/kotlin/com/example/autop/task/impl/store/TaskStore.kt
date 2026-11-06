@@ -25,6 +25,8 @@ public class TaskStore(
     private val configProvider: ConfigProvider,
     private val knownSources: () -> Set<String>,
     private val codec: TaskJsonCodec = TaskJsonCodec(),
+    /** 任务删除后的清理（如流程状态 	ask:<id> 作用域）。 */
+    private val onDeleted: suspend (TaskId) -> Unit = {},
 ) : TaskRepository {
     /** 保存/删除后的重排信号（AlarmScheduler 订阅）。 */
     public val scheduleChanges: MutableStateFlow<Long> = MutableStateFlow(0)
@@ -62,6 +64,7 @@ public class TaskStore(
     override suspend fun delete(id: TaskId) {
         db.taskDao().delete(id.value)
         db.triggerStateDao().delete(id.value)
+        onDeleted(id)
         bumpSchedule()
     }
 

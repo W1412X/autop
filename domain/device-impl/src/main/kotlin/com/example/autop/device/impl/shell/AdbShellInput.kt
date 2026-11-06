@@ -127,6 +127,16 @@ public class AdbShellInput
 
         override suspend fun keyEvent(code: Int): Boolean = runShell("input keyevent $code")
 
+        /** 包名只允许字母、数字、点、下划线，防止 shell 注入。 */
+        override suspend fun forceStop(packageName: String): Boolean {
+            if (!PACKAGE_NAME.matches(packageName)) return false
+            return runShell("am force-stop $packageName")
+        }
+
+        private companion object {
+            val PACKAGE_NAME = Regex("[A-Za-z0-9._]+")
+        }
+
         override suspend fun keyCombination(vararg codes: Int): Boolean =
             runShell("input keycombination ${codes.joinToString(" ")}")
 

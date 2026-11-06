@@ -9,7 +9,9 @@ import android.view.View
 import android.view.WindowManager
 import com.example.autop.core.common.Logger
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
+import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlaySpec
+import com.example.autop.device.Rect
 import com.example.autop.device.impl.ServiceHolder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -33,10 +35,6 @@ public class OverlayWindowRegistry
 
         /** 截图隐藏期间为 true（此间新附着的窗口保持隐藏）。 */
         private var hidden = false
-
-        /** 输入封锁（注入期间，N216）：自家窗口一律不可触摸但保持可见。 */
-        @Volatile
-        private var inputBlocked = false
 
         /** 注册内容工厂；该 id 正在显示时用新工厂重建内容。 */
         public fun register(
@@ -74,7 +72,7 @@ public class OverlayWindowRegistry
             if (window != null && channel != null) {
                 window.windowManager.updateViewLayout(
                     window.view,
-                    buildOverlayParams(channel, spec, hidden, inputBlocked),
+                    buildOverlayParams(channel, spec, hidden, entry.blocked),
                 )
             }
         }
@@ -96,7 +94,7 @@ public class OverlayWindowRegistry
         /** 显示中、未隐藏且可触摸的窗口规格（触摸探针排除自家窗口用，questions.md N139）。 */
         public fun touchableSpecs(): List<OverlaySpec> =
             entries.values
-                .filter { !hidden && !inputBlocked && it.spec.touchable && it.window != null }
+                .filter { !hidden && !it.blocked && it.spec.touchable && it.window != null }
                 .map { it.spec }
 
         /** 截图隐藏：全部窗口透明且不可触摸（docs/tech/05 §10）。 */
@@ -107,26 +105,45 @@ public class OverlayWindowRegistry
                 val window = entry.window ?: continue
                 window.windowManager.updateViewLayout(
                     window.view,
-                    buildOverlayParams(window.channel, entry.spec, value, inputBlocked),
+                    buildOverlayParams(window.channel, entry.spec, value, entry.blocked),
                 )
             }
         }
 
         /**
-         * 输入封锁（N216）：期间全部自家窗口不可触摸但保持可见——注入动作期间，
-         * 悬浮球 / 进度窗 / 圆弧菜单 / 面板 / 工具测试面板若可触摸会把注入的点击吞掉
-         * （实测进度窗遮挡导致点击不生效）。
+         * 输入封锁（N216，P2 收窄）：只封锁与注入区域 [target] 相交的自家窗口（null = 全部）。
+         * 注入落点之外的窗口收不到这次注入，不需要因此变为不可触摸。
+         * 只有封锁状态真正变化的窗口才会更新布局，避免每次动作对所有窗口做无效重排。
          */
-        public fun setInputBlocked(value: Boolean) {
-            if (inputBlocked == value) return
-            inputBlocked = value
-            for (entry in entries.values) {
-                val window = entry.window ?: continue
-                window.windowManager.updateViewLayout(
-                    window.view,
-                    buildOverlayParams(window.channel, entry.spec, hidden, inputBlocked),
-                )
+        public fun setInputBlocked(
+            value: Boolean,
+            target: Rect?,
+        ) {
+            entries.values.forEach { entry ->
+                val want = value && intersects(entry.spec, target)
+                if (entry.blocked != want) {
+                    entry.blocked = want
+                    entry.window?.let { window ->
+                        window.windowManager.updateViewLayout(
+                            window.view,
+                            buildOverlayParams(window.channel, entry.spec, hidden, want),
+                        )
+                    }
+                }
             }
+        }
+
+        /** 窗口是否与注入区域相交；无法判断（非左上对齐或 MATCH_PARENT）时保守地视为相交。 */
+        private fun intersects(
+            spec: OverlaySpec,
+            target: Rect?,
+        ): Boolean {
+            if (target == null) return true
+            if (spec.gravity != OverlayGravity.TOP_LEFT || spec.width < 0 || spec.height < 0) return true
+            return spec.x < target.r &&
+                spec.x + spec.width > target.l &&
+                spec.y < target.b &&
+                spec.y + spec.height > target.t
         }
 
         private fun attach(
@@ -142,7 +159,7 @@ public class OverlayWindowRegistry
             }
             val owner = OverlayLifecycleOwner()
             val view = factory(contextFor(channel), owner)
-            val params = buildOverlayParams(channel, entry.spec, hidden, inputBlocked)
+            val params = buildOverlayParams(channel, entry.spec, hidden, entry.blocked)
             val added = runCatching { windowManager.addView(view, params) }.isSuccess
             if (!added) {
                 logger.w(TAG, "overlay_add_failed", "id" to id, "channel" to channel.name)
@@ -181,6 +198,9 @@ private class Entry(
     var spec: OverlaySpec,
 ) {
     var window: AttachedWindow? = null
+
+    /** 输入封锁（注入期间不可触摸，仍可见）；按窗口单独记录，只更新变化的窗口。 */
+    var blocked: Boolean = false
 }
 
 /** 已附着到 WindowManager 的窗口。 */

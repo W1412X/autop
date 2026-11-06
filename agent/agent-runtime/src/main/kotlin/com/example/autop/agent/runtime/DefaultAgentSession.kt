@@ -19,14 +19,11 @@ import com.example.autop.agent.runtime.compaction.CompactionCoordinator
 import com.example.autop.agent.runtime.guard.Budget
 import com.example.autop.agent.runtime.guard.CircuitBreaker
 import com.example.autop.agent.runtime.notes.RunNotes
-import com.example.autop.agent.runtime.tools.ToolExecutor
-import com.example.autop.agent.runtime.tools.ToolRouter
+import com.example.autop.agent.runtime.tools.RouterBuilder
 import com.example.autop.core.common.AppError
-import com.example.autop.core.common.Capability
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.ThreadId
-import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.llm.Block
 import com.example.autop.llm.Role
@@ -40,6 +37,18 @@ internal class DefaultAgentSession(
     private val extensions: RuntimeExtensions,
     private val ports: RuntimePorts,
 ) : AgentSession {
+    private val routerBuilder =
+        RouterBuilder(
+            tools = extensions.tools,
+            enrichers = extensions.enrichers,
+            llm = services.llm,
+            prompts = services.prompts,
+            clock = services.clock,
+            policy = ports.policy,
+            platform = ports.platform,
+            audit = ports.audit,
+        )
+
     @Suppress("TooGenericExceptionCaught") // 主循环异常统一兜底转 RunFinished(FAILED)，不外传（N168）
     override fun start(
         request: RunRequest,
@@ -123,7 +132,7 @@ internal class DefaultAgentSession(
                         ports.replayTargets,
                     ),
             )
-        val modelVision = modelVisionOf(request)
+        val modelVision = routerBuilder.modelVisionOf(request)
         val loop =
             TurnLoop(
                 req = request,
@@ -132,43 +141,12 @@ internal class DefaultAgentSession(
                     RunParts(
                         renderer = HistoryRenderer(controller.toolStore, extensions.rules),
                         assembler = ContextAssembler(extensions.contributors),
-                        router = newRouter(request, modelVision),
+                        router = routerBuilder.build(request, request.toolFilter, modelVision),
                         engines = engines,
                         modelVision = modelVision,
                     ),
             )
         return loop.run()
-    }
-
-    /** 当前 modelRole 的模型是否支持图片输入（新方案 §2.7 下发到 ToolContext）。 */
-    private fun modelVisionOf(request: RunRequest): Boolean =
-        services.llm
-            .forRole(request.modelRole)
-            .getOrNull()
-            ?.profile
-            ?.capabilities
-            ?.vision ?: false
-
-    /** 过滤本次可见工具后建路由器（docs/tech/04 §3.2）。 */
-    private fun newRouter(
-        request: RunRequest,
-        modelVision: Boolean,
-    ): ToolRouter {
-        val capabilities = Capability.entries.filterTo(mutableSetOf()) { ports.platform.has(it) }
-        val visible =
-            ToolRouter.visibleTools(
-                tools = extensions.tools.toList(),
-                enabled = request.config[AgentConfig.TOOLS].enabled.toSet(),
-                toolFilter = request.toolFilter,
-                capabilities = capabilities,
-                modelVision = modelVision,
-            )
-        return ToolRouter(
-            tools = visible,
-            executor = ToolExecutor(visible, ports.policy, ports.audit, services.prompts, services.clock),
-            enrichers = extensions.enrichers.toList(),
-            prompts = services.prompts,
-        )
     }
 
     /** 从 atSeq 前最近的 Baseline 起的事件（无 Baseline 则全部，docs/tech/04 §3.11 第 1 步）。 */

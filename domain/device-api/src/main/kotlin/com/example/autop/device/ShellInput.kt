@@ -60,6 +60,9 @@ public interface ShellInput {
     /** 注入按键（KeyEvent.KEYCODE_*）。 */
     public suspend fun keyEvent(code: Int): Boolean
 
+    /** 强制结束应用进程（`am force-stop`）；包名不合法或通道不可用时返回 false。默认不支持。 */
+    public suspend fun forceStop(packageName: String): Boolean = false
+
     /** 注入组合键（KeyEvent.KEYCODE_*，如 Ctrl+A 全选）。 */
     public suspend fun keyCombination(vararg codes: Int): Boolean
 }

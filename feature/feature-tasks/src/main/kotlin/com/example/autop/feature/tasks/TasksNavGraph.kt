@@ -36,6 +36,7 @@ public const val NEW_TASK_ID: String = "new"
  * @param detailRoute 详情路由模板（app 的 `AutopRoutes.TASK_DETAIL`）。
  * @param runRoute Run 详情路由模板（app 的 `AutopRoutes.RUN_DETAIL`）。
  * @param navigator 导航回调。
+ * @param flowsContent 「流程」页签的内容（由 app 提供 feature-flows 的列表）。
  */
 public fun NavGraphBuilder.tasksGraph(
     listRoute: String,
@@ -43,9 +44,10 @@ public fun NavGraphBuilder.tasksGraph(
     detailRoute: String,
     runRoute: String,
     navigator: TasksNavigator,
+    flowsContent: @Composable () -> Unit = {},
 ) {
     composable(listRoute) {
-        TasksListRoute(navigator = navigator)
+        TasksListRoute(navigator = navigator, flowsContent = flowsContent)
     }
     composable(editRoute) {
         TaskEditRoute(navigator = navigator)
@@ -61,12 +63,14 @@ public fun NavGraphBuilder.tasksGraph(
 @Composable
 private fun TasksListRoute(
     navigator: TasksNavigator,
+    flowsContent: @Composable () -> Unit,
     viewModel: TasksListViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     TasksListScreen(
         state = state,
         onAction = { action -> viewModel.onAction(action, navigator) },
+        flowsContent = flowsContent,
     )
 }
 

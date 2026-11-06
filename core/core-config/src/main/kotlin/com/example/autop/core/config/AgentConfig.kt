@@ -22,6 +22,7 @@ public data class AgentContextSection(
                 "context.memory_index",
                 "context.user_profile",
                 "context.environment",
+                "context.flow_directory",
                 "context.trigger",
                 "context.trigger_memory",
                 "context.goal",
@@ -49,6 +50,8 @@ public data class AgentToolsSection(
                 "tool.open_app",
                 "tool.open_uri",
                 "tool.wait",
+                "tool.dismiss_popup",
+                "tool.restart_app",
                 "tool.list_apps",
                 "tool.read_notifications",
                 "tool.device_state",
@@ -64,6 +67,10 @@ public data class AgentToolsSection(
                 "tool.ask_user",
                 "tool.history_recall",
                 "tool.note",
+                "tool.run_flow",
+                "tool.list_flows",
+                "tool.save_as_flow",
+                "tool.update_flow",
             )
 
         public val DEFAULT_TIMEOUT_MS: Map<String, Long> =

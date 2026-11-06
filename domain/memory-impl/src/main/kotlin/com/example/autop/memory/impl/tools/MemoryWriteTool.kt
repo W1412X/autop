@@ -9,6 +9,7 @@ package com.example.autop.memory.impl.tools
 import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolContext
+import com.example.autop.agent.ToolOrigin
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.Outcome
 import com.example.autop.device.AppLauncher
@@ -60,7 +61,7 @@ public class MemoryWriteTool
                     summary = args.str("summary"),
                     content = args.str("content").orEmpty(),
                     tags = args.strings("tags"),
-                    source = MemorySource.AGENT,
+                    source = sourceOf(ctx),
                     runId = ctx.runId,
                     reason = args.str("reason"),
                     evidence = evidenceOf(args["evidence"] as? JsonObject),
@@ -90,12 +91,16 @@ public class MemoryWriteTool
                     title = appName,
                     summary = "",
                     content = "",
-                    source = MemorySource.AGENT,
+                    source = sourceOf(ctx),
                     runId = ctx.runId,
                     reason = "auto-create app dir",
                 ),
             )
         }
+
+        /** 调用方是流程时来源记为 [MemorySource.FLOW]，否则为 agent。 */
+        private fun sourceOf(ctx: ToolContext): MemorySource =
+            if (ctx.origin == ToolOrigin.FLOW) MemorySource.FLOW else MemorySource.AGENT
 
         private fun evidenceOf(obj: JsonObject?): MemoryEvidence? =
             obj?.let {

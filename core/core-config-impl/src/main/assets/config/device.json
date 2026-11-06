@@ -100,11 +100,23 @@
       "jitterRatio": 0.15
     },
     "scroll": {
-      "pageRatio": 0.8,
-      "halfRatio": 0.45,
+      "stepRatio": 0.5,
+      "edgeInsetRatio": 0.1,
+      "pixelsPerMs": 1.5,
+      "minDurationMs": 250,
+      "maxDurationMs": 900,
+      "maxSteps": 5,
       "swipeDurationMs": 350,
       "endpointJitterPx": 12,
       "trajectoryJitterPx": 8
+    },
+    "nodeAction": {
+      "enabled": true,
+      "actions": ["click", "long_click", "scroll"],
+      "maxAreaRatio": 0.6,
+      "retryWindowMs": 8000,
+      "blockAfterEvidence": 2,
+      "blockTtlDays": 30
     },
     "wait": {
       "pollMs": 500,

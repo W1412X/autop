@@ -111,6 +111,8 @@ private class ExperienceFixture(
     private val runner =
         RunRunner(
             agentSession = FakeAgentSession(finished = sessionFinished),
+            flowSession = FakeFlowSession,
+            flowStore = FakeFlowStore,
             runStore = runStore,
             pending = pending,
             observer = RunObserver(runStore, config, clock),

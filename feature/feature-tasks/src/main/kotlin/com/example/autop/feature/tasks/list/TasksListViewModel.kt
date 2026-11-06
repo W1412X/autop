@@ -33,19 +33,19 @@ public class TasksListViewModel
         private val taskRepository: TaskRepository,
         private val runService: RunService,
     ) : ViewModel() {
-        private val tab = MutableStateFlow(TasksTab.CONDITION)
+        private val page = MutableStateFlow(TasksPage.TASKS)
         private val pendingDeleteId = MutableStateFlow<String?>(null)
 
         public val uiState: StateFlow<TasksListUiState> =
             combine(
                 taskRepository.observeTasks(),
                 taskRepository.observeRuns(taskId = null, limit = RUN_LIMIT),
-                tab,
+                page,
                 pendingDeleteId,
-            ) { tasks, runs, currentTab, deletingId ->
+            ) { tasks, runs, currentPage, deletingId ->
                 TasksListUiState(
-                    tab = currentTab,
-                    rows = tasks.filter { matchesTab(it, currentTab) }.map { rowOf(it, runs) },
+                    page = currentPage,
+                    rows = tasks.map { rowOf(it, runs) }.sortedBy { it.triggerKind.ordinal },
                     waiting = runs.filter { it.status == RunStatus.WAITING_USER }.map(::waitingOf),
                     pendingDeleteId = deletingId,
                 )
@@ -57,7 +57,8 @@ public class TasksListViewModel
             navigator: TasksNavigator,
         ) {
             when (action) {
-                is TasksListAction.SetTab -> tab.value = action.tab
+                is TasksListAction.SetPage -> page.value = action.page
+                TasksListAction.CreateFlow -> navigator.openFlowCreate()
                 is TasksListAction.OpenDetail -> navigator.openDetail(action.taskId)
                 is TasksListAction.OpenEdit -> navigator.openEdit(action.taskId)
                 TasksListAction.CreateTask -> navigator.openEdit(NEW_TASK_ID)
@@ -105,16 +106,6 @@ public class TasksListViewModel
         private fun launch(block: suspend () -> Unit) {
             viewModelScope.launch { block() }
         }
-
-        private fun matchesTab(
-            task: Task,
-            tab: TasksTab,
-        ): Boolean =
-            when (tab) {
-                TasksTab.MANUAL -> task.trigger is Trigger.Manual
-                TasksTab.SCHEDULE -> task.trigger is Trigger.Schedule
-                TasksTab.CONDITION -> task.trigger is Trigger.Condition
-            }
 
         private fun rowOf(
             task: Task,

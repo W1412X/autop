@@ -43,8 +43,15 @@ public class ActionEpilogue
         private val observer: ScreenObserver,
         private val probe: ReplayStateProbe,
     ) {
-        /** 动作执行前采样（docs/tech/05 §13 的 `pre`）；失败返回 null。 */
-        public suspend fun begin(): ReplayStateSample? = probe.sample().getOrNull()
+        /**
+         * 动作执行前采样（docs/tech/05 §13 的 `pre`）；失败返回 null。
+         * [ToolContext.quietActions] 为真（流程）时不采样：流程不录制回放，省掉一次完整采集。
+         */
+        public suspend fun begin(ctx: ToolContext): ReplayStateSample? =
+            if (ctx.quietActions) null else probe.sample().getOrNull()
+
+        /** 当前屏幕指纹（采样失败为 null）；工具用它判断动作是否产生了变化。 */
+        public suspend fun fingerprintNow(): String? = probe.sample().getOrNull()?.fingerprint
 
         /** 等待界面稳定（[waitMs] 为空取 `device.stabilize.maxWaitMs`）；工具可单独调用。 */
         public suspend fun awaitStable(
@@ -68,6 +75,13 @@ public class ActionEpilogue
             replay: ReplayInput,
         ): ToolOutput {
             awaitStable(ctx, waitMs)
+            if (ctx.quietActions) {
+                return ToolOutput(
+                    ok = true,
+                    content = listOf(Block.Text(resultText)),
+                    replay = buildReplay(replay, null),
+                )
+            }
             val mode = ctx.deviceHistory().lastMode ?: ObserveMode.A11Y
             if (mode == ObserveMode.LLM) {
                 val post = probe.sample().getOrNull()

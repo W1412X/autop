@@ -24,6 +24,7 @@ import com.example.autop.memory.WriteResult
 import com.example.autop.memory.impl.db.MemoryDb
 import com.example.autop.memory.impl.db.MemoryNodeEntity
 import com.example.autop.memory.impl.db.MemoryVersionEntity
+import com.example.autop.memory.isAutomated
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -53,7 +54,7 @@ internal class MemoryWriter(
                 Outcome.Err(AppError(MemoryErrorCodes.ALREADY_EXISTS, "路径已存在：${w.path.value}"))
             w.mode == WriteMode.UPDATE &&
                 existing.source == MemorySource.USER.name &&
-                w.source == MemorySource.AGENT -> supplementNode(w, existing)
+                w.source.isAutomated -> supplementNode(w, existing)
             w.mode == WriteMode.APPEND -> appendNode(w, existing, summary.maxChars)
             else -> updateNode(w, existing, summary.maxChars)
         }

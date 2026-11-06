@@ -5,6 +5,8 @@ package com.example.autop.feature.overlay.di
 
 import com.example.autop.feature.overlay.ball.BallPositionStore
 import com.example.autop.feature.overlay.ball.SharedPrefsBallPositionStore
+import com.example.autop.feature.overlay.record.TargetPickSession
+import com.example.autop.flow.TargetPicker
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -19,4 +21,9 @@ public object OverlayModule {
     @Provides
     @Singleton
     public fun provideBallPositionStore(impl: SharedPrefsBallPositionStore): BallPositionStore = impl
+
+    /** 编辑器“在手机上重新选取”的拾取端口。 */
+    @Provides
+    @Singleton
+    public fun provideTargetPicker(impl: TargetPickSession): TargetPicker = impl
 }

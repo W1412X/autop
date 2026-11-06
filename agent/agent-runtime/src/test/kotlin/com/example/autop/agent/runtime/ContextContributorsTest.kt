@@ -33,7 +33,7 @@ class ContextContributorsTest {
             assertThat(role?.promptIds).containsExactly("agent.system.role", 2)
             assertThat(role?.text).isNotEmpty()
             assertThat(safety?.promptIds).containsExactly("agent.system.safety", 1)
-            assertThat(guide?.promptIds).containsExactly("agent.system.tool_guide", 5)
+            assertThat(guide?.promptIds).containsExactly("agent.system.tool_guide", 10)
         }
 
     @Test

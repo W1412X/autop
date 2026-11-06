@@ -38,6 +38,14 @@ public class UserNotifierImpl(
         )
     }
 
+    public fun notifyFlowSuggestion(runId: RunId) {
+        notifyMessage(
+            title = context.getString(R.string.notify_flow_suggest_title),
+            text = context.getString(R.string.notify_flow_suggest_text),
+            runId = runId,
+        )
+    }
+
     override fun notifyMessage(
         title: String,
         text: String,

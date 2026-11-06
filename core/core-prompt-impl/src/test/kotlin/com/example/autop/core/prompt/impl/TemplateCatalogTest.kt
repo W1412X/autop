@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(28)
+        assertThat(toolTemplates).hasSize(34)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -72,12 +72,35 @@ class TemplateCatalogTest {
         /** 新方案模板 id（docs/design/observation-modes-coordinate-actions §4.4、§6；docs/tech/09 待更新）。 */
         val EXPECTED_IDS =
             setOf(
+                "flow.author.demo_declined",
+                "flow.author.draft_context",
+                "flow.author.spec",
+                "flow.author.system",
+                "flow.author.tools",
+                "flow.confirm.accept",
+                "flow.confirm.question",
+                "flow.confirm.skip",
+                "flow.llm.json_only",
+                "flow.llm.retry_feedback",
+                "flow.llm.screen_section",
+                "flow.llm.system",
+                "flow.author.tool_cancelled",
+                "flow.record.polish",
+                "flow.recovery.handoff_goal",
+                "flow.summary.cancelled",
+                "flow.summary.failed",
+                "flow.summary.succeeded",
+                "tool.list_flows",
+                "tool.run_flow",
+                "tool.save_as_flow",
+                "tool.update_flow",
                 "agent.breaker.repeat_warn",
                 "agent.breaker.same_error_stop",
                 "agent.breaker.same_error_warn",
                 "agent.breaker.stuck_stop",
                 "agent.breaker.stuck_warn",
                 "agent.budget.final_round",
+                "agent.flow_directory",
                 "agent.compaction.deterministic_note",
                 "agent.compaction.handoff",
                 "agent.compaction.last_observation",
@@ -141,6 +164,7 @@ class TemplateCatalogTest {
                 "tool.ask_user",
                 "tool.clipboard_get",
                 "tool.clipboard_set",
+                "tool.dismiss_popup",
                 "tool.finish",
                 "tool.get_device_state",
                 "tool.global_action",
@@ -160,6 +184,7 @@ class TemplateCatalogTest {
                 "tool.open_app",
                 "tool.open_uri",
                 "tool.read_notifications",
+                "tool.restart_app",
                 "tool.screenshot",
                 "tool.scroll",
                 "tool.swipe",

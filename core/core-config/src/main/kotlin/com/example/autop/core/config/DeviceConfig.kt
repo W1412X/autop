@@ -299,21 +299,85 @@ public data class DeviceTapSection(
         }
 }
 
-/** `device.scroll`：滚动幅度（相对屏幕比例）与抖动（拟人化，工具内部使用）。 */
+/** 滚动单步占容器边长比例的合法范围。 */
+private const val MIN_SCROLL_STEP_RATIO = 0.1
+
+/** 滚动安全边距占容器边长比例的上限（两侧各一份，必须小于 0.5）。 */
+private const val MAX_SCROLL_INSET_RATIO = 0.4
+
+/**
+ * `device.scroll`：滚动单步几何与抖动。
+ * 一步 = 一次人手滑动，距离取容器边长 × [stepRatio]，起止点落在容器内并留 [edgeInsetRatio] 安全边距；
+ * 内容不够时由模型多次调用或用 `steps` 连续多步（上限 [maxSteps]）。
+ */
 @Serializable
 public data class DeviceScrollSection(
-    @SerialName("pageRatio") val pageRatio: Double = 0.8,
-    @SerialName("halfRatio") val halfRatio: Double = 0.45,
+    @SerialName("stepRatio") val stepRatio: Double = 0.5,
+    @SerialName("edgeInsetRatio") val edgeInsetRatio: Double = 0.1,
+    @SerialName("pixelsPerMs") val pixelsPerMs: Double = 1.5,
+    @SerialName("minDurationMs") val minDurationMs: Long = 250,
+    @SerialName("maxDurationMs") val maxDurationMs: Long = 900,
+    @SerialName("maxSteps") val maxSteps: Int = 5,
     @SerialName("swipeDurationMs") val swipeDurationMs: Long = 350,
     @SerialName("endpointJitterPx") val endpointJitterPx: Int = 12,
     @SerialName("trajectoryJitterPx") val trajectoryJitterPx: Int = 8,
 ) : ConfigSection {
     override fun validate(): List<String> =
         buildList {
+            if (stepRatio !in MIN_SCROLL_STEP_RATIO..1.0) {
+                add("stepRatio must be within $MIN_SCROLL_STEP_RATIO..1.0, was $stepRatio")
+            }
+            if (edgeInsetRatio !in 0.0..MAX_SCROLL_INSET_RATIO) {
+                add("edgeInsetRatio must be within 0.0..$MAX_SCROLL_INSET_RATIO, was $edgeInsetRatio")
+            }
+            if (pixelsPerMs <= 0.0) add("pixelsPerMs must be > 0, was $pixelsPerMs")
+            if (minDurationMs <= 0) add("minDurationMs must be > 0, was $minDurationMs")
+            if (maxDurationMs < minDurationMs) add("maxDurationMs must be >= minDurationMs, was $maxDurationMs")
+            if (maxSteps < 1) add("maxSteps must be >= 1, was $maxSteps")
             if (swipeDurationMs <= 0) add("swipeDurationMs must be > 0, was $swipeDurationMs")
             if (endpointJitterPx < 0) add("endpointJitterPx must be >= 0, was $endpointJitterPx")
             if (trajectoryJitterPx < 0) add("trajectoryJitterPx must be >= 0, was $trajectoryJitterPx")
         }
+}
+
+/** 节点面积上限比例的下限：低于此值会把大多数真实控件排除在外。 */
+private const val MIN_NODE_AREA_RATIO = 0.1
+
+/**
+ * `device.nodeAction`：优先走无障碍节点动作（点击、长按、滚动）的开关与保护参数。
+ * 只在观测与行动都来自 a11y 时生效；应用屏蔽节点动作时按应用记录并改用手势。
+ */
+@Serializable
+public data class DeviceNodeActionSection(
+    @SerialName("enabled") val enabled: Boolean = true,
+    /** 允许走节点动作的动作种类：`click`、`long_click`、`scroll`。 */
+    @SerialName("actions") val actions: List<String> = DEFAULT_ACTIONS,
+    /** 超过屏幕该比例的节点视为全屏容器（如点击外部关闭的遮罩），不作为目标。 */
+    @SerialName("maxAreaRatio") val maxAreaRatio: Double = 0.6,
+    /** 节点动作无效后，该时间内对同一应用的再次操作升级为手势。 */
+    @SerialName("retryWindowMs") val retryWindowMs: Long = 8000,
+    /** “节点无效而手势有效”的证据累计到该次数，即判定应用屏蔽了节点动作。 */
+    @SerialName("blockAfterEvidence") val blockAfterEvidence: Int = 2,
+    /** 屏蔽记录有效天数，到期后重新尝试节点动作（应用可能已更新）。 */
+    @SerialName("blockTtlDays") val blockTtlDays: Int = 30,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            val unknown = actions.filter { it !in ACTION_IDS }
+            if (unknown.isNotEmpty()) add("actions contains unknown ids $unknown, allowed $ACTION_IDS")
+            if (maxAreaRatio !in MIN_NODE_AREA_RATIO..1.0) {
+                add("maxAreaRatio must be within $MIN_NODE_AREA_RATIO..1.0, was $maxAreaRatio")
+            }
+            if (retryWindowMs < 0) add("retryWindowMs must be >= 0, was $retryWindowMs")
+            if (blockAfterEvidence < 1) add("blockAfterEvidence must be >= 1, was $blockAfterEvidence")
+            if (blockTtlDays < 1) add("blockTtlDays must be >= 1, was $blockTtlDays")
+        }
+
+    public companion object {
+        /** 动作种类 id（与节点动作路由一致）。 */
+        public val ACTION_IDS: Set<String> = setOf("click", "long_click", "scroll")
+        public val DEFAULT_ACTIONS: List<String> = listOf("click", "long_click", "scroll")
+    }
 }
 
 /** `device.wait`：wait 工具轮询。 */
@@ -365,6 +429,8 @@ public object DeviceConfig {
         ConfigKey("device.tap", DeviceTapSection.serializer()) { DeviceTapSection() }
     public val SCROLL: ConfigKey<DeviceScrollSection> =
         ConfigKey("device.scroll", DeviceScrollSection.serializer()) { DeviceScrollSection() }
+    public val NODE_ACTION: ConfigKey<DeviceNodeActionSection> =
+        ConfigKey("device.nodeAction", DeviceNodeActionSection.serializer()) { DeviceNodeActionSection() }
     public val WAIT: ConfigKey<DeviceWaitSection> =
         ConfigKey("device.wait", DeviceWaitSection.serializer()) { DeviceWaitSection() }
     public val NOTIFICATIONS: ConfigKey<DeviceNotificationsSection> =
@@ -387,6 +453,7 @@ public object DeviceConfig {
             TOUCH,
             TAP,
             SCROLL,
+            NODE_ACTION,
             WAIT,
             NOTIFICATIONS,
             REPLAY,

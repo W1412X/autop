@@ -161,6 +161,7 @@ private fun menuIconOf(action: BallMenuAction): ImageVector =
         BallMenuAction.OPEN_APP -> AutopIcons.Launch
         BallMenuAction.VIEW_PROGRESS -> AutopIcons.Visibility
         BallMenuAction.ABORT_RUN -> AutopIcons.Stop
+        BallMenuAction.RECORD -> AutopIcons.Record
         BallMenuAction.TOOL_TEST -> AutopIcons.Settings
     }
 
@@ -173,6 +174,7 @@ private fun menuLabelOf(action: BallMenuAction): String =
             BallMenuAction.OPEN_APP -> R.string.ball_menu_open_app
             BallMenuAction.VIEW_PROGRESS -> R.string.ball_menu_progress
             BallMenuAction.ABORT_RUN -> R.string.ball_menu_abort
+            BallMenuAction.RECORD -> R.string.ball_menu_record
             BallMenuAction.TOOL_TEST -> R.string.ball_menu_tool_test
         },
     )

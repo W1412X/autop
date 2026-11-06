@@ -15,6 +15,7 @@ import com.example.autop.core.common.exceptionHandler
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayHost
 import com.example.autop.device.OverlaySpec
+import com.example.autop.device.Rect
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
@@ -113,14 +114,17 @@ public class OverlayWindowManager
          * 工具测试面板一律不可触摸（保持可见，不闪烁），避免它们把注入的点击吞掉
          * （实测进度窗遮挡导致点击不生效）。返回是否等到重排落地。
          */
-        public suspend fun blockInput(timeoutMs: Long): Boolean {
-            withContext(main) { registry.setInputBlocked(true) }
+        public suspend fun blockInput(
+            target: Rect?,
+            timeoutMs: Long,
+        ): Boolean {
+            withContext(main) { registry.setInputBlocked(true, target) }
             return awaitRelayoutApplied(timeoutMs)
         }
 
         /** 解除自家浮层输入封锁（各窗口按自身 spec 恢复可触摸）。 */
         public fun unblockInput() {
-            scope.launch { registry.setInputBlocked(false) }
+            scope.launch { registry.setInputBlocked(false, null) }
         }
 
         /** 等 [count] 帧（Choreographer 每帧回调一次）。 */

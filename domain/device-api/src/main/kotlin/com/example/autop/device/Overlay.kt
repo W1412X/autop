@@ -30,6 +30,11 @@ public data class OverlaySpec(
     val gravity: OverlayGravity,
     /** 是否需要 `FLAG_WATCH_OUTSIDE_TOUCH`（触摸探针窗口用，docs/tech/05 §8）。 */
     val watchOutsideTouch: Boolean = false,
+    /**
+     * 铺满整个屏幕（含状态栏、导航栏与刘海区域）。默认的悬浮窗会被摆在系统栏之内，
+     * 需要贴到物理屏幕边缘的内容（如执行期边缘光）设为 true；此时 [width]、[height] 应为 MATCH_PARENT。
+     */
+    val fullScreen: Boolean = false,
 )
 
 /** 悬浮窗宿主：只管窗口（位置、大小、触摸标志、可见性），不认识内容。 */

@@ -73,7 +73,7 @@ public class GlobalActionTool
             ctx: ToolContext,
         ): ToolOutput {
             val payload = action.payload as GlobalActionPayload
-            val pre = epilogue.begin()
+            val pre = epilogue.begin(ctx)
             val ok = gestures.globalAction(payload.action)
             if (!ok) {
                 return toolError(DeviceErrorCodes.ACTION_FAILED, "全局动作 ${payload.action.name} 执行失败")

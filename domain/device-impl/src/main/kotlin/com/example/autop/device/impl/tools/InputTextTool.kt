@@ -245,7 +245,7 @@ public class InputTextTool
             ctx: ToolContext,
         ): ToolOutput {
             val input = action.payload as InputAction
-            val pre = epilogue.begin()
+            val pre = epilogue.begin(ctx)
             val gesture =
                 input.clickPoint?.let {
                     if (!gestures.tap(it.x, it.y, input.clickDurationMs)) {

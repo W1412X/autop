@@ -14,6 +14,7 @@ import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.automirrored.outlined.Send
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.EventRepeat
+import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.outlined.Add
@@ -94,6 +95,9 @@ public object AutopIcons {
     public val Play: ImageVector = Icons.Outlined.PlayArrow
     public val Pause: ImageVector = Icons.Outlined.Pause
     public val Stop: ImageVector = Icons.Outlined.Stop
+
+    /** 录制（实心圆点），与「添加」图标区分。 */
+    public val Record: ImageVector = Icons.Filled.FiberManualRecord
     public val Block: ImageVector = Icons.Outlined.Block
     public val Schedule: ImageVector = Icons.Outlined.Schedule
     public val Error: ImageVector = Icons.Outlined.ErrorOutline

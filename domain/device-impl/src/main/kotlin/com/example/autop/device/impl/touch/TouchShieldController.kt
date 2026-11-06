@@ -27,6 +27,7 @@ import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlaySpec
+import com.example.autop.device.Rect
 import com.example.autop.device.TouchShield
 import com.example.autop.device.impl.overlay.OverlayWindowManager
 import java.util.concurrent.atomic.AtomicInteger
@@ -87,12 +88,12 @@ public class TouchShieldController
          * 封锁期间保持可见，不做隐藏闪烁。
          * 失败/取消时回退深度并恢复拦截，防永久放行。
          */
-        public suspend fun beginAction() {
+        public suspend fun beginAction(target: Rect?) {
             actionDepth.incrementAndGet()
             var released = false
             try {
                 overlay.updateNow(SHIELD_ID, ::shieldSpecOf)
-                val landed = overlay.blockInput(relayoutTimeoutMs())
+                val landed = overlay.blockInput(target, relayoutTimeoutMs())
                 released = true
                 logger.i(
                     TAG,
@@ -157,8 +158,11 @@ internal fun shieldTouchable(
     shieldEnabled: Boolean,
 ): Boolean = active && shieldEnabled && !forceReleased && actionDepth == 0 && overlayEnabled
 
-/** 盾窗口 spec：全屏（MATCH_PARENT，<= 0 的宽高在触摸探针矩形判定里视为不存在，
- * 用户触摸照常计入 lastUserTouchAt），不可聚焦。 */
+/**
+ * 盾窗口 spec：铺满整个屏幕（MATCH_PARENT，<= 0 的宽高在触摸探针矩形判定里视为不存在，
+ * 用户触摸照常计入 lastUserTouchAt），不可聚焦。[OverlaySpec.fullScreen] 让盾延伸到状态栏与导航栏区域，
+ * 否则默认窗口被摆在系统栏之内，执行期用户仍能下拉通知栏。
+ */
 private fun shieldSpec(touchable: Boolean): OverlaySpec =
     OverlaySpec(
         x = 0,
@@ -168,6 +172,7 @@ private fun shieldSpec(touchable: Boolean): OverlaySpec =
         touchable = touchable,
         focusable = false,
         gravity = OverlayGravity.TOP_LEFT,
+        fullScreen = true,
     )
 
 /** 盾窗口 id（`OverlayWindowManager.register/show/update` 的键）。 */

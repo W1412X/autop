@@ -11,15 +11,20 @@ import com.example.autop.agent.ContextContributor
 import com.example.autop.agent.HistoryRenderRule
 import com.example.autop.agent.ReplayStateProbe
 import com.example.autop.agent.ReplayTargetResolver
+import com.example.autop.agent.RunLineage
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolAuditSink
+import com.example.autop.agent.ToolInvokerFactory
 import com.example.autop.agent.ToolResultEnricher
 import com.example.autop.agent.UserInteraction
 import com.example.autop.agent.runtime.DefaultAgentSession
+import com.example.autop.agent.runtime.DefaultRunLineage
 import com.example.autop.agent.runtime.RuntimeExtensions
 import com.example.autop.agent.runtime.RuntimePorts
 import com.example.autop.agent.runtime.RuntimeServices
+import com.example.autop.agent.runtime.tools.RouterBuilder
+import com.example.autop.agent.runtime.tools.RuntimeToolInvokerFactory
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.PlatformCapabilities
@@ -80,4 +85,36 @@ public object AgentSessionModule {
                     replayTargets = replayTargets,
                 ),
         )
+
+    /** 工具调用器工厂（流程等在智能体循环之外执行工具，docs/design/flows.md §8.2）。 */
+    @Provides
+    @Singleton
+    @Suppress("LongParameterList") // DI 装配方法，端口逐个注入是职责所在
+    public fun provideToolInvokerFactory(
+        llm: LlmGateway,
+        prompts: PromptRepository,
+        clock: Clock,
+        tools: Set<@JvmSuppressWildcards Tool>,
+        enrichers: Set<@JvmSuppressWildcards ToolResultEnricher>,
+        policy: PolicyEngine,
+        platform: PlatformCapabilities,
+        audit: ToolAuditSink,
+    ): ToolInvokerFactory =
+        RuntimeToolInvokerFactory(
+            RouterBuilder(
+                tools = tools,
+                enrichers = enrichers,
+                llm = llm,
+                prompts = prompts,
+                clock = clock,
+                policy = policy,
+                platform = platform,
+                audit = audit,
+            ),
+        )
+
+    /** Run 谱系：流程子 Run 的提问落到根 Run 上。 */
+    @Provides
+    @Singleton
+    public fun provideRunLineage(): RunLineage = DefaultRunLineage()
 }

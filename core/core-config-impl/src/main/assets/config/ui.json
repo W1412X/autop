@@ -33,6 +33,12 @@
       "doubleTapStops": true,
       "attachScreenDefault": true
     },
+    "indicator": {
+      "enabled": true,
+      "edgeGlow": true,
+      "capsule": true,
+      "pulseMs": 1800
+    },
     "motion": {
       "expandMs": 200,
       "shimmerMs": 900

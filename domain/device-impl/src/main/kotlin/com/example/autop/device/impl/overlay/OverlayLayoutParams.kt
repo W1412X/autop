@@ -25,14 +25,23 @@ internal fun buildOverlayParams(
             OverlayChannel.APPLICATION -> WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         }
     var flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-    if (!spec.focusable) flags = flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+    // 注入期间（inputBlocked）自家窗口同时不可聚焦，避免抢走返回键与输入法焦点（ADR-0014）。
+    if (!spec.focusable || inputBlocked) flags = flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
     if (!spec.touchable || hidden || inputBlocked) flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
     if (spec.watchOutsideTouch) flags = flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
+    if (spec.fullScreen) {
+        flags =
+            flags or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+            WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+    }
     return WindowManager.LayoutParams(spec.width, spec.height, type, flags, PixelFormat.TRANSLUCENT).apply {
         gravity = gravityOf(spec.gravity)
         x = spec.x
         y = spec.y
         alpha = if (hidden) HIDDEN_ALPHA else VISIBLE_ALPHA
+        if (spec.fullScreen) {
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
+        }
     }
 }
 

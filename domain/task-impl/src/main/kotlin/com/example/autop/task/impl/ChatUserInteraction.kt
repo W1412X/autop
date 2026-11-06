@@ -6,6 +6,7 @@
 package com.example.autop.task.impl
 
 import com.example.autop.agent.AgentErrorCodes
+import com.example.autop.agent.RunLineage
 import com.example.autop.agent.UserInteraction
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Logger
@@ -21,6 +22,7 @@ import java.util.concurrent.ConcurrentHashMap
 public class ChatUserInteraction(
     private val runStore: RunStore,
     private val logger: Logger,
+    private val lineage: RunLineage? = null,
 ) : UserInteraction {
     /** runId → 当前等待中的回答。 */
     private val pending = ConcurrentHashMap<RunId, CompletableDeferred<String>>()
@@ -36,6 +38,8 @@ public class ChatUserInteraction(
         options: List<String>,
         timeoutMs: Long,
     ): Outcome<String> {
+        // 流程子 Run 的提问落到用户看得见的根 Run（docs/design/flows.md §6.9）。
+        val runId = lineage?.rootOf(runId) ?: runId
         runStore.mutate(runId) {
             it.copy(status = RunStatus.WAITING_USER, waitingQuestion = question, waitingOptions = options)
         }

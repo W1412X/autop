@@ -7,11 +7,20 @@ package com.example.autop.task.impl
 
 import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.PauseReason
+import com.example.autop.core.common.AppError
+import com.example.autop.core.common.FlowId
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.device.TouchShield
+import com.example.autop.flow.FlowDebugControl
+import com.example.autop.flow.FlowErrorCodes
+import com.example.autop.flow.FlowProgress
+import com.example.autop.flow.FlowRunHandle
+import com.example.autop.flow.FlowRunOptions
+import com.example.autop.flow.FlowStore
+import com.example.autop.flow.FlowValidationService
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
@@ -22,6 +31,7 @@ import com.example.autop.task.impl.schedule.TriggerRunner
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.JsonObject
 
 /** 运行协调器：实现 [RunService] 与 [TriggerRunner]。 */
 @Suppress("TooManyFunctions", "LongParameterList") // RunService 接口面 + 端口装配（DI 注入）的自然结果
@@ -34,6 +44,8 @@ public class RunCoordinator(
     private val recovery: InterruptedRunRecovery,
     private val shield: TouchShield,
     private val logger: Logger,
+    private val flowStore: FlowStore,
+    private val flowValidation: FlowValidationService,
 ) : RunService,
     TriggerRunner {
     override suspend fun startChat(
@@ -59,6 +71,23 @@ public class RunCoordinator(
     /** 任务页“立即运行”/试运行（origin=TASK_MANUAL）。 */
     override suspend fun runTaskNow(task: Task): Outcome<RunRecord> {
         val result = executor.launchTask(task, RunOrigin.TASK_MANUAL, emptyMap())
+        host.ensureRunning()
+        return result
+    }
+
+    /** 流程页「运行」与调试（origin=TASK_MANUAL）。 */
+    override suspend fun runFlow(
+        flowId: FlowId,
+        params: JsonObject,
+        options: FlowRunOptions,
+    ): Outcome<RunRecord> {
+        val stored =
+            flowStore.get(flowId)
+                ?: return Outcome.Err(
+                    AppError(code = FlowErrorCodes.NOT_FOUND, message = "flow not found: ${flowId.value}"),
+                )
+        val needsScreen = flowValidation.needsScreen(stored.definition)
+        val result = executor.launchFlow(stored.definition, params, options, needsScreen)
         host.ensureRunning()
         return result
     }
@@ -146,6 +175,11 @@ public class RunCoordinator(
     ) {
         interaction.answer(runId, answer)
     }
+
+    override fun flowDebug(runId: RunId): FlowDebugControl? = (observer.handleOf(runId) as? FlowRunHandle)?.debug()
+
+    override fun flowProgress(runId: RunId): StateFlow<FlowProgress>? =
+        (observer.handleOf(runId) as? FlowRunHandle)?.progress
 
     override fun observeActive(): StateFlow<ActiveRunInfo?> = observer.active
 

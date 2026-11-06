@@ -202,7 +202,7 @@ private fun embeddingProviderLabel(providerId: String): String =
         else -> providerId
     }
 
-/** 安全分组（docs/tech/08 §4.5）：安全规则、屏蔽的应用、操作记录。 */
+/** 安全分组（docs/tech/08 §4.5）：安全规则、屏蔽的应用、节点操作、操作记录。 */
 @Composable
 private fun SecuritySection(onOpen: (SettingsSection) -> Unit) {
     Column {
@@ -216,6 +216,11 @@ private fun SecuritySection(onOpen: (SettingsSection) -> Unit) {
             title = stringResource(R.string.me_nav_blocked_apps),
             subtitle = null,
             onClick = { onOpen(SettingsSection.BLOCKED_APPS) },
+        )
+        NavRow(
+            title = stringResource(R.string.me_nav_node_action),
+            subtitle = null,
+            onClick = { onOpen(SettingsSection.NODE_ACTION) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_audit),

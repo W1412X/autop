@@ -1,7 +1,8 @@
 /**
- * `tool.tap`（docs/design/observation-modes-coordinate-actions §5.1、§5.2）：
- * 按内容区 0–1000 坐标点击；按压时长与落点抖动由配置内部处理，不对模型开放。
- * 结果附命中回执（§5.4），回放参数附 `_hit`（§5.7）。
+ * `tool.tap`（docs/design/observation-modes-coordinate-actions §5.1、§5.2；ADR-0015）：
+ * 按内容区 0–1000 坐标点击或长按；按压时长与落点抖动由配置内部处理，不对模型开放。
+ * 观测与行动都来自 a11y 时优先对落点处的节点执行 ACTION_CLICK / ACTION_LONG_CLICK，
+ * 否则、或节点动作被拒时，用坐标手势。结果附命中回执（§5.4），回放参数带 `_hit`（§5.7）。
  */
 package com.example.autop.device.impl.tools
 
@@ -21,17 +22,27 @@ import com.example.autop.device.core.PixelSize
 import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.CoordSpaceResolver
 import com.example.autop.device.impl.PolicySubjectBuilder
+import com.example.autop.device.impl.nodeaction.NodeActionIds
+import com.example.autop.device.impl.nodeaction.NodeActionRouter
+import com.example.autop.device.impl.nodeaction.NodeKind
+import com.example.autop.device.impl.nodeaction.NodeRoute
+import com.example.autop.device.impl.nodeaction.NodeRouteRequest
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
+import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /** prepare 生成的执行载荷。 */
 private data class TapAction(
-    /** 抖动后的实际落点（屏幕像素）。 */
+    val snapshot: ScreenSnapshot,
+    /** 未抖动的目标落点（屏幕像素）：节点选择用它。 */
+    val target: Point,
+    /** 抖动后的实际落点（屏幕像素）：坐标手势用它。 */
     val point: Point,
     val durationMs: Long,
+    val long: Boolean,
     val waitMs: Long?,
     val resultText: String,
     val replayArgs: JsonObject,
@@ -39,6 +50,7 @@ private data class TapAction(
 
 /** 点击工具。 */
 @Singleton
+@Suppress("LongParameterList") // 装配类：读屏/手势/策略/收尾/坐标/内容区/回执/节点路由均为点击必需，不可再减（N114 口径）
 public class TapTool
     @Inject
     constructor(
@@ -49,6 +61,7 @@ public class TapTool
         private val coords: CoordSpaceResolver,
         private val contentAreas: ContentAreaProvider,
         private val receipts: HitReceiptBuilder,
+        private val router: NodeActionRouter,
     ) : ScreenActionTool {
         override val id: String = ID
 
@@ -81,10 +94,8 @@ public class TapTool
             val target = mapper.toScreen(x, y) ?: return coordOutOfRange(coords)
             val modelPoint = Point(x, y)
             val tree = receipts.treeOf(ctx, snap)
-            val actual =
-                jitteredTapPoint(target, receipts.bounds(tree, modelPoint, mapper), area, snap, ctx)
+            val actual = jitteredTapPoint(target, receipts.bounds(tree, modelPoint, mapper), area, snap, ctx)
             val actualModel = mapper.toNormalized(actual.x, actual.y)
-            val hit = receipts.describe(tree, actualModel)
             val long = args.bool("long") == true
             val subject =
                 subjects.build(
@@ -97,11 +108,14 @@ public class TapTool
                 )
             val action =
                 TapAction(
+                    snapshot = snap,
+                    target = target,
                     point = actual,
                     durationMs = tapDurationOf(ctx, long),
+                    long = long,
                     waitMs = args.long("wait_ms"),
                     resultText = resultTextOf(x, y, long, receipts.receipt(tree, actualModel)),
-                    replayArgs = replayArgsOf(args, hit),
+                    replayArgs = replayArgsOf(args, receipts.describe(tree, actualModel)),
                 )
             return Outcome.Ok(PreparedAction(subject, action))
         }
@@ -111,13 +125,71 @@ public class TapTool
             ctx: ToolContext,
         ): ToolOutput {
             val tap = action.payload as TapAction
-            val pre = epilogue.begin()
-            val ok = gestures.tap(tap.point.x, tap.point.y, tap.durationMs)
-            if (!ok) {
-                return errorOutput(AppError(code = DeviceErrorCodes.GESTURE_CANCELLED, message = "点击手势被取消"))
+            val pre = epilogue.begin(ctx)
+            val route = router.attempt(routeRequest(tap, ctx))
+            val gesture =
+                if (route is NodeRoute.Done) {
+                    null
+                } else {
+                    tapGesture(tap) ?: return errorOutput(AppError(DeviceErrorCodes.GESTURE_CANCELLED, "点击手势被取消"))
+                }
+            val out = epilogue.finish(ctx, tap.resultText, tap.waitMs, ReplayInput(ID, pre, tap.replayArgs, gesture))
+            val moved = movedAfter(ctx, tap.snapshot, pre?.fingerprint)
+            return annotate(out, learn(ctx, route, moved), moved)
+        }
+
+        private fun routeRequest(
+            tap: TapAction,
+            ctx: ToolContext,
+        ): NodeRouteRequest =
+            NodeRouteRequest(
+                ctx = ctx,
+                snapshot = tap.snapshot,
+                point = tap.target,
+                kind = if (tap.long) NodeKind.LONG_CLICK else NodeKind.CLICK,
+                actionId = if (tap.long) NodeActionIds.LONG_CLICK else NodeActionIds.CLICK,
+            )
+
+        /** 动作后用同一个探针取指纹，与 pre 同口径；非 a11y 来源或没有节点树时不判断。 */
+        private suspend fun movedAfter(
+            ctx: ToolContext,
+            snapshot: ScreenSnapshot,
+            preFingerprint: String?,
+        ): Boolean? {
+            if (preFingerprint == null) return null
+            return router.movedOrNull(ctx, snapshot, preFingerprint, epilogue.fingerprintNow())
+        }
+
+        /** 把本次结果交给路由器学习；返回是否因此新近判定该应用屏蔽了节点动作。 */
+        private suspend fun learn(
+            ctx: ToolContext,
+            route: NodeRoute,
+            moved: Boolean?,
+        ): Boolean =
+            when (route) {
+                is NodeRoute.Done -> false.also { router.afterNodeDone(route.packageName, moved) }
+                is NodeRoute.Rejected -> router.afterGesture(ctx, route.packageName, moved)
+                is NodeRoute.Skipped -> router.afterGesture(ctx, route.packageName, moved)
             }
-            val gesture = gestureJson(tap.point.x, tap.point.y, tap.durationMs)
-            return epilogue.finish(ctx, tap.resultText, tap.waitMs, ReplayInput(ID, pre, tap.replayArgs, gesture))
+
+        private suspend fun tapGesture(tap: TapAction): JsonObject? =
+            if (gestures.tap(tap.point.x, tap.point.y, tap.durationMs)) {
+                gestureJson(tap.point.x, tap.point.y, tap.durationMs)
+            } else {
+                null
+            }
+
+        private fun annotate(
+            out: ToolOutput,
+            newlyBlocked: Boolean,
+            moved: Boolean?,
+        ): ToolOutput {
+            val notes =
+                buildList {
+                    if (moved == false) add(NO_EFFECT_TEXT)
+                    if (newlyBlocked) add(BLOCKED_TEXT)
+                }
+            return if (notes.isEmpty()) out else out.copy(content = out.content + notes.map { Block.Text(it) })
         }
 
         private fun resultTextOf(
@@ -132,5 +204,13 @@ public class TapTool
 
         private companion object {
             const val ID = "tool.tap"
+
+            /** 指纹未变：提示模型换方式，而不是把它当成失败（有些点击本就不改变页面）。 */
+            val NO_EFFECT_TEXT =
+                "屏幕没有变化（${DeviceErrorCodes.NO_EFFECT}）：这次点击可能没有生效。" +
+                    "可以先 wait 等页面加载，或换一个位置，或用 observe 重新确认界面后再点。"
+
+            /** 新判定应用屏蔽节点动作：告知模型，之后工具自动改用手势，模型无需处理。 */
+            const val BLOCKED_TEXT = "该应用不响应无障碍节点操作，已记录；之后对它的点击、长按、滚动会自动改用手势。"
         }
     }

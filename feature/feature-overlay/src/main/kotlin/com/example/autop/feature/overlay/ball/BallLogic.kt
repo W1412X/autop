@@ -22,10 +22,12 @@ public fun deriveBallMode(
     accessibilityConnected: Boolean,
     maxSteps: Int,
     toolCategory: ToolCategory?,
+    recording: Boolean = false,
 ): BallMode {
     val run = active?.run
     return when {
         !accessibilityConnected -> BallMode.AccessibilityLost
+        recording && run == null -> BallMode.Recording
         run == null -> BallMode.Idle
         run.pauseReason == PauseReason.POLICY_BLOCKED -> BallMode.Blocked
         run.waitingQuestion != null -> BallMode.WaitingAnswer

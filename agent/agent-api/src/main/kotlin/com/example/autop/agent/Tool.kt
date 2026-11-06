@@ -143,6 +143,24 @@ public interface ToolContext {
     public val debugImages: Boolean
         get() = false
 
+    /**
+     * 在本 Run 的锁、超时、策略与审计约束下调用其他工具的入口（docs/design/flows.md §8.2）；
+     * 智能体 Run 与流程 Run 提供，其余上下文为 null。
+     */
+    public val tools: ToolInvoker?
+        get() = null
+
+    /**
+     * 为真时动作工具收尾只等界面稳定，不自动附观测、不做回放前采样
+     * （流程自己决定何时观测；docs/design/flows.md §8.2）。
+     */
+    public val quietActions: Boolean
+        get() = false
+
+    /** 本次调用来自智能体还是流程；`memory_write` 据此标记记忆来源。 */
+    public val origin: ToolOrigin
+        get() = ToolOrigin.AGENT
+
     /** 用于 saveBlob、history_recall。 */
     public val threadStore: ThreadStore
 
@@ -155,6 +173,33 @@ public interface ToolContext {
 
     /** 工具执行中的进度文本，给 UI。 */
     public fun emitProgress(text: String)
+}
+
+/** 工具调用的发起方。 */
+public enum class ToolOrigin {
+    AGENT,
+    FLOW,
+}
+
+/**
+ * 工具调用器（docs/design/flows.md §8.2）：与智能体相同的 schema 校验、读写锁、超时、
+ * 策略两步检查与审计。调用器本身不做名单限制，由调用方（流程校验器等）决定可用工具。
+ */
+public interface ToolInvoker {
+    /** 按模型可见名称（如 `tap`）执行一次调用；工具不存在或未启用返回 `agent.unknown_tool` 错误输出。 */
+    public suspend fun invoke(
+        toolName: String,
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolOutput
+}
+
+/** 为一次 Run 构造 [ToolInvoker]：按配置启用清单、[toolFilter] 与设备能力过滤工具，锁独立。 */
+public interface ToolInvokerFactory {
+    public fun create(
+        request: RunRequest,
+        toolFilter: Set<String>?,
+    ): ToolInvoker
 }
 
 /** Run 内共享值容器：键稳定的惰性单例。 */

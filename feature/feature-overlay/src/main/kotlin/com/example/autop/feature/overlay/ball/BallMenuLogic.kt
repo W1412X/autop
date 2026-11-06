@@ -10,6 +10,9 @@ import kotlin.math.sin
 
 /** 圆弧菜单动作（docs/tech/08 §5.1，N182）。 */
 public enum class BallMenuAction {
+    /** 录制流程：展开录制面板（flows-recording-recovery.md V5）。 */
+    RECORD,
+
     /** 即时创建任务（无任务运行时）：展开输入面板。 */
     CREATE_TASK,
 
@@ -32,7 +35,7 @@ public enum class BallMenuAction {
  */
 public fun deriveBallMenu(active: ActiveRunInfo?): List<BallMenuAction> =
     if (active == null) {
-        listOf(BallMenuAction.CREATE_TASK, BallMenuAction.OPEN_APP, BallMenuAction.TOOL_TEST)
+        listOf(BallMenuAction.CREATE_TASK, BallMenuAction.OPEN_APP, BallMenuAction.RECORD, BallMenuAction.TOOL_TEST)
     } else {
         listOf(BallMenuAction.VIEW_PROGRESS, BallMenuAction.ABORT_RUN, BallMenuAction.TOOL_TEST)
     }

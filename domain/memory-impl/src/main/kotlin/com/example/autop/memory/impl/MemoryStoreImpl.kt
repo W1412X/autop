@@ -155,7 +155,7 @@ public class MemoryStoreImpl
 
         override suspend fun markConfirmed(path: MemoryPath) {
             val node = db.nodeDao().get(path.value) ?: return
-            if (node.source != MemorySource.AGENT.name) return
+            if (node.source != MemorySource.AGENT.name && node.source != MemorySource.FLOW.name) return
             val confirmed = node.copy(source = MemorySource.USER.name, updatedAt = clock.nowMillis())
             db.nodeDao().update(confirmed)
             db.versionDao().insert(

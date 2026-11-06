@@ -11,6 +11,8 @@
     <string name="host_action_stop">停止</string>
     <string name="notify_channel_result">任务结果</string>
     <string name="notify_channel_alert">重要提醒</string>
+    <string name="notify_flow_suggest_title">可以保存为流程</string>
+    <string name="notify_flow_suggest_text">本次任务的操作可以保存为流程，下次一键运行。打开“流程”页查看草稿。</string>
     <string name="notify_result_title">任务已完成</string>
     <string name="notify_blocked_title">任务被拦截</string>
     <string name="notify_blocked_continue">我已手动完成，继续</string>

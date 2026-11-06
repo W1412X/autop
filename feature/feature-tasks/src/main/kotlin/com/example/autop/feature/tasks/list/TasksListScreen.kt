@@ -1,5 +1,7 @@
 /**
- * 任务列表页（docs/tech/08 §4.3）：分组标签 + 等待提醒横幅 + 任务行（启用开关）。
+ * 任务页（docs/tech/08 §4.3）：顶部「任务 / 流程」两个页签。
+ * 任务页签把条件触发、定时、手动合并成一个列表，内部按触发方式分组；
+ * 流程页签的内容由 app 通过 [flowsContent] 提供（feature 之间不互相依赖）。
  */
 package com.example.autop.feature.tasks.list
 
@@ -31,6 +33,7 @@ import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ListRow
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionSheet
+import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.TopLevelHeader
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -44,6 +47,7 @@ import com.example.autop.feature.tasks.sourceLabel
 public fun TasksListScreen(
     state: TasksListUiState,
     onAction: (TasksListAction) -> Unit,
+    flowsContent: @Composable () -> Unit = {},
 ) {
     var menuTaskId by remember { mutableStateOf<String?>(null) }
     Column(
@@ -55,34 +59,33 @@ public fun TasksListScreen(
         TopLevelHeader(
             title = stringResource(R.string.tasks_title),
             actions = {
+                val onAdd =
+                    if (state.page == TasksPage.FLOWS) {
+                        TasksListAction.CreateFlow
+                    } else {
+                        TasksListAction.CreateTask
+                    }
                 AutopIconButton(
                     icon = AutopIcons.Add,
-                    contentDescription = stringResource(R.string.tasks_new),
-                    onClick = { onAction(TasksListAction.CreateTask) },
+                    contentDescription =
+                        stringResource(
+                            if (state.page ==
+                                TasksPage.FLOWS
+                            ) {
+                                R.string.tasks_flow_new
+                            } else {
+                                R.string.tasks_new
+                            },
+                        ),
+                    onClick = { onAction(onAdd) },
                 )
             },
         )
-        TaskTabs(tab = state.tab, onAction = onAction)
-        if (state.waiting.isNotEmpty()) {
-            WaitingBanner(waiting = state.waiting.first(), onAction = onAction)
-        }
-        if (state.rows.isEmpty()) {
-            EmptyState(
-                text = stringResource(R.string.tasks_empty),
-                icon = AutopIcons.EventRepeat,
-                modifier = Modifier.fillMaxSize(),
-            )
+        PageTabs(page = state.page, onAction = onAction)
+        if (state.page == TasksPage.FLOWS) {
+            flowsContent()
         } else {
-            LazyColumn(modifier = Modifier.fillMaxSize()) {
-                items(state.rows, key = { it.id }) { row ->
-                    TaskRow(
-                        row = row,
-                        onClick = { onAction(TasksListAction.OpenDetail(row.id)) },
-                        onLongClick = { menuTaskId = row.id },
-                        onToggle = { onAction(TasksListAction.ToggleEnabled(row.id, it)) },
-                    )
-                }
-            }
+            TaskList(state = state, onAction = onAction, onLongPress = { menuTaskId = it })
         }
     }
     TaskDialogs(
@@ -136,18 +139,54 @@ private const val MENU_EDIT = "edit"
 private const val MENU_DELETE = "delete"
 
 @Composable
-private fun TaskTabs(
-    tab: TasksTab,
+private fun PageTabs(
+    page: TasksPage,
     onAction: (TasksListAction) -> Unit,
 ) {
-    val tabs = TasksTab.entries
-    SecondaryTabRow(selectedTabIndex = tabs.indexOf(tab)) {
-        tabs.forEach { item ->
+    val pages = TasksPage.entries
+    SecondaryTabRow(selectedTabIndex = pages.indexOf(page)) {
+        pages.forEach { item ->
             Tab(
-                selected = item == tab,
-                onClick = { onAction(TasksListAction.SetTab(item)) },
-                text = { Text(stringResource(tabLabelRes(item))) },
+                selected = item == page,
+                onClick = { onAction(TasksListAction.SetPage(item)) },
+                text = { Text(stringResource(pageLabelRes(item))) },
             )
+        }
+    }
+}
+
+/** 任务页签：等待横幅 + 按触发方式分组的任务列表（条件 / 定时 / 手动在同一列表内区分）。 */
+@Composable
+private fun TaskList(
+    state: TasksListUiState,
+    onAction: (TasksListAction) -> Unit,
+    onLongPress: (String) -> Unit,
+) {
+    if (state.waiting.isNotEmpty()) {
+        WaitingBanner(waiting = state.waiting.first(), onAction = onAction)
+    }
+    if (state.rows.isEmpty()) {
+        EmptyState(
+            text = stringResource(R.string.tasks_empty),
+            icon = AutopIcons.EventRepeat,
+            modifier = Modifier.fillMaxSize(),
+        )
+        return
+    }
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        TasksTab.entries.forEach { kind ->
+            val group = state.rows.filter { it.triggerKind == kind }
+            if (group.isNotEmpty()) {
+                item(key = "group-${kind.name}") { SectionTitle(text = stringResource(groupLabelRes(kind))) }
+                items(group, key = { it.id }) { row ->
+                    TaskRow(
+                        row = row,
+                        onClick = { onAction(TasksListAction.OpenDetail(row.id)) },
+                        onLongClick = { onLongPress(row.id) },
+                        onToggle = { onAction(TasksListAction.ToggleEnabled(row.id, it)) },
+                    )
+                }
+            }
         }
     }
 }
@@ -233,7 +272,13 @@ private fun scheduleText(row: TaskRowUi): String =
         "${stringResource(row.scheduleLabelRes)} ${row.triggerDetail}"
     }
 
-private fun tabLabelRes(tab: TasksTab): Int =
+private fun pageLabelRes(page: TasksPage): Int =
+    when (page) {
+        TasksPage.TASKS -> R.string.tasks_page_tasks
+        TasksPage.FLOWS -> R.string.tasks_page_flows
+    }
+
+private fun groupLabelRes(tab: TasksTab): Int =
     when (tab) {
         TasksTab.CONDITION -> R.string.tasks_tab_condition
         TasksTab.SCHEDULE -> R.string.tasks_tab_schedule

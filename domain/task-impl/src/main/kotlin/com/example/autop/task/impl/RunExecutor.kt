@@ -15,6 +15,8 @@ import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.flatMap
 import com.example.autop.core.common.getOrNull
 import com.example.autop.device.ScreenReader
+import com.example.autop.flow.FlowDefinition
+import com.example.autop.flow.FlowRunOptions
 import com.example.autop.llm.Block
 import com.example.autop.task.ChatTitleGenerator
 import com.example.autop.task.RunOrigin
@@ -24,6 +26,7 @@ import com.example.autop.task.Task
 import com.example.autop.task.impl.store.RunStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 
 /** Run 排队（供 DI 装配）。 */
 @Suppress("LongParameterList") // 端口装配面大是执行器职责的自然结果（DI 注入）
@@ -83,6 +86,18 @@ public class RunExecutor(
         return enqueue(origin, thread, listOf(Block.Text(task.goal)), vars, task)
     }
 
+    /** 独立流程运行入队（流程页「运行」与调试，docs/design/flows.md §9.2）。 */
+    suspend fun launchFlow(
+        flow: FlowDefinition,
+        params: JsonObject,
+        options: FlowRunOptions,
+        needsScreen: Boolean,
+    ): Outcome<RunRecord> {
+        val thread = threadStore.createThread(title = flow.name, parent = null)
+        val launch = FlowLaunch(flow, params, options, needsScreen)
+        return enqueue(RunOrigin.TASK_MANUAL, thread, emptyList(), emptyMap(), null, launch)
+    }
+
     /** 中断恢复 Run（docs/tech/04 §3.11）：同一 Thread 新起，input 为恢复提示文本。 */
     suspend fun launchResume(
         source: RunRecord,
@@ -107,6 +122,7 @@ public class RunExecutor(
         input: List<Block>,
         vars: Map<String, String>,
         task: Task?,
+        flow: FlowLaunch? = null,
     ): Outcome<RunRecord> {
         val now = clock.nowMillis()
         val record =
@@ -126,7 +142,7 @@ public class RunExecutor(
                 waitingQuestion = null,
             )
         runStore.save(record)
-        pending.put(record.id, PendingEntry(input = input, vars = vars, task = task))
+        pending.put(record.id, PendingEntry(input = input, vars = vars, task = task, flow = flow))
         scheduler.enqueue(record)
         scheduler.trySchedule()
         return Outcome.Ok(record)

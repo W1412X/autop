@@ -95,7 +95,7 @@ public class OpenAppTool
             app: AppAction,
             ctx: ToolContext,
         ): ToolOutput {
-            val pre = epilogue.begin()
+            val pre = epilogue.begin(ctx)
             if (!apps.launch(targetPkg)) {
                 return toolError(DeviceErrorCodes.LAUNCH_FAILED, "打开 $targetPkg 失败")
             }

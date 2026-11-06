@@ -1,11 +1,13 @@
 ---
 id: tool.scroll
-version: 2
+version: 3
 vars: []
 meta:
   param.direction: up、down、left 或 right
-  param.amount: page 整页或 half 半页，默认 page
+  param.steps: 连续滚动的次数，默认 1，最多 5；建议 1–3，滚完看一眼再决定是否继续
+  param.amount: 已废弃，会被忽略，不要填
   param.x: 滚动区域内一点，0–1000
   param.y: 滚动区域内一点，0–1000
 ---
-滚动屏幕。x、y 是要滚动区域里的任意一点（例如列表的 at），不填为屏幕中央。direction 是手指滑动的方向：up 是手指往上滑，用来查看下方的内容；down 用来查看上方的内容。
+滚动屏幕，每次相当于人手滑动一下，距离由滚动区域的大小决定，不能指定“一页”或“半页”。x、y 是要滚动的区域里的任意一点（例如列表的 at），不填为屏幕中央；有多个可滚动区域（如弹窗里的列表）时一定要填。direction 是手指滑动的方向：up 是手指往上滑，用来查看下方的内容；down 用来查看上方的内容。内容不够时多滚几次或用 steps；结果提示“已到头”就不要再向该方向滚动。
+

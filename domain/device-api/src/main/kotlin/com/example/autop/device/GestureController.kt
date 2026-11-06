@@ -12,6 +12,17 @@ public interface GestureController {
         args: Map<String, Any?> = emptyMap(),
     ): Boolean
 
+    /**
+     * 对快照里选中的节点执行无障碍动作：按 [windowId] 与根到节点的子序号路径 [path] 在实时树里定位，
+     * 只做过期校验（类名与 [expectedBounds] 必须与快照一致），不做别的匹配。不走输入管道。
+     */
+    public suspend fun performAtPath(
+        windowId: Int,
+        path: List<Int>,
+        expectedBounds: Rect,
+        actionId: Int,
+    ): NodeActionOutcome
+
     /** 点击（或长按）坐标点；落点抖动由工具计算后传入（§5.2）。 */
     public suspend fun tap(
         x: Int,
@@ -36,6 +47,18 @@ public interface GestureController {
 
     /** 全局动作。 */
     public suspend fun globalAction(action: GlobalAction): Boolean
+}
+
+/** [GestureController.performAtPath] 的结果。 */
+public enum class NodeActionOutcome {
+    /** 应用接受了动作（返回 true）；不代表界面一定变化。 */
+    DONE,
+
+    /** 节点存在但应用拒绝了动作（返回 false）；动作没有执行。 */
+    REJECTED,
+
+    /** 实时树里找不到对应节点（界面已变化或窗口消失）；动作没有执行。 */
+    STALE,
 }
 
 /** 全局动作（映射 AccessibilityService.GLOBAL_ACTION_*）。 */

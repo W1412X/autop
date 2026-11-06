@@ -1,13 +1,17 @@
 /**
  * JSON 树视图（N210）：工具测试输出与参数按树级展开查看。
  * 容器节点可逐层展开折叠；非 JSON 文本原样退回等宽纯文本展示。
+ * 树整体可横向滑动：层级很深时缩进撑宽内容，不再被屏幕宽度截断。
  */
 package com.example.autop.core.ui.component
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -23,8 +27,14 @@ import com.example.autop.core.common.JsonTreeParser
 /** 容器节点默认展开深度（0＝全折叠，1＝根展开）。 */
 private const val DEFAULT_EXPAND_DEPTH: Int = 1
 
-/** 每层缩进宽度。 */
+/** 每层相对父层的缩进宽度（子节点容器只缩进一次；父层的缩进已包含在外层容器里，不能再按深度累乘）。 */
 private const val INDENT_DP: Int = 12
+
+/**
+ * 叶子值的最大宽度：横向滚动容器给子项的是无限宽度，超长字符串若不设上限会变成一行超宽文本，
+ * 超过 Compose 单次测量的宽度上限；到达该宽度后换行。
+ */
+private const val LEAF_VALUE_MAX_WIDTH_DP: Int = 480
 
 /** 展开标记。 */
 private const val EXPANDED_MARK: String = "▾"
@@ -56,7 +66,9 @@ public fun JsonTreeView(
     }
     val expanded = remember(text) { mutableStateMapOf<String, Boolean>() }
     Column(modifier = modifier) {
-        JsonNodeView(node = root, path = "", depth = 0, expanded = expanded)
+        Column(modifier = Modifier.horizontalScroll(rememberScrollState())) {
+            JsonNodeView(node = root, path = "", depth = 0, expanded = expanded)
+        }
         if (tree.trailing.isNotBlank()) {
             Text(
                 text = tree.trailing,
@@ -77,7 +89,7 @@ private fun JsonNodeView(
     expanded: MutableMap<String, Boolean>,
 ) {
     when (node) {
-        is JsonTreeNode.Leaf -> LeafView(node = node, depth = depth)
+        is JsonTreeNode.Leaf -> LeafView(node = node)
         is JsonTreeNode.Branch ->
             BranchView(node = node, path = path, depth = depth, expanded = expanded)
     }
@@ -85,11 +97,8 @@ private fun JsonNodeView(
 
 /** 叶子节点：键名与值同行。 */
 @Composable
-private fun LeafView(
-    node: JsonTreeNode.Leaf,
-    depth: Int,
-) {
-    Row(modifier = Modifier.padding(start = (depth * INDENT_DP).dp)) {
+private fun LeafView(node: JsonTreeNode.Leaf) {
+    Row {
         if (node.key.isNotEmpty()) {
             Text(
                 text = node.key + ":",
@@ -102,6 +111,7 @@ private fun LeafView(
             text = node.value,
             style = MaterialTheme.typography.bodySmall,
             fontFamily = FontFamily.Monospace,
+            modifier = Modifier.widthIn(max = LEAF_VALUE_MAX_WIDTH_DP.dp),
         )
     }
 }
@@ -115,7 +125,7 @@ private fun BranchView(
     expanded: MutableMap<String, Boolean>,
 ) {
     val isOpen = expanded[path] ?: (depth < DEFAULT_EXPAND_DEPTH)
-    Column(modifier = Modifier.padding(start = (depth * INDENT_DP).dp)) {
+    Column {
         Row(
             modifier = Modifier.clickable { expanded[path] = !isOpen },
             verticalAlignment = Alignment.CenterVertically,
@@ -133,8 +143,10 @@ private fun BranchView(
             )
         }
         if (isOpen) {
-            node.children.forEachIndexed { index, child ->
-                JsonNodeView(node = child, path = "$path.$index", depth = depth + 1, expanded = expanded)
+            Column(modifier = Modifier.padding(start = INDENT_DP.dp)) {
+                node.children.forEachIndexed { index, child ->
+                    JsonNodeView(node = child, path = "$path.$index", depth = depth + 1, expanded = expanded)
+                }
             }
         }
     }

@@ -7,9 +7,11 @@ import com.example.autop.agent.Tool
 import com.example.autop.device.impl.tools.ClipboardGetTool
 import com.example.autop.device.impl.tools.ClipboardSetTool
 import com.example.autop.device.impl.tools.DeviceStateTool
+import com.example.autop.device.impl.tools.DismissPopupTool
 import com.example.autop.device.impl.tools.ListAppsTool
 import com.example.autop.device.impl.tools.OpenAppTool
 import com.example.autop.device.impl.tools.OpenUriTool
+import com.example.autop.device.impl.tools.RestartAppTool
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -23,6 +25,14 @@ public object ToolsSystemModule {
     @Provides
     @IntoSet
     public fun provideOpenAppTool(tool: OpenAppTool): Tool = tool
+
+    @Provides
+    @IntoSet
+    public fun provideDismissPopupTool(tool: DismissPopupTool): Tool = tool
+
+    @Provides
+    @IntoSet
+    public fun provideRestartAppTool(tool: RestartAppTool): Tool = tool
 
     @Provides
     @IntoSet

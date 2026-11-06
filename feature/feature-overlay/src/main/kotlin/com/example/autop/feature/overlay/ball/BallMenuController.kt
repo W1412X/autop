@@ -23,6 +23,7 @@ import com.example.autop.feature.overlay.panel.PanelController
 import com.example.autop.feature.overlay.panel.PanelRunActions
 import com.example.autop.feature.overlay.probe.ProbeController
 import com.example.autop.feature.overlay.progress.ProgressController
+import com.example.autop.feature.overlay.record.RecordController
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import javax.inject.Inject
@@ -41,6 +42,7 @@ public class BallMenuController
         private val panelController: PanelController,
         private val progressController: ProgressController,
         private val probeController: ProbeController,
+        private val recordController: RecordController,
     ) {
         private val openState = MutableStateFlow(false)
 
@@ -112,6 +114,7 @@ public class BallMenuController
                 BallMenuAction.OPEN_APP -> actions.openApp()
                 BallMenuAction.VIEW_PROGRESS -> progressController.show()
                 BallMenuAction.ABORT_RUN -> actions.stop()
+                BallMenuAction.RECORD -> recordController.show()
                 BallMenuAction.TOOL_TEST -> probeController.show()
             }
         }

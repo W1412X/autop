@@ -4,6 +4,7 @@
 package com.example.autop.task
 
 import com.example.autop.agent.ReplayScript
+import com.example.autop.core.common.FlowId
 import com.example.autop.core.common.TaskId
 import com.example.autop.policy.PolicyOverrides
 import kotlinx.serialization.SerialName
@@ -32,9 +33,30 @@ public data class Task(
     val outputSchema: JsonObject? = null,
     /** 回放脚本（docs/tech/04 §3.12，R1/A6）：最近一次成功 Run 录制的动作序列；null = 无。 */
     val replayScript: ReplayScript? = null,
+    /** 执行方式；默认智能体，FLOW 时按 [flow] 运行流程（docs/design/flows.md §9.1）。 */
+    val executor: TaskExecutor = TaskExecutor.AGENT,
+    /** executor = FLOW 时的流程绑定。 */
+    val flow: FlowBinding? = null,
     val createdAt: Long,
     val updatedAt: Long,
     val schemaVersion: Int = 1,
+)
+
+/** 任务的执行方式。 */
+@Serializable
+public enum class TaskExecutor {
+    /** 由智能体按自然语言目标执行。 */
+    AGENT,
+
+    /** 运行绑定的流程。 */
+    FLOW,
+}
+
+/** 任务与流程的绑定：流程 id 与固定的参数值。 */
+@Serializable
+public data class FlowBinding(
+    val flowId: FlowId,
+    val params: JsonObject = JsonObject(emptyMap()),
 )
 
 /** 锁屏时的行为。 */

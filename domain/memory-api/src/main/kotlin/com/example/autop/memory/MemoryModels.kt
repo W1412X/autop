@@ -16,7 +16,14 @@ public enum class MemorySource {
 
     /** 导入恢复。 */
     IMPORT,
+
+    /** 流程（自动化）写入，行为同 agent：不覆盖用户内容、可撤销、可确认。 */
+    FLOW,
 }
+
+/** 自动写入来源（agent 或流程）：受用户内容保护、可确认、可撤销。 */
+public val MemorySource.isAutomated: Boolean
+    get() = this == MemorySource.AGENT || this == MemorySource.FLOW
 
 /** 记忆条目（目录也是一种条目：content 为空）。 */
 @kotlinx.serialization.Serializable

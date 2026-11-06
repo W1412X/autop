@@ -25,6 +25,22 @@ public sealed interface TaskEditAction {
         val value: String,
     ) : TaskEditAction
 
+    /** 执行方式：false = 智能体，true = 流程。 */
+    public data class SetExecutorFlow(
+        val flow: Boolean,
+    ) : TaskEditAction
+
+    /** 选择绑定的流程。 */
+    public data class SetFlow(
+        val flowId: String,
+    ) : TaskEditAction
+
+    /** 填写流程参数。 */
+    public data class SetFlowParam(
+        val name: String,
+        val value: String,
+    ) : TaskEditAction
+
     /** 需要操作屏幕。 */
     public data class SetNeedsScreen(
         val value: Boolean,

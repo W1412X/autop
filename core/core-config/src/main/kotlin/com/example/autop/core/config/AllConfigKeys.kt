@@ -16,7 +16,8 @@ public object AllConfigKeys {
             PolicyConfig.ALL +
             TaskConfig.ALL +
             UiConfig.ALL +
-            FeaturesConfig.ALL
+            FeaturesConfig.ALL +
+            FlowConfig.ALL
 
     init {
         val duplicates = ALL.groupBy { it.path }.filterValues { it.size > 1 }.keys

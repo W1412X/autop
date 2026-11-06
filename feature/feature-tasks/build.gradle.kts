@@ -9,6 +9,8 @@ dependencies {
     implementation(project(":core:core-config"))
     implementation(project(":domain:task-api"))
     implementation(project(":agent:agent-api"))
+    // 任务可绑定流程：读取流程库与参数声明（docs/design/flows.md §9）。
+    implementation(project(":domain:flow-api"))
     testImplementation(project(":core:core-testing"))
 }
 

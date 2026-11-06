@@ -227,6 +227,16 @@
     <string name="blocked_package_hint">包名，如 com.example.app</string>
     <string name="blocked_package_invalid">请填写合法的包名</string>
 
+    <!-- 节点操作页（ADR-0015 me/node-action） -->
+    <string name="me_nav_node_action">节点操作</string>
+    <string name="node_action_title">节点操作</string>
+    <string name="node_action_note">点击、长按、滚动在能读到界面节点时，会优先用系统的无障碍节点动作，比坐标手势更稳。个别应用不响应节点动作，AutoP 发现后会自动记下，之后对它改用手势</string>
+    <string name="node_action_switch_title">优先使用节点操作</string>
+    <string name="node_action_switch_subtitle">关闭后一律使用坐标手势</string>
+    <string name="node_action_blocked_count">不响应节点操作的应用（%1$d）</string>
+    <string name="node_action_row_subtitle">%1$s · 记录于 %2$s · 点按恢复</string>
+    <string name="node_action_empty">还没有发现不响应节点操作的应用</string>
+
     <!-- 调试页（docs/tech/08 §4.6 me/debug） -->
     <string name="debug_title">调试</string>
     <string name="debug_capture">采集当前屏幕（3 秒后）</string>

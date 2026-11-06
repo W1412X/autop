@@ -8,12 +8,7 @@ package com.example.autop.feature.overlay.ball
 
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.animateColorAsState
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -36,19 +31,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.scale
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSemanticColors
 import com.example.autop.core.ui.theme.tone
+import com.example.autop.feature.overlay.rememberBreath
+import com.example.autop.feature.overlay.rememberRotation
 
 /** 球直径（docs/tech/08 §5.1）。 */
 internal val BALL_SIZE = 52.dp
@@ -102,7 +99,12 @@ private const val STATE_TRANSITION_MS = 250
 /** 进度环比例变化的过渡时长。 */
 private const val RING_TRANSITION_MS = 300
 
-/** 脉冲（角标/光晕）周期。 */
+/** 呼吸光晕随呼吸缩放的下限（只向内收，不超出球窗口）与径向渐变中段停靠点。 */
+private const val HALO_SCALE_MIN = 0.9f
+private const val HALO_MID_STOP = 0.55f
+private const val HALO_MID_ALPHA = 0.45f
+
+/** 脉冲（角标/光晕）半周期（最暗到最亮）。 */
 private const val PULSE_PERIOD_MS = 1200
 
 /** 不定环旋转周期。 */
@@ -248,22 +250,22 @@ private fun BoxScope.OscillatingHalo(
     alphaMax: Float,
     periodMs: Long,
 ) {
-    val transition = rememberInfiniteTransition(label = "ball_halo")
-    val alpha by transition.animateFloat(
-        initialValue = alphaMin,
-        targetValue = alphaMax,
-        animationSpec =
-            infiniteRepeatable(
-                animation = tween(periodMs.coerceAtLeast(1L).toInt(), easing = LinearEasing),
-                repeatMode = RepeatMode.Reverse,
-            ),
-        label = "ball_halo_alpha",
-    )
-    Canvas(Modifier.matchParentSize().alpha(alpha)) {
+    // 进度只在 graphicsLayer 块（绘制阶段）里读取：每帧只重绘，不重组。
+    val breath = rememberBreath(halfPeriodMs = periodMs, enabled = true)
+    Canvas(
+        Modifier.matchParentSize().graphicsLayer {
+            val p = breath.value
+            alpha = alphaMin + (alphaMax - alphaMin) * p
+            val scale = HALO_SCALE_MIN + (1f - HALO_SCALE_MIN) * p
+            scaleX = scale
+            scaleY = scale
+        },
+    ) {
         drawCircle(
             brush =
                 Brush.radialGradient(
                     0f to color,
+                    HALO_MID_STOP to color.copy(alpha = HALO_MID_ALPHA),
                     1f to color.copy(alpha = 0f),
                     center = center,
                     radius = size.minDimension / 2,
@@ -284,14 +286,14 @@ private fun BoxScope.BallRing(
     spin: Boolean,
 ) {
     if (alpha <= 0f) return
-    val angleOffset = spinAngle(spin)
+    val angleOffset = rememberRotation(periodMs = SPIN_PERIOD_MS.toLong(), enabled = spin)
     Canvas(Modifier.matchParentSize().alpha(alpha)) {
         val stroke = Stroke(width = RING_WIDTH.toPx(), cap = StrokeCap.Round)
         val inset = stroke.width / 2
         val arcSize = Size(size.width - stroke.width, size.height - stroke.width)
         drawArc(
             color = color,
-            startAngle = START_ANGLE + angleOffset,
+            startAngle = START_ANGLE + angleOffset.value,
             sweepAngle = sweep,
             useCenter = false,
             topLeft = Offset(inset, inset),
@@ -301,26 +303,6 @@ private fun BoxScope.BallRing(
     }
 }
 
-/** 不定环旋转角度（动效关闭时恒 0，弧静止）。 */
-@Composable
-private fun spinAngle(spin: Boolean): Float =
-    if (spin) {
-        val transition = rememberInfiniteTransition(label = "ball_spin")
-        val angle by transition.animateFloat(
-            initialValue = 0f,
-            targetValue = FULL_CIRCLE,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(SPIN_PERIOD_MS, easing = LinearEasing),
-                    repeatMode = RepeatMode.Restart,
-                ),
-            label = "ball_spin_angle",
-        )
-        angle
-    } else {
-        0f
-    }
-
 /** 右上角角标（N185）：等待回答为脉冲圆点（[pulse] 关闭时静态圆点，提醒不消失）。 */
 @Composable
 private fun StateBadge(
@@ -329,33 +311,17 @@ private fun StateBadge(
     modifier: Modifier = Modifier,
 ) {
     if (pulse) {
-        val transition = rememberInfiniteTransition(label = "ball_pulse_badge")
-        val scale by transition.animateFloat(
-            initialValue = 1f,
-            targetValue = PULSE_SCALE_MAX,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(PULSE_PERIOD_MS, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-            label = "ball_pulse_badge_scale",
-        )
-        val alpha by transition.animateFloat(
-            initialValue = 1f,
-            targetValue = PULSE_ALPHA_MIN,
-            animationSpec =
-                infiniteRepeatable(
-                    animation = tween(PULSE_PERIOD_MS, easing = LinearEasing),
-                    repeatMode = RepeatMode.Reverse,
-                ),
-            label = "ball_pulse_badge_alpha",
-        )
+        val breath = rememberBreath(halfPeriodMs = PULSE_PERIOD_MS.toLong(), enabled = true)
         Box(
             modifier
                 .size(BADGE_SIZE)
-                .scale(scale)
-                .alpha(alpha)
-                .background(color, CircleShape),
+                .graphicsLayer {
+                    val p = breath.value
+                    val scale = 1f + (PULSE_SCALE_MAX - 1f) * p
+                    scaleX = scale
+                    scaleY = scale
+                    alpha = 1f - (1f - PULSE_ALPHA_MIN) * p
+                }.background(color, CircleShape),
         )
     } else {
         Box(
@@ -383,4 +349,5 @@ internal fun iconOf(
         BallMode.Paused -> Icons.Outlined.Pause
         BallMode.Blocked -> Icons.Outlined.Block
         BallMode.Idle, BallMode.WaitingAnswer, BallMode.AccessibilityLost -> AutopIcons.Orbit
+        BallMode.Recording -> AutopIcons.Record
     }

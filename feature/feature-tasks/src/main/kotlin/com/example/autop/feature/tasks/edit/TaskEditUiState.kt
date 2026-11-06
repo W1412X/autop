@@ -1,6 +1,8 @@
 /**
  * 任务编辑页界面状态（docs/tech/08 §4.3）：定时触发含单次日期 + 时/分/秒。
  */
+@file:Suppress("CyclomaticComplexMethod") // 表单校验逐字段分支
+
 package com.example.autop.feature.tasks.edit
 
 import com.example.autop.feature.tasks.cronTimeOf
@@ -10,6 +12,7 @@ import com.example.autop.task.GroupMode
 import com.example.autop.task.LockedBehavior
 import com.example.autop.task.ScheduleSpec
 import com.example.autop.task.Task
+import com.example.autop.task.TaskExecutor
 import com.example.autop.task.Trigger
 import java.time.Instant
 import java.time.LocalDate
@@ -44,6 +47,12 @@ public data class TaskEditUiState(
     val llmCondition: String = "",
     val cooldownMinutes: Int = DEFAULT_COOLDOWN_MINUTES,
     val dailyLimit: Int = DEFAULT_DAILY_LIMIT,
+    // 执行方式：智能体按目标执行，或运行绑定的流程
+    val executorFlow: Boolean = false,
+    val flowId: String = "",
+    val flowOptions: List<FlowOptionUi> = emptyList(),
+    /** 流程参数的输入文本（按参数声明在保存时转成 JSON）。 */
+    val flowParams: Map<String, String> = emptyMap(),
     // 执行
     val lockedRemind: Boolean = true,
     val priority: Int = 0,
@@ -57,6 +66,25 @@ public data class TaskEditUiState(
     val error: String? = null,
     /** 试运行里“直接运行一次”已成功发起。 */
     val simStarted: Boolean = false,
+)
+
+/** 可绑定的流程。 */
+public data class FlowOptionUi(
+    val id: String,
+    val name: String,
+    val params: List<FlowParamUi>,
+)
+
+/** 流程参数的表单描述。 */
+public data class FlowParamUi(
+    val name: String,
+    /** string /
+umber / oolean / list / object / 	ime / ny。 */
+    val type: String,
+    val required: Boolean,
+    val defaultText: String,
+    val description: String,
+    val secret: Boolean,
 )
 
 /** 试运行结果。 */
@@ -82,6 +110,8 @@ public enum class TaskEditError {
     TIME,
     COOLDOWN,
     LIMIT,
+    FLOW,
+    FLOW_PARAM,
 }
 
 /** 已有任务 → 表单。 */
@@ -96,6 +126,17 @@ internal fun TaskEditUiState.from(task: Task): TaskEditUiState {
         name = task.name,
         goal = task.goal,
         needsScreen = task.needsScreen,
+        executorFlow = task.executor == TaskExecutor.FLOW,
+        flowId =
+            task.flow
+                ?.flowId
+                ?.value
+                .orEmpty(),
+        flowParams =
+            task.flow?.params.orEmpty().mapValues { (_, v) ->
+                (v as? kotlinx.serialization.json.JsonPrimitive)?.content
+                    ?: v.toString()
+            },
         lockedRemind = task.lockedBehavior == LockedBehavior.REMIND,
         priority = task.priority,
         triggerKind = triggerKindOf(task.trigger),
@@ -118,7 +159,9 @@ internal fun TaskEditUiState.from(task: Task): TaskEditUiState {
 internal fun TaskEditUiState.validate(now: Long): String? =
     when {
         name.isBlank() -> TaskEditError.NAME.name
-        goal.isBlank() -> TaskEditError.GOAL.name
+        !executorFlow && goal.isBlank() -> TaskEditError.GOAL.name
+        executorFlow && flowId.isBlank() -> TaskEditError.FLOW.name
+        executorFlow && missingRequiredParam() -> TaskEditError.FLOW_PARAM.name
         triggerKind == EditTriggerKind.CONDITION && sourceId.isBlank() -> TaskEditError.SOURCE.name
         isBlankCron() -> TaskEditError.CRON.name
         isPastOnce(now) -> TaskEditError.TIME.name
@@ -133,6 +176,12 @@ internal fun TaskEditUiState.withUpcomingOnceDate(now: Long): TaskEditUiState =
         copy(date = date.plusDays(1))
     } else {
         this
+    }
+
+/** 绑定的流程有必填参数既没填也没默认值。 */
+private fun TaskEditUiState.missingRequiredParam(): Boolean =
+    flowOptions.firstOrNull { it.id == flowId }?.params.orEmpty().any { p ->
+        p.required && p.defaultText.isBlank() && flowParams[p.name].isNullOrBlank()
     }
 
 /** cron 自定义模式未填表达式。 */

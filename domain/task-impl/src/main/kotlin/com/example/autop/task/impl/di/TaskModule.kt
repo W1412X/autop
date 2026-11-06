@@ -23,6 +23,9 @@ import com.example.autop.device.ScreenLease
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.TouchShield
 import com.example.autop.device.UserActivityMonitor
+import com.example.autop.flow.FlowSession
+import com.example.autop.flow.FlowStore
+import com.example.autop.flow.FlowValidationService
 import com.example.autop.llm.LlmGateway
 import com.example.autop.memory.ExperienceExtractor
 import com.example.autop.task.AgentHostStatus
@@ -133,6 +136,8 @@ public object TaskModule {
     @Suppress("LongParameterList") // DI 装配方法，端口逐个注入是职责所在
     public fun provideRunRunner(
         agentSession: AgentSession,
+        flowSession: FlowSession,
+        flowStore: FlowStore,
         runStore: RunStore,
         pending: PendingRuns,
         observer: RunObserver,
@@ -151,6 +156,8 @@ public object TaskModule {
     ): RunRunner =
         RunRunner(
             agentSession = agentSession,
+            flowSession = flowSession,
+            flowStore = flowStore,
             runStore = runStore,
             pending = pending,
             observer = observer,
@@ -284,6 +291,19 @@ public object TaskModule {
         recovery: InterruptedRunRecovery,
         shield: TouchShield,
         logger: Logger,
+        flowStore: FlowStore,
+        flowValidation: FlowValidationService,
     ): RunCoordinator =
-        RunCoordinator(executor, observer, interaction, host, control, recovery, shield, logger)
+        RunCoordinator(
+            executor,
+            observer,
+            interaction,
+            host,
+            control,
+            recovery,
+            shield,
+            logger,
+            flowStore,
+            flowValidation,
+        )
 }

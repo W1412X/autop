@@ -17,6 +17,7 @@ import com.example.autop.memory.MemorySource
 import com.example.autop.memory.MemoryStore
 import com.example.autop.memory.MemoryWrite
 import com.example.autop.memory.WriteMode
+import com.example.autop.memory.isAutomated
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -103,7 +104,7 @@ public class NodeViewModel
                     content = node?.content.orEmpty(),
                     tags = node?.tags.orEmpty(),
                     links = node?.links?.map { link -> link.value }.orEmpty(),
-                    byAgent = node?.source == MemorySource.AGENT,
+                    byAgent = node?.source?.isAutomated == true,
                     version = node?.version ?: 0,
                     updatedAt = node?.updatedAt ?: 0,
                     versions = versions.map(::toRow),
@@ -160,7 +161,10 @@ public class NodeViewModel
         }
 
         private fun undoLastWrite() {
-            val latest = _uiState.value.versions.firstOrNull { it.source == MemorySource.AGENT.name }
+            val latest =
+                _uiState.value.versions.firstOrNull {
+                    it.source == MemorySource.AGENT.name || it.source == MemorySource.FLOW.name
+                }
             if (latest != null) {
                 revert(latest.id)
             }

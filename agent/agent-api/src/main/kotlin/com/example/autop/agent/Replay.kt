@@ -54,6 +54,9 @@ public data class ReplayableAction(
 public enum class MessageOrigin {
     MODEL,
     REPLAY,
+
+    /** 流程节点合成（docs/design/flows.md §9.3）。 */
+    FLOW,
 }
 
 /** 回放前比对用的端口：由 device-impl 实现，返回当前屏幕的语义样本。 */

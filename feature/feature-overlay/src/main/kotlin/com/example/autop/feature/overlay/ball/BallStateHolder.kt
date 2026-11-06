@@ -15,6 +15,7 @@ import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.UiConfig
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.flow.RecordingSession
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunService
 import kotlinx.coroutines.CoroutineScope
@@ -40,6 +41,7 @@ public class BallStateHolder
     @Inject
     constructor(
         private val runService: RunService,
+        private val recording: RecordingSession,
         accessibility: AccessibilityStatus,
         private val configProvider: ConfigProvider,
         private val positionStore: BallPositionStore,
@@ -68,9 +70,10 @@ public class BallStateHolder
                 accessibility.connected,
                 configProvider.observe().map { configBits(it[AgentConfig.BUDGET].maxSteps, it) },
                 toolCategory,
-            ) { active, connected, bits, tool ->
+                recording.state.map { it.active },
+            ) { active, connected, bits, tool, isRecording ->
                 BallUiState(
-                    mode = deriveBallMode(active, connected, bits.maxSteps, tool),
+                    mode = deriveBallMode(active, connected, bits.maxSteps, tool, isRecording),
                     breathMs = bits.breathMs,
                     motionEnabled = bits.motionEnabled,
                     doubleTapStops = bits.doubleTapStops,

@@ -5,7 +5,8 @@ package com.example.autop.feature.tasks.list
 
 /** 列表页状态。 */
 public data class TasksListUiState(
-    val tab: TasksTab = TasksTab.CONDITION,
+    /** 顶部页签：任务（条件/定时/手动合并显示）或流程。 */
+    val page: TasksPage = TasksPage.TASKS,
     val rows: List<TaskRowUi> = emptyList(),
     val waiting: List<WaitingRunUi> = emptyList(),
     val pendingDeleteId: String? = null,

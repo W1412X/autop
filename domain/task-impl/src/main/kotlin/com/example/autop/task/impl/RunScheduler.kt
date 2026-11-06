@@ -68,7 +68,7 @@ public class RunScheduler(
                     return@withLock
                 }
                 val task = pending.taskOf(record.id)
-                val needsScreen = task?.needsScreen ?: true
+                val needsScreen = pending.flowNeedsScreen(record.id) ?: task?.needsScreen ?: true
                 if (needsScreen && !accessibilityStatus.connected.value) {
                     notifier.notifyAccessibilityNeeded(ACCESSIBILITY_HINT)
                     markWaiting(record, RunStatus.WAITING_SCREEN)

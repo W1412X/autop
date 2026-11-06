@@ -12,6 +12,7 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.UserMessageKind
 import com.example.autop.agent.runtime.replay.ReplayStepResult
+import com.example.autop.agent.runtime.tools.RouterToolInvoker
 import com.example.autop.core.common.Outcome
 import com.example.autop.llm.Block
 
@@ -33,6 +34,7 @@ internal class ToolPhase(
             ask = ::askUser,
             progress = { text -> controller.emit(AgentEvent.ToolProgress(callId = "", text = text)) },
             modelVision = parts.modelVision,
+            tools = RouterToolInvoker(parts.router),
         )
     }
 

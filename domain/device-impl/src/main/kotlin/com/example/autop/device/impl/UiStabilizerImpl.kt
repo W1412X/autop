@@ -47,7 +47,8 @@ public class UiStabilizerImpl
                 val watcher =
                     launch(start = CoroutineStart.UNDISPATCHED) {
                         eventBus.events.collect { event ->
-                            if (event.type in STABILIZE_EVENTS) lastEventAt = clock.nowMillis()
+                            // 自家窗口（盾、指示、悬浮球等）的重排不是目标界面的变化，不计入稳定等待（ADR-0014）。
+                            if (event.type in STABILIZE_EVENTS && !event.isSelfOrigin) lastEventAt = clock.nowMillis()
                         }
                     }
                 try {

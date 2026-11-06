@@ -147,6 +147,8 @@ private class RecoveryFixture(
             runner =
                 RunRunner(
                     agentSession = FakeAgentSession(),
+                    flowSession = FakeFlowSession,
+                    flowStore = FakeFlowStore,
                     runStore = runStore,
                     pending = pending,
                     observer = RunObserver(runStore, config, clock),

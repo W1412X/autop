@@ -11,6 +11,10 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopButton
@@ -18,7 +22,9 @@ import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.ListRow
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionRow
+import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
@@ -52,6 +58,7 @@ public fun TaskEditScreen(
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item { DraftSection(state = state, onAction = onAction) }
             item { BasicSection(state = state, onAction = onAction) }
+            item { ExecutorSection(state = state, onAction = onAction) }
             item { TriggerForm(state = state, onAction = onAction) }
             item { ExecSection(state = state, onAction = onAction) }
             // 试运行只对条件触发有意义（定时/手动没有事件可比对）。
@@ -113,18 +120,88 @@ private fun BasicSection(
         spec = InputBarSpec(placeholder = stringResource(R.string.task_edit_name)),
         modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge),
     )
-    AutopInputBar(
-        value = state.goal,
-        onValueChange = { onAction(TaskEditAction.SetGoal(it)) },
-        spec = InputBarSpec(placeholder = stringResource(R.string.task_edit_goal), maxLines = 3),
-        modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge),
+    if (!state.executorFlow) {
+        AutopInputBar(
+            value = state.goal,
+            onValueChange = { onAction(TaskEditAction.SetGoal(it)) },
+            spec = InputBarSpec(placeholder = stringResource(R.string.task_edit_goal), maxLines = 3),
+            modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge),
+        )
+        SwitchRow(
+            title = stringResource(R.string.task_edit_needs_screen),
+            subtitle = stringResource(R.string.task_edit_needs_screen_hint),
+            checked = state.needsScreen,
+            onCheckedChange = { onAction(TaskEditAction.SetNeedsScreen(it)) },
+        )
+    }
+}
+
+/** 执行方式：智能体 / 流程；选流程后按其参数声明填写参数。 */
+@Composable
+private fun ExecutorSection(
+    state: TaskEditUiState,
+    onAction: (TaskEditAction) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    var picking by remember { mutableStateOf(false) }
+    SectionTitle(text = stringResource(R.string.task_edit_section_executor))
+    OptionRow(
+        title = stringResource(R.string.task_edit_executor),
+        subtitle = stringResource(R.string.task_edit_executor_hint),
+        value =
+            stringResource(
+                if (state.executorFlow) R.string.task_edit_executor_flow else R.string.task_edit_executor_agent,
+            ),
+        onClick = { onAction(TaskEditAction.SetExecutorFlow(!state.executorFlow)) },
     )
-    SwitchRow(
-        title = stringResource(R.string.task_edit_needs_screen),
-        subtitle = stringResource(R.string.task_edit_needs_screen_hint),
-        checked = state.needsScreen,
-        onCheckedChange = { onAction(TaskEditAction.SetNeedsScreen(it)) },
+    if (!state.executorFlow) return
+    val chosen = state.flowOptions.firstOrNull { it.id == state.flowId }
+    OptionRow(
+        title = stringResource(R.string.task_edit_flow_pick),
+        subtitle = null,
+        value = chosen?.name ?: stringResource(R.string.task_edit_flow_none),
+        onClick = { picking = true },
     )
+    if (chosen != null && chosen.params.isNotEmpty()) {
+        SectionTitle(text = stringResource(R.string.task_edit_flow_params))
+        chosen.params.forEach { p ->
+            AutopInputBar(
+                value = state.flowParams[p.name].orEmpty(),
+                onValueChange = { onAction(TaskEditAction.SetFlowParam(p.name, it)) },
+                spec = InputBarSpec(placeholder = paramHint(p), maxLines = 3),
+                modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge),
+            )
+        }
+    }
+    if (picking) {
+        OptionSheet(
+            title = stringResource(R.string.task_edit_flow_pick),
+            options = state.flowOptions.map { OptionItem(id = it.id, label = it.name) },
+            selectedId = state.flowId.ifBlank { null },
+            onSelect = {
+                picking = false
+                onAction(TaskEditAction.SetFlow(it))
+            },
+            onDismiss = { picking = false },
+        )
+    }
+}
+
+/** 参数输入框的占位提示：名称 + 说明，必填加标记，有默认值附上。 */
+@Composable
+private fun paramHint(p: FlowParamUi): String {
+    val required = if (p.required) " ${stringResource(R.string.task_edit_flow_param_required)}" else ""
+    val note =
+        p.description
+            .takeIf { it.isNotBlank() }
+            ?.let { " · $it" }
+            .orEmpty()
+    val default =
+        p.defaultText
+            .takeIf { it.isNotBlank() }
+            ?.let { " · $it" }
+            .orEmpty()
+    return "${p.name}$required$note$default"
 }
 
 @Composable
@@ -250,6 +327,8 @@ private fun errorText(code: String): String =
         TaskEditError.CRON.name -> stringResource(R.string.task_edit_error_cron)
         TaskEditError.TIME.name -> stringResource(R.string.task_edit_error_time)
         TaskEditError.COOLDOWN.name -> stringResource(R.string.task_edit_error_cooldown)
+        TaskEditError.FLOW.name -> stringResource(R.string.task_edit_error_flow)
+        TaskEditError.FLOW_PARAM.name -> stringResource(R.string.task_edit_error_flow_param)
         TaskEditError.LIMIT.name -> stringResource(R.string.task_edit_error_limit)
         else -> stringResource(R.string.task_edit_save_failed, code)
     }

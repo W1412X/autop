@@ -8,4 +8,6 @@ dependencies {
     api(project(":agent:agent-api"))
     api(project(":core:core-common"))
     api(project(":domain:policy-api"))
+    // 任务可绑定流程（Task.flow）；运行流程需要 FlowRunOptions。
+    api(project(":domain:flow-api"))
 }

@@ -14,6 +14,8 @@ import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.device.GestureController
 import com.example.autop.device.GlobalAction
+import com.example.autop.device.NodeActionOutcome
+import com.example.autop.device.Rect
 import com.example.autop.device.ResolvedNode
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
@@ -83,7 +85,7 @@ public class GestureControllerImpl
         ): Boolean {
             if (shellTap(x, y, durationMs)) return true
             val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
-            return stroke(path, durationMs, OP_TAP)
+            return stroke(path, durationMs, OP_TAP, pointRect(x, y))
         }
 
         /**
@@ -100,7 +102,7 @@ public class GestureControllerImpl
         ): Boolean {
             if (shellSwipe(fromX, fromY, toX, toY, durationMs)) return true
             val path = buildSwipePath(fromX, fromY, toX, toY, jitterPx)
-            return stroke(path, durationMs, OP_SWIPE)
+            return stroke(path, durationMs, OP_SWIPE, spanRect(fromX, fromY, toX, toY))
         }
 
         /** 当前焦点输入框；没有返回 null（§5.3）。 */
@@ -109,6 +111,50 @@ public class GestureControllerImpl
             val node = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
             val snapshot = NodeSnapshotReader.read(node, idx = 0, parent = null, childIndex = 0)
             return DirectResolvedNode(snapshot, node.windowId, node)
+        }
+
+        /** 按路径定位快照里选中的节点并执行无障碍动作；动作不走输入管道，无需放行触摸盾。 */
+        override suspend fun performAtPath(
+            windowId: Int,
+            path: List<Int>,
+            expectedBounds: Rect,
+            actionId: Int,
+        ): NodeActionOutcome {
+            val node = locate(windowId, path, expectedBounds) ?: return NodeActionOutcome.STALE
+            return try {
+                if (selfAction { node.performAction(actionId) }) NodeActionOutcome.DONE else NodeActionOutcome.REJECTED
+            } finally {
+                release(node)
+            }
+        }
+
+        /** 沿子序号路径走到节点，只比对 bounds 判断是否过期（不做语义匹配）；找不到或已变化返回 null。 */
+        private fun locate(
+            windowId: Int,
+            path: List<Int>,
+            expectedBounds: Rect,
+        ): AccessibilityNodeInfo? {
+            val service = holder.current() ?: return null
+            var current: AccessibilityNodeInfo =
+                service.windowList().firstOrNull { it.id == windowId }?.root ?: return null
+            for (position in path) {
+                val child = if (position in 0 until current.childCount) current.getChild(position) else null
+                release(current)
+                current = child ?: return null
+            }
+            val bounds = android.graphics.Rect()
+            current.getBoundsInScreen(bounds)
+            val same =
+                bounds.left == expectedBounds.l &&
+                    bounds.top == expectedBounds.t &&
+                    bounds.right == expectedBounds.r &&
+                    bounds.bottom == expectedBounds.b
+            if (!same) release(current)
+            return current.takeIf { same }
+        }
+
+        private fun release(node: AccessibilityNodeInfo) {
+            if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.TIRAMISU) node.recycle()
         }
 
         /** 构建滑动路径：在起止点间插入中间点并按 [jitterPx] 随机偏移，模拟真实手指。 */
@@ -139,13 +185,27 @@ public class GestureControllerImpl
             return path
         }
 
+        /** 点击的注入区域（一个像素）：只封锁落点所在的自家窗口（P2）。 */
+        private fun pointRect(
+            x: Int,
+            y: Int,
+        ): Rect = Rect(x, y, x + 1, y + 1)
+
+        /** 滑动的注入区域：起止点的包围盒（P2）。 */
+        private fun spanRect(
+            fromX: Int,
+            fromY: Int,
+            toX: Int,
+            toY: Int,
+        ): Rect = Rect(minOf(fromX, toX), minOf(fromY, toY), maxOf(fromX, toX) + 1, maxOf(fromY, toY) + 1)
+
         /** shell 注入点击：通道已连接时放行触摸盾＋标记自身动作窗口后注入 `input` 命令。 */
         private suspend fun shellTap(
             x: Int,
             y: Int,
             durationMs: Long,
         ): Boolean =
-            shellAction { shellInput.tap(x, y, durationMs) }.also { ok ->
+            shellAction(pointRect(x, y)) { shellInput.tap(x, y, durationMs) }.also { ok ->
                 if (ok) logger.i(TAG, EVENT_CHANNEL, "op" to OP_TAP, "channel" to CHANNEL_SHELL, "x" to x, "y" to y)
             }
 
@@ -157,7 +217,9 @@ public class GestureControllerImpl
             toY: Int,
             durationMs: Long,
         ): Boolean =
-            shellAction { shellInput.swipe(fromX, fromY, toX, toY, durationMs) }.also { ok ->
+            shellAction(
+                spanRect(fromX, fromY, toX, toY),
+            ) { shellInput.swipe(fromX, fromY, toX, toY, durationMs) }.also { ok ->
                 if (ok) {
                     logger.i(
                         TAG,
@@ -171,9 +233,12 @@ public class GestureControllerImpl
             }
 
         /** shell 注入包裹：通道未连接直接回落（返回 false）；注入同走输入管道，盾放行＋自身动作标记。 */
-        private suspend fun shellAction(block: suspend () -> Boolean): Boolean {
+        private suspend fun shellAction(
+            target: Rect?,
+            block: suspend () -> Boolean,
+        ): Boolean {
             if (shellInput.state.value != ShellState.Connected) return false
-            return shielded { selfAction { block() } }
+            return shielded(target) { selfAction { block() } }
         }
 
         /**
@@ -186,12 +251,12 @@ public class GestureControllerImpl
             if (keyCode != null && shellKeyEvent(keyCode)) return true
             // 回落无障碍 API
             logger.i(TAG, EVENT_CHANNEL, "op" to OP_GLOBAL_ACTION, "channel" to CHANNEL_A11Y)
-            return shielded { selfAction { holder.current()?.performGlobalAction(globalId(action)) == true } }
+            return shielded(null) { selfAction { holder.current()?.performGlobalAction(globalId(action)) == true } }
         }
 
         /** shell 注入按键事件。 */
         private suspend fun shellKeyEvent(keyCode: Int): Boolean =
-            shellAction { shellInput.keyEvent(keyCode) }.also { ok ->
+            shellAction(null) { shellInput.keyEvent(keyCode) }.also { ok ->
                 if (ok) {
                     logger.i(
                         TAG,
@@ -218,13 +283,14 @@ public class GestureControllerImpl
             path: Path,
             durationMs: Long,
             op: String,
+            target: Rect?,
         ): Boolean {
             val service = holder.current() ?: return false
             val stroke = GestureDescription.StrokeDescription(path, 0, durationMs)
             val gesture = GestureDescription.Builder().addStroke(stroke).build()
             // N186/N191：注入手势走输入管道，会被触摸盾截获——动作期间临时放行。
             logger.i(TAG, EVENT_CHANNEL, "op" to op, "channel" to CHANNEL_A11Y)
-            return shielded { selfAction { dispatchGesture(service, gesture) } }
+            return shielded(target) { selfAction { dispatchGesture(service, gesture) } }
         }
 
         /**
@@ -232,8 +298,11 @@ public class GestureControllerImpl
          * performGlobalAction 注入按键）期间临时放行触摸盾（beginAction 等放行落地后才注入，
          * 动作完成才收尾保证覆盖全程）；performNodeAction 不走输入管道无需放行。
          */
-        private suspend fun shielded(block: suspend () -> Boolean): Boolean {
-            touchShield.beginAction()
+        private suspend fun shielded(
+            target: Rect?,
+            block: suspend () -> Boolean,
+        ): Boolean {
+            touchShield.beginAction(target)
             return try {
                 block()
             } finally {

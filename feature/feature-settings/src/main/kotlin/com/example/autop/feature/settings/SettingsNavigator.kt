@@ -18,6 +18,7 @@ public enum class SettingsSection(
     SHELL("shell"),
     RULES("rules"),
     BLOCKED_APPS("blocked-apps"),
+    NODE_ACTION("node-action"),
     AUDIT("audit"),
     TASKS("tasks"),
     BUDGET("budget"),
@@ -41,6 +42,7 @@ public enum class SettingsSection(
                 this == SHELL ||
                 this == RULES ||
                 this == BLOCKED_APPS ||
+                this == NODE_ACTION ||
                 this == AUDIT ||
                 this == BUDGET ||
                 this == ADVANCED ||

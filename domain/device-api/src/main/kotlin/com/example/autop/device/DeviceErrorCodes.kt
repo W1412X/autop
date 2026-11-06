@@ -9,6 +9,9 @@ public object DeviceErrorCodes {
     /** 无障碍服务未连接。 */
     public const val SERVICE_UNAVAILABLE: String = "device.service_unavailable"
 
+    /** 点击后屏幕指纹未变化（点击可能没有生效；结果附提示，不算失败）。 */
+    public const val NO_EFFECT: String = "device.no_effect"
+
     /** 参数缺失/非法（如 tap 未给 id 或 x,y）。 */
     public const val INVALID_ARGUMENT: String = "device.invalid_argument"
 
@@ -38,6 +41,18 @@ public object DeviceErrorCodes {
 
     /** 启动应用失败。 */
     public const val LAUNCH_FAILED: String = "device.launch_failed"
+
+    /** 点位上没有可拾取的元素。 */
+    public const val ELEMENT_NOT_FOUND: String = "device.element_not_found"
+
+    /** 没有发现可关闭的弹窗。 */
+    public const val POPUP_NOT_FOUND: String = "device.popup_not_found"
+
+    /** 无法强制结束应用（shell 通道不可用或包名被拒绝）。 */
+    public const val RESTART_UNAVAILABLE: String = "device.restart_unavailable"
+
+    /** 强制结束应用失败（包名不合法或被保护）。 */
+    public const val RESTART_DENIED: String = "device.restart_denied"
 
     /** 打开 URI 失败。 */
     public const val URI_FAILED: String = "device.uri_failed"

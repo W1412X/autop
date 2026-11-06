@@ -14,8 +14,14 @@ class BallMenuLogicTest {
     @Test
     fun `idle shows create task and open app in order`() {
         assertThat(deriveBallMenu(null))
-            .containsExactly(BallMenuAction.CREATE_TASK, BallMenuAction.OPEN_APP, BallMenuAction.TOOL_TEST)
-            .inOrder()
+            .isEqualTo(
+                listOf(
+                    BallMenuAction.CREATE_TASK,
+                    BallMenuAction.OPEN_APP,
+                    BallMenuAction.RECORD,
+                    BallMenuAction.TOOL_TEST,
+                ),
+            )
     }
 
     @Test

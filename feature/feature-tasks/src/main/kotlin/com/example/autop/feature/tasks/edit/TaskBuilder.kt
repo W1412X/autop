@@ -3,15 +3,22 @@
  */
 package com.example.autop.feature.tasks.edit
 
+import com.example.autop.core.common.FlowId
 import com.example.autop.core.common.TaskId
 import com.example.autop.task.FilterClause
 import com.example.autop.task.FilterGroup
 import com.example.autop.task.FilterOp
+import com.example.autop.task.FlowBinding
 import com.example.autop.task.GroupMode
 import com.example.autop.task.LockedBehavior
 import com.example.autop.task.ScheduleSpec
 import com.example.autop.task.Task
+import com.example.autop.task.TaskExecutor
 import com.example.autop.task.Trigger
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import java.time.ZoneId
 
 /** 当前表单 → [Task]（[existingId] 为 null 时用 [newId] 建新任务）。 */
@@ -23,7 +30,9 @@ internal fun TaskEditUiState.buildTask(
     Task(
         id = existingId ?: TaskId(newId),
         name = name,
-        goal = goal,
+        goal = if (executorFlow) goal.ifBlank { flowOptions.firstOrNull { it.id == flowId }?.name.orEmpty() } else goal,
+        executor = if (executorFlow) TaskExecutor.FLOW else TaskExecutor.AGENT,
+        flow = if (executorFlow) FlowBinding(FlowId(flowId), flowParamsJson()) else null,
         trigger = buildTrigger(),
         needsScreen = needsScreen,
         lockedBehavior = if (lockedRemind) LockedBehavior.REMIND else LockedBehavior.SKIP,
@@ -31,6 +40,35 @@ internal fun TaskEditUiState.buildTask(
         createdAt = now,
         updatedAt = now,
     )
+
+/** 流程参数文本 → 按声明类型转 JSON；空值不写入（运行时用默认值）。 */
+internal fun TaskEditUiState.flowParamsJson(): JsonObject {
+    val declared =
+        flowOptions
+            .firstOrNull { it.id == flowId }
+            ?.params
+            .orEmpty()
+            .associateBy { it.name }
+    val out = LinkedHashMap<String, JsonElement>()
+    for ((key, text) in flowParams) {
+        if (text.isBlank()) continue
+        out[key] = paramJson(declared[key]?.type, text)
+    }
+    return JsonObject(out)
+}
+
+private fun paramJson(
+    type: String?,
+    text: String,
+): JsonElement =
+    when (type) {
+        "number", "time" -> text.trim().toDoubleOrNull()?.let { JsonPrimitive(it) } ?: JsonPrimitive(text)
+        "boolean" -> JsonPrimitive(text.trim().lowercase() in TRUE_WORDS)
+        "list", "object", "any" -> runCatching { Json.parseToJsonElement(text) }.getOrDefault(JsonPrimitive(text))
+        else -> JsonPrimitive(text)
+    }
+
+private val TRUE_WORDS = setOf("true", "是", "1")
 
 /** 当前表单的触发方式。 */
 internal fun TaskEditUiState.buildTrigger(): Trigger =

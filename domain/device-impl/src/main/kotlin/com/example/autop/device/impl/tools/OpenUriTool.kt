@@ -61,7 +61,7 @@ public class OpenUriTool
             ctx: ToolContext,
         ): ToolOutput {
             val uri = action.payload as String
-            val pre = epilogue.begin()
+            val pre = epilogue.begin(ctx)
             if (!apps.openUri(uri)) {
                 return toolError(DeviceErrorCodes.URI_FAILED, "无法打开 $uri")
             }

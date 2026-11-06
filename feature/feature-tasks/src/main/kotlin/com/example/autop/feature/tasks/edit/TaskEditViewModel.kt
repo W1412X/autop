@@ -13,6 +13,9 @@ import com.example.autop.core.common.TaskId
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.TASK_ID_ARG
 import com.example.autop.feature.tasks.TasksNavigator
+import com.example.autop.flow.FlowParam
+import com.example.autop.flow.FlowStore
+import com.example.autop.flow.FlowValidationService
 import com.example.autop.task.ConditionResult
 import com.example.autop.task.FilterOp
 import com.example.autop.task.RunService
@@ -27,6 +30,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 
 /** 编辑页 ViewModel。 */
@@ -43,6 +47,8 @@ public class TaskEditViewModel
         private val sources: Set<@JvmSuppressWildcards TriggerSource>,
         private val ids: IdGenerator,
         private val clock: Clock,
+        private val flowStore: FlowStore,
+        private val flowValidation: FlowValidationService,
     ) : ViewModel() {
         private val taskId: String? =
             savedStateHandle.get<String>(TASK_ID_ARG)?.takeIf { it != NEW_TASK_ID }
@@ -57,6 +63,7 @@ public class TaskEditViewModel
             _uiState.update {
                 it.copy(sourceOptions = sources.map { s -> SourceOptionUi(s.id, s.fieldNames, s.requiresPermission) })
             }
+            loadFlowOptions()
             if (taskId != null) load(taskId)
         }
 
@@ -72,6 +79,16 @@ public class TaskEditViewModel
                 is TaskEditAction.SetName -> _uiState.update { it.copy(name = action.value) }
                 is TaskEditAction.SetGoal -> _uiState.update { it.copy(goal = action.value) }
                 is TaskEditAction.SetNeedsScreen -> _uiState.update { it.copy(needsScreen = action.value) }
+                is TaskEditAction.SetExecutorFlow -> _uiState.update { it.copy(executorFlow = action.flow) }
+                is TaskEditAction.SetFlow ->
+                    _uiState.update {
+                        it.copy(
+                            flowId = action.flowId,
+                            flowParams = emptyMap(),
+                        )
+                    }
+                is TaskEditAction.SetFlowParam ->
+                    _uiState.update { it.copy(flowParams = it.flowParams + (action.name to action.value)) }
                 is TaskEditAction.SetTriggerKind -> _uiState.update { it.copy(triggerKind = action.kind) }
                 is TaskEditAction.SetScheduleMode ->
                     _uiState.update {
@@ -111,6 +128,30 @@ public class TaskEditViewModel
                 TaskEditAction.Back -> navigator.navigateBack()
             }
         }
+
+        private fun loadFlowOptions() {
+            viewModelScope.launch {
+                val options =
+                    flowStore.listAll().map { stored ->
+                        FlowOptionUi(
+                            id = stored.id.value,
+                            name = stored.definition.name,
+                            params = stored.definition.params.map(::paramUi),
+                        )
+                    }
+                _uiState.update { it.copy(flowOptions = options) }
+            }
+        }
+
+        private fun paramUi(p: FlowParam): FlowParamUi =
+            FlowParamUi(
+                name = p.name,
+                type = p.type.name.lowercase(),
+                required = p.required,
+                defaultText = (p.default as? JsonPrimitive)?.content ?: p.default?.toString().orEmpty(),
+                description = p.description,
+                secret = p.secret,
+            )
 
         private fun load(id: String) {
             viewModelScope.launch {
@@ -203,11 +244,23 @@ public class TaskEditViewModel
                 return
             }
             viewModelScope.launch {
-                when (val result = taskRepository.save(buildTask())) {
+                val task = buildTask()
+                val toSave = if (state.executorFlow) task.copy(needsScreen = flowNeedsScreen(state.flowId)) else task
+                when (val result = taskRepository.save(toSave)) {
                     is Outcome.Ok -> navigator.navigateBack()
                     is Outcome.Err -> _uiState.update { it.copy(error = result.error.code) }
                 }
             }
+        }
+
+        /** 绑定流程是否需要屏幕（决定任务是否取屏幕租约、锁屏时是否提醒）。 */
+        private suspend fun flowNeedsScreen(flowId: String): Boolean {
+            val stored =
+                flowStore.get(
+                    com.example.autop.core.common
+                        .FlowId(flowId),
+                ) ?: return true
+            return flowValidation.needsScreen(stored.definition)
         }
 
         /** 当前表单 → Task（装配细节在 [buildTask] 扩展）。 */

@@ -5,10 +5,13 @@ package com.example.autop.feature.tasks.list
 
 /** 列表页意图。 */
 public sealed interface TasksListAction {
-    /** 切换分组标签。 */
-    public data class SetTab(
-        val tab: TasksTab,
+    /** 切换顶部页签（任务 / 流程）。 */
+    public data class SetPage(
+        val page: TasksPage,
     ) : TasksListAction
+
+    /** 新建流程（由 app 导航到流程创建入口）。 */
+    public data object CreateFlow : TasksListAction
 
     /** 打开详情。 */
     public data class OpenDetail(
@@ -56,9 +59,15 @@ public sealed interface TasksListAction {
     ) : TasksListAction
 }
 
-/** 列表分组。 */
+/** 任务按触发方式的内部分组（同一页签内按分组标题区分）。 */
 public enum class TasksTab {
     CONDITION,
     SCHEDULE,
     MANUAL,
+}
+
+/** 任务页顶部页签。 */
+public enum class TasksPage {
+    TASKS,
+    FLOWS,
 }

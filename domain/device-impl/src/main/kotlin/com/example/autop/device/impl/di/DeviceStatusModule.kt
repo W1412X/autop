@@ -8,6 +8,7 @@ import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.NotificationFeed
 import com.example.autop.device.OverlayHost
 import com.example.autop.device.OverlayPermission
+import com.example.autop.device.UserActionMonitor
 import com.example.autop.device.UserActivityMonitor
 import com.example.autop.device.impl.NotificationFeedImpl
 import com.example.autop.device.impl.PolicyWindowRedactor
@@ -15,6 +16,7 @@ import com.example.autop.device.impl.ServiceHolder
 import com.example.autop.device.impl.WindowRedactor
 import com.example.autop.device.impl.overlay.OverlayPermissionImpl
 import com.example.autop.device.impl.overlay.OverlayWindowManager
+import com.example.autop.device.impl.record.RecordingActionMonitor
 import com.example.autop.device.impl.touch.UserActivityMonitorImpl
 import dagger.Module
 import dagger.Provides
@@ -37,6 +39,10 @@ public object DeviceStatusModule {
     @Provides
     @Singleton
     public fun provideUserActivityMonitor(impl: UserActivityMonitorImpl): UserActivityMonitor = impl
+
+    @Provides
+    @Singleton
+    public fun provideUserActionMonitor(impl: RecordingActionMonitor): UserActionMonitor = impl
 
     @Provides
     @Singleton

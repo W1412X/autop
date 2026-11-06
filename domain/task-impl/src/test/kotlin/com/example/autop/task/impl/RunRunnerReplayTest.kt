@@ -161,6 +161,8 @@ private class ReplayFixture(
     private val runner =
         RunRunner(
             agentSession = session,
+            flowSession = FakeFlowSession,
+            flowStore = FakeFlowStore,
             runStore = runStore,
             pending = pending,
             observer = RunObserver(runStore, config, clock),

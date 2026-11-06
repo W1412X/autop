@@ -82,6 +82,22 @@ public interface UserInteraction {
     ): Outcome<String>
 }
 
+/**
+ * Run 谱系：流程的 `agent` 节点（及 handoff）会启动子 Run。子 Run 在 [UserInteraction] 里的
+ * 提问需要落到用户看得见的根 Run 上（docs/design/flows.md §6.9），由发起方登记父子关系。
+ */
+public interface RunLineage {
+    public fun register(
+        child: RunId,
+        parent: RunId,
+    )
+
+    /** 沿父链找到根 Run；没有登记过的 Run 返回自身。 */
+    public fun rootOf(runId: RunId): RunId
+
+    public fun unregister(child: RunId)
+}
+
 /** 审计端口：ToolRouter 对每次 WRITE_* 调用与策略决定调用一次。实现由 task-impl 提供。 */
 public interface ToolAuditSink {
     public suspend fun record(

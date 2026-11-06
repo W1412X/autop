@@ -78,6 +78,7 @@ private const val ICON_ALPHA_FULL: Float = 1f
  *
  * @param motionEnabled 动效是否开启（`ui.appearance.motionEnabled` ∧ `LocalMotionEnabled`）。
  */
+@Suppress("LongMethod") // 六态映射表：一个状态一个分支，拆开反而难读
 public fun ballVisualSpec(
     mode: BallMode,
     motionEnabled: Boolean,
@@ -87,6 +88,15 @@ public fun ballVisualSpec(
             BallVisualSpec(
                 ringTone = null,
                 ringKind = RingKind.NONE,
+                ringProgress = null,
+                haloKind = HaloKind.NONE,
+                badgeKind = BadgeKind.NONE,
+                iconAlpha = ICON_ALPHA_FULL,
+            )
+        BallMode.Recording ->
+            BallVisualSpec(
+                ringTone = StatusTone.WAITING,
+                ringKind = RingKind.FULL,
                 ringProgress = null,
                 haloKind = HaloKind.NONE,
                 badgeKind = BadgeKind.NONE,
@@ -148,6 +158,7 @@ public fun ballDescriptionOf(mode: BallMode): Int =
         BallMode.Idle -> R.string.overlay_ball_description
         is BallMode.Running -> R.string.overlay_ball_running_description
         BallMode.WaitingAnswer -> R.string.overlay_ball_waiting_description
+        BallMode.Recording -> R.string.overlay_ball_recording_description
         BallMode.Paused -> R.string.overlay_ball_paused_description
         BallMode.Blocked -> R.string.overlay_ball_blocked_description
         BallMode.AccessibilityLost -> R.string.overlay_ball_accessibility_lost_description

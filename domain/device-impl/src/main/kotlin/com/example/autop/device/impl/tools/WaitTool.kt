@@ -55,7 +55,8 @@ public class WaitTool
                         "until 至少需要一个条件",
                         hint = "可填 text_appears / text_disappears / package_is 之一",
                     )
-                else -> conditionWait(until, args.long("timeout_ms"), ctx)
+                // timeout_ms 写在 until 里是常见误用（模型按 until 的结构套参数），两处都认。
+                else -> conditionWait(until, args.long("timeout_ms") ?: until.long("timeout_ms"), ctx)
             }
         }
 

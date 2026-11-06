@@ -12,9 +12,11 @@ import com.example.autop.device.impl.touch.TouchShieldController
 import com.example.autop.feature.overlay.OverlayBallController
 import com.example.autop.feature.overlay.OverlayWindowIds
 import com.example.autop.feature.overlay.ball.BallMenuController
+import com.example.autop.feature.overlay.indicator.IndicatorController
 import com.example.autop.feature.overlay.panel.PanelController
 import com.example.autop.feature.overlay.probe.ProbeController
 import com.example.autop.feature.overlay.progress.ProgressController
+import com.example.autop.feature.overlay.record.RecordController
 import com.example.autop.task.impl.InterruptedRunRecovery
 import com.example.autop.task.impl.di.AppScope
 import com.example.autop.task.impl.store.AuditCleaner
@@ -49,6 +51,10 @@ class AutopApplication : Application() {
 
     @Inject lateinit var probeController: ProbeController
 
+    @Inject lateinit var recordController: RecordController
+
+    @Inject lateinit var indicatorController: IndicatorController
+
     @Inject lateinit var configProvider: ConfigProvider
 
     @Inject lateinit var userActivityMonitor: UserActivityMonitor
@@ -78,6 +84,11 @@ class AutopApplication : Application() {
         overlayWindows.register(OverlayWindowIds.PANEL, panelController.panelFactory())
         overlayWindows.register(OverlayWindowIds.PROGRESS, progressController.progressFactory())
         overlayWindows.register(OverlayWindowIds.PROBE, probeController.probeFactory())
+        overlayWindows.register(OverlayWindowIds.RECORD, recordController.recordFactory())
+        overlayWindows.register(OverlayWindowIds.PICKER, recordController.pickerFactory())
+        // ADR-0014：执行期指示在盾之上（不可触摸，不挡注入）。
+        overlayWindows.register(OverlayWindowIds.INDICATOR, indicatorController.indicatorFactory())
+        indicatorController.start()
         if (configProvider.current()[UiConfig.OVERLAY].enabled) {
             ballController.start()
         }

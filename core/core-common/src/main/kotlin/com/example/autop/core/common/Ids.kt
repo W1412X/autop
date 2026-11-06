@@ -23,6 +23,13 @@ public value class TaskId(
     val value: String,
 )
 
+/** 流程定义的 id（放在 core-common，避免 task-api 依赖 flow-api）。 */
+@JvmInline
+@Serializable
+public value class FlowId(
+    val value: String,
+)
+
 /**
  * id 生成器。实现必须是**时间有序**的（docs/tech/02 §1.2，UUIDv7 风格），
  * 这样按 id 排序即按创建时间排序，无需额外索引。

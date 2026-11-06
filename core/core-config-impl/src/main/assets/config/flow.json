@@ -1,0 +1,71 @@
+{
+  "schemaVersion": 2,
+  "flow": {
+    "run": {
+      "pollMs": 500,
+      "slowPollMs": 2000,
+      "waitTimeoutMs": 10000,
+      "targetWaitMs": 3000,
+      "observeCacheMs": 300,
+      "exprMaxSteps": 10000,
+      "maxVarBytes": 1048576,
+      "depthGuard": 200
+    },
+    "llm": {
+      "retries": 2,
+      "maxOutputTokens": 1024,
+      "dailyTokenBudget": 0
+    },
+    "agent": {
+      "maxSteps": 20
+    },
+    "api": {
+      "timeoutMs": 30000,
+      "maxRequestBytes": 1048576,
+      "maxResponseBytes": 2097152,
+      "allowHttp": false
+    },
+    "trace": {
+      "inlineMaxChars": 16384,
+      "maxDetailRowsPerRun": 0
+    },
+    "author": {
+      "maxTurns": 30
+    },
+    "recovery": {
+      "enabled": true,
+      "ladder": [
+        "recovery.wait_stable",
+        "recovery.alt_click",
+        "recovery.scroll_into_view",
+        "recovery.dismiss_popup",
+        "recovery.back_and_retry",
+        "recovery.reopen_app",
+        "recovery.restart_app"
+      ],
+      "implicitMaxAttempts": 3,
+      "implicitHandoff": true,
+      "allowRestartApp": true,
+      "verifyTools": ["tap", "input_text", "open_app"],
+      "verifyTimeoutMs": 1500,
+      "verifyPollMs": 200,
+      "waitStableMs": 1500,
+      "altClickOffsets": [[0.5, 0.5], [0.3, 0.5], [0.7, 0.5], [0.5, 0.3], [0.5, 0.7]]
+    },
+    "directory": {
+      "maxItems": 20,
+      "maxChars": 1600
+    },
+    "save": {
+      "settleMinMs": 800,
+      "settleMaxMs": 1500,
+      "suggestMinSteps": 4
+    },
+    "recorder": {
+      "minGapMs": 100,
+      "maxSteps": 200,
+      "overlaySuppressMs": 800,
+      "recentShown": 8
+    }
+  }
+}

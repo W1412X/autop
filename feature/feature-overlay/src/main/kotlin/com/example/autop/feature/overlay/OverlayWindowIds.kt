@@ -16,4 +16,13 @@ public object OverlayWindowIds {
 
     /** 工具测试悬浮面板（选工具→任意页面执行→看输出；N198）。 */
     public const val PROBE: String = "overlay.probe"
+
+    /** 流程录制面板（flows-recording-recovery.md V5）。 */
+    public const val RECORD: String = "overlay.record"
+
+    /** 流程录制的整屏拾取层（点击元素，V5 拾取模式）。 */
+    public const val PICKER: String = "overlay.picker"
+
+    /** 执行期状态指示：屏幕边缘光 + 顶部胶囊（ADR-0014）；全屏、不可触摸、不可聚焦。 */
+    public const val INDICATOR: String = "overlay.indicator"
 }

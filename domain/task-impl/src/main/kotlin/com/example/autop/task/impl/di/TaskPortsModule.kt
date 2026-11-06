@@ -25,7 +25,8 @@ public object TaskPortsModule {
     public fun provideChatUserInteraction(
         runStore: RunStore,
         logger: Logger,
-    ): ChatUserInteraction = ChatUserInteraction(runStore, logger)
+        lineage: com.example.autop.agent.RunLineage,
+    ): ChatUserInteraction = ChatUserInteraction(runStore, logger, lineage)
 
     @Provides
     public fun provideUserInteraction(impl: ChatUserInteraction): UserInteraction = impl

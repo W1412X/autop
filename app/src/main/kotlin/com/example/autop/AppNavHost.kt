@@ -45,6 +45,10 @@ import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.feature.chat.ChatNavigator
 import com.example.autop.feature.chat.chatGraph
+import com.example.autop.feature.flows.FlowsNavigator
+import com.example.autop.feature.flows.FlowsRoutes
+import com.example.autop.feature.flows.flowsGraph
+import com.example.autop.feature.flows.list.FlowsListContent
 import com.example.autop.feature.memory.MemoryNavigator
 import com.example.autop.feature.memory.memoryGraph
 import com.example.autop.feature.onboarding.OnboardingNavigator
@@ -93,6 +97,7 @@ internal fun AppNavHost(
     val memoryNavigator = remember(navController) { createMemoryNavigator(navController) }
     val chatNavigator = remember(navController, context) { createChatNavigator(navController, context) }
     val tasksNavigator = remember(navController) { createTasksNavigator(navController) }
+    val flowsNavigator = remember(navController, context) { createFlowsNavigator(navController, context) }
     val onboardingNavigator = remember(navController, context) { createOnboardingNavigator(navController, context) }
     Column(modifier = Modifier.fillMaxSize()) {
         NavHost(
@@ -111,7 +116,9 @@ internal fun AppNavHost(
                 detailRoute = AutopRoutes.TASK_DETAIL,
                 runRoute = AutopRoutes.RUN_DETAIL,
                 navigator = tasksNavigator,
+                flowsContent = { FlowsListContent(navigator = flowsNavigator) },
             )
+            flowsGraph(FLOW_ROUTES, flowsNavigator)
             memoryGraph(
                 browseRoute = AutopRoutes.MEMORY_BROWSE,
                 nodeRoute = AutopRoutes.MEMORY_NODE,
@@ -390,6 +397,75 @@ private fun createTasksNavigator(navController: NavHostController): TasksNavigat
 
         override fun openRun(runId: String) {
             navController.navigate(AutopRoutes.runDetail(runId))
+        }
+
+        override fun openFlowCreate() {
+            navController.navigate(AutopRoutes.FLOW_CREATE)
+        }
+
+        override fun navigateBack() {
+            navController.popBackStack()
+        }
+    }
+
+/** 流程域路由模板（由 [AutopRoutes] 集中定义）。 */
+private val FLOW_ROUTES =
+    FlowsRoutes(
+        detail = AutopRoutes.FLOW_DETAIL,
+        editor = AutopRoutes.FLOW_EDITOR,
+        author = AutopRoutes.FLOW_AUTHOR,
+        create = AutopRoutes.FLOW_CREATE,
+        record = AutopRoutes.FLOW_RECORD,
+        endpoints = AutopRoutes.FLOW_ENDPOINTS,
+        state = AutopRoutes.FLOW_STATE,
+    )
+
+/** 流程导航回调：页面跳转与导出（系统分享文本）。 */
+private fun createFlowsNavigator(
+    navController: NavHostController,
+    context: Context,
+): FlowsNavigator =
+    object : FlowsNavigator {
+        override fun openFlow(flowId: String) {
+            navController.navigate(AutopRoutes.flowDetail(flowId))
+        }
+
+        override fun openEditor(flowId: String) {
+            navController.navigate(AutopRoutes.flowEditor(flowId))
+        }
+
+        override fun openAuthor(
+            draftId: String?,
+            editFlowId: String?,
+        ) {
+            navController.navigate(AutopRoutes.flowAuthor(draftId, editFlowId))
+        }
+
+        override fun openCreate() {
+            navController.navigate(AutopRoutes.FLOW_CREATE)
+        }
+
+        override fun openRunRecord(runId: String) {
+            navController.navigate(AutopRoutes.flowRecord(runId))
+        }
+
+        override fun openEndpoints() {
+            navController.navigate(AutopRoutes.FLOW_ENDPOINTS)
+        }
+
+        override fun openState(flowId: String) {
+            navController.navigate(AutopRoutes.flowState(flowId))
+        }
+
+        override fun shareText(text: String) {
+            runCatching {
+                val send =
+                    Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, text)
+                    }
+                context.startActivity(Intent.createChooser(send, null).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+            }.onFailure { context.navLogger().w(TAG_NAV, "share_flow_failed", error = it) }
         }
 
         override fun navigateBack() {

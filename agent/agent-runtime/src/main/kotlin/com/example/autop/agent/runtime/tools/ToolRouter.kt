@@ -53,6 +53,17 @@ internal class ToolRouter(
     /** 按 spec.name 找工具（熔断观察等用）。 */
     fun toolFor(name: String): Tool? = byName[name]
 
+    /**
+     * 按模型可见名称执行一次调用（流程等内部调用方，docs/design/flows.md §8.2）：
+     * 与普通调用同一条执行链（schema 校验、锁、超时、策略、审计），不触发 enricher。
+     */
+    suspend fun invokeByName(
+        callId: String,
+        toolName: String,
+        args: kotlinx.serialization.json.JsonObject,
+        ctx: ToolContext,
+    ): ToolOutput = executor.runOne(Block.ToolCall(callId, toolName, args.toString()), ctx, false).output
+
     /** 按工具 id 找模型可见名称（回放合成消息用）。 */
     fun toolNameOf(toolId: String): String? = byId[toolId]?.spec?.name
 

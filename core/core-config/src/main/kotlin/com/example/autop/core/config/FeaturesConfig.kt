@@ -12,6 +12,8 @@ import kotlinx.serialization.Serializable
 public data class FeaturesSection(
     @SerialName("experienceExtraction") val experienceExtraction: Boolean = false,
     @SerialName("subtasks") val subtasks: Boolean = false,
+    /** 流程（可重复自动化）总开关，docs/design/flows.md §15。 */
+    @SerialName("flows") val flows: Boolean = true,
 ) : ConfigSection
 
 /** `features` 领域全部配置键的登记（DI 多绑定与测试用）。 */

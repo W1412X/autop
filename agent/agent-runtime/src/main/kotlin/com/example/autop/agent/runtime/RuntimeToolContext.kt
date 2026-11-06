@@ -9,6 +9,7 @@ import com.example.autop.agent.RunRequest
 import com.example.autop.agent.RunScopedValues
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolContext
+import com.example.autop.agent.ToolInvoker
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import java.util.concurrent.ConcurrentHashMap
@@ -31,6 +32,7 @@ internal class RuntimeToolContext(
     private val ask: suspend (String, List<String>, Long) -> Outcome<String>,
     private val progress: (String) -> Unit,
     override val modelVision: Boolean = false,
+    override val tools: ToolInvoker? = null,
 ) : ToolContext {
     override val runId get() = req.runId
     override val threadId get() = req.threadId

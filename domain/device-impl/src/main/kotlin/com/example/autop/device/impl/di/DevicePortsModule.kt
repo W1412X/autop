@@ -7,7 +7,9 @@ import com.example.autop.agent.ReplayStateProbe
 import com.example.autop.agent.ReplayTargetResolver
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceStateProvider
+import com.example.autop.device.ElementPicker
 import com.example.autop.device.GestureController
+import com.example.autop.device.NodeActionBlockStore
 import com.example.autop.device.ObserveModeAvailability
 import com.example.autop.device.ScreenLease
 import com.example.autop.device.ScreenReader
@@ -23,8 +25,10 @@ import com.example.autop.device.impl.ObserveModeResolver
 import com.example.autop.device.impl.ScreenLeaseImpl
 import com.example.autop.device.impl.ScreenReaderImpl
 import com.example.autop.device.impl.UiStabilizerImpl
+import com.example.autop.device.impl.nodeaction.FileNodeActionBlockStore
 import com.example.autop.device.impl.observation.ReplayStateProbeImpl
 import com.example.autop.device.impl.observation.ReplayTargetResolverImpl
+import com.example.autop.device.impl.record.ElementPickerImpl
 import com.example.autop.device.impl.shell.AdbShellInput
 import com.example.autop.device.impl.shell.ShellKeepAliveImpl
 import com.example.autop.device.impl.touch.TouchShieldController
@@ -43,6 +47,10 @@ public object DevicePortsModule {
     @Provides
     @Singleton
     public fun provideScreenReader(impl: ScreenReaderImpl): ScreenReader = impl
+
+    @Provides
+    @Singleton
+    public fun provideElementPicker(impl: ElementPickerImpl): ElementPicker = impl
 
     @Provides
     @Singleton
@@ -88,6 +96,11 @@ public object DevicePortsModule {
     @Provides
     @Singleton
     public fun provideShellKeepAlive(impl: ShellKeepAliveImpl): ShellKeepAlive = impl
+
+    /** 节点动作屏蔽记录（ADR-0015）。 */
+    @Provides
+    @Singleton
+    public fun provideNodeActionBlockStore(impl: FileNodeActionBlockStore): NodeActionBlockStore = impl
 
     /** 观测模式可用性（设置页展示各模式能否用）。 */
     @Provides

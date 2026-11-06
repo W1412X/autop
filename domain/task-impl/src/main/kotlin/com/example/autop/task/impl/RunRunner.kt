@@ -6,6 +6,7 @@
 package com.example.autop.task.impl
 
 import com.example.autop.agent.AgentSession
+import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.ReplayConfig
 import com.example.autop.agent.ReplayPlan
 import com.example.autop.agent.ReplayRecorder
@@ -20,10 +21,16 @@ import com.example.autop.core.common.Clock
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Logger
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.FlowConfig
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.ScreenLease
+import com.example.autop.flow.FlowErrorCodes
+import com.example.autop.flow.FlowRunOptions
+import com.example.autop.flow.FlowRunRequest
+import com.example.autop.flow.FlowSession
+import com.example.autop.flow.FlowStore
 import com.example.autop.llm.Block
 import com.example.autop.memory.ExperienceExtractor
 import com.example.autop.memory.ExperienceRequest
@@ -32,6 +39,7 @@ import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
 import com.example.autop.task.TaskErrorCodes
+import com.example.autop.task.TaskExecutor
 import com.example.autop.task.TaskRepository
 import com.example.autop.task.core.OutputSchemaValidator
 import com.example.autop.task.impl.notify.UserNotifierImpl
@@ -39,13 +47,20 @@ import com.example.autop.task.impl.store.RunStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import kotlin.coroutines.cancellation.CancellationException
+
+/** 保存流程的工具名（与 flow-impl 的 `save_as_flow` 一致）。 */
+private const val SAVE_FLOW_TOOL: String = "save_as_flow"
 
 /** Run 执行器（供 DI 装配）。 */
 @Suppress("LongParameterList", "TooManyFunctions") // 执行面端口装配（DI 注入）与收口链各环节的自然结果
 public class RunRunner(
     private val agentSession: AgentSession,
+    private val flowSession: FlowSession,
+    private val flowStore: FlowStore,
     private val runStore: RunStore,
     private val pending: PendingRuns,
     private val observer: RunObserver,
@@ -70,15 +85,17 @@ public class RunRunner(
     ) {
         val startedAt = clock.nowMillis()
         runStore.mutate(record.id) { it.copy(status = RunStatus.RUNNING, startedAt = startedAt) }
-        val needsScreen = task?.needsScreen ?: true
+        val entry = pending.take(record.id)
+        val flowLaunch = flowLaunchOf(entry, task)
+        val needsScreen = flowLaunch?.needsScreen ?: task?.needsScreen ?: true
         val originPkg = if (needsScreen) deviceState.current().foregroundPackage else null
-        val request = buildRequest(record, task)
+        val request = if (flowLaunch == null && !isFlowTask(task)) buildRequest(record, task, entry) else null
         val finished =
             try {
                 if (needsScreen) {
-                    screenLease.withLease(record.id.value) { runBlock(record, request) }
+                    screenLease.withLease(record.id.value) { runBlock(record, request, flowLaunch, task, entry) }
                 } else {
-                    runBlock(record, request)
+                    runBlock(record, request, flowLaunch, task, entry)
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -91,23 +108,54 @@ public class RunRunner(
         val final = runStore.get(record.id)
         if (final != null) {
             val outputsValid = validateOutputs(task, finished, final)
-            if (outputsValid) {
+            if (outputsValid && !isFlowRun(flowLaunch, task)) {
                 val events = threadStore.events(record.threadId).filter { it.runId == record.id }
                 recordReplayScript(task, record, finished, events)
                 extractExperience(record, finished, events)
+                suggestFlowIfRepeatable(record, finished, events)
             }
             notifyIfBackground(final)
             returnToOrigin(task, originPkg)
         }
     }
 
+    private fun isFlowTask(task: Task?): Boolean = task?.executor == TaskExecutor.FLOW && task.flow != null
+
+    private fun isFlowRun(
+        launch: FlowLaunch?,
+        task: Task?,
+    ): Boolean = launch != null || isFlowTask(task)
+
+    /** 独立流程运行取暂存的启动数据；任务绑定的流程在此按 id 取最新定义。 */
+    private suspend fun flowLaunchOf(
+        entry: PendingEntry?,
+        task: Task?,
+    ): FlowLaunch? {
+        entry?.flow?.let { return it }
+        val binding = task?.flow?.takeIf { task.executor == TaskExecutor.FLOW } ?: return null
+        val stored = flowStore.get(binding.flowId) ?: return null
+        return FlowLaunch(stored.definition, binding.params, FlowRunOptions(), task.needsScreen)
+    }
+
     private suspend fun runBlock(
         record: RunRecord,
-        request: RunRequest,
+        request: RunRequest?,
+        flowLaunch: FlowLaunch?,
+        task: Task?,
+        entry: PendingEntry?,
     ): RunFinished {
         // N217：新 Run 的盾抑制清除在启动前同步落地（见 [TouchShieldWatcher.beginRun]）。
         touchShieldWatcher.beginRun()
-        val handle = agentSession.start(request, scope)
+        val handle =
+            when {
+                flowLaunch != null -> flowSession.start(flowRequest(record, task, entry, flowLaunch), scope)
+                request != null -> agentSession.start(request, scope)
+                else -> return RunFinished(
+                    status = RunOutcome.FAILED,
+                    summary = null,
+                    errorCode = FlowErrorCodes.NOT_FOUND,
+                )
+            }
         observer.begin(record, handle)
         val watcher = scope.launch { observer.watch(record.id, handle) }
         val shieldWatcher = scope.launch { touchShieldWatcher.watch(handle) }
@@ -119,12 +167,47 @@ public class RunRunner(
         }
     }
 
+    private fun flowRequest(
+        record: RunRecord,
+        task: Task?,
+        entry: PendingEntry?,
+        launch: FlowLaunch,
+    ): FlowRunRequest =
+        FlowRunRequest(
+            runId = record.id,
+            threadId = record.threadId,
+            flow = launch.definition,
+            params = launch.params,
+            trigger = triggerObject(entry?.vars.orEmpty()),
+            taskId = task?.id,
+            origin = record.origin.name.lowercase(),
+            options = launch.options,
+            config = configFor(task),
+        )
+
+    /** 	rigger. 前缀的变量 → 流程的 	rigger 命名空间；extracted. 子前缀收成子对象。 */
+    private fun triggerObject(vars: Map<String, String>): JsonObject {
+        val top = LinkedHashMap<String, JsonElement>()
+        val extracted = LinkedHashMap<String, JsonElement>()
+        for ((key, value) in vars) {
+            if (!key.startsWith(TRIGGER_PREFIX)) continue
+            val name = key.removePrefix(TRIGGER_PREFIX)
+            if (name.startsWith(EXTRACTED_PREFIX)) {
+                extracted[name.removePrefix(EXTRACTED_PREFIX)] = JsonPrimitive(value)
+            } else {
+                top[name] = JsonPrimitive(value)
+            }
+        }
+        if (extracted.isNotEmpty()) top[EXTRACTED_KEY] = JsonObject(extracted)
+        return JsonObject(top)
+    }
+
     private fun buildRequest(
         record: RunRecord,
         task: Task?,
-    ): RunRequest {
-        val entry = pending.take(record.id)
-        return RunRequest(
+        entry: PendingEntry?,
+    ): RunRequest =
+        RunRequest(
             runId = record.id,
             threadId = record.threadId,
             input = entry?.input ?: emptyList(),
@@ -134,7 +217,6 @@ public class RunRunner(
             toolFilter = task?.allowedTools,
             replay = replayPlan(record, task),
         )
-    }
 
     /** 定时/条件触发且有脚本时优先回放（docs/tech/04 §3.12，R1/A6）。 */
     @Suppress("ReturnCount") // 回放资格逐条早退是选择链的自然结构
@@ -198,6 +280,29 @@ public class RunRunner(
             }
         }
         return problems.isEmpty()
+    }
+
+    /**
+     * 成功且界面操作足够多、本次没有保存过流程时，提示用户把这次操作保存为流程
+     * （docs/design/flows-recording-recovery.md A5）。阈值来自 `flow.save.suggestMinSteps`。
+     */
+    private fun suggestFlowIfRepeatable(
+        record: RunRecord,
+        finished: RunFinished,
+        events: List<ThreadEvent>,
+    ) {
+        if (finished.status != RunOutcome.SUCCEEDED) return
+        val minSteps = configProvider.current()[FlowConfig.SAVE].suggestMinSteps
+        val steps = events.count { (it.payload as? ToolResultEvent)?.let { r -> r.ok && r.replay != null } == true }
+        if (steps < minSteps) return
+        val savedAlready =
+            events.any { ev ->
+                (ev.payload as? AssistantMessage)?.blocks?.any { b ->
+                    b is Block.ToolCall && b.name == SAVE_FLOW_TOOL
+                } ==
+                    true
+            }
+        if (!savedAlready) notifier.notifyFlowSuggestion(record.id)
     }
 
     /** 成功 Run 收口后录制回放脚本存回 Task（docs/tech/04 §3.12，R1/A6）。 */
@@ -276,6 +381,9 @@ public class RunRunner(
         const val RUN_MODE_FOREGROUND = "foreground"
         const val RUN_MODE_BACKGROUND = "background"
         const val KEY_POLICY = "policy"
+        const val TRIGGER_PREFIX = "trigger."
+        const val EXTRACTED_PREFIX = "extracted."
+        const val EXTRACTED_KEY = "extracted"
 
         /** 步骤摘要：每行结果首行截断长度与最大行数。 */
         const val STEP_TEXT_CHARS = 60

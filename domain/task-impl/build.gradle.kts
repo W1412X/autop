@@ -13,6 +13,7 @@ dependencies {
     implementation(project(":domain:device-api"))
     implementation(project(":agent:agent-api"))
     implementation(project(":domain:memory-api"))
+    implementation(project(":domain:flow-api"))
     implementation(project(":core:core-common"))
     implementation(project(":core:core-config"))
     implementation(project(":core:core-prompt"))

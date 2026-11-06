@@ -7,6 +7,11 @@ package com.example.autop
 
 import android.net.Uri
 import com.example.autop.feature.chat.THREAD_ARG
+import com.example.autop.feature.flows.AUTHOR_DRAFT_ARG
+import com.example.autop.feature.flows.AUTHOR_EDIT_ARG
+import com.example.autop.feature.flows.FLOW_ID_ARG
+import com.example.autop.feature.flows.FLOW_RUN_ID_ARG
+import com.example.autop.feature.flows.NO_ARG
 import com.example.autop.feature.memory.MEMORY_PATH_ARG
 import com.example.autop.feature.onboarding.ONBOARDING_MODE_ARG
 import com.example.autop.feature.onboarding.ONBOARDING_MODE_HEALTH
@@ -58,6 +63,44 @@ object AutopRoutes {
 
     /** Run 详情路由模板（docs/tech/08 §4.3 `runs/{runId}`；参数名取自 feature-tasks 的 [RUN_ID_ARG]）。 */
     val RUN_DETAIL: String = "runs/{${RUN_ID_ARG}}"
+
+    /** 流程详情路由模板。 */
+    val FLOW_DETAIL: String = "flows/detail/{${FLOW_ID_ARG}}"
+
+    /** 流程编辑器路由模板。 */
+    val FLOW_EDITOR: String = "flows/editor/{${FLOW_ID_ARG}}"
+
+    /** AI 创建流程路由模板（草稿 / 待修改流程，缺省用占位 [NO_ARG]）。 */
+    val FLOW_AUTHOR: String =
+        "flows/author?${AUTHOR_DRAFT_ARG}={${AUTHOR_DRAFT_ARG}}&${AUTHOR_EDIT_ARG}={${AUTHOR_EDIT_ARG}}"
+
+    /** 流程创建入口。 */
+    const val FLOW_CREATE: String = "flows/create"
+
+    /** 流程执行记录路由模板。 */
+    val FLOW_RECORD: String = "flows/record/{${FLOW_RUN_ID_ARG}}"
+
+    /** 接口登记页。 */
+    const val FLOW_ENDPOINTS: String = "flows/endpoints"
+
+    /** 流程状态管理路由模板。 */
+    val FLOW_STATE: String = "flows/state/{${FLOW_ID_ARG}}"
+
+    fun flowDetail(flowId: String): String = "flows/detail/$flowId"
+
+    fun flowEditor(flowId: String): String = "flows/editor/$flowId"
+
+    fun flowAuthor(
+        draftId: String?,
+        editFlowId: String?,
+    ): String =
+        "flows/author?${AUTHOR_DRAFT_ARG}=${Uri.encode(draftId ?: NO_ARG)}&${AUTHOR_EDIT_ARG}=${Uri.encode(
+            editFlowId ?: NO_ARG,
+        )}"
+
+    fun flowRecord(runId: String): String = "flows/record/$runId"
+
+    fun flowState(flowId: String): String = "flows/state/$flowId"
 
     /** 记忆浏览路由：[path] 经 URL 编码（如 `memory/browse?path=%2Fnotes`）。 */
     fun memoryBrowse(path: String = "/"): String = "memory/browse?path=${Uri.encode(path)}"

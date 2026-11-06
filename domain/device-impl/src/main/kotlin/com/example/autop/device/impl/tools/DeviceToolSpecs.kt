@@ -68,10 +68,12 @@ public object DeviceToolSpecs {
             integer("wait_ms")
         }
 
-    /** `tool.scroll`：只用手势；`x,y` 为滚动区域内一点。 */
+    /** `tool.scroll`：单步人手滑动，`steps` 连续多步；`x,y` 为滚动区域内一点。 */
     public val scroll: ToolSpec =
         toolSpec(name = "scroll", descriptionPromptId = "tool.scroll") {
             string("direction", required = true, enum = listOf("up", "down", "left", "right"))
+            integer("steps")
+            // 已废弃且被忽略：只为让旧流程里保存的 amount 仍能通过参数校验（ADR-0015）。
             string("amount", enum = listOf("page", "half"))
             integer("x")
             integer("y")
@@ -97,6 +99,16 @@ public object DeviceToolSpecs {
             )
         }
 
+    /** `tool.dismiss_popup`：无参数，自动识别并关闭遮挡页面的弹窗。 */
+    public val dismissPopup: ToolSpec =
+        toolSpec(name = "dismiss_popup", descriptionPromptId = "tool.dismiss_popup") {}
+
+    /** `tool.restart_app`：强制结束并重新打开应用；package 缺省时用当前前台应用。 */
+    public val restartApp: ToolSpec =
+        toolSpec(name = "restart_app", descriptionPromptId = "tool.restart_app") {
+            string("package")
+        }
+
     /** `tool.open_app`：`package` 与 `name` 二选一。 */
     public val openApp: ToolSpec =
         toolSpec(name = "open_app", descriptionPromptId = "tool.open_app") {
@@ -119,6 +131,7 @@ public object DeviceToolSpecs {
                 string("text_appears")
                 string("text_disappears")
                 string("package_is")
+                integer("timeout_ms")
             }
             integer("timeout_ms")
             oneOfRequired(listOf("ms"), listOf("until"))

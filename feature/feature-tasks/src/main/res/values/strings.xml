@@ -3,6 +3,20 @@
     <!-- 任务列表 -->
     <string name="tasks_title">任务</string>
     <string name="tasks_new">新建任务</string>
+    <string name="tasks_flow_new">新建流程</string>
+    <string name="tasks_page_tasks">任务</string>
+    <string name="tasks_page_flows">流程</string>
+    <string name="task_edit_section_executor">执行方式</string>
+    <string name="task_edit_executor">执行方式</string>
+    <string name="task_edit_executor_agent">智能体</string>
+    <string name="task_edit_executor_flow">流程</string>
+    <string name="task_edit_executor_hint">智能体按目标自主操作；流程按预先设计好的步骤运行，更快更稳定</string>
+    <string name="task_edit_flow_pick">选择流程</string>
+    <string name="task_edit_flow_none">未选择</string>
+    <string name="task_edit_flow_params">流程参数</string>
+    <string name="task_edit_flow_param_required">必填</string>
+    <string name="task_edit_error_flow">请选择要运行的流程</string>
+    <string name="task_edit_error_flow_param">还有必填的流程参数没有填写</string>
     <string name="tasks_tab_condition">条件触发</string>
     <string name="tasks_tab_schedule">定时</string>
     <string name="tasks_tab_manual">手动</string>

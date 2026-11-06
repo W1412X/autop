@@ -80,9 +80,54 @@ class BallStateHolderTest {
         assertThat(store.saved).isNull()
     }
 
+    private class FakeRecordingSession : com.example.autop.flow.RecordingSession {
+        override val state: kotlinx.coroutines.flow.StateFlow<com.example.autop.flow.RecordingState> =
+            kotlinx.coroutines.flow.MutableStateFlow(
+                com.example.autop.flow
+                    .RecordingState(),
+            )
+
+        override fun start() = Unit
+
+        override fun undo() = Unit
+
+        override suspend fun finish(
+            name: String,
+            paramNames: Map<String, String>,
+        ): com.example.autop.core.common.Outcome<String> =
+            com.example.autop.core.common.Outcome
+                .Ok("")
+
+        override fun cancel() = Unit
+
+        override fun typedInputs(): List<com.example.autop.flow.TypedInput> = emptyList()
+
+        override suspend fun polishName(
+            name: String,
+        ): com.example.autop.core.common.Outcome<com.example.autop.flow.PolishedName> =
+            com.example.autop.core.common.Outcome.Err(
+                com.example.autop.core.common
+                    .AppError(code = "test", message = "unused"),
+            )
+
+        override suspend fun trialRun(
+            scope: com.example.autop.flow.TrialScope,
+        ): com.example.autop.core.common.Outcome<com.example.autop.agent.RunOutcome> =
+            com.example.autop.core.common.Outcome.Err(
+                com.example.autop.core.common
+                    .AppError(code = "test", message = "unused"),
+            )
+
+        override fun addPicked(
+            element: com.example.autop.device.PickedElement,
+            kind: com.example.autop.flow.PickKind,
+        ) = Unit
+    }
+
     private fun newHolder(): BallStateHolder =
         BallStateHolder(
             runService = FakeRunService(),
+            recording = FakeRecordingSession(),
             accessibility = FakeAccessibilityStatus(),
             configProvider = FakeConfigProvider(),
             positionStore = store,

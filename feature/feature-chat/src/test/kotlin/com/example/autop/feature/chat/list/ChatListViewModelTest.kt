@@ -213,6 +213,16 @@ private class FakeRunService : RunService {
         answer: String,
     ): Unit = Unit
 
+    override suspend fun runFlow(
+        flowId: com.example.autop.core.common.FlowId,
+        params: kotlinx.serialization.json.JsonObject,
+        options: com.example.autop.flow.FlowRunOptions,
+    ): com.example.autop.core.common.Outcome<RunRecord> = error("unused")
+
+    override fun flowDebug(runId: RunId): com.example.autop.flow.FlowDebugControl? = null
+
+    override fun flowProgress(runId: RunId): StateFlow<com.example.autop.flow.FlowProgress>? = null
+
     override suspend fun runTaskNow(task: Task): com.example.autop.core.common.Outcome<RunRecord> = error("unused")
 
     override suspend fun resumeInterrupted(runId: RunId): com.example.autop.core.common.Outcome<RunRecord> =

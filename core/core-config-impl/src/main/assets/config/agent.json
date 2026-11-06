@@ -10,6 +10,7 @@
         "context.memory_index",
         "context.user_profile",
         "context.environment",
+        "context.flow_directory",
         "context.trigger",
         "context.trigger_memory",
         "context.goal"
@@ -27,6 +28,8 @@
         "tool.open_app",
         "tool.open_uri",
         "tool.wait",
+        "tool.dismiss_popup",
+        "tool.restart_app",
         "tool.list_apps",
         "tool.read_notifications",
         "tool.device_state",
@@ -41,7 +44,11 @@
         "tool.finish",
         "tool.ask_user",
         "tool.history_recall",
-        "tool.note"
+        "tool.note",
+        "tool.run_flow",
+        "tool.list_flows",
+        "tool.save_as_flow",
+        "tool.update_flow"
       ],
       "defaultTimeoutMs": 30000,
       "timeoutMs": {

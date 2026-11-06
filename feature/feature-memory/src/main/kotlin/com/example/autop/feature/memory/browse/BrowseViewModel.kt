@@ -20,6 +20,7 @@ import com.example.autop.memory.MemorySource
 import com.example.autop.memory.MemoryStore
 import com.example.autop.memory.MemoryWrite
 import com.example.autop.memory.WriteMode
+import com.example.autop.memory.isAutomated
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -144,7 +145,7 @@ public class BrowseViewModel
                         summary = child.summary,
                         childCount = child.childCount,
                         isDirectory = child.content.isBlank(),
-                        byAgent = child.source == MemorySource.AGENT,
+                        byAgent = child.source.isAutomated,
                     )
                 }
             _uiState.value =
@@ -168,7 +169,9 @@ public class BrowseViewModel
                 _uiState.value = _uiState.value.copy(recentChangesCount = null)
                 return
             }
-            val count = store.recentChanges(offset = 0, limit = RECENT_LIMIT, source = MemorySource.AGENT).size
+            val count =
+                store.recentChanges(offset = 0, limit = RECENT_LIMIT, source = MemorySource.AGENT).size +
+                    store.recentChanges(offset = 0, limit = RECENT_LIMIT, source = MemorySource.FLOW).size
             _uiState.value = _uiState.value.copy(recentChangesCount = count)
         }
 

@@ -66,12 +66,19 @@ public object TaskTriggerModule {
         runStore: RunStore,
         configProvider: ConfigProvider,
         sources: Set<@JvmSuppressWildcards TriggerSource>,
+        flowState: com.example.autop.flow.FlowStateStore,
     ): TaskStore =
         TaskStore(
             db = db,
             runStore = runStore,
             configProvider = configProvider,
             knownSources = { sources.map { it.id }.toSet() },
+            onDeleted = {
+                flowState.clearScope(
+                    com.example.autop.flow.FlowStateStore
+                        .taskScope(it.value),
+                )
+            },
         )
 
     @Provides

@@ -39,6 +39,54 @@
     <string name="ball_menu_progress">任务进度</string>
     <string name="ball_menu_abort">中止任务</string>
     <string name="ball_menu_tool_test">工具测试</string>
+    <string name="ball_menu_record">录制流程</string>
+
+    <!-- 流程录制面板（flows-recording-recovery.md V5） -->
+    <string name="overlay_ball_recording_description">正在录制流程，单击展开录制面板</string>
+    <string name="indicator_operating">AutoP 正在操作手机 · 第 %1$d 步</string>
+    <string name="record_title">录制流程</string>
+    <string name="record_hint">切到要录制的应用，正常操作即可。结束后保存为待确认的流程。</string>
+    <string name="record_status">已记录 %1$d 个操作</string>
+    <string name="record_status_compact">录制中 · 已记录 %1$d 步</string>
+    <string name="record_hint_short">切到要录制的应用，正常操作即可</string>
+    <string name="record_details">详情</string>
+    <string name="record_details_hide">收起详情</string>
+    <string name="record_recent_title">最近的操作</string>
+    <string name="record_recent_empty">还没有记录到操作</string>
+    <string name="record_step_click">点击「%1$s」</string>
+    <string name="record_step_click_plain">点击</string>
+    <string name="record_step_long_click">长按「%1$s」</string>
+    <string name="record_step_long_click_plain">长按</string>
+    <string name="record_step_input">输入「%1$s」</string>
+    <string name="record_step_input_plain">输入文字</string>
+    <string name="record_step_scroll_forward">向下滚动</string>
+    <string name="record_step_scroll_backward">向上滚动</string>
+    <string name="record_step_window">切换页面</string>
+    <string name="record_step_wait">等待「%1$s」出现</string>
+    <string name="record_step_wait_plain">等待元素出现</string>
+    <string name="record_start">开始录制</string>
+    <string name="record_undo">撤销上一步</string>
+    <string name="record_save">保存</string>
+    <string name="record_cancel">放弃</string>
+    <string name="record_close">收起</string>
+    <string name="record_pick">拾取元素</string>
+    <string name="record_pick_hint">点击屏幕上要拾取的元素</string>
+    <string name="record_pick_picked">已拾取元素，选择要添加的步骤</string>
+    <string name="record_pick_click">点击它</string>
+    <string name="record_pick_wait">等它出现</string>
+    <string name="record_pick_discard">取消拾取</string>
+    <string name="record_pick_failed">该位置没有可拾取的元素，请换一个位置</string>
+    <string name="record_param_title">以下输入可以设为参数（点选即可）</string>
+    <string name="record_polish">AI 整理名称</string>
+    <string name="record_polished">整理后的名称：%1$s</string>
+    <string name="record_polish_failed">AI 整理失败，将使用默认名称</string>
+    <string name="record_trial_all">试运行整个</string>
+    <string name="record_trial_last">试这一步</string>
+    <string name="record_trial_succeeded">试运行成功</string>
+    <string name="record_trial_failed">试运行失败，可以撤销或补充步骤后再试</string>
+    <string name="record_saved">已保存为待确认流程，请在“流程”页确认</string>
+    <string name="record_failed">保存失败，请重试</string>
+    <string name="record_default_name">录制的流程</string>
 
     <!-- 任务进度悬浮窗（docs/tech/08 §5.3，N182） -->
     <string name="progress_title">任务进度</string>
