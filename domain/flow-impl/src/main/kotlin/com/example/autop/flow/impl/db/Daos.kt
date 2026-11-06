@@ -200,9 +200,19 @@ internal interface FlowVersionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(entity: FlowVersionEntity)
 
+    /** 冲突（同一 flowId + version 已存在）时不写入，返回 -1；调用方据此重取版本号。 */
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertIfAbsent(entity: FlowVersionEntity): Long
+
     @Query("SELECT MAX(version) FROM flow_versions WHERE flowId = :flowId")
     suspend fun maxVersion(flowId: String): Int?
 
     @Query("SELECT * FROM flow_versions WHERE flowId = :flowId ORDER BY version DESC")
     suspend fun forFlow(flowId: String): List<FlowVersionEntity>
+
+    @Query("SELECT * FROM flow_versions WHERE flowId = :flowId AND version = :version")
+    suspend fun byVersion(
+        flowId: String,
+        version: Int,
+    ): FlowVersionEntity?
 }

@@ -30,6 +30,7 @@ import com.example.autop.flow.FlowRunStore
 import com.example.autop.flow.FlowSession
 import com.example.autop.flow.FlowStateStore
 import com.example.autop.flow.FlowStore
+import com.example.autop.flow.FlowVersionStore
 import com.example.autop.flow.FlowValidationService
 import com.example.autop.flow.RecordingSession
 import com.example.autop.flow.impl.author.AuthorDeps
@@ -49,6 +50,7 @@ import com.example.autop.flow.impl.store.RoomEndpointStore
 import com.example.autop.flow.impl.store.RoomFlowRunStore
 import com.example.autop.flow.impl.store.RoomFlowStateStore
 import com.example.autop.flow.impl.store.RoomFlowStore
+import com.example.autop.flow.impl.store.RoomFlowVersionStore
 import com.example.autop.flow.impl.tools.ListFlowsTool
 import com.example.autop.flow.impl.tools.RunFlowTool
 import com.example.autop.flow.impl.tools.SaveAsFlowTool
@@ -73,6 +75,7 @@ public class FlowStorage internal constructor(
     internal val flows: RoomFlowStore,
     internal val state: RoomFlowStateStore,
     internal val endpoints: RoomEndpointStore,
+    internal val versions: RoomFlowVersionStore,
 )
 
 /** flow 领域装配。 */
@@ -100,12 +103,23 @@ public object FlowModule {
         val runs = RoomFlowRunStore(db, context.filesDir, configProvider)
         // needsScreen 分析要读取其他流程（子流程）与工具元数据，用延迟获取避免构造期循环。
         val flows = RoomFlowStore(db, runs, clock) { analyzer.get().needsScreen(it) }
-        return FlowStorage(db, runs, flows, RoomFlowStateStore(db, clock), RoomEndpointStore(db, secrets))
+        return FlowStorage(
+            db,
+            runs,
+            flows,
+            RoomFlowStateStore(db, clock),
+            RoomEndpointStore(db, secrets),
+            RoomFlowVersionStore(db, clock),
+        )
     }
 
     @Provides
     @Singleton
     public fun provideFlowStore(storage: FlowStorage): FlowStore = storage.flows
+
+    @Provides
+    @Singleton
+    public fun provideFlowVersionStore(storage: FlowStorage): FlowVersionStore = storage.versions
 
     @Provides
     @Singleton

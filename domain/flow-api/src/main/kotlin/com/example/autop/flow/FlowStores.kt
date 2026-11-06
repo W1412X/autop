@@ -53,6 +53,39 @@ public interface FlowStore {
     public suspend fun exists(id: FlowId): Boolean
 }
 
+/** 流程的一个历史版本。 */
+public data class FlowVersion(
+    val flowId: String,
+    val version: Int,
+    val definition: FlowDefinition,
+    val createdAt: Long,
+    val reason: String?,
+)
+
+/**
+ * 流程版本留存（docs/design/flows-precondition-selfrepair.md S2）。
+ *
+ * 修订生效前把旧定义存进来，出问题可以回滚。恢复到某版本由调用方组合
+ * `get(flowId, version)` + `FlowStore.save(definition)` 完成，恢复本身也会追加一个新版本。
+ */
+public interface FlowVersionStore {
+    /** 保存一个历史版本；版本号在单事务内递增，避免并发撞号丢版本。 */
+    public suspend fun save(
+        flowId: String,
+        definition: FlowDefinition,
+        reason: String?,
+    )
+
+    /** 列出某流程的历史版本（新到旧）。 */
+    public suspend fun list(flowId: String): List<FlowVersion>
+
+    /** 取出某版本定义；不存在返回 null。 */
+    public suspend fun get(
+        flowId: String,
+        version: Int,
+    ): FlowDefinition?
+}
+
 /** 运行记录状态。 */
 @Serializable
 public enum class FlowRunStatus {

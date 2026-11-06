@@ -14,6 +14,8 @@ import com.example.autop.flow.FlowListItem
 import com.example.autop.flow.FlowStateStore
 import com.example.autop.flow.FlowStore
 import com.example.autop.flow.FlowTree
+import com.example.autop.flow.FlowVersion
+import com.example.autop.flow.FlowVersionStore
 import com.example.autop.flow.StoredFlow
 import com.example.autop.flow.impl.db.ApiEndpointEntity
 import com.example.autop.flow.impl.db.FlowEntity
@@ -114,6 +116,72 @@ internal class RoomFlowStore(
             createdAt = e.createdAt,
             updatedAt = e.updatedAt,
         )
+}
+
+/** 流程历史版本（`flow_versions` 表，docs/design/flows-precondition-selfrepair.md S2）。 */
+internal class RoomFlowVersionStore(
+    private val db: FlowsDb,
+    private val clock: Clock,
+) : FlowVersionStore {
+    private val json = AutopJson.default
+
+    override suspend fun save(
+        flowId: String,
+        definition: FlowDefinition,
+        reason: String?,
+    ) {
+        val dao = db.flowVersionDao()
+        val encoded = json.encodeToString(FlowDefinition.serializer(), definition)
+        // 取号与插入做原子化：主键冲突说明并发占用了同一版本号，重取再插，避免丢版本。
+        repeat(VERSION_ATTEMPTS) {
+            val next = (dao.maxVersion(flowId) ?: 0) + 1
+            val rowId =
+                dao.insertIfAbsent(
+                    FlowVersionEntity(
+                        flowId = flowId,
+                        version = next,
+                        definitionJson = encoded,
+                        createdAt = clock.nowMillis(),
+                        reason = reason,
+                    ),
+                )
+            if (rowId != -1L) return
+        }
+        // 重试耗尽（极端并发）：退回覆盖写入，保证这条版本不丢。
+        val next = (dao.maxVersion(flowId) ?: 0) + 1
+        dao.insert(
+            FlowVersionEntity(
+                flowId = flowId,
+                version = next,
+                definitionJson = encoded,
+                createdAt = clock.nowMillis(),
+                reason = reason,
+            ),
+        )
+    }
+
+    override suspend fun list(flowId: String): List<FlowVersion> =
+        db.flowVersionDao().forFlow(flowId).map { e ->
+            FlowVersion(
+                flowId = e.flowId,
+                version = e.version,
+                definition = json.decodeFromString(FlowDefinition.serializer(), e.definitionJson),
+                createdAt = e.createdAt,
+                reason = e.reason,
+            )
+        }
+
+    override suspend fun get(
+        flowId: String,
+        version: Int,
+    ): FlowDefinition? =
+        db.flowVersionDao().byVersion(flowId, version)?.let {
+            json.decodeFromString(FlowDefinition.serializer(), it.definitionJson)
+        }
+
+    private companion object {
+        const val VERSION_ATTEMPTS: Int = 3
+    }
 }
 
 /** 跨运行状态（`flow_state` 表）。 */
