@@ -4,9 +4,7 @@
  */
 package com.example.autop.feature.memory.browse
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -28,8 +26,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
-import com.example.autop.core.ui.component.AutopChip
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
@@ -45,7 +41,6 @@ import com.example.autop.core.ui.component.PagedListState
 import com.example.autop.core.ui.component.StatusChip
 import com.example.autop.core.ui.component.TopLevelHeader
 import com.example.autop.core.ui.component.subtitleParts
-import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
@@ -129,8 +124,8 @@ private fun BrowseContent(
 ) {
     Breadcrumbs(crumbs = state.crumbs, onAction = onAction)
     if (state.path == "/") {
-        state.recentChangesCount?.let { count ->
-            RecentChangesCard(count = count, onClick = onOpenChanges)
+        state.recentChangesCount?.takeIf { it > 0 }?.let { count ->
+            RecentChangesRow(count = count, onClick = onOpenChanges)
         }
     }
     when {
@@ -163,7 +158,7 @@ private fun SearchField(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.lg, vertical = spacing.sm),
+                .padding(horizontal = spacing.lg, vertical = spacing.xs),
         leading = {
             Icon(
                 imageVector = AutopIcons.Search,
@@ -175,24 +170,44 @@ private fun SearchField(
     )
 }
 
+/** 面包屑：只在进入子目录后出现，用文字路径而不是胶囊，当前层级加深显示。 */
 @Composable
 private fun Breadcrumbs(
     crumbs: List<String>,
     onAction: (BrowseAction) -> Unit,
 ) {
+    if (crumbs.size <= 1) return
     val spacing = LocalSpacing.current
     LazyRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.lg, vertical = spacing.xs),
-        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                .padding(horizontal = spacing.lg),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         itemsIndexed(crumbs) { index, crumb ->
-            AutopChip(
+            val current = index == crumbs.lastIndex
+            if (index > 0) {
+                Icon(
+                    imageVector = AutopIcons.ChevronRight,
+                    contentDescription = null,
+                    modifier = Modifier.size(IconSize.Sm.scaled()),
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
                 text = crumbSegmentLabel(crumb),
-                selected = index == crumbs.lastIndex,
-                onClick = { onAction(BrowseAction.OpenCrumb(index)) },
+                style = MaterialTheme.typography.bodyMedium,
+                color =
+                    if (current) {
+                        MaterialTheme.colorScheme.onSurface
+                    } else {
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                    },
+                modifier =
+                    Modifier
+                        .clickable(enabled = !current) { onAction(BrowseAction.OpenCrumb(index)) }
+                        .padding(vertical = spacing.sm, horizontal = spacing.xs),
             )
         }
     }
@@ -205,7 +220,7 @@ private fun ChildRow(
     onAction: (BrowseAction) -> Unit,
 ) {
     val subtitle =
-        if (row.isDirectory) {
+        if (row.isDirectory && row.childCount > 0) {
             subtitleParts(row.summary, stringResource(R.string.memory_child_count, row.childCount))
         } else {
             row.summary
@@ -303,9 +318,9 @@ private fun crumbSegmentLabel(crumb: String): String =
         crumb.substringAfterLast('/')
     }
 
-/** 「最近变更」入口卡片（N188 布局整理）：surfaceVariant α0.55 底、medium 圆角、行尾 chevron。 */
+/** 「最近变更」入口：无底色的一行，左标题右计数 + chevron。 */
 @Composable
-private fun RecentChangesCard(
+private fun RecentChangesRow(
     count: Int,
     onClick: () -> Unit,
 ) {
@@ -314,29 +329,20 @@ private fun RecentChangesCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.lg, vertical = spacing.xs)
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AutopAlpha.BLOCK_FILL),
-                    shape = MaterialTheme.shapes.medium,
-                ).clickable(onClick = onClick)
-                .padding(horizontal = spacing.md, vertical = spacing.sm),
+                .clickable(onClick = onClick)
+                .padding(horizontal = spacing.lg, vertical = spacing.md),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = stringResource(R.string.memory_recent_changes),
-                style = MaterialTheme.typography.bodyMedium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Text(
-                text = stringResource(R.string.memory_recent_changes_hint, count),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
+        Text(
+            text = stringResource(R.string.memory_recent_changes),
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(R.string.memory_recent_changes_hint, count),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
         Icon(
             imageVector = AutopIcons.ChevronRight,
             contentDescription = null,
