@@ -15,18 +15,12 @@ import com.example.autop.flow.Expect
 import com.example.autop.flow.ExpectKind
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowSettings
-import com.example.autop.flow.MatchMode
 import com.example.autop.flow.Node
 import com.example.autop.flow.Precondition
-import com.example.autop.flow.Target
-import com.example.autop.flow.TargetBy
-import com.example.autop.flow.TargetFallback
 import com.example.autop.flow.ToolNode
 import com.example.autop.flow.WaitFor
 import com.example.autop.flow.WaitNode
 import com.example.autop.flow.core.FlowToolRules
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -116,7 +110,7 @@ public object TrajectoryConverter {
                         ms = DelayRange(settleMinMs, settleMaxMs),
                     )
                 if (tool == "open_app") {
-                    pendingApp = step.replayArgs.str(ARG_PACKAGE)
+                    pendingApp = (step.replayArgs[ARG_PACKAGE] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
                 }
             }
         }
@@ -132,49 +126,17 @@ public object TrajectoryConverter {
     private fun tapNode(
         id: String,
         args: JsonObject,
-    ): ToolNode {
-        val extra = JsonObject(args.filterKeys { it !in INTERNAL_KEYS && it !in COORD_KEYS })
-        return ToolNode(id = id, tool = TOOL_TAP, args = extra, target = targetOf(args))
-    }
+    ): ToolNode =
+        ToolNode(
+            id = id,
+            tool = TOOL_TAP,
+            args = HitTarget.publicArgs(args, dropCoords = true),
+            target = HitTarget.targetOf(args),
+        )
 
     private fun genericNode(
         id: String,
         tool: String,
         args: JsonObject,
-    ): ToolNode = ToolNode(id = id, tool = tool, args = JsonObject(args.filterKeys { it !in INTERNAL_KEYS }))
-
-    /** 由命中回执生成目标：文字 > 描述 > 图标；都没有时只保留坐标后备。 */
-    private fun targetOf(args: JsonObject): Target {
-        val hit = hitOf(args)
-        val text = hit?.str("text")
-        val desc = hit?.str("desc")
-        val icon = hit?.str("icon")
-        val point = point(args)
-        val fallback = point?.let { TargetFallback(at = listOf(it.first, it.second)) }
-        return when {
-            text != null -> Target(by = TargetBy.TEXT, value = text, match = MatchMode.EQUALS, fallback = fallback)
-            desc != null -> Target(by = TargetBy.DESC, value = desc, match = MatchMode.EQUALS, fallback = fallback)
-            icon != null -> Target(by = TargetBy.ICON, value = icon, match = MatchMode.EQUALS, fallback = fallback)
-            else -> Target(by = TargetBy.TEXT, value = null, fallback = fallback)
-        }
-    }
-
-    private fun hitOf(args: JsonObject): JsonObject? {
-        val raw: JsonElement = args["_hit"] ?: return null
-        val obj =
-            when (raw) {
-                is JsonObject -> raw
-                is JsonPrimitive -> runCatching { Json.parseToJsonElement(raw.content) as? JsonObject }.getOrNull()
-                else -> null
-            }
-        return (obj?.get("hit") as? JsonObject) ?: obj
-    }
-
-    private fun JsonObject.str(key: String): String? = (get(key) as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
-
-    private fun point(args: JsonObject): Pair<Int, Int>? {
-        val x = (args["x"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return null
-        val y = (args["y"] as? JsonPrimitive)?.content?.toIntOrNull() ?: return null
-        return x to y
-    }
+    ): ToolNode = ToolNode(id = id, tool = tool, args = HitTarget.publicArgs(args, dropCoords = false))
 }
