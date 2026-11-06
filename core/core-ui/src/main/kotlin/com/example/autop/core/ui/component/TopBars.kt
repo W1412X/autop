@@ -53,7 +53,7 @@ public fun SubPageTopBar(
     }
 }
 
-/** 顶级页大标题：start 24 / end 12 / top 32 / bottom 20 内边距，headlineMedium。 */
+/** 顶级页大标题：start 24 / end 12 / top 32 / bottom 20 内边距，headlineSmall。 */
 @Composable
 public fun TopLevelHeader(
     title: String,
@@ -74,7 +74,7 @@ public fun TopLevelHeader(
     ) {
         Text(
             text = title,
-            style = MaterialTheme.typography.headlineMedium,
+            style = MaterialTheme.typography.headlineSmall,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
