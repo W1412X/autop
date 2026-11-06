@@ -161,6 +161,34 @@ public data class Anchor(
     @SerialName("target") val target: Target? = null,
 )
 
+/** 前置条件不满足时的处理策略。 */
+@Serializable
+public enum class PrePolicy {
+    /** 判定节点失败，进入 onFail 链。 */
+    @SerialName("fail")
+    FAIL,
+
+    /** 等待条件成立，超过 timeoutMs 仍不成立则判定失败。 */
+    @SerialName("wait")
+    WAIT,
+}
+
+/**
+ * 节点前置条件（docs/design/flows-precondition-selfrepair.md P1）。
+ *
+ * 不成立即判定节点失败，失败进入 `onFail` 链；不成立就跳过节点的需求用 `if` 表达。
+ * 条件求值本身出错（非法正则、模板缺变量等）不属于"条件不成立"，按流程定义错误快速失败。
+ */
+@Serializable
+public data class Precondition(
+    @SerialName("cond") val cond: Condition,
+    @SerialName("policy") val policy: PrePolicy = PrePolicy.FAIL,
+    /** 仅 WAIT 策略有效；null 用 `min(节点 timeoutMs, flow.precondition.waitTimeoutMs)`。 */
+    @SerialName("timeoutMs") val timeoutMs: Long? = null,
+    /** 失败说明；支持模板。 */
+    @SerialName("message") val message: String? = null,
+)
+
 /** 重试策略：PLAIN 为原地重复执行；ESCALATE 按恢复阶梯逐级升级。 */
 @Serializable
 public enum class RetryStrategy {
@@ -576,6 +604,9 @@ public sealed interface Node {
     public val confirm: Confirm?
     public val timeoutMs: Long?
     public val trace: TraceLevel?
+
+    /** 进入本节点前的前置断言；null = 不检查。 */
+    public val pre: Precondition?
 }
 
 /** 调用工具。 */
@@ -590,6 +621,7 @@ public data class ToolNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("tool") val tool: String,
     @SerialName("args") val args: JsonObject = JsonObject(emptyMap()),
     @SerialName("target") val target: Target? = null,
@@ -613,6 +645,7 @@ public data class ObserveNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("mode") val mode: String? = null,
     @SerialName("region") val region: List<Int>? = null,
     @SerialName("out") val out: String? = null,
@@ -677,6 +710,7 @@ public data class ReadNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("from") val from: ReadFrom,
     @SerialName("target") val target: Target? = null,
     @SerialName("attr") val attr: ReadAttr = ReadAttr.TEXT,
@@ -743,6 +777,7 @@ public data class WaitNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("for") val waitFor: WaitFor,
     /** `time`：毫秒或 `{min,max}`。 */
     @SerialName("ms") val ms: DelayRange? = null,
@@ -885,6 +920,7 @@ public data class LlmNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("role") val role: String? = null,
     @SerialName("system") val system: String? = null,
     @SerialName("prompt") val prompt: String,
@@ -911,6 +947,7 @@ public data class IfNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("cond") val cond: Condition,
     @SerialName("then") val thenSteps: List<Node> = emptyList(),
     @SerialName("else") val elseSteps: List<Node> = emptyList(),
@@ -935,6 +972,7 @@ public data class SwitchNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("on") val on: String,
     @SerialName("cases") val cases: List<SwitchCase> = emptyList(),
     @SerialName("default") val default: List<Node> = emptyList(),
@@ -971,6 +1009,7 @@ public data class LoopNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("mode") val mode: LoopMode,
     /** `count` 次数表达式。 */
     @SerialName("count") val count: String? = null,
@@ -1000,6 +1039,7 @@ public data class BreakNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
 ) : Node
 
 /** 进入最近循环的下一轮。 */
@@ -1014,6 +1054,7 @@ public data class ContinueNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
 ) : Node
 
 /** 调用子流程。 */
@@ -1028,6 +1069,7 @@ public data class CallNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     /** 流程名或 ID。 */
     @SerialName("flow") val flow: String,
     @SerialName("args") val args: JsonObject = JsonObject(emptyMap()),
@@ -1046,6 +1088,7 @@ public data class AgentNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("goal") val goal: String,
     @SerialName("tools") val tools: List<String>? = null,
     @SerialName("maxSteps") val maxSteps: Int? = null,
@@ -1092,6 +1135,7 @@ public data class ApiNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("endpoint") val endpoint: String,
     @SerialName("method") val method: HttpMethod = HttpMethod.GET,
     @SerialName("path") val path: String = "",
@@ -1116,6 +1160,7 @@ public data class SetNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("vars") val vars: Map<String, String>,
 ) : Node
 
@@ -1157,6 +1202,7 @@ public data class StateNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("op") val op: StateOp,
     @SerialName("key") val key: String,
     /** `set` 的值表达式；`inc` 的增量表达式（默认 1）。 */
@@ -1181,6 +1227,7 @@ public data class LogNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("message") val message: String,
     @SerialName("level") val level: String = "info",
 ) : Node
@@ -1207,6 +1254,7 @@ public data class EndNode(
     @SerialName("confirm") override val confirm: Confirm? = null,
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
+    @SerialName("pre") override val pre: Precondition? = null,
     @SerialName("status") val status: EndStatus = EndStatus.SUCCESS,
     @SerialName("message") val message: String? = null,
     /** 输出名 → 表达式。 */

@@ -33,4 +33,10 @@ public object FlowErrorCodes {
 
     /** 恢复阶梯全部用尽。 */
     public const val RECOVERY_EXHAUSTED: String = "flow.recovery_exhausted"
+
+    /** 节点前置条件不满足，动作未执行。 */
+    public const val PRECONDITION_FAILED: String = "flow.precondition_failed"
+
+    /** 条件求值本身出错（非法正则、模板缺变量等），不属于条件不成立。 */
+    public const val PRECONDITION_ERROR: String = "flow.precondition_error"
 }
