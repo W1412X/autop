@@ -9,11 +9,15 @@
 package com.example.autop.flow.core.author
 
 import com.example.autop.agent.ReplayableAction
+import com.example.autop.flow.Condition
 import com.example.autop.flow.DelayRange
+import com.example.autop.flow.Expect
+import com.example.autop.flow.ExpectKind
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowSettings
 import com.example.autop.flow.MatchMode
 import com.example.autop.flow.Node
+import com.example.autop.flow.Precondition
 import com.example.autop.flow.Target
 import com.example.autop.flow.TargetBy
 import com.example.autop.flow.TargetFallback
@@ -57,6 +61,12 @@ public object TrajectoryConverter {
     /** 会切换页面的工具，之后插入等待。 */
     private val PAGE_CHANGING_TOOLS = setOf("open_app", "restart_app", "open_uri")
 
+    /** 动作后自动写效果校验的工具。 */
+    private val AUTO_EXPECT_TOOLS = setOf(TOOL_TAP, "input_text")
+
+    /** 会切换页面的工具里的包名参数键。 */
+    private const val ARG_PACKAGE = "package"
+
     /** 回放专用键，不能写进流程参数。 */
     private val INTERNAL_KEYS = setOf("_hit", "_locator")
 
@@ -66,6 +76,10 @@ public object TrajectoryConverter {
     /**
      * 转换操作轨迹为流程。[settleMinMs]..[settleMaxMs] 为页面切换后的等待区间。
      * 结果可能没有任何步骤（轨迹里没有可流程化的操作），调用方需要检查。
+     *
+     * 自动写入（docs/design/flows-precondition-selfrepair.md P7）：
+     * - tap / input_text 自动写 `expect.kind = SCREEN_CHANGED`，动作后校验效果；
+     * - 打开应用后紧跟的节点补 `pre`（前台应用为该包名），页面没打开成功时在动作之前就拦下。
      */
     public fun convert(
         flowId: String,
@@ -76,11 +90,24 @@ public object TrajectoryConverter {
         settleMaxMs: Long,
     ): FlowDefinition {
         val nodes = mutableListOf<Node>()
+        // 打开应用后待补的前置条件；补给下一个真实节点后清空。
+        var pendingApp: String? = null
         for (step in steps) {
             val tool = step.toolId.removePrefix(TOOL_PREFIX)
             if (tool in NON_REPLAYABLE || tool in FlowToolRules.FORBIDDEN) continue
             val id = "n${nodes.size + 1}"
-            nodes += if (tool == TOOL_TAP) tapNode(id, step.replayArgs) else genericNode(id, tool, step.replayArgs)
+            val base = if (tool == TOOL_TAP) tapNode(id, step.replayArgs) else genericNode(id, tool, step.replayArgs)
+            val withExpect =
+                if (tool in AUTO_EXPECT_TOOLS) {
+                    base.copy(expect = Expect(kind = ExpectKind.SCREEN_CHANGED))
+                } else {
+                    base
+                }
+            val withPre =
+                pendingApp?.let { app -> withExpect.copy(pre = Precondition(cond = Condition.App(value = app))) }
+                    ?: withExpect
+            pendingApp = null
+            nodes += withPre
             if (tool in PAGE_CHANGING_TOOLS) {
                 nodes +=
                     WaitNode(
@@ -88,6 +115,9 @@ public object TrajectoryConverter {
                         waitFor = WaitFor.TIME,
                         ms = DelayRange(settleMinMs, settleMaxMs),
                     )
+                if (tool == "open_app") {
+                    pendingApp = step.replayArgs.str(ARG_PACKAGE)
+                }
             }
         }
         return FlowDefinition(

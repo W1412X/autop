@@ -1,6 +1,6 @@
 ---
 id: flow.author.spec
-version: 1
+version: 2
 vars: [open, close]
 ---
 # 流程 JSON 规格
@@ -23,8 +23,8 @@ settings：observeMode("a11y"|"visual"|"llm"，默认 a11y)、onFail、maxDurati
 ## 条件 cond（if、loop、wait 用，字段 kind 区分）
 expr{expr} | screenText{op:contains|notContains|equals|regex,value} | element{op:exists|absent|checked|unchecked|enabled|disabled|focused,target} | app{value:包名,page} | screenChanged{since} | ime{shown} | device{metric:battery|charging|network|screenOn|locked,op:==|!=|<|<=|>|>=,value} | time{between:["HH:mm","HH:mm"],weekdays:[1..7]} | lastOk{node} | llm{prompt,screen,images,role} | all{of:[...]} | any{of:[...]} | not{of:条件}。
 
-## 节点（字段 type 区分；公共字段 id name comment enabled onFail confirm timeoutMs trace）
-- tool：{tool:"工具名",args:{...},target,target2,out}。target 解析成坐标写入 x,y（swipe 为 x1,y1 与 target2 的 x2,y2）。不能用 finish、update_plan、note、history_recall、observe、run_flow。
+## 节点（字段 type 区分；公共字段 id name comment enabled onFail confirm timeoutMs trace pre）
+- tool：{tool:"工具名",args:{...},target,target2,out,expect,anchor}。target 解析成坐标写入 x,y（swipe 为 x1,y1 与 target2 的 x2,y2）。expect：{kind:"screenChanged|text|textGone|element|elementGone|app",text,target,app,timeoutMs} 动作后的期望效果。anchor：{app,text,target} 恢复后判断是否回到原页面。不能用 finish、update_plan、note、history_recall、observe、run_flow。
 - observe：{mode,out}，结果 {mode,app,page,nodes,text}。
 - read：{from:"target|list|page|region|screenshot",target,attr:"text|desc|hint|state|checked|exists|bounds|count",region,out}。
 - wait：{for:"time|text|gone|element|elementGone|change|stable|app|notification|cond|until",ms,value,page,target,since,package,contains,sender,cond,onTimeout:"fail|continue",out}。
@@ -37,6 +37,9 @@ expr{expr} | screenText{op:contains|notContains|equals|regex,value} | element{op
 - set：{vars:{"名":"表达式"}}，按书写顺序求值。
 - state：{op:"get|set|inc|delete",key,value,scope:"task|flow",ttlMs,resetDaily,default,out}，跨运行保存状态。
 - log：{message,level}；end：{status:"success|failure",message,outputs:{"名":"表达式"}}。
+
+## 前置条件 pre（公共字段）
+{"pre":{"cond":条件,"policy":"fail|wait","timeoutMs":数字,"message":"失败说明"}}。进入节点前断言页面状态，不成立即判定节点失败并走 onFail；policy=wait 先等待条件成立，超时再失败。条件写法同 if 的 cond（kind：expr/screenText/element/app/screenChanged/ime/device/time/lastOk/all/any/not）。前置条件不支持 llm 判定。依赖前一步结果的节点都应该写 pre，上一步的 expect 就是下一步的 pre。
 
 ## 失败处理 onFail
 {"retry":{"max":3,"delayMs":数字或{"min","max"}},"handoff":{"goal","tools","maxSteps","maxDurationMs","role"},"steps":[兜底节点],"after":"retry|continue","final":"stop|skip|pause|succeed"}。顺序：retry → handoff → steps → final。confirm：{"message","timeoutMs","onTimeout":"skip|stop|proceed"}。
