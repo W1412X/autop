@@ -61,6 +61,14 @@ public object FlowToolSpecs {
             string("name", required = true)
             string("description")
         }
+
+    /** tool.patch_flow_node：用本次运行中成功的动作修订某个流程的单个节点。 */
+    public val patchFlowNode: ToolSpec =
+        toolSpec(name = "patch_flow_node", descriptionPromptId = "tool.patch_flow_node") {
+            string("flow", required = true)
+            string("node_id", required = true)
+            string("reason", required = true)
+        }
 }
 
 internal fun failure(

@@ -53,6 +53,7 @@ import com.example.autop.flow.impl.store.RoomFlowStore
 import com.example.autop.flow.impl.store.RoomFlowVersionStore
 import com.example.autop.flow.impl.tools.ListFlowsTool
 import com.example.autop.flow.impl.tools.RunFlowTool
+import com.example.autop.flow.impl.tools.PatchFlowNodeTool
 import com.example.autop.flow.impl.tools.SaveAsFlowTool
 import com.example.autop.flow.impl.tools.UpdateFlowTool
 import com.example.autop.llm.LlmGateway
@@ -265,6 +266,10 @@ public object FlowModule {
     @Provides
     @IntoSet
     public fun provideUpdateFlowTool(tool: UpdateFlowTool): Tool = tool
+
+    @Provides
+    @IntoSet
+    public fun providePatchFlowNodeTool(tool: PatchFlowNodeTool): Tool = tool
 
     @Provides
     @IntoSet

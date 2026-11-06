@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(34)
+        assertThat(toolTemplates).hasSize(35)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -94,6 +94,7 @@ class TemplateCatalogTest {
                 "tool.run_flow",
                 "tool.save_as_flow",
                 "tool.update_flow",
+                "tool.patch_flow_node",
                 "agent.breaker.repeat_warn",
                 "agent.breaker.same_error_stop",
                 "agent.breaker.same_error_warn",
