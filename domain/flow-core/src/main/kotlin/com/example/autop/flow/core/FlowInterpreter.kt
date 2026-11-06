@@ -7,10 +7,12 @@ import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.ToolAccess
 import com.example.autop.core.config.FlowAgentSection
 import com.example.autop.core.config.FlowLlmSection
+import com.example.autop.core.config.FlowPreconditionSection
 import com.example.autop.core.config.FlowRecoverySection
 import com.example.autop.core.config.FlowRunSection
 import com.example.autop.flow.AfterRecovery
 import com.example.autop.flow.AgentNode
+import com.example.autop.flow.Condition
 import com.example.autop.flow.ApiNode
 import com.example.autop.flow.BreakNode
 import com.example.autop.flow.CallNode
@@ -29,6 +31,7 @@ import com.example.autop.flow.Node
 import com.example.autop.flow.NodeStatus
 import com.example.autop.flow.ObserveNode
 import com.example.autop.flow.OnFail
+import com.example.autop.flow.PrePolicy
 import com.example.autop.flow.PauseResolution
 import com.example.autop.flow.ReadNode
 import com.example.autop.flow.RetryStrategy
@@ -40,6 +43,7 @@ import com.example.autop.flow.core.recovery.FailureStage
 import com.example.autop.flow.TraceLevel
 import com.example.autop.flow.WaitNode
 import com.example.autop.flow.core.expr.FlowException
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -112,6 +116,7 @@ public class FlowInterpreter(
     private val llmCfg: FlowLlmSection,
     private val agentCfg: FlowAgentSection,
     private val recoveryCfg: FlowRecoverySection = FlowRecoverySection(),
+    private val preconditionCfg: FlowPreconditionSection = FlowPreconditionSection(),
 ) {
     private lateinit var input: FlowRunInput
     private lateinit var meta: RunMeta
@@ -141,6 +146,9 @@ public class FlowInterpreter(
     private var consecutiveFailures = 0
     private val lastOk = HashMap<String, Boolean>()
     private val tokens = TokenBudget()
+
+    /** 单次 Run 已用掉的 handoff 次数；达到 `handoffBudgetPerRun` 后不再交回智能体。 */
+    private var handoffsUsed = 0
 
     /** 执行流程。参数/表达式等受控错误转为 FAILED 结果，不抛出。 */
     public suspend fun run(input: FlowRunInput): FlowRunResult {
@@ -298,7 +306,9 @@ public class FlowInterpreter(
         val level = node.trace ?: frame.flow.settings.trace
         val start = NodeTraceStart(frame.flow.id, node.id, typeName(node), node.name, path)
         val handle = if (level == TraceLevel.FULL) ports.trace.nodeStarted(start) else -1
-        val resolved = recover(node, frame, path)
+        // 前置断言先于动作：页面已经跑偏时在点击之前就停下，而不是点空后再发现。
+        val pre = checkPre(node, frame)
+        val resolved = recover(node, frame, path, pre)
         executed++
         val ended =
             NodeTraceEnd(
@@ -398,13 +408,24 @@ public class FlowInterpreter(
         node: Node,
         frame: Frame,
         path: String,
+        preResult: Attempt?,
     ): Resolved {
-        var attempts = 1
-        var attempt = nodes.perform(node, frame, path)
+        // 前置失败时动作未执行：此后重试的对象是前置条件，通过后才执行动作。
+        var stage = if (preResult == null) FailureStage.ACTION else FailureStage.PRECONDITION
+        var attempts = if (preResult == null) 1 else 0
+        var attempt = preResult ?: nodes.perform(node, frame, path)
         if (attempt is Attempt.Ok) return okResolved(attempt, attempts, NodeStatus.OK)
+        // 条件求值出错是流程定义错误：对写错的条件重试没有意义，也不该唤醒智能体。
+        if (isPreconditionError(attempt)) {
+            val failed = attempt as Attempt.Failed
+            setFailureLast(frame, failed)
+            val policy = node.onFail ?: frame.flow.settings.onFail ?: OnFail()
+            return finalAction(node, frame, path, policy, failed, attempts)
+        }
         val policy = node.onFail ?: frame.flow.settings.onFail ?: OnFail()
         val retry = policy.retry
         val toolNode = node as? ToolNode
+        val preKind = node.pre?.cond
         val escalating = toolNode != null && escalates(toolNode, frame, policy)
         if (toolNode != null && escalating) {
             // 恢复阶梯：第 k 次重试先执行阶梯第 k 个适用动作（docs/design/flows-recording-recovery.md R4）。
@@ -413,17 +434,23 @@ public class FlowInterpreter(
             for (k in 1..max) {
                 attempts++
                 val code = (attempt as Attempt.Failed).code
-                nodes.recoveryStep(toolNode, frame, ladder, k, code, FailureStage.ACTION)
+                nodes.recoveryStep(toolNode, frame, ladder, k, code, stage, preKind)
                 nodes.pause(retry?.delayMs)
-                attempt = nodes.perform(node, frame, path)
+                val (a, s) = retryAttempt(node, frame, path, stage)
+                attempt = a
+                stage = s
                 if (attempt is Attempt.Ok) return okResolved(attempt, attempts, NodeStatus.OK)
+                if (isPreconditionError(attempt)) break
             }
         } else if (retry != null) {
-            repeat(retry.max) {
+            for (i in 0 until retry.max) {
                 nodes.pause(retry.delayMs)
                 attempts++
-                attempt = nodes.perform(node, frame, path)
+                val (a, s) = retryAttempt(node, frame, path, stage)
+                attempt = a
+                stage = s
                 if (attempt is Attempt.Ok) return okResolved(attempt, attempts, NodeStatus.OK)
+                if (isPreconditionError(attempt)) break
             }
         }
         var failed = attempt as Attempt.Failed
@@ -432,10 +459,81 @@ public class FlowInterpreter(
                 Attempt.Failed(FlowErrorCodes.RECOVERY_EXHAUSTED, "恢复阶梯已用尽：${failed.message}", failed.input)
         }
         setFailureLast(frame, failed)
-        val recovered = tryRecover(node, frame, path, policy, escalating)
+        val recovered = tryRecover(node, frame, path, policy, escalating, stage)
         if (recovered != null) return okResolved(recovered.first, attempts + recovered.second, NodeStatus.RECOVERED)
         return finalAction(node, frame, path, policy, failed, attempts)
     }
+
+    /**
+     * 重试一次。返回(结果, 新阶段)：前置阶段先重新断言前置条件，通过后阶段转 ACTION 并执行动作。
+     */
+    private suspend fun retryAttempt(
+        node: Node,
+        frame: Frame,
+        path: String,
+        stage: FailureStage,
+    ): Pair<Attempt, FailureStage> {
+        if (stage == FailureStage.ACTION) return nodes.perform(node, frame, path) to FailureStage.ACTION
+        val pre = checkPre(node, frame)
+        return if (pre == null) {
+            nodes.perform(node, frame, path) to FailureStage.ACTION
+        } else {
+            pre to FailureStage.PRECONDITION
+        }
+    }
+
+    /**
+     * 检查节点前置条件。null = 通过；返回 [Attempt.Failed] = 前置不成立（进入 onFail 链）；
+     * 求值出错返回带 [FlowErrorCodes.PRECONDITION_ERROR] 的失败，调用方据此快速失败。
+     */
+    private suspend fun checkPre(
+        node: Node,
+        frame: Frame,
+    ): Attempt? {
+        val pre = node.pre ?: return null
+        if (!preconditionCfg.enabled) return null
+        if (!preconditionCfg.allowLlm && containsLlm(pre.cond)) {
+            ports.trace.log("warn", "precondition ignored node=${node.id} reason=llm_condition_disabled")
+            return null
+        }
+        val deadlineAt = ports.clock.nowMs() + waitBudget(node)
+        while (true) {
+            val detail = conditions.detail(pre.cond, frame)
+            if (detail.error != null) {
+                return Attempt.Failed(FlowErrorCodes.PRECONDITION_ERROR, "前置条件求值出错：${detail.error}")
+            }
+            if (detail.ok) return null
+            if (pre.policy == PrePolicy.FAIL || ports.clock.nowMs() >= deadlineAt) {
+                val message = pre.message?.let { frame.templates.renderString(it) } ?: "前置条件不满足：${detail.label}"
+                val actual = detail.actual?.let { "（实际：$it）" }.orEmpty()
+                return Attempt.Failed(FlowErrorCodes.PRECONDITION_FAILED, "$message$actual")
+            }
+            delay(preconditionCfg.pollMs)
+        }
+    }
+
+    /** WAIT 策略的等待上限：受节点 `timeoutMs` 约束，避免节点超时形同虚设。 */
+    private fun waitBudget(node: Node): Long {
+        val nodeTimeout = node.timeoutMs
+        return if (nodeTimeout != null && nodeTimeout > 0) {
+            minOf(nodeTimeout, preconditionCfg.waitTimeoutMs)
+        } else {
+            preconditionCfg.waitTimeoutMs
+        }
+    }
+
+    /** 条件树里是否含 LLM 判定（每节点都会求值，会重复消耗 token）。 */
+    private fun containsLlm(cond: Condition): Boolean =
+        when (cond) {
+            is Condition.Llm -> true
+            is Condition.All -> cond.of.any { containsLlm(it) }
+            is Condition.Any -> cond.of.any { containsLlm(it) }
+            is Condition.Not -> containsLlm(cond.of)
+            else -> false
+        }
+
+    /** 条件求值出错（流程定义错误），与"条件不成立"区分。 */
+    private fun isPreconditionError(a: Attempt): Boolean = a is Attempt.Failed && a.code == FlowErrorCodes.PRECONDITION_ERROR
 
     /**
      * 是否按恢复阶梯升级：显式 `retry.strategy=escalate`，或工具节点未写任何 onFail 且工具会改变屏幕（隐式升级）。
@@ -491,6 +589,7 @@ public class FlowInterpreter(
         path: String,
         policy: OnFail,
         escalating: Boolean,
+        stage: FailureStage,
     ): Pair<Attempt.Ok, Int>? {
         var extra = 0
         // 隐式交回：阶梯耗尽且节点无 handoff 时，目标文本由智能体端口按模板生成（空 goal）。
@@ -504,40 +603,54 @@ public class FlowInterpreter(
                 null
             }
         val handoff = policy.handoff ?: implicit
-        if (handoff != null) {
+        if (handoff != null && handoffBudgetExhausted()) {
+            ports.trace.log("warn", "handoff skipped node=${node.id} reason=budget_exhausted")
+        } else if (handoff != null) {
+            handoffsUsed++
             ports.trace.counters(RunCounters(handoffs = 1))
             screens.markDirty(action = true)
             val goal = frame.templates.renderString(handoff.goal)
+            // 隐式交回用更宽的步数预算；显式写的 maxSteps 始终优先。
+            val steps = handoff.maxSteps ?: if (handoff === implicit) recoveryCfg.handoffMaxSteps else agentCfg.maxSteps
             val r =
                 ports.agent.run(
                     node.id,
                     goal,
                     handoff.tools,
-                    handoff.maxSteps ?: agentCfg.maxSteps,
+                    steps,
                     handoff.maxDurationMs,
                     handoff.role,
                 )
             extra++
-            if (r.ok) afterRecovered(node, frame, path, policy)?.let { return it to extra }
+            if (r.ok) afterRecovered(node, frame, path, policy, stage)?.let { return it to extra }
         }
         if (policy.steps.isNotEmpty()) {
             screens.markDirty(action = true)
             val signal = runSteps(policy.steps, 0, frame, "$path.onFail/")
             extra++
-            if (signal !is Signal.Fail) afterRecovered(node, frame, path, policy)?.let { return it to extra }
+            if (signal !is Signal.Fail) afterRecovered(node, frame, path, policy, stage)?.let { return it to extra }
         }
         return null
     }
 
+    /**
+     * handoff / steps 成功后的接回。[stage] 为失败阶段：前置失败时 RETRY 要先确认
+     * 页面已被带到正确状态（重新断言前置条件），通过才执行动作。
+     */
     private suspend fun afterRecovered(
         node: Node,
         frame: Frame,
         path: String,
         policy: OnFail,
+        stage: FailureStage,
     ): Attempt.Ok? {
         if (policy.after == AfterRecovery.CONTINUE) return Attempt.Ok()
+        if (stage == FailureStage.PRECONDITION && checkPre(node, frame) != null) return null
         return nodes.perform(node, frame, path) as? Attempt.Ok
     }
+
+    /** 单 Run 的 handoff 次数是否已用尽。 */
+    private fun handoffBudgetExhausted(): Boolean = recoveryCfg.handoffBudgetPerRun > 0 && handoffsUsed >= recoveryCfg.handoffBudgetPerRun
 
     private suspend fun finalAction(
         node: Node,

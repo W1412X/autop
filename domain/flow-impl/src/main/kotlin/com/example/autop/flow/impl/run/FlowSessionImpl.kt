@@ -167,6 +167,7 @@ internal class FlowSessionImpl(
                 flowCfg[FlowConfig.LLM],
                 flowCfg[FlowConfig.AGENT],
                 flowCfg[FlowConfig.RECOVERY],
+                flowCfg[FlowConfig.PRECONDITION],
             )
         val result =
             interpreter.run(
