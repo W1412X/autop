@@ -1,0 +1,4 @@
+# 视觉模型资产按字节校验（vision/manifest.json 里的 SHA-256），任何系统上检出都必须是同一份字节，
+# 所以不做换行转换。否则 Windows（autocrlf）与 Linux CI 检出的 ppocr_keys.txt 哈希不同，
+# VisionModelStore 会静默拒绝它，OCR 字符字典失效。
+domain/device-impl/src/main/assets/vision/** -text

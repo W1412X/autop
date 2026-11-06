@@ -42,7 +42,7 @@ android {
     }
 }
 
-// 测试读取真实 prompt 模板与序列化规则文件（同 core-platform 的 autop.quirksFile 机制）。
+// 测试读取真实 prompt 模板、序列化规则与视觉模型资产（同 core-platform 的 autop.quirksFile 机制）。
 tasks.withType<Test>().configureEach {
     systemProperty(
         "autop.promptDir",
@@ -60,6 +60,12 @@ tasks.withType<Test>().configureEach {
         "autop.serializerRulesFile",
         layout.projectDirectory
             .file("src/main/assets/rules/serializer_rules.json")
+            .asFile.absolutePath,
+    )
+    systemProperty(
+        "autop.visionAssetDir",
+        layout.projectDirectory
+            .file("src/main/assets/vision")
             .asFile.absolutePath,
     )
 }
