@@ -46,7 +46,8 @@ jobs:
         run: |
           if [ -n "$KS_B64" ]; then
             mkdir -p signing
-            printf '%s' "$KS_B64" | base64 -d > signing/autop-release.jks
+            printf '%s' "$KS_B64" | tr -d '[:space:]' | base64 -d > signing/autop-release.jks
+            echo "keystore bytes: $(wc -c < signing/autop-release.jks)"
             printf 'storeFile=signing/autop-release.jks\nstorePassword=%s\nkeyAlias=%s\nkeyPassword=%s\n' \
               "$KS_PASS" "$KS_ALIAS" "$KEY_PASS" > keystore.properties
             echo "release keystore restored（产物将带正式签名）"
