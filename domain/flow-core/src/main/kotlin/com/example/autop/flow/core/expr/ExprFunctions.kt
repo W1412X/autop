@@ -118,11 +118,14 @@ public object ExprFunctions {
                 ).replace(str1("regexReplace", a), Values.str(arg("regexReplace", a, 2))),
             )
         }
-        m.fn("untrusted") { _, a ->
-            val body = str1("untrusted", a).replace(UNTRUSTED_CLOSE, "")
-            JsonPrimitive("$UNTRUSTED_OPEN$body$UNTRUSTED_CLOSE")
-        }
+        m.fn("untrusted") { _, a -> JsonPrimitive(untrusted(str1("untrusted", a))) }
     }
+
+    /**
+     * 把来自屏幕、通知、网络的不可信文本包上信封，避免其中的文字被当成指令。
+     * 与表达式函数 `untrusted` 产出同一格式。
+     */
+    public fun untrusted(text: String): String = "$UNTRUSTED_OPEN${text.replace(UNTRUSTED_CLOSE, "")}$UNTRUSTED_CLOSE"
 
     private fun regex(pattern: JsonElement): Regex =
         try {

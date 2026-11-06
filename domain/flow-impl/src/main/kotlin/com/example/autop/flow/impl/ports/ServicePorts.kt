@@ -20,6 +20,7 @@ import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.FlowStateStore
 import com.example.autop.flow.FlowStore
+import com.example.autop.flow.core.AgentContext
 import com.example.autop.flow.core.AgentPort
 import com.example.autop.flow.core.AgentResult
 import com.example.autop.flow.core.DevicePort
@@ -176,9 +177,10 @@ internal class AgentPortImpl(
         maxSteps: Int?,
         maxDurationMs: Long?,
         role: String?,
+        context: AgentContext?,
     ): AgentResult {
         // 空目标表示“隐式交回”：使用模板 flow.recovery.handoff_goal 生成目标（flows-recording-recovery.md R4）。
-        val text = goal.ifBlank { renderHandoffGoal(nodeId) }
+        val text = goal.ifBlank { renderHandoffGoal(nodeId, context) }
         val childRun = RunId(ids.newId())
         val thread = store.createThread(title = text.take(TITLE_CHARS), parent = null)
         lineage.register(childRun, parentRunId)
@@ -217,8 +219,25 @@ internal class AgentPortImpl(
         return configProvider.layered(overlay)
     }
 
-    private fun renderHandoffGoal(nodeId: String): String =
-        (prompts.render(HANDOFF_GOAL_PROMPT, mapOf("nodeId" to nodeId)) as? Outcome.Ok)?.value?.text.orEmpty()
+    /** 渲染隐式交回的目标：上下文缺项时给空串（模板缺变量会渲染失败）。 */
+    private fun renderHandoffGoal(
+        nodeId: String,
+        context: AgentContext?,
+    ): String {
+        val vars =
+            mapOf(
+                "nodeId" to nodeId,
+                "flowName" to context?.flowName.orEmpty(),
+                "nodeName" to (context?.nodeName ?: nodeId),
+                "failure" to (context?.failureMessage ?: context?.failureCode.orEmpty()),
+                "expectation" to context?.expectation.orEmpty(),
+                "anchor" to context?.anchorHint.orEmpty(),
+                "precondition" to context?.preconditionDetail.orEmpty(),
+                "executed" to (context?.executedSteps.orEmpty().joinToString("\n")),
+                "screen" to context?.screenSummary.orEmpty(),
+            )
+        return (prompts.render(HANDOFF_GOAL_PROMPT, vars) as? Outcome.Ok)?.value?.text.orEmpty()
+    }
 
     private companion object {
         const val HANDOFF_GOAL_PROMPT = "flow.recovery.handoff_goal"

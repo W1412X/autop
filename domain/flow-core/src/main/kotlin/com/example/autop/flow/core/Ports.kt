@@ -122,6 +122,40 @@ public data class AgentResult(
     val errorCode: String?,
 )
 
+/**
+ * 交回智能体时携带的流程上下文（docs/design/flows-precondition-selfrepair.md C1）。
+ *
+ * 让接手的智能体直接知道"这是哪个流程的哪一步、期望达到什么、现在在哪、前面做了什么"，
+ * 而不是从屏幕重新摸索。含屏幕原文的字段必须已包好不可信信封。
+ */
+public data class AgentContext(
+    /** 流程 id 与名称。 */
+    val flowId: String,
+    val flowName: String,
+    /** 失败节点。 */
+    val nodeId: String,
+    val nodeName: String?,
+    /** 节点类型名（tool / llm / agent …）。 */
+    val nodeType: String,
+    /** 该节点的目标描述，可空。 */
+    val targetHint: String?,
+    /** 该节点的期望效果，可空。 */
+    val expectation: String?,
+    /** 该节点的锚点，可空。 */
+    val anchorHint: String?,
+    /** 前置条件不成立时的明细；其他失败阶段为空。 */
+    val preconditionDetail: String?,
+    /** 失败错误码与说明。 */
+    val failureCode: String?,
+    val failureMessage: String?,
+    /** 已执行节点摘要，每项 "节点名(类型): ok/failed"；不含参数内容。 */
+    val executedSteps: List<String>,
+    /** 当前屏幕摘要（前台包名 + 可见文本片段），已包不可信信封。 */
+    val screenSummary: String?,
+    /** 已尝试过的恢复动作 id。 */
+    val triedRecoveries: List<String>,
+)
+
 /** 智能体端口。 */
 public interface AgentPort {
     public suspend fun run(
@@ -131,6 +165,7 @@ public interface AgentPort {
         maxSteps: Int?,
         maxDurationMs: Long?,
         role: String?,
+        context: AgentContext? = null,
     ): AgentResult
 }
 
