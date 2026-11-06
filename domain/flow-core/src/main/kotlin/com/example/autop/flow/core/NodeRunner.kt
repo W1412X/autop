@@ -10,6 +10,7 @@ import com.example.autop.flow.AgentNode
 import com.example.autop.flow.ApiNode
 import com.example.autop.flow.BreakNode
 import com.example.autop.flow.CallNode
+import com.example.autop.flow.Condition
 import com.example.autop.flow.ConfirmTimeout
 import com.example.autop.flow.ContinueNode
 import com.example.autop.flow.DelayRange
@@ -29,6 +30,7 @@ import com.example.autop.flow.SwitchNode
 import com.example.autop.flow.ToolNode
 import com.example.autop.flow.WaitNode
 import com.example.autop.flow.core.expr.FlowException
+import com.example.autop.flow.core.recovery.FailureStage
 import com.example.autop.flow.core.recovery.RecoveryCatalog
 import com.example.autop.flow.core.recovery.RecoveryHints
 import com.example.autop.flow.core.recovery.RecoveryRunner
@@ -144,7 +146,9 @@ internal class NodeRunner(
         ladder: List<String>,
         attempt: Int,
         errorCode: String,
-    ): String? = env.recovery.step(node, frame, ladder, attempt, errorCode)
+        stage: FailureStage,
+        preKind: Condition? = null,
+    ): String? = env.recovery.step(node, frame, ladder, attempt, errorCode, stage, preKind)
 
     suspend fun pause(range: DelayRange?) {
         if (range == null) return

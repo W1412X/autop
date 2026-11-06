@@ -8,6 +8,7 @@ package com.example.autop.flow.core.recovery
 
 import com.example.autop.core.config.FlowRecoverySection
 import com.example.autop.flow.Anchor
+import com.example.autop.flow.Condition
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.ToolNode
 import com.example.autop.flow.core.FlowPorts
@@ -16,6 +17,15 @@ import com.example.autop.flow.core.ScreenService
 import com.example.autop.flow.core.screen.TargetMatch
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+
+/** 失败发生的阶段（docs/design/flows-precondition-selfrepair.md P2）。 */
+internal enum class FailureStage {
+    /** 前置条件不成立，动作未执行。 */
+    PRECONDITION,
+
+    /** 动作执行了但失败或未生效。 */
+    ACTION,
+}
 
 /** 替代点击的临时提示：只对紧随其后的一次工具调用生效，调用时消费并清空。 */
 internal class RecoveryHints {
@@ -28,6 +38,8 @@ internal class RecoveryContext(
     val node: ToolNode,
     val attempt: Int,
     val errorCode: String,
+    val stage: FailureStage,
+    val preKind: Condition?,
     val frame: Frame,
     val ports: FlowPorts,
     val screens: ScreenService,
@@ -79,7 +91,8 @@ internal class RecoveryRunner(
 ) {
     /**
      * 执行阶梯第 [attempt] 步（从 1 开始）。返回执行的动作 id；没有适用动作时返回 null。
-     * 取消信号直接向上抛出。
+     * [stage] 决定阶梯动作的适用性（前置阶段没有动作可换点、元素类条件可滚动寻找）；
+     * [preKind] 为前置条件本身，用于推导临时锚点。取消信号直接向上抛出。
      */
     suspend fun step(
         node: ToolNode,
@@ -87,8 +100,10 @@ internal class RecoveryRunner(
         ladder: List<String>,
         attempt: Int,
         errorCode: String,
+        stage: FailureStage,
+        preKind: Condition? = null,
     ): String? {
-        val ctx = RecoveryContext(node, attempt, errorCode, frame, ports, screens, cfg, hints)
+        val ctx = RecoveryContext(node, attempt, errorCode, stage, preKind, frame, ports, screens, cfg, hints)
         val applicable = ladder.mapNotNull { catalog.byId(it) }.filter { it.applicable(ctx) }
         val action = applicable.getOrNull(attempt - 1)
         if (action == null) {
@@ -100,6 +115,23 @@ internal class RecoveryRunner(
         return action.id
     }
 }
+
+/** 从条件推导临时锚点：app → anchor.app；screenText / element → anchor.text / target。 */
+internal fun deriveAnchor(cond: Condition): Anchor? =
+    when (cond) {
+        is Condition.App -> Anchor(app = cond.value)
+        is Condition.ScreenText -> Anchor(text = cond.value)
+        is Condition.Element -> Anchor(target = cond.target)
+        // 复合条件取第一个可推导的子条件；any / not 语义不确定，不推导。
+        is Condition.All -> cond.of.firstNotNullOfOrNull { deriveAnchor(it) }
+        else -> null
+    }
+
+/**
+ * 生效的锚点：节点自身锚点优先，为空时从前置条件推导临时锚点。
+ * 推导出的锚点只用于恢复判定，不写回流程定义。
+ */
+internal fun effectiveAnchor(ctx: RecoveryContext): Anchor? = ctx.node.anchor ?: ctx.preKind?.let { deriveAnchor(it) }
 
 /** 判断锚点是否仍成立（应用、文字、元素均需满足已配置的项）。 */
 internal suspend fun anchorHolds(
@@ -143,12 +175,15 @@ internal class WaitStableAction : RecoveryAction {
             .ok
 }
 
-/** 换一个点击位置（节点内的比例点）。 */
+/** 换一个点击位置（节点内的比例点）。仅动作失败阶段适用：前置阶段没有动作可换点。 */
 internal class AltClickAction : RecoveryAction {
     override val id: String = "recovery.alt_click"
 
     override suspend fun applicable(ctx: RecoveryContext): Boolean =
-        ctx.node.tool == TOOL_TAP && ctx.node.target != null && ctx.cfg.altClickOffsets.isNotEmpty()
+        ctx.stage == FailureStage.ACTION &&
+            ctx.node.tool == TOOL_TAP &&
+            ctx.node.target != null &&
+            ctx.cfg.altClickOffsets.isNotEmpty()
 
     override suspend fun run(ctx: RecoveryContext): Boolean {
         val offsets = ctx.cfg.altClickOffsets
@@ -158,12 +193,16 @@ internal class AltClickAction : RecoveryAction {
     }
 }
 
-/** 目标未找到时滚动寻找（奇数次向下，偶数次向上）。 */
+/** 目标未找到时滚动寻找（奇数次向下，偶数次向上）。前置阶段对元素类条件不成立同样适用。 */
 internal class ScrollIntoViewAction : RecoveryAction {
     override val id: String = "recovery.scroll_into_view"
 
     override suspend fun applicable(ctx: RecoveryContext): Boolean =
-        ctx.node.target != null && ctx.errorCode == FlowErrorCodes.TARGET_NOT_FOUND
+        if (ctx.stage == FailureStage.ACTION) {
+            ctx.node.target != null && ctx.errorCode == FlowErrorCodes.TARGET_NOT_FOUND
+        } else {
+            ctx.preKind is Condition.Element
+        }
 
     override suspend fun run(ctx: RecoveryContext): Boolean {
         val direction = if (ctx.attempt % 2 == 1) "down" else "up"
@@ -190,7 +229,7 @@ internal class BackAndRetryAction : RecoveryAction {
     override val id: String = "recovery.back_and_retry"
 
     override suspend fun applicable(ctx: RecoveryContext): Boolean {
-        val anchor = ctx.node.anchor ?: return false
+        val anchor = effectiveAnchor(ctx) ?: return false
         return !anchorHolds(anchor, ctx)
     }
 
@@ -199,7 +238,7 @@ internal class BackAndRetryAction : RecoveryAction {
             ctx.ports.tools
                 .call(TOOL_GLOBAL_ACTION, JsonObject(mapOf(ARG_ACTION to JsonPrimitive(ACTION_BACK))), ctx.node.id)
                 .ok
-        val app = ctx.node.anchor?.app ?: return back
+        val app = effectiveAnchor(ctx)?.app ?: return back
         val observed = ctx.screens.screen(null, ctx.frame.flow.settings.observeMode, force = true)
         if (ctx.screens.foregroundApp(observed.screen) != app) {
             ctx.ports.tools.call(TOOL_OPEN_APP, JsonObject(mapOf(ARG_PACKAGE to JsonPrimitive(app))), ctx.node.id)
@@ -212,10 +251,10 @@ internal class BackAndRetryAction : RecoveryAction {
 internal class ReopenAppAction : RecoveryAction {
     override val id: String = "recovery.reopen_app"
 
-    override suspend fun applicable(ctx: RecoveryContext): Boolean = ctx.node.anchor?.app != null
+    override suspend fun applicable(ctx: RecoveryContext): Boolean = effectiveAnchor(ctx)?.app != null
 
     override suspend fun run(ctx: RecoveryContext): Boolean {
-        val app = ctx.node.anchor?.app ?: return false
+        val app = effectiveAnchor(ctx)?.app ?: return false
         return ctx.ports.tools
             .call(TOOL_OPEN_APP, JsonObject(mapOf(ARG_PACKAGE to JsonPrimitive(app))), ctx.node.id)
             .ok
@@ -227,10 +266,10 @@ internal class RestartAppAction : RecoveryAction {
     override val id: String = "recovery.restart_app"
 
     override suspend fun applicable(ctx: RecoveryContext): Boolean =
-        ctx.cfg.allowRestartApp && ctx.node.anchor?.app != null
+        ctx.cfg.allowRestartApp && effectiveAnchor(ctx)?.app != null
 
     override suspend fun run(ctx: RecoveryContext): Boolean {
-        val app = ctx.node.anchor?.app ?: return false
+        val app = effectiveAnchor(ctx)?.app ?: return false
         return ctx.ports.tools
             .call(TOOL_RESTART_APP, JsonObject(mapOf(ARG_PACKAGE to JsonPrimitive(app))), ctx.node.id)
             .ok

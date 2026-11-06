@@ -36,6 +36,7 @@ import com.example.autop.flow.SetNode
 import com.example.autop.flow.StateNode
 import com.example.autop.flow.SwitchNode
 import com.example.autop.flow.ToolNode
+import com.example.autop.flow.core.recovery.FailureStage
 import com.example.autop.flow.TraceLevel
 import com.example.autop.flow.WaitNode
 import com.example.autop.flow.core.expr.FlowException
@@ -412,7 +413,7 @@ public class FlowInterpreter(
             for (k in 1..max) {
                 attempts++
                 val code = (attempt as Attempt.Failed).code
-                nodes.recoveryStep(toolNode, frame, ladder, k, code)
+                nodes.recoveryStep(toolNode, frame, ladder, k, code, FailureStage.ACTION)
                 nodes.pause(retry?.delayMs)
                 attempt = nodes.perform(node, frame, path)
                 if (attempt is Attempt.Ok) return okResolved(attempt, attempts, NodeStatus.OK)
