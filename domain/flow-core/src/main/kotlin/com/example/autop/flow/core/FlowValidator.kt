@@ -24,6 +24,8 @@ import com.example.autop.flow.LoopNode
 import com.example.autop.flow.Node
 import com.example.autop.flow.ObserveNode
 import com.example.autop.flow.OnFail
+import com.example.autop.flow.PrePolicy
+import com.example.autop.flow.Precondition
 import com.example.autop.flow.ReadFrom
 import com.example.autop.flow.ReadNode
 import com.example.autop.flow.SetNode
@@ -58,9 +60,17 @@ public class FlowValidator(
     private val issues = mutableListOf<FlowIssue>()
     private val ids = HashSet<String>()
 
+    /** 全流程的节点 id（含分支、循环、onFail 兜底），用于引用完整性。 */
+    private var allNodeIds: Set<String> = emptySet()
+
+    /** 按执行顺序已经处理过的节点 id，用于拦截"引用更晚的节点"。 */
+    private val processedIds = HashSet<String>()
+
     public fun validate(flow: FlowDefinition): List<FlowIssue> {
         issues.clear()
         ids.clear()
+        processedIds.clear()
+        allNodeIds = collectIds(flow.steps)
         if (flow.format != FlowSpec.FORMAT) error(null, FlowErrorCodes.INVALID, "format 必须是 ${FlowSpec.FORMAT}")
         if (flow.schemaVersion > FlowSpec.CURRENT_SCHEMA_VERSION) {
             error(null, FlowErrorCodes.INVALID, "流程版本 ${flow.schemaVersion} 高于当前支持的 ${FlowSpec.CURRENT_SCHEMA_VERSION}")
@@ -110,6 +120,8 @@ public class FlowValidator(
         } else if (!ids.add(n.id)) {
             error(n.id, FlowErrorCodes.INVALID, "节点 id 重复：${n.id}")
         }
+        processedIds.add(n.id)
+        n.pre?.let { pre(n.id, it, defined) }
         n.onFail?.let { onFail(n.id, it, defined) }
         return when (n) {
             is ToolNode -> tool(n, defined)
@@ -161,6 +173,86 @@ public class FlowValidator(
     ) {
         o.handoff?.let { template(nodeId, it.goal, defined + "last") }
         steps(o.steps, defined, inLoop = false)
+    }
+
+    /** 校验前置条件（docs/design/flows-precondition-selfrepair.md P4）。 */
+    private fun pre(
+        nodeId: String,
+        p: Precondition,
+        defined: Set<String>,
+    ) {
+        if (p.policy == PrePolicy.WAIT && (p.timeoutMs ?: 0) < 0) {
+            error(nodeId, FlowErrorCodes.INVALID, "pre 的 timeoutMs 不能为负")
+        }
+        p.message?.let { template(nodeId, it, defined) }
+        cond(nodeId, p.cond, defined)
+        if (findLlm(p.cond) != null) {
+            error(nodeId, FlowErrorCodes.INVALID, "前置条件不支持 llm 判定：每个节点都会求值，会重复消耗模型额度")
+        }
+        checkPreRefs(nodeId, p.cond)
+    }
+
+    /** 前置条件的节点引用必须指向已执行的节点，不能依赖尚未执行的结果。 */
+    private fun checkPreRefs(
+        nodeId: String,
+        c: Condition,
+    ) {
+        when (c) {
+            is Condition.LastOk -> {
+                val target = c.node
+                when {
+                    target !in allNodeIds -> error(nodeId, FlowErrorCodes.NOT_FOUND, "pre 引用了不存在的节点：$target")
+                    target !in processedIds -> error(nodeId, FlowErrorCodes.INVALID, "pre 引用了尚未执行的节点：$target")
+                }
+            }
+            is Condition.ScreenChanged -> {
+                val since = c.since
+                if (since != "lastAction" && since !in allNodeIds) {
+                    error(nodeId, FlowErrorCodes.NOT_FOUND, "pre 的 screenChanged.since 引用了不存在的节点：$since")
+                }
+            }
+            is Condition.All -> c.of.forEach { checkPreRefs(nodeId, it) }
+            is Condition.Any -> c.of.forEach { checkPreRefs(nodeId, it) }
+            is Condition.Not -> checkPreRefs(nodeId, c.of)
+            else -> Unit
+        }
+    }
+
+    /** 找出条件树里的第一个 LLM 判定。 */
+    private fun findLlm(c: Condition): Condition.Llm? =
+        when (c) {
+            is Condition.Llm -> c
+            is Condition.All -> c.of.firstNotNullOfOrNull { findLlm(it) }
+            is Condition.Any -> c.of.firstNotNullOfOrNull { findLlm(it) }
+            is Condition.Not -> findLlm(c.of)
+            else -> null
+        }
+
+    /** 递归收集步骤树（含分支、循环、onFail 兜底）里的全部节点 id。 */
+    private fun collectIds(steps: List<Node>): Set<String> {
+        val out = HashSet<String>()
+
+        fun walk(list: List<Node>) {
+            for (n in list) {
+                out += n.id
+                n.onFail?.let { walk(it.steps) }
+                when (n) {
+                    is IfNode -> {
+                        walk(n.thenSteps)
+                        walk(n.elseSteps)
+                    }
+                    is SwitchNode -> {
+                        n.cases.forEach { walk(it.steps) }
+                        walk(n.default)
+                    }
+                    is LoopNode -> walk(n.steps)
+                    else -> Unit
+                }
+            }
+        }
+
+        walk(steps)
+        return out
     }
 
     private fun tool(
