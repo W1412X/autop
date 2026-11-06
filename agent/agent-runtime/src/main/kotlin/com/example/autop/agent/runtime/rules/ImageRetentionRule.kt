@@ -6,6 +6,7 @@ package com.example.autop.agent.runtime.rules
 
 import com.example.autop.agent.HistoryRenderRule
 import com.example.autop.agent.RenderItem
+import com.example.autop.agent.USER_IMAGE_NAME_PREFIX
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.ConfigSnapshot
@@ -33,6 +34,7 @@ internal class ImageRetentionRule(
                         item.msg.mapBlocks { block ->
                             when {
                                 block !is Block.Image -> listOf(block)
+                                isUserPicked(block) -> listOf(block)
                                 keep > 0 -> {
                                     keep--
                                     listOf(block)
@@ -43,6 +45,10 @@ internal class ImageRetentionRule(
                 )
             }.asReversed()
     }
+
+    /** 用户主动发送的图片是对话内容，不参与「只留最近 N 张」的截图淘汰。 */
+    private fun isUserPicked(image: Block.Image): Boolean =
+        image.fileRef.substringAfterLast('/').startsWith(USER_IMAGE_NAME_PREFIX)
 
     private fun stubFor(item: RenderItem): Block.Text? =
         prompts

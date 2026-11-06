@@ -6,15 +6,31 @@
  */
 package com.example.autop.feature.chat.thread
 
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.PickVisualMediaRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
@@ -26,9 +42,13 @@ import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.theme.AutopAlpha
+import com.example.autop.core.ui.theme.AutopDimens
+import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
+import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.chat.R
+import com.example.autop.task.ImageAttachment
 
 /** 发送与停止图标互换的淡入淡出时长（毫秒）。 */
 private const val SWAP_MS: Int = 150
@@ -57,11 +77,16 @@ internal fun InputArea(
                 .fillMaxWidth()
                 .padding(horizontal = LocalSpacing.current.screenEdge),
     ) {
-        AutopChip(
-            text = stringResource(R.string.thread_attach_screen),
-            selected = state.attachScreen,
-            onClick = { onAction(ChatThreadAction.ToggleAttachScreen) },
-        )
+        PendingImages(images = state.images, onAction = onAction)
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AutopChip(
+                text = stringResource(R.string.thread_attach_screen),
+                selected = state.attachScreen,
+                onClick = { onAction(ChatThreadAction.ToggleAttachScreen) },
+            )
+            Spacer(modifier = Modifier.weight(1f))
+            if (!state.running && state.images.size < state.maxImages) AddImageButton(onAction)
+        }
         AutopInputBar(
             value = state.input,
             onValueChange = { text -> if (enabled) onAction(ChatThreadAction.SetInput(text)) },
@@ -87,6 +112,67 @@ internal fun InputArea(
     }
 }
 
+/** 系统相册选图（Photo Picker 不需要存储权限）；选中的 Uri 交给 ViewModel 读取压缩。 */
+@Composable
+private fun AddImageButton(onAction: (ChatThreadAction) -> Unit) {
+    val picker =
+        rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
+            if (uris.isNotEmpty()) onAction(ChatThreadAction.AddImages(uris))
+        }
+    AutopIconButton(
+        icon = AutopIcons.AddPhoto,
+        contentDescription = stringResource(R.string.thread_add_image),
+        onClick = {
+            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+        },
+    )
+}
+
+/** 待发送图片缩略图行：每张右上角带移除按钮。 */
+@Composable
+private fun PendingImages(
+    images: List<ImageAttachment>,
+    onAction: (ChatThreadAction) -> Unit,
+) {
+    if (images.isEmpty()) return
+    val spacing = LocalSpacing.current
+    val description = stringResource(R.string.thread_image_description)
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
+                .padding(bottom = spacing.sm),
+    ) {
+        images.forEachIndexed { index, image ->
+            Box {
+                Thumbnail(
+                    key = image,
+                    size = AutopDimens.attachThumb,
+                    contentDescription = description,
+                    decode = { px -> decodeSampledBytes(image.bytes, px) },
+                )
+                Icon(
+                    imageVector = AutopIcons.Close,
+                    contentDescription = stringResource(R.string.thread_remove_image),
+                    tint = MaterialTheme.colorScheme.onSurface,
+                    modifier =
+                        Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(spacing.xs)
+                            .background(
+                                MaterialTheme.colorScheme.surface.copy(alpha = AutopAlpha.OVERLAY_SCRIM),
+                                CircleShape,
+                            ).clickable { onAction(ChatThreadAction.RemoveImage(index)) }
+                            .padding(spacing.xs)
+                            .size(IconSize.Sm.scaled()),
+                )
+            }
+        }
+    }
+}
+
 /** 尾部唯一的按钮：发送与停止互换，两者同为 44dp 图标按钮，切换时不会跳动布局。 */
 @Composable
 private fun TrailingButton(
@@ -105,7 +191,7 @@ private fun TrailingButton(
             TrailingMode.STOP -> StopButton(onClick = { onAction(ChatThreadAction.Stop) })
             TrailingMode.SEND ->
                 SendButton(
-                    sendable = enabled && state.input.isNotBlank(),
+                    sendable = enabled && (state.input.isNotBlank() || state.images.isNotEmpty()),
                     running = state.running,
                     onClick = { if (enabled) onAction(ChatThreadAction.Send) },
                 )

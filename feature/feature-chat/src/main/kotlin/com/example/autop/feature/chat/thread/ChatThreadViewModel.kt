@@ -8,6 +8,7 @@
  */
 package com.example.autop.feature.chat.thread
 
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autop.agent.AgentEvent
@@ -28,6 +29,7 @@ import com.example.autop.core.config.UiConfig
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.feature.chat.NEW_THREAD
 import com.example.autop.task.ActiveRunInfo
+import com.example.autop.task.ImageAttachment
 import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -60,6 +62,7 @@ private data class TimelineInput(
 /** 页面本地状态（输入、开关、弹层）。 */
 private data class ChatMeta(
     val input: String = "",
+    val images: List<ImageAttachment> = emptyList(),
     val attachScreen: Boolean = true,
     val sheet: ChatThreadSheet = ChatThreadSheet(),
     val notice: ThreadNotice? = null,
@@ -77,6 +80,7 @@ public class ChatThreadViewModel
         private val configProvider: ConfigProvider,
         private val accessibility: AccessibilityStatus,
         private val logFiles: LogFiles,
+        private val imageReader: ChatImageReader,
     ) : ViewModel() {
         private val timeline = MutableStateFlow(TimelineInput())
         private val meta = MutableStateFlow(ChatMeta())
@@ -153,7 +157,10 @@ public class ChatThreadViewModel
         public fun onAction(action: ChatThreadAction) {
             when (action) {
                 is ChatThreadAction.SetInput -> meta.update { it.copy(input = action.text) }
-                ChatThreadAction.ToggleAttachScreen -> meta.update { it.copy(attachScreen = !it.attachScreen) }
+                is ChatThreadAction.AddImages,
+                is ChatThreadAction.RemoveImage,
+                ChatThreadAction.ToggleAttachScreen,
+                -> handleAttachments(action)
                 ChatThreadAction.Send -> send()
                 ChatThreadAction.Stop ->
                     runService.observeActive().value?.let { runService.cancel(it.run.id) }
@@ -165,6 +172,16 @@ public class ChatThreadViewModel
                 is ChatThreadAction.OpenSourceThread ->
                     viewModelScope.launch { navChannel.send(ChatNavEvent.ReplaceThread(action.threadId)) }
                 else -> handleSheet(action)
+            }
+        }
+
+        private fun handleAttachments(action: ChatThreadAction) {
+            when (action) {
+                is ChatThreadAction.AddImages -> addImages(action.uris)
+                is ChatThreadAction.RemoveImage ->
+                    meta.update { it.copy(images = it.images.filterIndexed { index, _ -> index != action.index }) }
+                ChatThreadAction.ToggleAttachScreen -> meta.update { it.copy(attachScreen = !it.attachScreen) }
+                else -> Unit
             }
         }
 
@@ -207,13 +224,31 @@ public class ChatThreadViewModel
             }
         }
 
+        /** 读取相册选中的图片（逐张压缩，不超过上限），读取失败的跳过并提示。 */
+        private fun addImages(uris: List<Uri>) {
+            val config = configProvider.current()[UiConfig.CHAT]
+            val room = config.attachMaxImages - meta.value.images.size
+            if (room <= 0) return
+            viewModelScope.launch {
+                val loaded = uris.take(room).map { imageReader.read(it, config).getOrNull() }
+                meta.update { state ->
+                    state.copy(
+                        images = (state.images + loaded.filterNotNull()).take(config.attachMaxImages),
+                        notice = if (loaded.any { it == null }) ThreadNotice.IMAGE_FAILED else state.notice,
+                    )
+                }
+            }
+        }
+
         private fun send() {
             val text = meta.value.input.trim()
-            if (text.isEmpty()) return
-            val attach = meta.value.attachScreen
-            meta.update { it.copy(input = "") }
-            val background = configProvider.current()[UiConfig.CHAT].backgroundOnSend
+            val images = meta.value.images
             val active = runService.observeActive().value
+            // 运行中只能补充文字指令（图片随新一轮对话发送）。
+            if (text.isEmpty() && (active != null || images.isEmpty())) return
+            val attach = meta.value.attachScreen
+            meta.update { it.copy(input = "", images = if (active == null) emptyList() else it.images) }
+            val background = configProvider.current()[UiConfig.CHAT].backgroundOnSend
             if (active != null) {
                 runService.steer(active.run.id, text)
                 if (background) viewModelScope.launch { navChannel.send(ChatNavEvent.Background) }
@@ -221,7 +256,7 @@ public class ChatThreadViewModel
             }
             viewModelScope.launch {
                 val fresh = threadId == NEW_THREAD
-                val outcome = runService.startChat(if (fresh) null else ThreadId(threadId), text, attach)
+                val outcome = runService.startChat(if (fresh) null else ThreadId(threadId), text, attach, images)
                 outcome.getOrNull()?.let { record ->
                     sentRunId.value = record.id
                     if (fresh) {
@@ -303,6 +338,8 @@ public class ChatThreadViewModel
                 running = active != null,
                 accessibilityConnected = connected,
                 input = metaState.input,
+                images = metaState.images,
+                maxImages = chatConfig.attachMaxImages,
                 attachScreen = metaState.attachScreen,
                 inputMaxLines = chatConfig.inputMaxLines,
                 waitingQuestion =

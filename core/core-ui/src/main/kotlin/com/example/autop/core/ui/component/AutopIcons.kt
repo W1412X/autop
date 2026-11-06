@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
@@ -84,6 +85,7 @@ public object AutopIcons {
     public val Send: ImageVector = Icons.AutoMirrored.Outlined.Send
     public val Mic: ImageVector = Icons.Outlined.Mic
     public val Add: ImageVector = Icons.Outlined.Add
+    public val AddPhoto: ImageVector = Icons.Outlined.AddPhotoAlternate
     public val Remove: ImageVector = Icons.Outlined.Remove
     public val MoreVert: ImageVector = Icons.Outlined.MoreVert
     public val Delete: ImageVector = Icons.Outlined.Delete

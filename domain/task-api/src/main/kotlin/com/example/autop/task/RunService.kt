@@ -20,11 +20,12 @@ import kotlinx.serialization.json.JsonObject
 /** 运行服务：发起、控制与观察 Run（端口门面：方法数是服务面的自然结果）。 */
 @Suppress("TooManyFunctions")
 public interface RunService {
-    /** 发起一次对话；[threadId] 为 null 时新建对话。 */
+    /** 发起一次对话；[threadId] 为 null 时新建对话。[images] 为用户从相册选取的图片。 */
     public suspend fun startChat(
         threadId: ThreadId?,
         text: String,
         attachCurrentScreen: Boolean,
+        images: List<ImageAttachment> = emptyList(),
     ): Outcome<RunRecord>
 
     /** 从 [atSeq] 处分叉源线程并发起对话（[text] 为 null 时沿用源消息继续）。 */

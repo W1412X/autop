@@ -34,7 +34,33 @@ public data class UiChatSection(
     @SerialName("backgroundOnSend") val backgroundOnSend: Boolean = false,
     /** 新会话标题按首条消息自动生成（LLM 精炼失败时用消息截断占位）。 */
     @SerialName("autoTitle") val autoTitle: Boolean = true,
-) : ConfigSection
+    /** 单条消息最多附带的图片数。 */
+    @SerialName("attachMaxImages") val attachMaxImages: Int = 4,
+    /** 附图压缩后的长边上限（px）：控制 token 与存储体积。 */
+    @SerialName("attachMaxEdge") val attachMaxEdge: Int = 1280,
+    /** 附图 JPEG 压缩质量（1–100）。 */
+    @SerialName("attachJpegQuality") val attachJpegQuality: Int = 85,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (attachMaxImages !in ATTACH_IMAGES_MIN..ATTACH_IMAGES_MAX) {
+                add("attachMaxImages 必须在 $ATTACH_IMAGES_MIN~$ATTACH_IMAGES_MAX 之间")
+            }
+            if (attachMaxEdge !in ATTACH_EDGE_MIN..ATTACH_EDGE_MAX) {
+                add("attachMaxEdge 必须在 $ATTACH_EDGE_MIN~$ATTACH_EDGE_MAX 之间")
+            }
+            if (attachJpegQuality !in ATTACH_QUALITY_MIN..ATTACH_QUALITY_MAX) {
+                add("attachJpegQuality 必须在 $ATTACH_QUALITY_MIN~$ATTACH_QUALITY_MAX 之间")
+            }
+        }
+}
+
+private const val ATTACH_IMAGES_MIN = 1
+private const val ATTACH_IMAGES_MAX = 9
+private const val ATTACH_EDGE_MIN = 256
+private const val ATTACH_EDGE_MAX = 4096
+private const val ATTACH_QUALITY_MIN = 30
+private const val ATTACH_QUALITY_MAX = 100
 
 /** `ui.banner`：顶部横幅提示。 */
 @Serializable

@@ -129,9 +129,10 @@ private fun appendUserBubble(
 ) {
     if (payload.kind == UserMessageKind.INJECTED) return
     val text = payload.blocks.filterIsInstance<Block.Text>().joinToString("\n") { it.text }
+    val images = payload.blocks.filterIsInstance<Block.Image>().map { it.fileRef }
     entries.add(
         TimelineEntry(
-            TimelineItem.UserBubble(text, payload.kind == UserMessageKind.STEER),
+            TimelineItem.UserBubble(text, payload.kind == UserMessageKind.STEER, images),
             event.seq,
             forkable = false,
         ),

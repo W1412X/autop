@@ -43,6 +43,7 @@
     <string name="thread_notice_save_task">“保存为任务”将在任务功能上线后可用</string>
     <string name="thread_notice_export">已导出日志，正在调起分享</string>
     <string name="thread_notice_copied">已复制</string>
+    <string name="thread_notice_image_failed">有图片无法读取，已跳过</string>
     <string name="thread_steer_tag">补充指令</string>
     <string name="thread_thinking">思考 · %1$d 字</string>
     <string name="thread_plan_title">计划</string>
@@ -61,6 +62,9 @@
     <string name="thread_action_end">结束</string>
     <string name="thread_ask_self">自己输入</string>
     <string name="thread_attach_screen">附带当前屏幕</string>
+    <string name="thread_add_image">添加图片</string>
+    <string name="thread_remove_image">移除图片</string>
+    <string name="thread_image_description">图片</string>
     <string name="thread_input_hint_idle">告诉我要做什么</string>
     <string name="thread_input_hint_running">补充指令…</string>
     <string name="thread_send">发送</string>

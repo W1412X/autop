@@ -7,6 +7,12 @@ import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import kotlinx.coroutines.flow.Flow
 
+/**
+ * 用户从相册选取的图片的文件名前缀。历史渲染的「图片保留」规则据此区分用户图片与
+ * 屏幕截图：截图只保留最近几张，用户图片是对话内容，始终保留。
+ */
+public const val USER_IMAGE_NAME_PREFIX: String = "pick-"
+
 /** 线程列表项（`listThreads` 返回）。 */
 public data class ThreadSummary(
     val threadId: ThreadId,

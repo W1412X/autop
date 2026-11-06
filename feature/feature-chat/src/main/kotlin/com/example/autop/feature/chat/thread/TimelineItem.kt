@@ -37,6 +37,8 @@ public sealed interface TimelineItem {
     public data class UserBubble(
         val text: String,
         val isSteer: Boolean,
+        /** 随消息发送的图片（相对 filesDir 的 fileRef）。 */
+        val images: List<String> = emptyList(),
     ) : TimelineItem
 
     /**

@@ -22,6 +22,7 @@ import com.example.autop.flow.FlowRunOptions
 import com.example.autop.flow.FlowStore
 import com.example.autop.flow.FlowValidationService
 import com.example.autop.task.ActiveRunInfo
+import com.example.autop.task.ImageAttachment
 import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
@@ -52,8 +53,9 @@ public class RunCoordinator(
         threadId: ThreadId?,
         text: String,
         attachCurrentScreen: Boolean,
+        images: List<ImageAttachment>,
     ): Outcome<RunRecord> {
-        val result = executor.launchChat(threadId, text, attachCurrentScreen)
+        val result = executor.launchChat(threadId, text, attachCurrentScreen, images)
         host.ensureRunning()
         return result
     }

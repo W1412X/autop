@@ -5,6 +5,7 @@
 package com.example.autop.feature.chat.thread
 
 import com.example.autop.core.config.UiChatSection
+import com.example.autop.task.ImageAttachment
 
 /** 等待回答的问题（docs/tech/08 §4.2 AskCard）。 */
 public data class WaitingQuestion(
@@ -22,6 +23,9 @@ public enum class ThreadNotice {
 
     /** "已复制"（元信息行复制图标，N183）。 */
     COPIED,
+
+    /** 选中的图片读取失败（格式不支持或文件不可读）。 */
+    IMAGE_FAILED,
 }
 
 /** 对话页弹层状态。 */
@@ -48,6 +52,10 @@ public data class ChatThreadUiState(
     /** 无障碍已连接（false 时输入禁用并显示提示，docs/tech/08 §4.1）。 */
     val accessibilityConnected: Boolean = true,
     val input: String = "",
+    /** 待发送的图片（已压缩，发送后清空）。 */
+    val images: List<ImageAttachment> = emptyList(),
+    /** 单条消息可附图片数上限（`ui.chat.attachMaxImages`）。 */
+    val maxImages: Int = UiChatSection().attachMaxImages,
     /** "附带当前屏幕"开关（发送时 `attachCurrentScreen`）。 */
     val attachScreen: Boolean = true,
     /** 输入框最大行数（`ui.chat.inputMaxLines`）。 */

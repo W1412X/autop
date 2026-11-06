@@ -23,6 +23,9 @@ public object AutopDimens {
     public val sectionBarCornerRadius: Dp = 2.dp
     public val progressBarHeight: Dp = 3.dp
     public val listThumb: Dp = 48.dp
+
+    /** 对话附图缩略图边长（输入区待发送图与气泡内已发送图）。 */
+    public val attachThumb: Dp = 72.dp
     public val overlayBall: Dp = 52.dp
     public val overlayPanelWidth: Dp = 300.dp
     public val minTouchTarget: Dp = 48.dp

@@ -6,6 +6,7 @@ package com.example.autop.task.impl
 
 import com.example.autop.agent.AgentSession
 import com.example.autop.agent.ThreadStore
+import com.example.autop.agent.USER_IMAGE_NAME_PREFIX
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Logger
@@ -19,6 +20,7 @@ import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.llm.Block
 import com.example.autop.task.ChatTitleGenerator
+import com.example.autop.task.ImageAttachment
 import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus
@@ -51,10 +53,14 @@ public class RunExecutor(
         threadId: ThreadId?,
         text: String,
         attachCurrentScreen: Boolean,
+        images: List<ImageAttachment>,
     ): Outcome<RunRecord> {
         val placeholder = if (threadId == null) placeholderTitle(text) else null
         val thread = threadId ?: threadStore.createThread(title = placeholder, parent = null)
-        val blocks = mutableListOf<Block>(Block.Text(text))
+        // 纯图片消息没有文本块：部分协议拒绝空 text 块。
+        val blocks = mutableListOf<Block>()
+        if (text.isNotBlank()) blocks += Block.Text(text)
+        saveImages(thread, images, blocks)
         if (attachCurrentScreen) attachScreen(thread, blocks)
         val enqueued = enqueue(RunOrigin.CHAT, thread, blocks, emptyMap(), null)
         if (placeholder != null && enqueued is Outcome.Ok) {
@@ -161,6 +167,20 @@ public class RunExecutor(
         }
     }
 
+    /** 用户选取的图片落盘并追加为 Image 块；文件名带 [USER_IMAGE_NAME_PREFIX]，供历史渲染区分于屏幕截图。 */
+    private suspend fun saveImages(
+        thread: ThreadId,
+        images: List<ImageAttachment>,
+        blocks: MutableList<Block>,
+    ) {
+        val stamp = clock.nowMillis()
+        images.forEachIndexed { index, image ->
+            val ext = if (image.mime == MIME_PNG) "png" else "jpg"
+            val fileRef = threadStore.saveBlob(thread, "$USER_IMAGE_NAME_PREFIX$stamp-$index.$ext", image.bytes)
+            blocks += Block.Image(fileRef = fileRef, mime = image.mime, width = image.width, height = image.height)
+        }
+    }
+
     /** 附当前屏幕截图（失败时只记日志，不阻塞发送）。 */
     private suspend fun attachScreen(
         thread: ThreadId,
@@ -188,6 +208,7 @@ public class RunExecutor(
         public const val RESUMED_FROM_KEY: String = "resumedFrom"
 
         private const val TAG = "RunExecutor"
+        private const val MIME_PNG = "image/png"
     }
 }
 

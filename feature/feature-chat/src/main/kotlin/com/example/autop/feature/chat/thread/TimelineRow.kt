@@ -15,6 +15,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -32,6 +34,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -43,11 +46,13 @@ import com.example.autop.agent.PlanStatus
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.MarkdownText
 import com.example.autop.core.ui.theme.AutopAlpha
+import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.chat.R
+import java.io.File
 
 /** 时间线条目分派（长按菜单只对带 seq 的 AssistantText / StepRow 开放，docs/tech/08 §4.2）。 */
 @Composable
@@ -108,10 +113,36 @@ private fun UserBubbleRow(
                     color = MaterialTheme.colorScheme.onPrimaryContainer,
                 )
             }
-            Text(
-                text = item.text,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.onPrimaryContainer,
+            if (item.images.isNotEmpty()) BubbleImages(fileRefs = item.images)
+            if (item.text.isNotBlank()) {
+                Text(
+                    text = item.text,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onPrimaryContainer,
+                )
+            }
+        }
+    }
+}
+
+/** 气泡内的图片缩略图：横向排布、超宽自动换行；fileRef 相对应用 files 目录解析。 */
+@OptIn(ExperimentalLayoutApi::class) // FlowRow 在当前 Compose 版本仍为实验 API
+@Composable
+private fun BubbleImages(fileRefs: List<String>) {
+    val filesDir = LocalContext.current.filesDir
+    val spacing = LocalSpacing.current
+    val description = stringResource(R.string.thread_image_description)
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+        verticalArrangement = Arrangement.spacedBy(spacing.xs),
+        modifier = Modifier.padding(bottom = spacing.xs),
+    ) {
+        fileRefs.forEach { ref ->
+            Thumbnail(
+                key = ref,
+                size = AutopDimens.attachThumb,
+                contentDescription = description,
+                decode = { px -> decodeSampledFile(File(filesDir, ref), px) },
             )
         }
     }

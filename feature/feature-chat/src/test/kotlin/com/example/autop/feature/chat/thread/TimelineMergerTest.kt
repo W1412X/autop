@@ -154,6 +154,18 @@ class TimelineMergerTest {
     }
 
     @Test
+    fun `user bubble carries attached images`() {
+        val image = Block.Image(fileRef = "threads/t/img/pick-1-0.jpg", mime = "image/jpeg", width = 4, height = 4)
+        val history =
+            listOf(event(1, UserMessage(blocks = listOf(Block.Text("这是什么"), image), kind = UserMessageKind.INPUT)))
+
+        val bubble = mergeTimeline(history, emptyList(), GROUP_THRESHOLD).single().item as TimelineItem.UserBubble
+
+        assertThat(bubble.text).isEqualTo("这是什么")
+        assertThat(bubble.images).containsExactly("threads/t/img/pick-1-0.jpg")
+    }
+
+    @Test
     fun `registry tool ids normalize so read steps still fold`() {
         val history =
             (1..3).flatMap { index ->

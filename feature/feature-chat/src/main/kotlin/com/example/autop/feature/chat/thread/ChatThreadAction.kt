@@ -5,10 +5,22 @@
  */
 package com.example.autop.feature.chat.thread
 
+import android.net.Uri
+
 public sealed interface ChatThreadAction {
     /** 输入框变化。 */
     public data class SetInput(
         val text: String,
+    ) : ChatThreadAction
+
+    /** 从相册选中了图片（读取、压缩由 ViewModel 完成，超出上限的忽略）。 */
+    public data class AddImages(
+        val uris: List<Uri>,
+    ) : ChatThreadAction
+
+    /** 移除第 [index] 张待发送图片。 */
+    public data class RemoveImage(
+        val index: Int,
     ) : ChatThreadAction
 
     /** 切换"附带当前屏幕"。 */

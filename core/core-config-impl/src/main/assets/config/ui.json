@@ -17,7 +17,10 @@
       "inputMaxLines": 6,
       "stepGroupThreshold": 3,
       "backgroundOnSend": false,
-      "autoTitle": true
+      "autoTitle": true,
+      "attachMaxImages": 4,
+      "attachMaxEdge": 1280,
+      "attachJpegQuality": 85
     },
     "banner": {
       "durationMs": 3000

@@ -233,6 +233,7 @@ private class FakeRunService : RunService {
         threadId: ThreadId?,
         text: String,
         attachCurrentScreen: Boolean,
+        images: List<com.example.autop.task.ImageAttachment>,
     ): com.example.autop.core.common.Outcome<RunRecord> = error("unused")
 
     override suspend fun forkAndRun(
