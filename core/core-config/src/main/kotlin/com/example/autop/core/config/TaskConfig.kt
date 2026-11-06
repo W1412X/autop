@@ -89,7 +89,14 @@ public data class TaskAuditSection(
 @Serializable
 public data class TaskHostSection(
     @SerialName("persistent") val persistent: Boolean = false,
-) : ConfigSection
+    /** 有活跃 Run 时持有的 CPU 唤醒锁的最长时间（毫秒），到点自动释放，防止异常情况下一直占着。 */
+    @SerialName("wakeLockMaxMs") val wakeLockMaxMs: Long = 1_800_000,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (wakeLockMaxMs <= 0) add("wakeLockMaxMs must be > 0, was $wakeLockMaxMs")
+        }
+}
 
 /** `task.replay`：任务回放（docs/tech/04 §2.7/§3.12，R1/A6）。 */
 @Serializable

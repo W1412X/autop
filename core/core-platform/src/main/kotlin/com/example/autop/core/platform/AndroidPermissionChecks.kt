@@ -1,6 +1,7 @@
 package com.example.autop.core.platform
 
 import android.annotation.SuppressLint
+import android.app.AlarmManager
 import android.app.NotificationManager
 import android.content.Context
 import android.os.PowerManager
@@ -43,8 +44,14 @@ public class AndroidPermissionChecks(
     override fun isIgnoringBatteryOptimizations(): Boolean =
         powerManager().isIgnoringBatteryOptimizations(context.packageName)
 
+    @SuppressLint("NewApi") // EXACT_ALARM_NEEDS_GRANT 闸门已隐含 SDK≥31
+    override fun canScheduleExactAlarms(): Boolean =
+        if (capabilities.has(Capability.EXACT_ALARM_NEEDS_GRANT)) alarmManager().canScheduleExactAlarms() else true
+
     private fun notificationManager(): NotificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+    private fun alarmManager(): AlarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
 
     private fun powerManager(): PowerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
 

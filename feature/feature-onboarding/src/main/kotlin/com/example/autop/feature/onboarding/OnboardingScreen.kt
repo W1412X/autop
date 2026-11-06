@@ -162,6 +162,7 @@ private fun titleRes(id: CheckId): Int =
         CheckId.NOTIFICATIONS -> R.string.onboarding_check_notifications_title
         CheckId.NOTIFICATION_LISTENER -> R.string.onboarding_check_listener_title
         CheckId.FULL_SCREEN_INTENT -> R.string.onboarding_check_full_screen_intent_title
+        CheckId.EXACT_ALARM -> R.string.onboarding_check_exact_alarm_title
         CheckId.BATTERY_OPTIMIZATIONS -> R.string.onboarding_check_battery_title
         CheckId.VENDOR_BACKGROUND -> R.string.onboarding_check_vendor_title
     }
@@ -175,6 +176,7 @@ private fun descriptionRes(id: CheckId): Int =
         CheckId.NOTIFICATIONS -> R.string.onboarding_check_notifications_desc
         CheckId.NOTIFICATION_LISTENER -> R.string.onboarding_check_listener_desc
         CheckId.FULL_SCREEN_INTENT -> R.string.onboarding_check_full_screen_intent_desc
+        CheckId.EXACT_ALARM -> R.string.onboarding_check_exact_alarm_desc
         CheckId.BATTERY_OPTIMIZATIONS -> R.string.onboarding_check_battery_desc
         CheckId.VENDOR_BACKGROUND -> R.string.onboarding_check_vendor_desc
     }

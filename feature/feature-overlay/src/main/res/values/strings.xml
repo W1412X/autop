@@ -12,7 +12,6 @@
     <string name="panel_input_placeholder">输入任务，回车发送…</string>
     <string name="panel_attach_screen">针对当前屏幕</string>
     <string name="panel_send">发送</string>
-    <string name="panel_mic_description">语音输入</string>
     <string name="panel_steer_placeholder">补充指令…</string>
     <string name="panel_steer_send">发送补充指令</string>
     <string name="panel_action_pause">暂停</string>

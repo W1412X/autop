@@ -19,4 +19,7 @@ public interface PermissionChecks {
 
     /** 是否已在电池优化白名单（忽略电池优化）。 */
     public fun isIgnoringBatteryOptimizations(): Boolean
+
+    /** 精确闹钟是否可用（SDK 31–32 需用户授权；其余平台返回 true）。不可用时定时任务降级为不准时。 */
+    public fun canScheduleExactAlarms(): Boolean
 }

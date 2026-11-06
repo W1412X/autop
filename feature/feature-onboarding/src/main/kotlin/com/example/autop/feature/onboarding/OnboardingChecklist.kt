@@ -24,6 +24,9 @@ public enum class CheckId {
     /** 全屏提醒权限（仅 Capability.FULL_SCREEN_INTENT_NEEDS_GRANT 时显示）。 */
     FULL_SCREEN_INTENT,
 
+    /** 精确闹钟（仅 Capability.EXACT_ALARM_NEEDS_GRANT 时显示；未授权时定时任务降级为不准时）。 */
+    EXACT_ALARM,
+
     /** 电池优化白名单。 */
     BATTERY_OPTIMIZATIONS,
 

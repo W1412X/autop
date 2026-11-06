@@ -273,6 +273,8 @@ private class FakePermissionChecks : PermissionChecks {
     override fun canUseFullScreenIntent(): Boolean = true
 
     override fun isIgnoringBatteryOptimizations(): Boolean = true
+
+    override fun canScheduleExactAlarms(): Boolean = true
 }
 
 /** 本用例不触碰记忆存储（仅构造注入），保持空实现。 */

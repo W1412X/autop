@@ -1,6 +1,6 @@
 /**
- * 输入面板（docs/tech/08 §5.2）：`AutopInputBar` 单行起最多 3 行 + 麦 + 发送 +
- * 「针对当前屏幕」chip（默认 `ui.overlay.attachScreenDefault`）。
+ * 输入面板（docs/tech/08 §5.2）：`AutopInputBar` 单行起最多 3 行 + 发送 +
+ * 「针对当前屏幕」chip（默认 `ui.overlay.attachScreenDefault`）。语音输入暂不提供，入口已隐藏。
  */
 package com.example.autop.feature.overlay.panel
 
@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -54,11 +53,6 @@ internal fun InputPanel(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        AutopIconButton(
-            icon = Icons.Outlined.Mic,
-            contentDescription = stringResource(R.string.panel_mic_description),
-            onClick = callbacks.onMicTap,
-        )
         AutopChip(
             text = stringResource(R.string.panel_attach_screen),
             selected = attachScreen,

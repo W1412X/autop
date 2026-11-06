@@ -199,6 +199,8 @@ private class FakePermissionChecks : PermissionChecks {
     override fun canUseFullScreenIntent(): Boolean = fullScreenIntent
 
     override fun isIgnoringBatteryOptimizations(): Boolean = batteryOptimizations
+
+    override fun canScheduleExactAlarms(): Boolean = true
 }
 
 private class FakeCapabilities(

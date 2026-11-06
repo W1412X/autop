@@ -74,8 +74,6 @@ public class PanelController
                                 progressController.show()
                             }
                         },
-                        // 语音输入待后续工作包接入（questions.md N136），暂为占位。
-                        onMicTap = {},
                         onDismiss = ::dismiss,
                     )
                 }

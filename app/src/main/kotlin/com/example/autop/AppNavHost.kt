@@ -283,6 +283,14 @@ private fun createOnboardingNavigator(
             )
         }
 
+        override fun openExactAlarmSettings() {
+            // 首选精确闹钟授权页；部分 ROM 不支持时回退应用详情页。
+            startWithFallback(
+                Intent(Settings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM, Uri.parse("package:${context.packageName}")),
+                Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:${context.packageName}")),
+            )
+        }
+
         override fun openBatteryOptimizationSettings() {
             // 白名单申请弹窗 → 系统省电策略列表 → 应用详情页逐级回退（N163）。
             startWithFallback(

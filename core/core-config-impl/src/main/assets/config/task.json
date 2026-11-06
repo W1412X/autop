@@ -45,7 +45,8 @@
       "retentionDays": 30
     },
     "host": {
-      "persistent": false
+      "persistent": false,
+      "wakeLockMaxMs": 1800000
     },
     "replay": {
       "enabled": true,

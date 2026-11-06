@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <!-- 定时任务：开机重排与精确闹钟（docs/tech/07 §4.1，WP9）。 -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- 后台任务执行期间保持 CPU 唤醒，避免息屏后被休眠打断。 -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 
     <application>

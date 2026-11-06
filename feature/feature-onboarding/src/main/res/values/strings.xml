@@ -20,6 +20,8 @@
     <string name="onboarding_check_listener_desc">允许 AutoP 读取通知，用于通知触发的任务。</string>
     <string name="onboarding_check_full_screen_intent_title">全屏提醒权限</string>
     <string name="onboarding_check_full_screen_intent_desc">锁屏提醒时全屏展示，便于直接处理任务。</string>
+    <string name="onboarding_check_exact_alarm_title">精确闹钟</string>
+    <string name="onboarding_check_exact_alarm_desc">允许 AutoP 在设定的时刻准时启动定时任务；不授权时定时任务可能延迟执行。</string>
     <string name="onboarding_check_battery_title">电池优化白名单</string>
     <string name="onboarding_check_battery_desc">避免后台任务被系统休眠中断。</string>
     <string name="onboarding_check_vendor_title">厂商后台设置</string>

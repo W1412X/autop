@@ -16,6 +16,7 @@ import android.content.pm.ServiceInfo
 import android.graphics.drawable.Icon
 import android.os.Build
 import android.os.IBinder
+import android.os.PowerManager
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.exceptionHandler
 import com.example.autop.core.config.ConfigProvider
@@ -71,6 +72,9 @@ public class AgentHostService : Service() {
     }
     private var observeJob: Job? = null
 
+    /** 有活跃 Run 时持有的 CPU 唤醒锁；息屏后网络请求与协程不会被休眠打断。 */
+    private var wakeLock: PowerManager.WakeLock? = null
+
     override fun onCreate() {
         super.onCreate()
         hostStatus.setRunning(true)
@@ -86,6 +90,7 @@ public class AgentHostService : Service() {
                     ->
                     Triple(active, unfinished.size, paired)
                 }.collect { (active, unfinishedCount, paired) ->
+                    syncWakeLock(held = active != null)
                     if (shouldStop(active, unfinishedCount, paired)) {
                         stopSelf()
                         return@collect
@@ -104,11 +109,27 @@ public class AgentHostService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
+        syncWakeLock(held = false)
         shellKeepAlive.stop()
         observeJob?.cancel()
         scope.cancel()
         hostStatus.setRunning(false)
         super.onDestroy()
+    }
+
+    /** 按是否有活跃 Run 获取或释放唤醒锁（幂等）；最长持有时间取 `task.host.wakeLockMaxMs`，到点系统自动释放。 */
+    private fun syncWakeLock(held: Boolean) {
+        val current = wakeLock
+        if (held && current?.isHeld != true) {
+            val lock =
+                getSystemService(PowerManager::class.java)
+                    .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, WAKE_LOCK_TAG)
+            lock.acquire(config.current()[TaskConfig.HOST].wakeLockMaxMs)
+            wakeLock = lock
+        } else if (!held && current?.isHeld == true) {
+            current.release()
+            wakeLock = null
+        }
     }
 
     /** 空闲收口（N203）：无活动 Run、无未完 Run、未配对 shell 通道且非常驻时停服。 */
@@ -221,5 +242,8 @@ public class AgentHostService : Service() {
         const val NOTIFICATION_ID = 4102
         const val REQUEST_PAUSE = 1
         const val REQUEST_CANCEL = 2
+
+        /** 唤醒锁名称（`adb shell dumpsys power` 里可见，用于排查耗电）。 */
+        const val WAKE_LOCK_TAG = "autop:run"
     }
 }

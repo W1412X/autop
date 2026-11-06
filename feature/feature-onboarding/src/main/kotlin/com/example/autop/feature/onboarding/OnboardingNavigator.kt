@@ -25,6 +25,9 @@ public interface OnboardingNavigator {
     /** 系统全屏提醒权限设置（Capability.FULL_SCREEN_INTENT_NEEDS_GRANT 时出现）。 */
     public fun openFullScreenIntentSettings()
 
+    /** 系统精确闹钟授权页（Capability.EXACT_ALARM_NEEDS_GRANT 时出现）。 */
+    public fun openExactAlarmSettings()
+
     /** 系统电池优化白名单申请。 */
     public fun openBatteryOptimizationSettings()
 

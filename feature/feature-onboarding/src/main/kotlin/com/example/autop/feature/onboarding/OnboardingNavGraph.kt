@@ -92,6 +92,7 @@ private fun openCheck(
         CheckId.NOTIFICATIONS -> navigator.openNotificationSettings()
         CheckId.NOTIFICATION_LISTENER -> navigator.openNotificationListenerSettings()
         CheckId.FULL_SCREEN_INTENT -> navigator.openFullScreenIntentSettings()
+        CheckId.EXACT_ALARM -> navigator.openExactAlarmSettings()
         CheckId.BATTERY_OPTIMIZATIONS -> navigator.openBatteryOptimizationSettings()
         CheckId.VENDOR_BACKGROUND -> state.vendorComponentSpec?.let { navigator.openVendorSettings(it) }
     }
