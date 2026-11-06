@@ -11,13 +11,14 @@
 
 > 这是一个自用项目，不上架应用商店。运行时屏幕内容会发送到**你自己配置的**模型服务，使用前请先阅读[隐私与安全](#隐私与安全)。
 
-<!--
-截图占位：提供图片后放到 assets/screenshots/ 并取消本段注释。
-
-| 对话与运行时间线 | 执行期边缘光与悬浮球 | 流程（录制 / AI 创建） | 记忆树 |
-|---|---|---|---|
-| ![chat](assets/screenshots/chat.png) | ![running](assets/screenshots/running.png) | ![flows](assets/screenshots/flows.png) | ![memory](assets/screenshots/memory.png) |
--->
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="img/chat-running.jpg" width="220" alt="对话中的运行时间线"><br><sub>对话：每一步都可展开查看</sub></td>
+    <td align="center" valign="top"><img src="img/running-glow.jpg" width="220" alt="执行期边缘光"><br><sub>执行期：边缘光 + 步数胶囊</sub></td>
+    <td align="center" valign="top"><img src="img/flow-ai-create.jpg" width="220" alt="AI 创建流程"><br><sub>AI 创建流程：边思考边生成</sub></td>
+    <td align="center" valign="top"><img src="img/memory.jpg" width="220" alt="记忆树"><br><sub>记忆：按目录组织</sub></td>
+  </tr>
+</table>
 
 ## 目录
 
@@ -65,6 +66,13 @@
 
 条件触发有冷却期、每日上限和重复事件去重，避免被消息风暴反复触发。需要屏幕但手机锁屏时，会发闹钟级提醒，解锁后一键执行或稍后再说。
 
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="img/chat-list.jpg" width="220" alt="对话列表"><br><sub>对话列表</sub></td>
+    <td align="center" valign="top"><img src="img/task-new.jpg" width="220" alt="新建任务"><br><sub>新建任务：一句话描述，生成草稿</sub></td>
+  </tr>
+</table>
+
 ### 流程：把重复操作沉淀下来
 
 重复做的事可以固化成**流程**，之后直接运行，不必每次让模型重新推理。流程有三个来源：
@@ -75,9 +83,19 @@
 
 流程执行带校验与恢复：动作后核对结果，失败时依次尝试等待、换位置、关闭弹窗、返回、重启应用，仍不行再交回 Agent 接手。
 
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="img/flows-empty.jpg" width="220" alt="流程列表（空）"><br><sub>流程页：点右上角加号创建</sub></td>
+    <td align="center" valign="top"><img src="img/flows-list.jpg" width="220" alt="流程列表"><br><sub>我的流程</sub></td>
+    <td align="center" valign="top"><img src="img/flow-detail.jpg" width="220" alt="流程详情"><br><sub>详情：运行、调试、统计与参数</sub></td>
+    <td align="center" valign="top"><img src="img/flow-editor.jpg" width="220" alt="流程编辑器"><br><sub>编辑器：简明 / 高级 / JSON</sub></td>
+  </tr>
+</table>
+
 ### 记忆
 
 按目录组织的记忆树（用户档案、人物、各 App 的操作手册、任务笔记）。提示词里只放索引，正文按需读取；检索是路径匹配、全文（中文二元组分词）和向量的混合召回。Agent 可以直接写入，所有写入带版本，可在「最近变更」里逐条撤销。
+
 
 ### 执行期体验
 
@@ -85,11 +103,18 @@
 - **执行期边缘光**：Agent 操作手机时，屏幕四周有随主题色流动、呼吸的柔光，顶部显示步数胶囊。
 - **触摸盾**：执行期间屏蔽用户误触（含状态栏），暂停或停止后立即解除。
 
+
 ### 模型
 
 - OpenAI 兼容（chat/completions）与 Anthropic 兼容（Messages）两种协议，不依赖官方 SDK。
 - 可按角色分配：主模型、视觉模型、轻量模型（条件判定、经验提炼、压缩摘要）。Embedding 独立配置，可关闭。
 - 上下文接近上限时自动压缩，完整事件日志保留，需要时可回取原文。
+
+<table>
+  <tr>
+    <td align="center" valign="top"><img src="img/settings.jpg" width="220" alt="我的页面"><br><sub>「我的」：外观、模型、观测方式等设置</sub></td>
+  </tr>
+</table>
 
 ## 工作原理
 
