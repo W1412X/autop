@@ -93,7 +93,8 @@ public class ChatListViewModel
             when (action) {
                 ChatListAction.LoadMore -> loadMore()
                 is ChatListAction.ShowThreadMenu -> sheet.update { it.copy(menuThreadId = action.threadId) }
-                ChatListAction.DismissMenu -> sheet.update { ChatListSheet(it.renameThreadId, it.deleteThreadId) }
+                // 只清菜单目标；用 copy 按字段名保留重命名/删除目标（按位置传参会让它们错位到别的字段）。
+                ChatListAction.DismissMenu -> sheet.update { it.copy(menuThreadId = null) }
                 is ChatListAction.ShowRename ->
                     sheet.update { ChatListSheet(renameThreadId = action.threadId) }
                 is ChatListAction.Rename -> rename(action.threadId, action.title)

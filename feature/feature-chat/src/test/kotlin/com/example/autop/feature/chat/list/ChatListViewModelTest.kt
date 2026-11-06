@@ -91,6 +91,47 @@ class ChatListViewModelTest {
             ).isEqualTo("最新")
         }
 
+    @Test
+    fun `menu then delete then confirm removes the thread`() =
+        runTest(testDispatcher) {
+            val store = FakeThreadStore(listOf(summary("t1", "要删的"), summary("t2", "保留的")))
+            val viewModel = createViewModel(store)
+
+            // 与界面一致的动作序列：长按行 → 菜单选“删除”（先 ShowDelete，紧接着 DismissMenu）→ 确认。
+            viewModel.onAction(ChatListAction.ShowThreadMenu("t1"))
+            viewModel.onAction(ChatListAction.ShowDelete("t1"))
+            viewModel.onAction(ChatListAction.DismissMenu)
+
+            val sheet = viewModel.uiState.value.sheet
+            assertThat(sheet.deleteThreadId).isEqualTo("t1")
+            assertThat(sheet.renameThreadId).isNull()
+            assertThat(sheet.menuThreadId).isNull()
+
+            viewModel.onAction(ChatListAction.ConfirmDelete)
+
+            assertThat(store.deleted.map { it.value }).containsExactly("t1")
+            assertThat(
+                viewModel.uiState.value.threads
+                    .map { it.threadId },
+            ).containsExactly("t2")
+            assertThat(viewModel.uiState.value.sheet).isEqualTo(ChatListSheet())
+        }
+
+    @Test
+    fun `menu then rename keeps the rename target and not the delete dialog`() =
+        runTest(testDispatcher) {
+            val store = FakeThreadStore(listOf(summary("t1", "旧标题")))
+            val viewModel = createViewModel(store)
+
+            viewModel.onAction(ChatListAction.ShowThreadMenu("t1"))
+            viewModel.onAction(ChatListAction.ShowRename("t1"))
+            viewModel.onAction(ChatListAction.DismissMenu)
+
+            val sheet = viewModel.uiState.value.sheet
+            assertThat(sheet.renameThreadId).isEqualTo("t1")
+            assertThat(sheet.deleteThreadId).isNull()
+        }
+
     private fun createViewModel(store: ThreadStore): ChatListViewModel =
         ChatListViewModel(
             threadStore = store,
@@ -124,6 +165,9 @@ private class FakeThreadStore(
     var summaries: List<ThreadSummary>,
 ) : ThreadStore {
     private val changes = MutableSharedFlow<Unit>(extraBufferCapacity = 8)
+
+    /** 被删除的线程（按调用顺序）。 */
+    val deleted = mutableListOf<ThreadId>()
 
     /** 模拟外部写入（新建 / append / 改名 / 删除）。 */
     fun emitChange() {
@@ -171,7 +215,10 @@ private class FakeThreadStore(
 
     override suspend fun titleOf(threadId: ThreadId): String? = null
 
-    override suspend fun delete(threadId: ThreadId): Unit = Unit
+    override suspend fun delete(threadId: ThreadId) {
+        deleted += threadId
+        summaries = summaries.filterNot { it.threadId == threadId }
+    }
 
     override suspend fun forkablePoints(threadId: ThreadId): List<Long> = emptyList()
 }
