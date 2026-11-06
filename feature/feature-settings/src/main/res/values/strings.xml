@@ -358,6 +358,13 @@
     <string name="me_nav_probe_history">工具测试记录</string>
     <string name="me_section_about">关于</string>
     <string name="me_version">版本</string>
+    <string name="me_about_project">项目地址</string>
+    <string name="me_about_developer">开发者</string>
+    <string name="me_about_releases">下载与更新</string>
+    <!-- 项目与开发者链接：应用元数据，不随语言翻译。 -->
+    <string name="me_about_project_url" translatable="false">https://github.com/W1412X/autop</string>
+    <string name="me_about_developer_url" translatable="false">https://github.com/W1412X</string>
+    <string name="me_about_releases_url" translatable="false">https://github.com/W1412X/autop/releases</string>
     <string name="me_backup_export">导出数据</string>
     <string name="me_backup_import">导入数据</string>
     <string name="me_backup_exported">已导出到 Download/autop</string>

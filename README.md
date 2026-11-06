@@ -30,7 +30,7 @@
 - [项目结构](#项目结构)
 - [开发指南](#开发指南)
 - [CI 与发布](#ci-与发布)
-- [现成 APK](#现成-apk)
+- [下载安装包](#下载安装包)
 
 ## 能做什么
 
@@ -262,14 +262,13 @@ Conventional Commits，scope 用模块领域名，例如 `feat(memory): …`、`
 
 ## CI 与发布
 
-push 到 `main`、打 `v*` tag 或手动触发 `.github/workflows/release.yml`：质量门禁（test / detekt / ktlint）→ 构建 release APK → 上传 artifact（**只含最终 APK**）。
+push 到 `main`、打 `v*` tag 或手动触发 `.github/workflows/release.yml`：质量门禁（test / detekt / ktlint）→ 构建 release APK → 上传 artifact（**只含最终 APK**）。打 `v*` tag 时，还会把 APK 发布到该 tag 对应的 [GitHub Release](https://github.com/W1412X/autop/releases)。
 
 签名靠仓库 Secrets：`ANDROID_KEYSTORE_BASE64`（keystore 的 base64）、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS`、`ANDROID_KEY_PASSWORD`；缺失时降级为未签名包并告警。
 
-## 现成 APK
+## 下载安装包
 
-http://39.101.160.55/apk/
-
+统一在 [GitHub Releases](https://github.com/W1412X/autop/releases) 下载最新的 `app-release.apk`。侧载安装时，Android 13 及以上需要先在应用信息里「允许受限设置」，再开启无障碍服务，详见[首次使用](#首次使用)。
 ## 许可
 
 仓库目前没有声明许可证，保留所有权利。如需使用或二次开发，请先联系作者。
