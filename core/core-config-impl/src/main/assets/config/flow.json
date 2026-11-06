@@ -50,7 +50,17 @@
       "verifyTimeoutMs": 1500,
       "verifyPollMs": 200,
       "waitStableMs": 1500,
-      "altClickOffsets": [[0.5, 0.5], [0.3, 0.5], [0.7, 0.5], [0.5, 0.3], [0.5, 0.7]]
+      "altClickOffsets": [[0.5, 0.5], [0.3, 0.5], [0.7, 0.5], [0.5, 0.3], [0.5, 0.7]],
+      "handoffContextMaxChars": 4000,
+      "handoffMaxSteps": 30,
+      "handoffBudgetPerRun": 5,
+      "autoPatch": false
+    },
+    "precondition": {
+      "enabled": true,
+      "waitTimeoutMs": 3000,
+      "pollMs": 200,
+      "allowLlm": false
     },
     "directory": {
       "maxItems": 20,

@@ -155,6 +155,18 @@ public data class FlowRecoverySection(
             listOf(0.5, 0.3),
             listOf(0.5, 0.7),
         ),
+    /** 交回智能体时注入的流程上下文字符上限。 */
+    @SerialName("handoffContextMaxChars")
+    val handoffContextMaxChars: Int = 4000,
+    /** 隐式 handoff 的步数上限（显式 `handoff.maxSteps` 优先）。 */
+    @SerialName("handoffMaxSteps")
+    val handoffMaxSteps: Int = 30,
+    /** 单次 Run 的 handoff 次数上限，超限后不再交回智能体，直接走 `final`。 */
+    @SerialName("handoffBudgetPerRun")
+    val handoffBudgetPerRun: Int = 5,
+    /** 是否允许自动写入流程修订版本（false = 只生成草稿等用户确认）。 */
+    @SerialName("autoPatch")
+    val autoPatch: Boolean = false,
 ) : ConfigSection {
     override fun validate(): List<String> =
         buildList {
@@ -162,9 +174,33 @@ public data class FlowRecoverySection(
             if (verifyTimeoutMs !in 200..10000) add("verifyTimeoutMs must be in 200..10000, was $verifyTimeoutMs")
             if (verifyPollMs !in 50..1000) add("verifyPollMs must be in 50..1000, was $verifyPollMs")
             if (waitStableMs < 0) add("waitStableMs must be >= 0, was $waitStableMs")
+            if (handoffContextMaxChars < 0) {
+                add("handoffContextMaxChars must be >= 0, was $handoffContextMaxChars")
+            }
+            if (handoffMaxSteps !in 1..200) add("handoffMaxSteps must be in 1..200, was $handoffMaxSteps")
+            if (handoffBudgetPerRun !in 1..50) add("handoffBudgetPerRun must be in 1..50, was $handoffBudgetPerRun")
             altClickOffsets.forEach { p ->
                 if (p.size != 2 || p.any { it !in 0.0..1.0 }) add("altClickOffsets entries must be [x,y] in 0..1")
             }
+        }
+}
+
+/** `flow.precondition`：节点前置断言（docs/design/flows-precondition-selfrepair.md P5）。 */
+@Serializable
+public data class FlowPreconditionSection(
+    /** 总开关；关闭时所有 `pre` 被忽略。 */
+    @SerialName("enabled") val enabled: Boolean = true,
+    /** `WAIT` 策略的默认等待上限；仍受节点 `timeoutMs` 约束。 */
+    @SerialName("waitTimeoutMs") val waitTimeoutMs: Long = 3000,
+    /** `WAIT` 策略的轮询间隔。 */
+    @SerialName("pollMs") val pollMs: Long = 200,
+    /** 是否允许 `pre.cond` 含 `llm` 子条件；为假时运行期忽略该 `pre` 并记 warn。 */
+    @SerialName("allowLlm") val allowLlm: Boolean = false,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (waitTimeoutMs !in 0..60000) add("waitTimeoutMs must be in 0..60000, was $waitTimeoutMs")
+            if (pollMs !in 50..2000) add("pollMs must be in 50..2000, was $pollMs")
         }
 }
 
@@ -231,6 +267,9 @@ public object FlowConfig {
     public val RECOVERY: ConfigKey<FlowRecoverySection> =
         ConfigKey("flow.recovery", FlowRecoverySection.serializer()) { FlowRecoverySection() }
 
+    public val PRECONDITION: ConfigKey<FlowPreconditionSection> =
+        ConfigKey("flow.precondition", FlowPreconditionSection.serializer()) { FlowPreconditionSection() }
+
     public val RUN: ConfigKey<FlowRunSection> =
         ConfigKey("flow.run", FlowRunSection.serializer()) { FlowRunSection() }
     public val LLM: ConfigKey<FlowLlmSection> =
@@ -245,5 +284,5 @@ public object FlowConfig {
         ConfigKey("flow.author", FlowAuthorSection.serializer()) { FlowAuthorSection() }
 
     public val ALL: List<ConfigKey<*>> =
-        listOf(RUN, LLM, AGENT, API, TRACE, AUTHOR, RECOVERY, DIRECTORY, SAVE, RECORDER)
+        listOf(RUN, LLM, AGENT, API, TRACE, AUTHOR, RECOVERY, PRECONDITION, DIRECTORY, SAVE, RECORDER)
 }
