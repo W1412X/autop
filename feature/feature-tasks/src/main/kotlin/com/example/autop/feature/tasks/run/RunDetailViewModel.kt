@@ -18,6 +18,7 @@ import com.example.autop.agent.RunStarted
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
+import com.example.autop.agent.protocol.displayTextOf
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.ThreadId
@@ -179,7 +180,17 @@ public class RunDetailViewModel
         private fun timelineOf(payload: EventPayload): TimelineUi =
             when (payload) {
                 is UserMessage -> TimelineUi(TimelineKind.USER, payload.blocks.textOf())
-                is AssistantMessage -> TimelineUi(TimelineKind.ASSISTANT, payload.blocks.textOf())
+                // 回退协议/工具标记文本不冒充正文（displayTextOf 过滤）。
+                is AssistantMessage ->
+                    TimelineUi(
+                        TimelineKind.ASSISTANT,
+                        payload.blocks
+                            .filterIsInstance<Block.Text>()
+                            .map { displayTextOf(it.text) }
+                            .filter { it.isNotBlank() }
+                            .joinToString(" ")
+                            .take(TEXT_LIMIT),
+                    )
                 is ToolResultEvent -> TimelineUi(TimelineKind.TOOL, payload.toolId)
                 is RunStarted -> TimelineUi(TimelineKind.STARTED, "")
                 is RunFinished -> TimelineUi(TimelineKind.FINISHED, payload.summary.orEmpty())

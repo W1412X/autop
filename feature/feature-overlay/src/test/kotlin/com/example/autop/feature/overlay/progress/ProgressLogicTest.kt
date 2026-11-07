@@ -17,6 +17,7 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
+import com.example.autop.agent.protocol.TOOL_MARK_NOTE
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.ui.theme.StatusTone
@@ -298,6 +299,24 @@ class ProgressLogicTest {
         assertThat(spec.tone).isEqualTo(StatusTone.NEUTRAL)
         assertThat(spec.chipText).isEqualTo(R.string.panel_status_queued)
         assertThat(spec.runControls).isFalse()
+    }
+
+    @Test
+    fun `回退协议与工具标记文本不冒充助手正文`() {
+        val xmlMark = "好的\n<tool_call><function=tap></function></tool_call>"
+        val rows =
+            progressRowsOf(
+                eventsOf(
+                    assistant(blocks = listOf(Block.Text("""{"tool_calls":[{"name":"tap","arguments":{}}]}"""))),
+                    assistant(blocks = listOf(Block.Text("""{"final":"已完成"}"""))),
+                    assistant(blocks = listOf(Block.Text(xmlMark))),
+                ),
+            )
+        assertThat(rows)
+            .containsExactly(
+                ProgressRow.Assistant("已完成"),
+                ProgressRow.Assistant("$TOOL_MARK_NOTE\n\n$xmlMark"),
+            ).inOrder()
     }
 
     private fun activeRun(

@@ -16,6 +16,7 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
+import com.example.autop.agent.protocol.displayTextOf
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.overlay.R
 import com.example.autop.llm.Block
@@ -104,7 +105,11 @@ private fun appendAssistant(
     payload.blocks.forEach { block ->
         when (block) {
             is Block.Thinking -> rows += ProgressRow.Thinking(block.text)
-            is Block.Text -> rows += ProgressRow.Assistant(block.text)
+            // 回退协议/工具标记文本不冒充正文（displayTextOf 过滤）。
+            is Block.Text ->
+                displayTextOf(block.text).takeIf { it.isNotBlank() }?.let { shown ->
+                    rows += ProgressRow.Assistant(shown)
+                }
             // 工具调用行取 ToolResultEvent；Image/ToolResult 不进消息行（同对话页）。
             else -> Unit
         }

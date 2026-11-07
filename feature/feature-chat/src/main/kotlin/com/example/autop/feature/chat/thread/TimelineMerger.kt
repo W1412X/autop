@@ -19,6 +19,7 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
+import com.example.autop.agent.protocol.displayTextOf
 import com.example.autop.llm.Block
 
 /** 读类工具：连续成功时折叠为 [TimelineItem.StepGroup]（docs/tech/08 §4.2）。 */
@@ -150,9 +151,12 @@ private fun appendMessage(
     payload.blocks.forEach { block ->
         when (block) {
             is Block.Text ->
-                entries.add(
-                    TimelineEntry(TimelineItem.AssistantText(block.text, streaming = false), event.seq, false),
-                )
+                // 回退协议/工具标记文本不冒充正文（displayTextOf 过滤，落盘原文不改）。
+                displayTextOf(block.text).takeIf { it.isNotBlank() }?.let { shown ->
+                    entries.add(
+                        TimelineEntry(TimelineItem.AssistantText(shown, streaming = false), event.seq, false),
+                    )
+                }
             is Block.Thinking ->
                 entries.add(
                     TimelineEntry(

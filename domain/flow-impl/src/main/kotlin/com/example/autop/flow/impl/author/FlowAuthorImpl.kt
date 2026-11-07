@@ -6,10 +6,9 @@ import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolInvokerFactory
 import com.example.autop.agent.ToolProbeService
 import com.example.autop.agent.protocol.FallbackMode
-import com.example.autop.agent.protocol.JsonParsed
-import com.example.autop.agent.protocol.JsonToolProtocol
 import com.example.autop.agent.protocol.RequestBuilder
 import com.example.autop.agent.protocol.ResolvedCalls
+import com.example.autop.agent.protocol.displayTextOf
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.Clock
@@ -372,10 +371,11 @@ internal class FlowAuthorSessionImpl(
             when {
                 displayText != null -> displayText.trim()
                 showRawText ->
-                    message.blocks
-                        .filterIsInstance<Block.Text>()
-                        .joinToString("") { it.text }
-                        .trim()
+                    displayTextOf(
+                        message.blocks
+                            .filterIsInstance<Block.Text>()
+                            .joinToString("") { it.text },
+                    ).trim()
                 else -> ""
             }
         _state.update { s ->
@@ -524,14 +524,6 @@ internal class FlowAuthorSessionImpl(
             m.role == Role.ASSISTANT && b is Block.Text && b.text.isNotBlank() ->
                 displayTextOf(b.text).takeIf { it.isNotBlank() }?.let { AuthorMessage.Assistant(it) }
             else -> null
-        }
-
-    /** 回退协议正文的展示形态：`tool_calls` 是调用指令不是助手回复；`final` 只展示正文。 */
-    private fun displayTextOf(text: String): String =
-        when (val parsed = JsonToolProtocol.parse(text, turn = 0)) {
-            is JsonParsed.Final -> parsed.text
-            is JsonParsed.Calls -> ""
-            is JsonParsed.Invalid -> text
         }
 
     private companion object {

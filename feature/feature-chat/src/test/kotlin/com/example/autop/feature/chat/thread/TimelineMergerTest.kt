@@ -14,6 +14,7 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
+import com.example.autop.agent.protocol.TOOL_MARK_NOTE
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.llm.Block
@@ -205,6 +206,22 @@ class TimelineMergerTest {
 
         assertThat((duplicated.last().item as TimelineItem.AssistantText).meta?.summary).isNull()
         assertThat((distinct.last().item as TimelineItem.AssistantText).meta?.summary).isEqualTo("任务摘要")
+    }
+
+    @Test
+    fun `回退协议与工具标记文本不冒充助手正文`() {
+        val xmlMark = "好的\n<tool_call><function=tap></function></tool_call>"
+        val history =
+            listOf(
+                event(1, assistant(Block.Text("""{"tool_calls":[{"name":"tap","arguments":{}}]}"""))),
+                event(2, assistant(Block.Text("""{"final":"已完成"}"""))),
+                event(3, assistant(Block.Text(xmlMark))),
+            )
+        val entries = mergeTimeline(history, emptyList(), GROUP_THRESHOLD)
+        assertThat(entries).hasSize(2)
+        assertThat((entries[0].item as TimelineItem.AssistantText).text).isEqualTo("已完成")
+        assertThat((entries[1].item as TimelineItem.AssistantText).text)
+            .isEqualTo("$TOOL_MARK_NOTE\n\n$xmlMark")
     }
 
     private companion object {
