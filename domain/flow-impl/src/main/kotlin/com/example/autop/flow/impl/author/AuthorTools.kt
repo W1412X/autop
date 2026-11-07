@@ -6,6 +6,8 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolInvoker
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserInteraction
+import com.example.autop.agent.protocol.JsonParsed
+import com.example.autop.agent.protocol.JsonToolProtocol
 import com.example.autop.agent.toolSpec
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
@@ -207,10 +209,16 @@ internal class AuthorTools(
         val events = d.threads.events(record.threadId)
         val calls = HashMap<String, Pair<String, String>>()
         val steps = mutableListOf<JsonElement>()
+        var turn = 0
         for (event in events) {
             when (val p = event.payload) {
-                is AssistantMessage ->
+                is AssistantMessage -> {
+                    // 解析计数与执行侧一致：每次采样（含解析失败重试）各占一轮，回退 id 为 fb_<turn>_<i>。
+                    turn++
                     p.blocks.filterIsInstance<Block.ToolCall>().forEach { calls[it.id] = it.name to it.argsJson }
+                    // 回退模式无 ToolCall 块：从协议 JSON 正文恢复调用参数，避免示范步骤退化成 "{}"。
+                    fallbackCallsOf(p.blocks, turn).forEach { calls[it.id] = it.name to it.argsJson }
+                }
                 is ToolResultEvent -> {
                     val (tool, args) = calls[p.callId] ?: (p.toolId to "{}")
                     val text =
@@ -264,4 +272,20 @@ internal class AuthorTools(
             )
         val TOOL_FILTER: Set<String> = setOf("tool.observe", "tool.memory_search")
     }
+}
+
+/** 回退模式助手正文（`{"tool_calls":[…]}`）里的工具调用；原生 ToolCall 块或普通文本返回空。 */
+internal fun fallbackCallsOf(
+    blocks: List<Block>,
+    turn: Int,
+): List<Block.ToolCall> {
+    val text =
+        blocks
+            .filterIsInstance<Block.Text>()
+            .lastOrNull()
+            ?.text
+            .orEmpty()
+    return (JsonToolProtocol.parse(text, turn) as? JsonParsed.Calls)
+        ?.calls
+        .orEmpty()
 }
