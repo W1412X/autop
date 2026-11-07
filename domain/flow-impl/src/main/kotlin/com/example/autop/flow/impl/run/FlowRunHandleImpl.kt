@@ -9,9 +9,13 @@ import com.example.autop.agent.RunResumed
 import com.example.autop.agent.RunState
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolControl
+import com.example.autop.core.common.AppError
+import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.flow.FlowDebugControl
+import com.example.autop.flow.FlowDefinition
+import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.FlowProgress
 import com.example.autop.flow.FlowRunHandle
 import com.example.autop.flow.PauseResolution
@@ -60,8 +64,26 @@ internal class FlowRunHandleImpl(
     private var failurePause: CompletableDeferred<PauseResolution>? = null
     private var job: Job? = null
 
+    /** 运行期修订入口；解释器就绪后挂上。 */
+    private var patcher: (suspend (FlowDefinition) -> Outcome<Unit>)? = null
+
     fun attach(job: Job) {
         this.job = job
+    }
+
+    /**
+     * 挂上修订入口（docs/design/flows-precondition-selfrepair.md S3）。
+     * 解释器就绪后调用；未挂上时修订请求返回"运行尚未开始"。
+     */
+    fun attachPatcher(patcher: suspend (FlowDefinition) -> Outcome<Unit>) {
+        this.patcher = patcher
+    }
+
+    override suspend fun applyPatch(definition: FlowDefinition): Outcome<Unit> {
+        val apply =
+            patcher
+                ?: return Outcome.Err(AppError(FlowErrorCodes.NOT_FOUND, "运行尚未开始，无法应用修订"))
+        return apply(definition)
     }
 
     fun setState(state: RunState) {

@@ -114,8 +114,8 @@ internal class ConditionEvaluator(
                 TextOp.REGEX ->
                     try {
                         Regex(value).containsMatchIn(text)
-                    } catch (e: Exception) {
-                        return CondDetail(label, false, error = "flow.expr_error: 非法正则「$value」")
+                    } catch (e: IllegalArgumentException) {
+                        return CondDetail(label, false, error = "flow.expr_error: 非法正则「$value」：${e.message.orEmpty()}")
                     }
             }
         return CondDetail(label, ok, actual = excerpt(text))

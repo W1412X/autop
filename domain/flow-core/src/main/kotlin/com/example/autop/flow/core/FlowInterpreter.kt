@@ -5,6 +5,8 @@ package com.example.autop.flow.core
 import com.example.autop.agent.PauseReason
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.ToolAccess
+import com.example.autop.core.common.AppError
+import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.FlowAgentSection
 import com.example.autop.core.config.FlowLlmSection
 import com.example.autop.core.config.FlowPreconditionSection
@@ -12,13 +14,13 @@ import com.example.autop.core.config.FlowRecoverySection
 import com.example.autop.core.config.FlowRunSection
 import com.example.autop.flow.AfterRecovery
 import com.example.autop.flow.AgentNode
-import com.example.autop.flow.Condition
-import com.example.autop.flow.ExpectKind
 import com.example.autop.flow.ApiNode
 import com.example.autop.flow.BreakNode
 import com.example.autop.flow.CallNode
+import com.example.autop.flow.Condition
 import com.example.autop.flow.ContinueNode
 import com.example.autop.flow.EndNode
+import com.example.autop.flow.ExpectKind
 import com.example.autop.flow.FinalAction
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowErrorCodes
@@ -32,20 +34,22 @@ import com.example.autop.flow.Node
 import com.example.autop.flow.NodeStatus
 import com.example.autop.flow.ObserveNode
 import com.example.autop.flow.OnFail
-import com.example.autop.flow.PrePolicy
 import com.example.autop.flow.PauseResolution
+import com.example.autop.flow.PrePolicy
 import com.example.autop.flow.ReadNode
 import com.example.autop.flow.RetryStrategy
 import com.example.autop.flow.SetNode
 import com.example.autop.flow.StateNode
 import com.example.autop.flow.SwitchNode
 import com.example.autop.flow.ToolNode
-import com.example.autop.flow.core.expr.ExprFunctions
-import com.example.autop.flow.core.recovery.FailureStage
 import com.example.autop.flow.TraceLevel
 import com.example.autop.flow.WaitNode
+import com.example.autop.flow.core.expr.ExprFunctions
 import com.example.autop.flow.core.expr.FlowException
+import com.example.autop.flow.core.recovery.FailureStage
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -138,6 +142,7 @@ public class FlowInterpreter(
                 params: JsonObject,
                 depth: Int,
             ): Signal {
+                definitions[flow.id] = flow
                 val frame = newFrame(flow, ParamBinder.bind(flow.params, params), JsonObject(emptyMap()), depth)
                 return runSteps(flow.steps, 0, frame, flow.id + ":")
             }
@@ -151,6 +156,15 @@ public class FlowInterpreter(
 
     /** 单次 Run 已用掉的 handoff 次数；达到 `handoffBudgetPerRun` 后不再交回智能体。 */
     private var handoffsUsed = 0
+
+    /** 当前生效的定义：顶层流程 + 本次运行中已解析的子流程。 */
+    private val definitions = HashMap<String, FlowDefinition>()
+
+    /** 修订替换与节点执行之间的互斥。 */
+    private val patchLock = Mutex()
+
+    /** 是否发生过修订；未修订时跳过节点刷新，避免常态查找开销。 */
+    private var patched = false
 
     /** 已执行节点摘要（"节点名(类型): 结果"），供交回智能体时交代上下文；不含参数内容。 */
     private val executedTrail = mutableListOf<String>()
@@ -183,6 +197,7 @@ public class FlowInterpreter(
                 ?.takeIf { it > 0 }
                 ?.let { meta.startedAt + it }
         return try {
+            definitions[input.flow.id] = input.flow
             val frame = newFrame(input.flow, ParamBinder.bind(input.flow.params, input.params), input.trigger, 0)
             input.options.overrides.forEach { (k, v) -> frame.vars[k] = v }
             val signal = start(frame)
@@ -304,10 +319,12 @@ public class FlowInterpreter(
     }
 
     private suspend fun runNode(
-        node: Node,
+        declared: Node,
         frame: Frame,
         prefix: String,
     ): Signal {
+        // 修订后取该节点的最新版本；未发生过修订时直接用原节点。
+        val node = refreshed(declared, frame)
         if (!node.enabled) return Signal.Next
         deadlineSignal()?.let { return it }
         ports.control.beforeNode(node.id, node.name)
@@ -475,7 +492,7 @@ public class FlowInterpreter(
                 Attempt.Failed(FlowErrorCodes.RECOVERY_EXHAUSTED, "恢复阶梯已用尽：${failed.message}", failed.input)
         }
         setFailureLast(frame, failed)
-        val recovered = tryRecover(node, frame, path, policy, escalating, stage, failed)
+        val recovered = tryRecover(RecoverPlan(node, frame, path, policy, escalating, stage, failed))
         if (recovered != null) return okResolved(recovered.first, attempts + recovered.second, NodeStatus.RECOVERED)
         return finalAction(node, frame, path, policy, failed, attempts)
     }
@@ -551,7 +568,8 @@ public class FlowInterpreter(
         }
 
     /** 条件求值出错（流程定义错误），与"条件不成立"区分。 */
-    private fun isPreconditionError(a: Attempt): Boolean = a is Attempt.Failed && a.code == FlowErrorCodes.PRECONDITION_ERROR
+    private fun isPreconditionError(a: Attempt): Boolean =
+        a is Attempt.Failed && a.code == FlowErrorCodes.PRECONDITION_ERROR
 
     /**
      * 是否按恢复阶梯升级：显式 `retry.strategy=escalate`，或工具节点未写任何 onFail 且工具会改变屏幕（隐式升级）。
@@ -600,20 +618,28 @@ public class FlowInterpreter(
             attempts,
         )
 
+    /** 失败处理的输入（handoff / steps 共用）。 */
+    private class RecoverPlan(
+        val node: Node,
+        val frame: Frame,
+        val path: String,
+        val policy: OnFail,
+        val escalating: Boolean,
+        val stage: FailureStage,
+        val failure: Attempt.Failed,
+    )
+
     /** handoff / steps；成功返回 (结果, 额外尝试次数)，未配置或失败返回 null。 */
-    private suspend fun tryRecover(
-        node: Node,
-        frame: Frame,
-        path: String,
-        policy: OnFail,
-        escalating: Boolean,
-        stage: FailureStage,
-        failure: Attempt.Failed,
-    ): Pair<Attempt.Ok, Int>? {
+    private suspend fun tryRecover(plan: RecoverPlan): Pair<Attempt.Ok, Int>? {
+        val node = plan.node
+        val frame = plan.frame
+        val path = plan.path
+        val policy = plan.policy
+        val stage = plan.stage
         var extra = 0
         // 隐式交回：阶梯耗尽且节点无 handoff 时，目标文本由智能体端口按模板生成（空 goal）。
         val implicit =
-            if (escalating &&
+            if (plan.escalating &&
                 recoveryCfg.implicitHandoff &&
                 policy.handoff == null
             ) {
@@ -628,7 +654,7 @@ public class FlowInterpreter(
             handoffsUsed++
             ports.trace.counters(RunCounters(handoffs = 1))
             screens.markDirty(action = true)
-            val context = buildContext(node, frame, stage, failure)
+            val context = buildContext(node, frame, plan.failure)
             // 用户写的 goal 优先，其后追加系统性的上下文块；goal 为空（隐式交回）时留给端口按模板生成。
             val goal = frame.templates.renderString(handoff.goal)
             val fullGoal =
@@ -651,6 +677,8 @@ public class FlowInterpreter(
                     context,
                 )
             extra++
+            // 智能体可能已经改变了屏幕：返回后必须重新观测，不能用交回前的缓存。
+            screens.markDirty(action = true)
             if (r.ok) afterRecovered(node, frame, path, policy, stage)?.let { return it to extra }
         }
         if (policy.steps.isNotEmpty()) {
@@ -679,13 +707,122 @@ public class FlowInterpreter(
     }
 
     /** 单 Run 的 handoff 次数是否已用尽。 */
-    private fun handoffBudgetExhausted(): Boolean = recoveryCfg.handoffBudgetPerRun > 0 && handoffsUsed >= recoveryCfg.handoffBudgetPerRun
+    private fun handoffBudgetExhausted(): Boolean =
+        recoveryCfg.handoffBudgetPerRun > 0 && handoffsUsed >= recoveryCfg.handoffBudgetPerRun
+
+    /**
+     * 用修订后的定义替换 [flowId] 对应流程的当前定义（docs/design/flows-precondition-selfrepair.md S3）。
+     *
+     * 只允许替换节点内容：节点结构与 id 不变，只允许 `tool` / `args` / `target` / `target2` 变化。
+     * 替换在节点执行前生效：正在执行的节点用旧定义完成，后续节点与 RETRY 取新定义。
+     * [flowId] 为空表示当前顶层流程。
+     */
+    public suspend fun applyPatch(
+        flowId: String,
+        patchedDefinition: FlowDefinition,
+    ): Outcome<Unit> =
+        patchLock.withLock {
+            if (!::input.isInitialized) {
+                return@withLock Outcome.Err(AppError(FlowErrorCodes.NOT_FOUND, "运行尚未开始，无法应用修订"))
+            }
+            val key = if (flowId.isBlank()) input.flow.id else flowId
+            val current =
+                definitions[key]
+                    ?: return@withLock Outcome.Err(AppError(FlowErrorCodes.NOT_FOUND, "流程 $key 不在本次运行中"))
+            if (current.settings != patchedDefinition.settings) {
+                return@withLock Outcome.Err(AppError(FlowErrorCodes.INVALID, "流程设置不允许在运行中修改"))
+            }
+            if (current.params != patchedDefinition.params) {
+                return@withLock Outcome.Err(AppError(FlowErrorCodes.INVALID, "流程参数不允许在运行中修改"))
+            }
+            val problem = structuralProblem(current.steps, patchedDefinition.steps)
+            if (problem != null) return@withLock Outcome.Err(AppError(FlowErrorCodes.INVALID, problem))
+            definitions[key] = patchedDefinition
+            patched = true
+            ports.trace.log("info", "flow patched flow=$key")
+            Outcome.Ok(Unit)
+        }
+
+    /** 取该节点在当前生效定义里的最新版本（修订只换内容，id 不变）。 */
+    private fun refreshed(
+        node: Node,
+        frame: Frame,
+    ): Node {
+        if (!patched) return node
+        // 先按当前所属流程取，避免不同流程的同名节点取错定义。
+        definitions[frame.flow.id]?.let { def -> findNodeById(def.steps, node.id)?.let { return it } }
+        for (def in definitions.values) {
+            val found = findNodeById(def.steps, node.id)
+            if (found != null) return found
+        }
+        return node
+    }
+
+    private fun findNodeById(
+        steps: List<Node>,
+        nodeId: String,
+    ): Node? {
+        for (n in steps) {
+            if (n.id == nodeId) return n
+            findNodeById(childrenOf(n), nodeId)?.let { return it }
+        }
+        return null
+    }
+
+    /** 校验修订只换了动作内容：节点结构与语义字段必须一致。返回问题描述，null 表示合法。 */
+    private fun structuralProblem(
+        current: List<Node>,
+        patched: List<Node>,
+    ): String? {
+        if (current.size != patched.size) return "节点数量不一致：只允许替换节点内容，不允许增删节点"
+        for (i in current.indices) {
+            val a = current[i]
+            val b = patched[i]
+            if (a.id != b.id) return "节点顺序不一致：${a.id} 与 ${b.id}"
+            semanticProblem(a, b)?.let { return it }
+            structuralProblem(childrenOf(a), childrenOf(b))?.let { return it }
+        }
+        return null
+    }
+
+    /** 语义字段（失败处理、前置条件、期望效果等）不允许在运行中修改，防止语义漂移。 */
+    private fun semanticProblem(
+        a: Node,
+        b: Node,
+    ): String? {
+        if (a::class != b::class) return "节点 ${a.id} 的类型不允许修改"
+        if (a is ToolNode && b is ToolNode) {
+            // 除动作与目标外的字段必须完全一致。
+            val sameMeta = a.copy(tool = b.tool, args = b.args, target = b.target, target2 = b.target2) == b
+            if (!sameMeta) return "节点 ${a.id} 只允许修改动作与目标"
+        } else if (withoutChildren(a) != withoutChildren(b)) {
+            return "节点 ${a.id} 只允许修改 tool 节点的动作与目标"
+        }
+        return null
+    }
+
+    /** 去掉子节点后的节点（子节点单独递归比较）。 */
+    private fun withoutChildren(n: Node): Node =
+        when (n) {
+            is IfNode -> n.copy(thenSteps = emptyList(), elseSteps = emptyList())
+            is SwitchNode -> n.copy(cases = n.cases.map { it.copy(steps = emptyList()) }, default = emptyList())
+            is LoopNode -> n.copy(steps = emptyList())
+            else -> n
+        }
+
+    /** 节点的子节点列表（分支与循环）。 */
+    private fun childrenOf(n: Node): List<Node> =
+        when (n) {
+            is IfNode -> n.thenSteps + n.elseSteps
+            is SwitchNode -> n.cases.flatMap { it.steps } + n.default
+            is LoopNode -> n.steps
+            else -> emptyList()
+        }
 
     /** 组装交回智能体时的流程上下文（docs/design/flows-precondition-selfrepair.md C2）。 */
     private suspend fun buildContext(
         node: Node,
         frame: Frame,
-        stage: FailureStage,
         failure: Attempt.Failed,
     ): AgentContext {
         val screen = screens.screen(null, frame.flow.settings.observeMode).screen

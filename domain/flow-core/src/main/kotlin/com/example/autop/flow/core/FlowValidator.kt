@@ -186,10 +186,33 @@ public class FlowValidator(
         }
         p.message?.let { template(nodeId, it, defined) }
         cond(nodeId, p.cond, defined)
+        preCondRules(nodeId, p.cond)
         if (findLlm(p.cond) != null) {
             error(nodeId, FlowErrorCodes.INVALID, "前置条件不支持 llm 判定：每个节点都会求值，会重复消耗模型额度")
         }
         checkPreRefs(nodeId, p.cond)
+    }
+
+    /**
+     * 前置条件里的必填项：页面文字必须有非空内容，元素条件必须有目标。
+     * 与 `expect` 的同类规则一致（见 `expectRules`）。
+     */
+    private fun preCondRules(
+        nodeId: String,
+        c: Condition,
+    ) {
+        when (c) {
+            is Condition.ScreenText ->
+                if (c.value.isBlank()) error(nodeId, FlowErrorCodes.INVALID, "pre 的 screenText 条件缺少内容")
+            is Condition.Element ->
+                if (c.target.value.isNullOrBlank() && c.target.tag.isNullOrBlank()) {
+                    error(nodeId, FlowErrorCodes.INVALID, "pre 的 element 条件缺少目标")
+                }
+            is Condition.All -> c.of.forEach { preCondRules(nodeId, it) }
+            is Condition.Any -> c.of.forEach { preCondRules(nodeId, it) }
+            is Condition.Not -> preCondRules(nodeId, c.of)
+            else -> Unit
+        }
     }
 
     /** 前置条件的节点引用必须指向已执行的节点，不能依赖尚未执行的结果。 */

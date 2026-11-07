@@ -61,12 +61,6 @@ public object TrajectoryConverter {
     /** 会切换页面的工具里的包名参数键。 */
     private const val ARG_PACKAGE = "package"
 
-    /** 回放专用键，不能写进流程参数。 */
-    private val INTERNAL_KEYS = setOf("_hit", "_locator")
-
-    /** tap 的坐标键（由目标定位替代，不写进参数）。 */
-    private val COORD_KEYS = setOf("x", "y")
-
     /**
      * 转换操作轨迹为流程。[settleMinMs]..[settleMaxMs] 为页面切换后的等待区间。
      * 结果可能没有任何步骤（轨迹里没有可流程化的操作），调用方需要检查。

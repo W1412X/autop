@@ -19,6 +19,11 @@ internal object FakeFlowSession : FlowSession {
         request: FlowRunRequest,
         scope: CoroutineScope,
     ): FlowRunHandle = error("flows are not used in this test")
+
+    override suspend fun applyPatch(
+        flowId: String,
+        definition: FlowDefinition,
+    ): Outcome<Unit> = Outcome.Ok(Unit)
 }
 
 /** 测试用：空流程库。 */

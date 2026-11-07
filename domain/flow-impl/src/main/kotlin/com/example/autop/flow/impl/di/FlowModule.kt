@@ -30,8 +30,8 @@ import com.example.autop.flow.FlowRunStore
 import com.example.autop.flow.FlowSession
 import com.example.autop.flow.FlowStateStore
 import com.example.autop.flow.FlowStore
-import com.example.autop.flow.FlowVersionStore
 import com.example.autop.flow.FlowValidationService
+import com.example.autop.flow.FlowVersionStore
 import com.example.autop.flow.RecordingSession
 import com.example.autop.flow.impl.author.AuthorDeps
 import com.example.autop.flow.impl.author.FlowAuthorImpl
@@ -45,6 +45,7 @@ import com.example.autop.flow.impl.run.FlowSessionImpl
 import com.example.autop.flow.impl.service.EndpointTesterImpl
 import com.example.autop.flow.impl.service.FlowBundleServiceImpl
 import com.example.autop.flow.impl.service.FlowCatalogBuilder
+import com.example.autop.flow.impl.service.FlowRevisionService
 import com.example.autop.flow.impl.service.FlowValidationServiceImpl
 import com.example.autop.flow.impl.store.RoomEndpointStore
 import com.example.autop.flow.impl.store.RoomFlowRunStore
@@ -52,8 +53,8 @@ import com.example.autop.flow.impl.store.RoomFlowStateStore
 import com.example.autop.flow.impl.store.RoomFlowStore
 import com.example.autop.flow.impl.store.RoomFlowVersionStore
 import com.example.autop.flow.impl.tools.ListFlowsTool
-import com.example.autop.flow.impl.tools.RunFlowTool
 import com.example.autop.flow.impl.tools.PatchFlowNodeTool
+import com.example.autop.flow.impl.tools.RunFlowTool
 import com.example.autop.flow.impl.tools.SaveAsFlowTool
 import com.example.autop.flow.impl.tools.UpdateFlowTool
 import com.example.autop.llm.LlmGateway
@@ -110,7 +111,7 @@ public object FlowModule {
             flows,
             RoomFlowStateStore(db, clock),
             RoomEndpointStore(db, secrets),
-            RoomFlowVersionStore(db, clock),
+            RoomFlowVersionStore(db, clock, flows),
         )
     }
 
@@ -121,6 +122,14 @@ public object FlowModule {
     @Provides
     @Singleton
     public fun provideFlowVersionStore(storage: FlowStorage): FlowVersionStore = storage.versions
+
+    @Provides
+    @Singleton
+    public fun provideFlowRevisionService(
+        storage: FlowStorage,
+        session: Provider<FlowSession>,
+        logger: Logger,
+    ): FlowRevisionService = FlowRevisionService(storage.flows, { session.get() }, logger)
 
     @Provides
     @Singleton
@@ -222,6 +231,7 @@ public object FlowModule {
         prompts: PromptRepository,
         configProvider: ConfigProvider,
         validation: FlowValidationService,
+        revisions: FlowRevisionService,
         threadStore: ThreadStore,
         clock: Clock,
         ids: IdGenerator,
@@ -237,6 +247,7 @@ public object FlowModule {
                 configProvider = configProvider,
                 validation = validation,
                 store = storage.flows,
+                revisions = revisions,
                 endpoints = storage.endpoints,
                 threads = threadStore,
                 clock = clock,

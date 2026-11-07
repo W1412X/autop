@@ -14,7 +14,10 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.ToolSpec
+import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.FlowConfig
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.FlowStore
@@ -25,6 +28,7 @@ import com.example.autop.flow.SwitchNode
 import com.example.autop.flow.ToolNode
 import com.example.autop.flow.core.author.NodeRevision
 import com.example.autop.flow.impl.author.FlowDraftWriter
+import com.example.autop.flow.impl.service.FlowRevisionService
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -39,6 +43,9 @@ public class PatchFlowNodeTool
         private val threads: ThreadStore,
         private val store: FlowStore,
         private val writer: FlowDraftWriter,
+        private val revisions: FlowRevisionService,
+        private val configProvider: ConfigProvider,
+        private val logger: Logger,
     ) : Tool {
         override val id: String = "tool.patch_flow_node"
         override val spec: ToolSpec = FlowToolSpecs.patchFlowNode
@@ -67,11 +74,25 @@ public class PatchFlowNodeTool
             val revised =
                 NodeRevision.revise(original, steps)
                     ?: return failure(FlowErrorCodes.INVALID, "本次运行没有可用于修订的操作", "只有成功执行的界面操作会被使用")
-            val (newSteps, found) = replaceNode(stored.definition.steps, nodeId, revised)
-            if (!found) return failure(FlowErrorCodes.NOT_FOUND, "找不到节点：$nodeId")
-            val revisedFlow = stored.definition.copy(steps = newSteps)
+            val revisedFlow = stored.definition.copy(steps = replaceNode(stored.definition.steps, nodeId, revised))
             val reason = args.text("reason").orEmpty()
-            return when (val saved = writer.save(revisedFlow, baseFlowId = stored.id.value)) {
+            // 自动修订开关（flow.recovery.autoPatch）：开时跳过用户确认，直接写版本并推给运行中的实例。
+            return if (configProvider.current()[FlowConfig.RECOVERY].autoPatch) {
+                autoPatch(stored.definition.name, stored.id.value, nodeId, revisedFlow, reason)
+            } else {
+                createDraft(stored.definition.name, stored.id.value, nodeId, revisedFlow, reason)
+            }
+        }
+
+        /** 生成修订草稿，等用户确认后生效。 */
+        private suspend fun createDraft(
+            flowName: String,
+            flowId: String,
+            nodeId: String,
+            revisedFlow: FlowDefinition,
+            reason: String,
+        ): ToolOutput =
+            when (val saved = writer.save(revisedFlow, baseFlowId = flowId)) {
                 is Outcome.Err -> failure(saved.error.code, saved.error.message, saved.error.hint)
                 is Outcome.Ok ->
                     ToolOutput(
@@ -79,15 +100,41 @@ public class PatchFlowNodeTool
                         content =
                             listOf(
                                 Block.Text(
-                                    "已生成流程「${stored.definition.name}」节点 $nodeId 的修订草稿(draftId=${saved.value})，原因：$reason。" +
+                                    "已生成流程「$flowName」节点 $nodeId 的修订草稿" +
+                                        "(draftId=${saved.value})，原因：$reason。" +
                                         "用户确认后生效，原定义会保留为历史版本。",
+                                ),
+                            ),
+                    )
+            }
+
+        /** 自动修订：直接写入新版本（旧定义进版本库），并推给正在运行的实例。 */
+        private suspend fun autoPatch(
+            flowName: String,
+            flowId: String,
+            nodeId: String,
+            revisedFlow: FlowDefinition,
+            reason: String,
+        ): ToolOutput {
+            logger.w(TAG, "flow_auto_patch", "flow" to flowId, "node" to nodeId, "reason" to reason)
+            return when (val applied = revisions.apply(flowId, revisedFlow, reason)) {
+                is Outcome.Err -> failure(applied.error.code, applied.error.message, applied.error.hint)
+                is Outcome.Ok ->
+                    ToolOutput(
+                        ok = true,
+                        content =
+                            listOf(
+                                Block.Text(
+                                    "已自动修订流程「$flowName」节点 $nodeId，原因：$reason。" +
+                                        "原定义已保留为历史版本，运行中的流程已用新定义继续。",
                                 ),
                             ),
                     )
             }
         }
 
-        private fun JsonObject.text(key: String): String? = (get(key) as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
+        private fun JsonObject.text(key: String): String? =
+            (get(key) as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() }
 
         /** 在步骤树（含分支与循环）里查找节点。 */
         private fun findNode(
@@ -108,47 +155,37 @@ public class PatchFlowNodeTool
             return null
         }
 
-        /** 替换步骤树里的节点，返回新树与是否找到。 */
+        /** 替换步骤树里的节点，返回新树（节点不存在时原样返回）。 */
         private fun replaceNode(
             steps: List<Node>,
             nodeId: String,
             replacement: Node,
-        ): Pair<List<Node>, Boolean> {
-            var found = false
-            val out =
-                steps.map { n ->
-                    if (n.id == nodeId) {
-                        found = true
-                        replacement
-                    } else {
-                        when (n) {
-                            is IfNode -> {
-                                val (t, ft) = replaceNode(n.thenSteps, nodeId, replacement)
-                                val (e, fe) = replaceNode(n.elseSteps, nodeId, replacement)
-                                found = found || ft || fe
-                                n.copy(thenSteps = t, elseSteps = e)
-                            }
-                            is SwitchNode -> {
-                                var inCases = false
-                                val cases =
+        ): List<Node> =
+            steps.map { n ->
+                if (n.id == nodeId) {
+                    replacement
+                } else {
+                    when (n) {
+                        is IfNode ->
+                            n.copy(
+                                thenSteps = replaceNode(n.thenSteps, nodeId, replacement),
+                                elseSteps = replaceNode(n.elseSteps, nodeId, replacement),
+                            )
+                        is SwitchNode ->
+                            n.copy(
+                                cases =
                                     n.cases.map { c ->
-                                        val (s, fs) = replaceNode(c.steps, nodeId, replacement)
-                                        inCases = inCases || fs
-                                        c.copy(steps = s)
-                                    }
-                                val (d, fd) = replaceNode(n.default, nodeId, replacement)
-                                found = found || inCases || fd
-                                n.copy(cases = cases, default = d)
-                            }
-                            is LoopNode -> {
-                                val (s, fs) = replaceNode(n.steps, nodeId, replacement)
-                                found = found || fs
-                                n.copy(steps = s)
-                            }
-                            else -> n
-                        }
+                                        c.copy(steps = replaceNode(c.steps, nodeId, replacement))
+                                    },
+                                default = replaceNode(n.default, nodeId, replacement),
+                            )
+                        is LoopNode -> n.copy(steps = replaceNode(n.steps, nodeId, replacement))
+                        else -> n
                     }
                 }
-            return out to found
+            }
+
+        private companion object {
+            const val TAG = "PatchFlowNode"
         }
     }

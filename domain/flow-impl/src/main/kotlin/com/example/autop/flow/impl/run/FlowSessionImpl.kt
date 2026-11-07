@@ -12,6 +12,7 @@ import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolInvokerFactory
 import com.example.autop.agent.ToolProbeService
 import com.example.autop.agent.UserInteraction
+import com.example.autop.core.common.AppError
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.CommonErrorCodes
@@ -28,6 +29,7 @@ import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.NotificationFeed
 import com.example.autop.flow.EndpointStore
 import com.example.autop.flow.FlowDefinition
+import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.FlowRunHandle
 import com.example.autop.flow.FlowRunRequest
 import com.example.autop.flow.FlowRunStatus
@@ -70,6 +72,7 @@ import okhttp3.OkHttpClient
 import java.time.Instant
 import java.time.ZoneId
 import java.util.concurrent.CancellationException
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.random.Random
 
 /** 流程会话依赖（DI 装配）。 */
@@ -105,6 +108,9 @@ internal class FlowSessionImpl(
 ) : FlowSession {
     private val json = AutopJson.default
 
+    /** 正在运行的流程实例（按流程 id）：修订从这里推给对应实例。 */
+    private val running = ConcurrentHashMap<String, FlowRunHandleImpl>()
+
     @Suppress("TooGenericExceptionCaught") // 解释器外的装配异常统一转 FAILED，不外传
     override fun start(
         request: FlowRunRequest,
@@ -120,12 +126,16 @@ internal class FlowSessionImpl(
                 debug = request.options.debug,
                 initialBreakpoints = request.options.breakpoints,
             )
+        val totals = RunTotals()
+        // 解释器在协程外装配：修订入口要在运行开始前就挂上，避免确认草稿时推不到。
+        val interpreter = buildInterpreter(request, scope, handle, totals)
+        handle.attachPatcher { definition -> interpreter.applyPatch("", definition) }
+        running[request.flow.id] = handle
         val job =
             scope.launch {
                 var result: FlowRunResult? = null
-                val totals = RunTotals()
                 try {
-                    result = execute(request, scope, handle, totals)
+                    result = execute(request, handle, interpreter)
                 } catch (e: CancellationException) {
                     withContext(NonCancellable) { finish(request, handle, totals, cancelled()) }
                     throw e
@@ -134,18 +144,50 @@ internal class FlowSessionImpl(
                     result = FlowRunResult(RunOutcome.FAILED, CommonErrorCodes.UNKNOWN, e.message, null, 0)
                 }
                 finish(request, handle, totals, result)
+                running.remove(request.flow.id, handle)
             }
         handle.attach(job)
         return handle
+    }
+
+    /**
+     * 把修订推给正在运行的该流程实例（docs/design/flows-precondition-selfrepair.md S3）。
+     * 没有运行中的实例时返回失败；结构不合法时由解释器判定。
+     */
+    override suspend fun applyPatch(
+        flowId: String,
+        definition: FlowDefinition,
+    ): Outcome<Unit> {
+        val handle =
+            running[flowId]
+                ?: return Outcome.Err(AppError(FlowErrorCodes.NOT_FOUND, "流程 $flowId 没有正在运行的实例"))
+        return handle.applyPatch(definition)
+    }
+
+    private fun buildInterpreter(
+        request: FlowRunRequest,
+        scope: CoroutineScope,
+        handle: FlowRunHandleImpl,
+        totals: RunTotals,
+    ): FlowInterpreter {
+        val ports = buildPorts(request, scope, handle, totals)
+        val flowCfg = request.config
+        return FlowInterpreter(
+            ports,
+            flowCfg[FlowConfig.RUN],
+            flowCfg[FlowConfig.LLM],
+            flowCfg[FlowConfig.AGENT],
+            flowCfg[FlowConfig.RECOVERY],
+            flowCfg[FlowConfig.PRECONDITION],
+        )
     }
 
     private fun cancelled() = FlowRunResult(RunOutcome.CANCELLED, null, null, null, 0)
 
     private suspend fun execute(
         request: FlowRunRequest,
-        scope: CoroutineScope,
         handle: FlowRunHandleImpl,
-        totals: RunTotals,
+        interpreter: FlowInterpreter,
     ): FlowRunResult {
         val flow = request.flow
         handle.append(
@@ -158,17 +200,6 @@ internal class FlowSessionImpl(
             ),
         )
         d.runs.begin(runEntity(request, flow))
-        val ports = buildPorts(request, scope, handle, totals)
-        val flowCfg = request.config
-        val interpreter =
-            FlowInterpreter(
-                ports,
-                flowCfg[FlowConfig.RUN],
-                flowCfg[FlowConfig.LLM],
-                flowCfg[FlowConfig.AGENT],
-                flowCfg[FlowConfig.RECOVERY],
-                flowCfg[FlowConfig.PRECONDITION],
-            )
         val result =
             interpreter.run(
                 FlowRunInput(

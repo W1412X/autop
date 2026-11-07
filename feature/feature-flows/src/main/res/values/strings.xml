@@ -124,6 +124,7 @@
     <string name="editor_unset">未设置</string>
     <string name="editor_template">套用模板</string>
     <string name="editor_reselect">在手机上重新选取</string>
+    <string name="editor_copy_expect_to_pre">从期望效果复制前置断言</string>
     <string name="author_input_answer_hint">回答上面的问题，或直接输入</string>
     <string name="author_examples_title">可以试试这些：</string>
     <string name="author_example_brightness">打开设置，把亮度调到 50%</string>
@@ -251,6 +252,11 @@
     <string name="flow_field_trace">记录级别</string>
     <string name="flow_field_onFail">失败处理（JSON）</string>
     <string name="flow_field_confirm">执行前确认（JSON）</string>
+    <string name="flow_field_pre">前置断言（JSON）</string>
+    <string name="flow_field_pre_summary">前置</string>
+    <string name="flow_pre_unset">未设置</string>
+    <string name="flow_opt_pre_fail">断言</string>
+    <string name="flow_opt_pre_wait">等待</string>
     <string name="flow_field_tool">工具名</string>
     <string name="flow_field_target">目标元素</string>
     <string name="flow_field_target2">终点元素</string>
@@ -390,4 +396,8 @@
     <string name="flow_tpl_cond_all">全部满足</string>
     <string name="flow_tpl_cond_any">任一满足</string>
     <string name="flow_tpl_cond_not">取反</string>
+    <string name="flow_tpl_pre_text_fail">页面含文字（断言）</string>
+    <string name="flow_tpl_pre_text_wait">页面含文字（等待）</string>
+    <string name="flow_tpl_pre_app">前台应用（断言）</string>
+    <string name="flow_tpl_pre_element">元素存在（断言）</string>
 </resources>

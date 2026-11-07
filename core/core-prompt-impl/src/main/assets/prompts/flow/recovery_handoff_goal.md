@@ -1,6 +1,6 @@
 ---
 id: flow.recovery.handoff_goal
-version: 2
+version: 3
 vars: [nodeId, nodeName, flowName, failure, expectation, anchor, precondition, executed, screen]
 ---
 流程「{{flowName}}」中的步骤「{{nodeName}}」（节点 id：{{nodeId}}）执行失败，自动恢复手段已经用尽。
@@ -16,3 +16,5 @@ vars: [nodeId, nodeName, flowName, failure, expectation, anchor, precondition, e
 {{screen}}
 
 请先观察当前屏幕，判断它处于什么页面：如果不在该步骤应有的页面，请回到正确的页面，然后完成这一步的操作；完成后结束并简要说明结果。遇到登录、验证码或需要本人确认的情况，请使用 ask_user 询问。
+
+完成这一步之后，如果你发现原来的步骤定义无法复现这次成功的做法，请调用 tool.patch_flow_node 提交一个针对该节点的修订（节点 id：{{nodeId}}，参数 flow 为流程名称、reason 为修订原因）。修订只替换这一步的动作与目标，不会改变流程结构。

@@ -66,7 +66,17 @@ internal class RoomFlowStore(
 
     override suspend fun listAll(): List<StoredFlow> = db.flowDao().all().map(::decode)
 
-    override suspend fun save(definition: FlowDefinition): Outcome<StoredFlow> {
+    override suspend fun save(definition: FlowDefinition): Outcome<StoredFlow> = save(definition, null)
+
+    /**
+     * 保存（新建或覆盖）；[reason] 写进版本记录，说明这次覆盖的来由。
+     *
+     * 覆盖保存前把旧定义存进版本库：版本号在冲突重试里取，避免并发覆盖丢版本。
+     */
+    suspend fun save(
+        definition: FlowDefinition,
+        reason: String?,
+    ): Outcome<StoredFlow> {
         if (definition.id.isBlank() || definition.name.isBlank()) {
             return Outcome.Err(AppError(code = FlowErrorCodes.INVALID, message = "flow id and name are required"))
         }
@@ -85,19 +95,51 @@ internal class RoomFlowStore(
             )
         if (existing != null && existing.json != entity.json) {
             // 覆盖保存前保留旧定义（flows-recording-recovery.md A4）。
-            val next = (db.flowVersionDao().maxVersion(definition.id) ?: 0) + 1
-            db.flowVersionDao().insert(
-                FlowVersionEntity(
-                    flowId = definition.id,
-                    version = next,
-                    definitionJson = existing.json,
-                    createdAt = now,
-                    reason = null,
-                ),
-            )
+            insertVersion(definition.id, existing.json, reason, now)
         }
         db.flowDao().upsert(entity)
         return Outcome.Ok(decode(entity))
+    }
+
+    /**
+     * 写入一个历史版本：取号与插入撞号时重取，避免并发覆盖丢版本。
+     */
+    private suspend fun insertVersion(
+        flowId: String,
+        definitionJson: String,
+        reason: String?,
+        now: Long,
+    ) {
+        val dao = db.flowVersionDao()
+        repeat(VERSION_ATTEMPTS) {
+            val next = (dao.maxVersion(flowId) ?: 0) + 1
+            val rowId =
+                dao.insertIfAbsent(
+                    FlowVersionEntity(
+                        flowId = flowId,
+                        version = next,
+                        definitionJson = definitionJson,
+                        createdAt = now,
+                        reason = reason,
+                    ),
+                )
+            if (rowId != -1L) return
+        }
+        // 重试耗尽（极端并发）：退回覆盖写入，保证这条版本不丢。
+        dao.insert(
+            FlowVersionEntity(
+                flowId = flowId,
+                version = (dao.maxVersion(flowId) ?: 0) + 1,
+                definitionJson = definitionJson,
+                createdAt = now,
+                reason = reason,
+            ),
+        )
+    }
+
+    private companion object {
+        /** 版本号冲突时的重试次数。 */
+        const val VERSION_ATTEMPTS: Int = 3
     }
 
     override suspend fun delete(id: FlowId): Outcome<Unit> {
@@ -122,6 +164,7 @@ internal class RoomFlowStore(
 internal class RoomFlowVersionStore(
     private val db: FlowsDb,
     private val clock: Clock,
+    private val flows: FlowStore,
 ) : FlowVersionStore {
     private val json = AutopJson.default
 
@@ -178,6 +221,25 @@ internal class RoomFlowVersionStore(
         db.flowVersionDao().byVersion(flowId, version)?.let {
             json.decodeFromString(FlowDefinition.serializer(), it.definitionJson)
         }
+
+    /**
+     * 回滚到指定版本：写回主定义（当前定义因此进版本库），回滚本身也留一条版本记录。
+     */
+    override suspend fun restore(
+        flowId: String,
+        version: Int,
+    ): Outcome<StoredFlow> {
+        val definition =
+            get(flowId, version)
+                ?: return Outcome.Err(
+                    AppError(
+                        code = FlowErrorCodes.NOT_FOUND,
+                        message = "流程 $flowId 没有版本 $version",
+                        hint = "在流程的历史版本里选一个版本回滚",
+                    ),
+                )
+        return flows.save(definition)
+    }
 
     private companion object {
         const val VERSION_ATTEMPTS: Int = 3

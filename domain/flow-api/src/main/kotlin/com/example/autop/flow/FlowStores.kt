@@ -65,8 +65,7 @@ public data class FlowVersion(
 /**
  * 流程版本留存（docs/design/flows-precondition-selfrepair.md S2）。
  *
- * 修订生效前把旧定义存进来，出问题可以回滚。恢复到某版本由调用方组合
- * `get(flowId, version)` + `FlowStore.save(definition)` 完成，恢复本身也会追加一个新版本。
+ * 修订生效前把旧定义存进来，出问题可以回滚。版本号在单事务内递增，避免并发撞号丢版本。
  */
 public interface FlowVersionStore {
     /** 保存一个历史版本；版本号在单事务内递增，避免并发撞号丢版本。 */
@@ -84,6 +83,15 @@ public interface FlowVersionStore {
         flowId: String,
         version: Int,
     ): FlowDefinition?
+
+    /**
+     * 恢复到指定版本：把该版本写回主定义，并追加一个新版本（回滚本身也留痕）。
+     * 版本不存在时返回失败。
+     */
+    public suspend fun restore(
+        flowId: String,
+        version: Int,
+    ): Outcome<StoredFlow>
 }
 
 /** 运行记录状态。 */

@@ -53,6 +53,7 @@ internal enum class FieldKind {
     TARGET,
     COND,
     JSON,
+    PRE,
 }
 
 /** 一个字段：[key] 即 JSON 键；[simple] 为真时简明模式也显示。 */
@@ -76,6 +77,7 @@ internal object NodeFields {
             FieldSpec("trace", FieldKind.ENUM, options = listOf("full", "failures", "none")),
             FieldSpec("onFail", FieldKind.JSON),
             FieldSpec("confirm", FieldKind.JSON),
+            FieldSpec("pre", FieldKind.PRE, simple = true),
         )
 
     fun forType(type: String): List<FieldSpec> = specific(type) + COMMON
@@ -315,8 +317,99 @@ private fun Field(
         FieldKind.TARGET -> JsonField(label, current, TARGET_TEMPLATES, set, reselectable = true)
         FieldKind.COND -> JsonField(label, current, COND_TEMPLATES, set)
         FieldKind.JSON -> JsonField(label, current, emptyList(), set)
+        FieldKind.PRE -> PreField(label, current, draft, set)
     }
 }
+
+/**
+ * 前置断言编辑（docs/design/flows-precondition-selfrepair.md P6）。
+ *
+ * 简明模式给一行摘要（条件描述 + 策略徽标），下面是 JSON 编辑与模板；
+ * "从 expect 复制"把本节点的期望效果翻成前置断言。
+ */
+@Composable
+private fun PreField(
+    label: String,
+    current: JsonElement?,
+    draft: JsonObject,
+    onChange: (JsonElement?) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    val pre = current as? JsonObject
+    val policy = pre?.policy() ?: "fail"
+    Text(
+        text =
+            stringByName("flow_field_pre_summary", "前置") + "：" + preSummary(pre) +
+                " · " + stringByName("flow_opt_pre_$policy", policy),
+        style = MaterialTheme.typography.labelSmall,
+        modifier = Modifier.padding(start = spacing.screenEdge, top = spacing.md),
+    )
+    JsonField(label, current, PRE_TEMPLATES, onChange)
+    val copied = preFromExpect(draft["expect"])
+    if (copied != null) {
+        AutopTextButton(
+            text = stringResource(R.string.editor_copy_expect_to_pre),
+            onClick = { onChange(copied) },
+            modifier = Modifier.padding(horizontal = spacing.screenEdge),
+        )
+    }
+}
+
+/** `pre` 的条件描述（结构化描述，不含界面文案）。 */
+@Composable
+private fun preSummary(pre: JsonObject?): String {
+    val cond = pre?.get("cond") as? JsonObject ?: return stringByName("flow_pre_unset", "未设置")
+    val kind = cond["kind"].textOrEmpty()
+    return when (kind) {
+        "screenText" ->
+            "页面文字${cond["op"].textOrEmpty().ifEmpty { "包含" }}「${cond["value"].textOrEmpty()}」"
+        "element" -> "元素状态（${cond["op"].textOrEmpty().ifEmpty { "exists" }}）"
+        "app" -> "前台应用为「${cond["value"].textOrEmpty()}」"
+        "expr" -> "表达式「${cond["expr"].textOrEmpty()}」"
+        "screenChanged" -> "屏幕相对 ${cond["since"].textOrEmpty()} 已变化"
+        "lastOk" -> "节点 ${cond["node"].textOrEmpty()} 最近一次成功"
+        "llm" -> "模型判断"
+        "all", "any", "not" -> "组合条件"
+        else -> kind
+    }
+}
+
+/** `pre` 的策略徽标文本（fail = 断言，wait = 等待）。 */
+private fun JsonObject.policy(): String = (this["policy"] as? JsonPrimitive)?.contentOrNull ?: "fail"
+
+/** 把节点的期望效果翻成前置断言；无法对应时返回 null。 */
+private fun preFromExpect(expect: JsonElement?): JsonObject? {
+    val e = expect as? JsonObject ?: return null
+    val kind = (e["kind"] as? JsonPrimitive)?.contentOrNull.orEmpty()
+    val cond =
+        when (kind) {
+            "text" ->
+                JsonObject(
+                    mapOf(
+                        "kind" to JsonPrimitive("screenText"),
+                        "op" to JsonPrimitive("contains"),
+                        "value" to JsonPrimitive(e["text"]?.textOrEmpty().orEmpty()),
+                    ),
+                )
+            "element" ->
+                e["target"]?.let {
+                    JsonObject(
+                        mapOf("kind" to JsonPrimitive("element"), "op" to JsonPrimitive("exists"), "target" to it),
+                    )
+                }
+            "app" ->
+                JsonObject(
+                    mapOf(
+                        "kind" to JsonPrimitive("app"),
+                        "value" to JsonPrimitive(e["app"]?.textOrEmpty().orEmpty()),
+                    ),
+                )
+            else -> null
+        } ?: return null
+    return JsonObject(mapOf("cond" to cond, "policy" to JsonPrimitive("fail")))
+}
+
+private fun JsonElement?.textOrEmpty(): String = (this as? JsonPrimitive)?.contentOrNull.orEmpty()
 
 private fun defaultBool(key: String): Boolean = key == "enabled" || key == "feedback"
 
@@ -501,6 +594,16 @@ private val COND_TEMPLATES: List<Pair<String, String>> =
         "cond_all" to """{"kind":"all","of":[]}""",
         "cond_any" to """{"kind":"any","of":[]}""",
         "cond_not" to """{"kind":"not","of":{"kind":"expr","expr":""}}""",
+    )
+
+/** 前置断言模板（整个 `pre` 对象）。 */
+private val PRE_TEMPLATES: List<Pair<String, String>> =
+    listOf(
+        "pre_text_fail" to """{"cond":{"kind":"screenText","op":"contains","value":""},"policy":"fail"}""",
+        "pre_text_wait" to """{"cond":{"kind":"screenText","op":"contains","value":""},"policy":"wait"}""",
+        "pre_app" to """{"cond":{"kind":"app","value":""},"policy":"fail"}""",
+        "pre_element" to
+            """{"cond":{"kind":"element","op":"exists","target":{"by":"text","value":""}},"policy":"fail"}""",
     )
 
 /** 供编辑器保存时检查某字段是否为整数（避免未用导入）。 */

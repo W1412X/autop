@@ -224,18 +224,7 @@ internal class AgentPortImpl(
         nodeId: String,
         context: AgentContext?,
     ): String {
-        val vars =
-            mapOf(
-                "nodeId" to nodeId,
-                "flowName" to context?.flowName.orEmpty(),
-                "nodeName" to (context?.nodeName ?: nodeId),
-                "failure" to (context?.failureMessage ?: context?.failureCode.orEmpty()),
-                "expectation" to context?.expectation.orEmpty(),
-                "anchor" to context?.anchorHint.orEmpty(),
-                "precondition" to context?.preconditionDetail.orEmpty(),
-                "executed" to (context?.executedSteps.orEmpty().joinToString("\n")),
-                "screen" to context?.screenSummary.orEmpty(),
-            )
+        val vars = handoffGoalVars(nodeId, context)
         return (prompts.render(HANDOFF_GOAL_PROMPT, vars) as? Outcome.Ok)?.value?.text.orEmpty()
     }
 
@@ -246,6 +235,28 @@ internal class AgentPortImpl(
         const val TITLE_CHARS = 20
     }
 }
+
+/**
+ * 隐式交回目标的模板变量（docs/design/flows-precondition-selfrepair.md C3）。
+ *
+ * 模板 `flow.recovery.handoff_goal` 缺变量会渲染失败，因此这里必须给全每个变量；
+ * 可空字段给空串，不漏传。
+ */
+internal fun handoffGoalVars(
+    nodeId: String,
+    context: AgentContext?,
+): Map<String, String> =
+    mapOf(
+        "nodeId" to nodeId,
+        "flowName" to context?.flowName.orEmpty(),
+        "nodeName" to (context?.nodeName ?: nodeId),
+        "failure" to (context?.failureMessage ?: context?.failureCode.orEmpty()),
+        "expectation" to context?.expectation.orEmpty(),
+        "anchor" to context?.anchorHint.orEmpty(),
+        "precondition" to context?.preconditionDetail.orEmpty(),
+        "executed" to (context?.executedSteps.orEmpty().joinToString("\n")),
+        "screen" to context?.screenSummary.orEmpty(),
+    )
 
 /** 构造参数不合法等需要抛出的统一入口。 */
 internal fun invalid(message: String): Nothing = throw FlowException(FlowErrorCodes.INVALID, message)

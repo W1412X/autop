@@ -31,6 +31,7 @@ import com.example.autop.flow.IssueSeverity
 import com.example.autop.flow.StoredFlow
 import com.example.autop.flow.impl.db.FlowDraftEntity
 import com.example.autop.flow.impl.db.FlowsDb
+import com.example.autop.flow.impl.service.FlowRevisionService
 import com.example.autop.llm.Block
 import com.example.autop.llm.LlmException
 import com.example.autop.llm.LlmGateway
@@ -70,6 +71,7 @@ internal class AuthorDeps(
     val configProvider: ConfigProvider,
     val validation: FlowValidationService,
     val store: FlowStore,
+    val revisions: FlowRevisionService,
     val endpoints: EndpointStore,
     val threads: ThreadStore,
     val clock: Clock,
@@ -218,7 +220,14 @@ internal class FlowAuthorSessionImpl(
         _state.update { it.copy(issues = issues) }
         val first = issues.firstOrNull { it.severity == IssueSeverity.ERROR }
         if (first != null) return Outcome.Err(AppError(code = first.code, message = first.message))
-        val saved = d.store.save(draft)
+        // 修改既有流程时走修订路径：旧定义进版本库，并把新定义推给正在运行的实例（S3）。
+        val target = editingFlowId
+        val saved =
+            if (target != null) {
+                d.revisions.apply(target, draft, REVISION_REASON)
+            } else {
+                d.store.save(draft)
+            }
         if (saved is Outcome.Ok) d.db.flowDao().deleteDraft(draftId)
         return saved
     }
@@ -470,5 +479,8 @@ internal class FlowAuthorSessionImpl(
         const val TOOL_CANCELLED_PROMPT = "flow.author.tool_cancelled"
         const val MAX_OUTPUT = 8192
         const val ERROR_TOO_LONG = "flow.author_too_long"
+
+        /** 版本记录里的修订原因。 */
+        const val REVISION_REASON = "用户确认的修订草稿"
     }
 }

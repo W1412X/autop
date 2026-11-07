@@ -5,6 +5,7 @@ package com.example.autop.flow
 
 import com.example.autop.agent.PauseReason
 import com.example.autop.agent.RunHandle
+import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.common.ThreadId
@@ -82,6 +83,14 @@ public interface FlowRunHandle : RunHandle {
     public val progress: StateFlow<FlowProgress>
 
     public fun debug(): FlowDebugControl
+
+    /**
+     * 运行中应用一份修订定义（docs/design/flows-precondition-selfrepair.md S3）。
+     *
+     * 只允许替换节点内容：节点结构与 id 不变，只允许 `tool` / `args` / `target` / `target2` 变化。
+     * 替换在节点执行前生效：正在执行的节点用旧定义完成，后续节点与 RETRY 取新定义。
+     */
+    public suspend fun applyPatch(definition: FlowDefinition): Outcome<Unit>
 }
 
 /** 流程运行入口。 */
@@ -90,4 +99,14 @@ public interface FlowSession {
         request: FlowRunRequest,
         scope: CoroutineScope,
     ): FlowRunHandle
+
+    /**
+     * 把修订后的定义推给正在运行的该流程实例（docs/design/flows-precondition-selfrepair.md S3）。
+     *
+     * 没有正在运行的实例时返回失败（`flow.not_found`）；实例存在但结构不合法时返回 `flow.invalid`。
+     */
+    public suspend fun applyPatch(
+        flowId: String,
+        definition: FlowDefinition,
+    ): Outcome<Unit>
 }

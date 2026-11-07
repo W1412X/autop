@@ -187,6 +187,7 @@ public data class FlowRecoverySection(
 
 /** `flow.precondition`：节点前置断言（docs/design/flows-precondition-selfrepair.md P5）。 */
 @Serializable
+@Suppress("MagicNumber") // 配置段的默认值与取值范围本身就是数字，与 assets/flow.json 一一对应
 public data class FlowPreconditionSection(
     /** 总开关；关闭时所有 `pre` 被忽略。 */
     @SerialName("enabled") val enabled: Boolean = true,
