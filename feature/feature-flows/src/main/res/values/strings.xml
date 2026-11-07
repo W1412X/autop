@@ -219,6 +219,21 @@
     <string name="state_clear">清空</string>
     <string name="state_clear_text">这个范围内的全部状态都会删除</string>
 
+    <!-- 版本历史 -->
+    <string name="flow_detail_versions">版本历史</string>
+    <string name="versions_title">版本历史</string>
+    <string name="versions_empty">还没有历史版本。每次编辑保存后，旧版本会自动保留</string>
+    <string name="versions_row_title">版本 %1$d</string>
+    <string name="versions_row_current">版本 %1$d · 当前</string>
+    <string name="versions_no_reason">未填写改动说明</string>
+    <string name="versions_view">查看</string>
+    <string name="versions_restore">回滚</string>
+    <string name="versions_restore_title">回滚到版本 %1$d？</string>
+    <string name="versions_restore_text">当前定义会保存为新版本，然后恢复到所选版本</string>
+    <string name="versions_restore_done">已回滚到版本 %1$d</string>
+    <string name="versions_preview_title">版本 %1$d 的定义</string>
+    <string name="versions_preview_empty">这个版本没有步骤</string>
+
     <!-- 节点类型 -->
     <string name="flow_node_type_tool">执行操作</string>
     <string name="flow_node_type_observe">观察屏幕</string>

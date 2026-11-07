@@ -44,6 +44,9 @@ public interface FlowsNavigator {
     /** 流程状态管理。 */
     public fun openState(flowId: String)
 
+    /** 版本历史。 */
+    public fun openVersions(flowId: String)
+
     /** 通过系统分享发出文本（导出）。 */
     public fun shareText(text: String)
 

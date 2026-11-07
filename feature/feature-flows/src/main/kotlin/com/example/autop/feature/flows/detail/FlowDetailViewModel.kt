@@ -82,6 +82,8 @@ public sealed interface FlowDetailAction {
 
     public data object OpenState : FlowDetailAction
 
+    public data object OpenVersions : FlowDetailAction
+
     public data object Export : FlowDetailAction
 
     public data class OpenRun(
@@ -155,6 +157,7 @@ public class FlowDetailViewModel
                 FlowDetailAction.Edit -> navigator.openEditor(flowId)
                 FlowDetailAction.AiEdit -> navigator.openAuthor(null, flowId)
                 FlowDetailAction.OpenState -> navigator.openState(flowId)
+                FlowDetailAction.OpenVersions -> navigator.openVersions(flowId)
                 FlowDetailAction.Export ->
                     viewModelScope.launch {
                         (

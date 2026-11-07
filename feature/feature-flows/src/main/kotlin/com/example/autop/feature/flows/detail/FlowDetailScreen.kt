@@ -97,6 +97,11 @@ public fun FlowDetailScreen(
                     onAction(FlowDetailAction.OpenState)
                 })
             }
+            item {
+                NavRow(title = stringResource(R.string.flow_detail_versions), subtitle = null, onClick = {
+                    onAction(FlowDetailAction.OpenVersions)
+                })
+            }
             item { SectionTitle(text = stringResource(R.string.flow_detail_runs)) }
             items(state.runs, key = { it.runId }) { run ->
                 ListRow(

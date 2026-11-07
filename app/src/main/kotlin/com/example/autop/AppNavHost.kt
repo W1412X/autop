@@ -426,6 +426,7 @@ private val FLOW_ROUTES =
         record = AutopRoutes.FLOW_RECORD,
         endpoints = AutopRoutes.FLOW_ENDPOINTS,
         state = AutopRoutes.FLOW_STATE,
+        versions = AutopRoutes.FLOW_VERSIONS,
     )
 
 /** 流程导航回调：页面跳转与导出（系统分享文本）。 */
@@ -463,6 +464,10 @@ private fun createFlowsNavigator(
 
         override fun openState(flowId: String) {
             navController.navigate(AutopRoutes.flowState(flowId))
+        }
+
+        override fun openVersions(flowId: String) {
+            navController.navigate(AutopRoutes.flowVersions(flowId))
         }
 
         override fun shareText(text: String) {

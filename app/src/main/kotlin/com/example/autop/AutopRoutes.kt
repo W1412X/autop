@@ -86,6 +86,9 @@ object AutopRoutes {
     /** 流程状态管理路由模板。 */
     val FLOW_STATE: String = "flows/state/{${FLOW_ID_ARG}}"
 
+    /** 流程版本历史路由模板。 */
+    val FLOW_VERSIONS: String = "flows/versions/{${FLOW_ID_ARG}}"
+
     fun flowDetail(flowId: String): String = "flows/detail/$flowId"
 
     fun flowEditor(flowId: String): String = "flows/editor/$flowId"
@@ -101,6 +104,8 @@ object AutopRoutes {
     fun flowRecord(runId: String): String = "flows/record/$runId"
 
     fun flowState(flowId: String): String = "flows/state/$flowId"
+
+    fun flowVersions(flowId: String): String = "flows/versions/$flowId"
 
     /** 记忆浏览路由：[path] 经 URL 编码（如 `memory/browse?path=%2Fnotes`）。 */
     fun memoryBrowse(path: String = "/"): String = "memory/browse?path=${Uri.encode(path)}"

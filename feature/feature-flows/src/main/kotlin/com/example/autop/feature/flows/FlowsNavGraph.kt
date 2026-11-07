@@ -1,5 +1,5 @@
 /**
- * 流程域路由图挂载入口：详情、编辑器、AI 创建、创建入口、执行记录、接口登记、状态管理。
+ * 流程域路由图挂载入口：详情、编辑器、AI 创建、创建入口、执行记录、接口登记、状态管理、版本历史。
  * 路由字符串由 app 的 `AutopRoutes` 集中定义；「流程」页签内容见 [com.example.autop.feature.flows.list.FlowsListContent]。
  */
 @file:Suppress("MatchingDeclarationName") // 路由图入口与其路由集合同文件
@@ -25,6 +25,8 @@ import com.example.autop.feature.flows.record.FlowRecordScreen
 import com.example.autop.feature.flows.record.FlowRecordViewModel
 import com.example.autop.feature.flows.state.FlowStateScreen
 import com.example.autop.feature.flows.state.FlowStateViewModel
+import com.example.autop.feature.flows.versions.FlowVersionsScreen
+import com.example.autop.feature.flows.versions.FlowVersionsViewModel
 
 /** 流程域的路由模板（由 app 的 `AutopRoutes` 组装）。 */
 public class FlowsRoutes(
@@ -35,6 +37,7 @@ public class FlowsRoutes(
     public val record: String,
     public val endpoints: String,
     public val state: String,
+    public val versions: String,
 )
 
 /** 挂载流程域全部页面。 */
@@ -76,5 +79,10 @@ public fun NavGraphBuilder.flowsGraph(
         val vm: FlowStateViewModel = hiltViewModel()
         val state by vm.uiState.collectAsStateWithLifecycle()
         FlowStateScreen(state = state, onAction = { vm.onAction(it, navigator) })
+    }
+    composable(routes.versions) {
+        val vm: FlowVersionsViewModel = hiltViewModel()
+        val state by vm.uiState.collectAsStateWithLifecycle()
+        FlowVersionsScreen(state = state, onAction = { vm.onAction(it, navigator) }, onRefresh = { vm.refresh() })
     }
 }
