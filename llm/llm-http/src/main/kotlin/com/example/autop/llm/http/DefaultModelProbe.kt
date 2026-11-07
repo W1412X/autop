@@ -1,6 +1,6 @@
 /**
  * [ModelProbe] 通用实现（docs/tech/03 §3）：对目标模型依次发 3 个最小请求——
- * 纯文本、带一个 echo 工具且 toolChoice=REQUIRED、带一张 8×8 内置测试图——
+ * 纯文本、带一个 echo 工具且 toolChoice=AUTO、带一张 8×8 内置测试图——
  * 分别判定 text / tools / vision 是否可用并记录耗时；设置页据此回填 `ModelCapabilities`。
  */
 package com.example.autop.llm.http
@@ -94,6 +94,8 @@ public class DefaultModelProbe
                 maxOutputTokens = PROBE_MAX_OUTPUT_TOKENS,
             )
 
+        // toolChoice 与运行时请求同为 AUTO：REQUIRED 会被部分兼容代理直接拒绝，
+        // 探测误报 tools=false 后整条链路被降级到 JSON 回退。
         private fun toolsRequest(): LlmRequest =
             LlmRequest(
                 system = emptyList(),
@@ -106,7 +108,7 @@ public class DefaultModelProbe
                             parameters = JsonObject(emptyMap()),
                         ),
                     ),
-                toolChoice = ToolChoice.REQUIRED,
+                toolChoice = ToolChoice.AUTO,
                 maxOutputTokens = PROBE_MAX_OUTPUT_TOKENS,
             )
 
