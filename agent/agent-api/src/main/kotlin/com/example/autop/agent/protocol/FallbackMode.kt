@@ -2,10 +2,12 @@
  * JSON 回退模式（docs/tech/04 §3.8）：模型不支持原生 tools 时用文本 JSON 表达工具调用；
  * 解析失败注入 `agent.fallback.parse_error` 重试（≤ `agent.fallback.parseRetries`），
  * 超限后当纯文本收尾。
+ *
+ * 与 [RequestBuilder] 一同放在 agent-api，流程创作会话复用同一套能力判定与解析，
+ * 避免“普通对话走回退、创作会话却硬发 native tools”的分叉。
  */
-package com.example.autop.agent.runtime.fallback
+package com.example.autop.agent.protocol
 
-import com.example.autop.agent.runtime.lastTextOf
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.Block
@@ -13,25 +15,25 @@ import com.example.autop.llm.Msg
 import com.example.autop.llm.ToolSchema
 
 /** 一轮回复的解析走向。 */
-internal sealed interface ResolvedCalls {
+public sealed interface ResolvedCalls {
     /** 有工具调用（原生 ToolCall 块或解析出的 `fb_<turn>_<i>` 调用）。 */
-    data class ToolCalls(
+    public data class ToolCalls(
         val calls: List<Block.ToolCall>,
     ) : ResolvedCalls
 
     /** 无工具调用的自然收尾；[text] 为回退协议的 `final` 文本（原生模式为 null，用模型原文）。 */
-    data class Done(
+    public data class Done(
         val text: String?,
     ) : ResolvedCalls
 
     /** 解析失败，已生成重试提示（作为 INJECTED 注入后等下一轮）。 */
-    data class Retry(
+    public data class Retry(
         val injectText: String,
     ) : ResolvedCalls
 }
 
 /** 工具调用解析器（每次 Run 一个，携带解析重试计数）。 */
-internal class FallbackMode(
+public class FallbackMode(
     private val prompts: PromptRepository,
     private val nativeTools: Boolean,
     private val parseRetriesLimit: Int,
@@ -39,7 +41,7 @@ internal class FallbackMode(
     private var parseRetries = 0
 
     /** 回退协议的 SYSTEM_STATIC 追加片段（原生模式为 null）。 */
-    fun staticToolList(schemas: List<ToolSchema>): String? {
+    public fun staticToolList(schemas: List<ToolSchema>): String? {
         if (nativeTools) return null
         return prompts
             .render(ID_JSON_PROTOCOL, mapOf("toolList" to JsonToolProtocol.toolListText(schemas)))
@@ -48,7 +50,7 @@ internal class FallbackMode(
     }
 
     /** 解析本轮回复的工具调用（docs/tech/04 §3.8）。 */
-    fun resolveCalls(
+    public fun resolveCalls(
         msg: Msg,
         turn: Int,
     ): ResolvedCalls {

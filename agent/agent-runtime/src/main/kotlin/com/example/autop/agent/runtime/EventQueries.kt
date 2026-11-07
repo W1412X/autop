@@ -10,7 +10,6 @@ import com.example.autop.agent.PlanUpdated
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
-import com.example.autop.llm.Block
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 
@@ -38,11 +37,3 @@ private fun PlanStatus.planMark(): String =
         PlanStatus.DONE -> "done"
         PlanStatus.DROPPED -> "dropped"
     }
-
-/** 消息中最后一个 Text 块（模型最后的文本）。 */
-internal fun lastTextOf(msg: Msg): String =
-    msg.blocks
-        .filterIsInstance<Block.Text>()
-        .lastOrNull()
-        ?.text
-        .orEmpty()

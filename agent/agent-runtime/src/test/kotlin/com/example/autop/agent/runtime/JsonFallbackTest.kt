@@ -7,10 +7,10 @@ package com.example.autop.agent.runtime
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
-import com.example.autop.agent.runtime.fallback.FallbackMode
-import com.example.autop.agent.runtime.fallback.JsonParsed
-import com.example.autop.agent.runtime.fallback.JsonToolProtocol
-import com.example.autop.agent.runtime.fallback.ResolvedCalls
+import com.example.autop.agent.protocol.FallbackMode
+import com.example.autop.agent.protocol.JsonParsed
+import com.example.autop.agent.protocol.JsonToolProtocol
+import com.example.autop.agent.protocol.ResolvedCalls
 import com.example.autop.agent.runtime.testing.FakeTool
 import com.example.autop.agent.runtime.testing.RuntimeHarness
 import com.example.autop.agent.runtime.testing.ScriptedLlmProvider

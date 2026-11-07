@@ -1,8 +1,11 @@
 /**
  * JSON 回退协议（docs/tech/04 §3.8）：模型不支持原生 tools 时，
  * 用文本 JSON 表达工具调用；历史里的 ToolCall/ToolResult 降级为 USER 文本。
+ *
+ * 放在 agent-api 供智能体主循环与流程创作会话共用，保证两条链路的
+ * 能力判定与协议格式完全一致。
  */
-package com.example.autop.agent.runtime.fallback
+package com.example.autop.agent.protocol
 
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
@@ -22,31 +25,31 @@ import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 
 /** JSON 协议的解析结果。 */
-internal sealed interface JsonParsed {
+public sealed interface JsonParsed {
     /** `{"tool_calls":[{"name","arguments"}]}`。 */
-    data class Calls(
+    public data class Calls(
         val calls: List<Block.ToolCall>,
     ) : JsonParsed
 
     /** `{"final":"…"}`。 */
-    data class Final(
+    public data class Final(
         val text: String,
     ) : JsonParsed
 
-    data class Invalid(
+    public data class Invalid(
         val error: String,
     ) : JsonParsed
 }
 
 /** JSON 回退协议工具。 */
-internal object JsonToolProtocol {
+public object JsonToolProtocol {
     private val json = Json { ignoreUnknownKeys = true }
 
     /**
      * 解析模型文本：提取第一个顶层 JSON 对象（容忍前后说明文字与 ``` 包裹），
      * 转为工具调用（id = `fb_<turn>_<i>`）或最终文本。
      */
-    fun parse(
+    public fun parse(
         text: String,
         turn: Int,
     ): JsonParsed {
@@ -81,7 +84,7 @@ internal object JsonToolProtocol {
         }
 
     /** 历史降级：ToolResult → USER 文本（模板 `agent.fallback.tool_result`），ToolCall → 其 JSON 文本。 */
-    fun downgrade(
+    public fun downgrade(
         messages: List<Msg>,
         prompts: PromptRepository,
     ): List<Msg> {
@@ -122,7 +125,7 @@ internal object JsonToolProtocol {
     }
 
     /** 工具清单文本：每个工具一行 `name(参数: 类型, …): 描述首句`。 */
-    fun toolListText(tools: List<ToolSchema>): String =
+    public fun toolListText(tools: List<ToolSchema>): String =
         tools.joinToString("\n") { tool ->
             val params =
                 tool.parameters["properties"]
@@ -137,7 +140,7 @@ internal object JsonToolProtocol {
         }
 
     /** 某个 ToolCall 的 JSON 文本（历史降级用）。 */
-    fun callJsonText(call: Block.ToolCall): String =
+    public fun callJsonText(call: Block.ToolCall): String =
         buildJsonObject {
             put("name", call.name)
             put("arguments", json.parseToJsonElement(call.argsJson.ifEmpty { "{}" }))

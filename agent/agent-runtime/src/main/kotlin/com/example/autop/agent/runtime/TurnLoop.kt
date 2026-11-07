@@ -17,7 +17,8 @@ import com.example.autop.agent.ToolControl
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
-import com.example.autop.agent.runtime.fallback.ResolvedCalls
+import com.example.autop.agent.protocol.ResolvedCalls
+import com.example.autop.agent.protocol.lastTextOf
 import com.example.autop.agent.runtime.guard.BreakerVerdict
 import com.example.autop.agent.runtime.replay.ReplayRunner
 import com.example.autop.core.common.AppError

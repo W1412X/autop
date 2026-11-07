@@ -7,8 +7,9 @@ package com.example.autop.agent.runtime
 import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.RunRequest
 import com.example.autop.agent.RunState
-import com.example.autop.agent.runtime.fallback.FallbackMode
-import com.example.autop.agent.runtime.fallback.ResolvedCalls
+import com.example.autop.agent.protocol.FallbackMode
+import com.example.autop.agent.protocol.RequestBuilder
+import com.example.autop.agent.protocol.ResolvedCalls
 import com.example.autop.core.common.AppError
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.prompt.PromptRepository
