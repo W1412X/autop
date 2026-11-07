@@ -51,7 +51,9 @@ internal class AskUserTool(
         val timeoutMs = timeoutMs(ctx, args)
         return when (val answer = ctx.askUser(question, options, timeoutMs)) {
             is Outcome.Ok -> ToolOutput(ok = true, content = listOf(Block.Text(answer.value)))
-            is Outcome.Err -> timeoutError()
+            // 只有真超时才按 ask_timeout 提示"继续或结束"；其余错误（如自测无交互端口）原样透出。
+            is Outcome.Err ->
+                if (answer.error.code == AgentErrorCodes.ASK_TIMEOUT) timeoutError() else errorOutput(answer.error)
         }
     }
 
@@ -61,11 +63,20 @@ internal class AskUserTool(
     ): Long {
         val cfg = ctx.config[AgentConfig.TOOLS]
         val budget = cfg.timeoutMs[id] ?: cfg.defaultTimeoutMs
-        val maxMs = (budget - TIMEOUT_MARGIN_MS).coerceAtLeast(0)
-        // timeout_s 截断到执行器预算内，否则被 withTimeout 打成 agent.tool_timeout 而非 ask_timeout（N172）。
+        // 提问超时必须先于执行器 withTimeout 到期，否则被打成 agent.tool_timeout 而非 ask_timeout（N172），
+        // 不传 timeout_s 的默认路径同样留余量；预算本就很小（≤ 余量）时不强扣。
+        val maxMs = if (budget > TIMEOUT_MARGIN_MS) budget - TIMEOUT_MARGIN_MS else budget
         args["timeout_s"]?.jsonPrimitive?.intOrNull?.let { return (it * MS_PER_SECOND).coerceIn(0, maxMs) }
-        return budget
+        return maxMs
     }
+
+    /** 非超时错误原样透出。 */
+    private fun errorOutput(error: AppError): ToolOutput =
+        ToolOutput(
+            ok = false,
+            content = listOf(Block.Text("错误 ${error.code}: ${error.message}")),
+            error = error,
+        )
 
     /** 空问题不再弹窗（N172）。 */
     private fun blankQuestion(): ToolOutput =

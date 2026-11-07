@@ -28,10 +28,11 @@ internal class FlowDraftWriter
         private val ids: IdGenerator,
         private val clock: Clock,
     ) {
-        /** 校验后写入草稿，返回草稿 id；存在错误级问题时返回错误。 */
+        /** 校验后写入草稿，返回草稿 id；存在错误级问题时返回错误。[reason] 确认生效时写进版本记录。 */
         suspend fun save(
             definition: FlowDefinition,
             baseFlowId: String? = null,
+            reason: String? = null,
         ): Outcome<String> {
             val errors = validation.validate(definition).filter { it.severity == IssueSeverity.ERROR }
             if (errors.isNotEmpty()) {
@@ -47,6 +48,7 @@ internal class FlowDraftWriter
                     flowId = baseFlowId,
                     conversationJson = EMPTY_CONVERSATION,
                     draftJson = AutopJson.default.encodeToString(FlowDefinition.serializer(), definition),
+                    reason = reason?.takeIf { it.isNotBlank() },
                     updatedAt = clock.nowMillis(),
                 ),
             )

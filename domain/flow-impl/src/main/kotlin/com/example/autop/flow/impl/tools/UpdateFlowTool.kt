@@ -67,7 +67,7 @@ public class UpdateFlowTool
             if (revised.steps.isEmpty()) {
                 return failure(FlowErrorCodes.INVALID, "本次运行没有可用于修订流程的操作", "只有成功执行的界面操作会被使用")
             }
-            return when (val saved = writer.save(revised, baseFlowId = stored.id.value)) {
+            return when (val saved = writer.save(revised, baseFlowId = stored.id.value, reason = reason)) {
                 is Outcome.Err -> failure(saved.error.code, saved.error.message, saved.error.hint)
                 is Outcome.Ok ->
                     ToolOutput(

@@ -40,11 +40,12 @@ public class ChatUserInteraction(
     ): Outcome<String> {
         // 流程子 Run 的提问落到用户看得见的根 Run（docs/design/flows.md §6.9）。
         val runId = lineage?.rootOf(runId) ?: runId
+        // 先注册回答入口、再置 WAITING_USER：否则状态一出、回答极早到达会被丢弃（answer_dropped）。
+        val deferred = CompletableDeferred<String>()
+        pending[runId] = deferred
         runStore.mutate(runId) {
             it.copy(status = RunStatus.WAITING_USER, waitingQuestion = question, waitingOptions = options)
         }
-        val deferred = CompletableDeferred<String>()
-        pending[runId] = deferred
         val answer =
             try {
                 withTimeoutOrNull(timeoutMs) { deferred.await() }

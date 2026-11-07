@@ -17,7 +17,9 @@ public object NodeRevision {
     /**
      * 按 [original] 的 id 生成修订后的节点。
      *
-     * 只替换 `tool` / `args` / `target` / `target2`，其余字段（含 `pre` / `expect` / `onFail`）原样保留。
+     * 只替换 `tool` / `args`；tap 另按命中回执重建 `target`（坐标不写进参数），其余工具
+     * 保留原 `target` / `target2`、新坐标随 `args` 更新（与 `TrajectoryConverter` 整份生成同口径）。
+     * 其余字段（含 `pre` / `expect` / `onFail`）原样保留。
      * [steps] 由调用方保证只含成功动作；这里**只取最后一个**，整段轨迹会把导航步骤编进目标节点。
      * 无可用动作时返回 null（不生成修订）。
      */

@@ -48,7 +48,10 @@ private data class ScrollAction(
     /** 模型给的滚动区域内一点（0–1000）。 */
     val anchor: Point,
     val direction: ScrollDirection,
+    /** 实际执行步数（已钳到上限）。 */
     val steps: Int,
+    /** 模型请求的步数（大于 [steps] 时被截断，收尾文本要说明）。 */
+    val requestedSteps: Int,
     val replayArgs: JsonObject,
 )
 
@@ -117,12 +120,14 @@ public class ScrollTool
                     fallbackPoint = Point(x, y),
                 )
             val maxSteps = ctx.config[DeviceConfig.SCROLL].maxSteps
+            val requested = args.int("steps") ?: 1
             val action =
                 ScrollAction(
                     snapshot = snap,
                     anchor = Point(x, y),
                     direction = direction,
-                    steps = (args.int("steps") ?: 1).coerceIn(1, maxSteps),
+                    steps = requested.coerceIn(1, maxSteps),
+                    requestedSteps = requested,
                     replayArgs = replayArgsOf(args, receipts.describe(tree, Point(x, y))),
                 )
             return Outcome.Ok(PreparedAction(subject, action))
@@ -135,7 +140,7 @@ public class ScrollTool
             val scroll = action.payload as ScrollAction
             val pre = epilogue.begin(ctx)
             var snap = scroll.snapshot
-            var before = pre?.fingerprint
+            var before = baselineFingerprint(pre?.fingerprint)
             var done = 0
             var reachedEnd = false
             var blocked = false
@@ -221,6 +226,10 @@ public class ScrollTool
                 cfg.maxDurationMs,
             )
 
+        /** 基线指纹：优先动作前采样；quiet（流程）下自补一份，否则 moved 判不出来、到头也不提前停。 */
+        private suspend fun baselineFingerprint(preFingerprint: String?): String? =
+            preFingerprint ?: epilogue.fingerprintNow()
+
         /** 动作后等界面稳定，再用探针取指纹与 [before] 比较；静默模式（[before] 为空）或不可信时返回 null。 */
         private suspend fun movedAfterAction(
             ctx: ToolContext,
@@ -239,7 +248,13 @@ public class ScrollTool
         ): String {
             val steps = if (done > 1) "（共 $done 步）" else ""
             val end = if (reachedEnd) "，已到头，继续向该方向滚动不会有新内容" else ""
-            return "已向${directionName(scroll.direction)}滚动$steps$end"
+            val clamped =
+                if (scroll.requestedSteps > scroll.steps) {
+                    "；steps 超出上限，已截断到 ${scroll.steps} 步"
+                } else {
+                    ""
+                }
+            return "已向${directionName(scroll.direction)}滚动$steps$end$clamped"
         }
 
         private fun directionName(direction: ScrollDirection): String =

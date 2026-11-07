@@ -1,6 +1,6 @@
 ---
 id: tool.input_text
-version: 3
+version: 4
 vars: []
 meta:
   param.text: 要写入的文字
@@ -11,3 +11,5 @@ meta:
   param.wait_ms: 输入后等待界面稳定的最长时间（毫秒）
 ---
 在输入框中输入文字。给出输入框的坐标会先点击它；不给则输入到当前已激活的输入框。
+找不到可输入的输入框且 shell 通道未连接时返回 device.not_editable，请先点击输入框或给出输入框坐标；
+可写入但回车发送失败时会提示点击发送按钮。

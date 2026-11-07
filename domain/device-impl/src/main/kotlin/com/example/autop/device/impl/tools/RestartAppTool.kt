@@ -29,6 +29,8 @@ import com.example.autop.device.impl.popup.PopupRulesLoader
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -55,7 +57,8 @@ public class RestartAppTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> =
-            when (val got = screenReader.snapshot()) {
+            // N193 空树降级：package 缺省时取前台包名，降级快照照常带前台信息。
+            when (val got = screenReader.snapshotOrDegraded()) {
                 is Outcome.Err -> got
                 is Outcome.Ok -> prepareWith(got.value, args)
             }
@@ -103,7 +106,8 @@ public class RestartAppTool
                 ctx,
                 "已重启 $pkg",
                 null,
-                ReplayInput(ID, pre, JsonObject(emptyMap()), gesture = null),
+                // 回放参数带上解析后的包名（含缺省时取的前台应用），否则回放会重启到别的应用。
+                ReplayInput(ID, pre, buildJsonObject { put("package", pkg) }, gesture = null),
             )
         }
 

@@ -7,7 +7,7 @@ package com.example.autop.device.impl.tools
 import com.example.autop.agent.ToolSpec
 import com.example.autop.agent.toolSpec
 
-/** 15 个设备工具的 spec（含 `read_notifications`）。 */
+/** 17 个设备工具的 spec。 */
 public object DeviceToolSpecs {
     /** `tool.observe`：静态形态（全模式枚举）；运行期由 [observeFor] 按生效模式收窄。 */
     public val observe: ToolSpec = observeFor(listOf("a11y", "visual", "llm"), "")
@@ -51,8 +51,8 @@ public object DeviceToolSpecs {
     /** `tool.tap`：坐标 0–1000 必填；时长与抖动由工具内部处理。 */
     public val tap: ToolSpec =
         toolSpec(name = "tap", descriptionPromptId = "tool.tap") {
-            integer("x", required = true)
-            integer("y", required = true)
+            integer("x", required = true, min = 0, max = 1000)
+            integer("y", required = true, min = 0, max = 1000)
             boolean("long")
             integer("wait_ms")
         }
@@ -61,8 +61,8 @@ public object DeviceToolSpecs {
     public val inputText: ToolSpec =
         toolSpec(name = "input_text", descriptionPromptId = "tool.input_text") {
             string("text", required = true)
-            integer("x")
-            integer("y")
+            integer("x", min = 0, max = 1000)
+            integer("y", min = 0, max = 1000)
             string("mode", enum = listOf("replace", "append"))
             boolean("submit")
             integer("wait_ms")
@@ -72,21 +72,21 @@ public object DeviceToolSpecs {
     public val scroll: ToolSpec =
         toolSpec(name = "scroll", descriptionPromptId = "tool.scroll") {
             string("direction", required = true, enum = listOf("up", "down", "left", "right"))
-            integer("steps")
+            integer("steps", min = 1)
             // 已废弃且被忽略：只为让旧流程里保存的 amount 仍能通过参数校验（ADR-0015）。
             string("amount", enum = listOf("page", "half"))
-            integer("x")
-            integer("y")
+            integer("x", min = 0, max = 1000)
+            integer("y", min = 0, max = 1000)
         }
 
     /** `tool.swipe`。 */
     public val swipe: ToolSpec =
         toolSpec(name = "swipe", descriptionPromptId = "tool.swipe") {
-            integer("x1", required = true)
-            integer("y1", required = true)
-            integer("x2", required = true)
-            integer("y2", required = true)
-            integer("duration_ms")
+            integer("x1", required = true, min = 0, max = 1000)
+            integer("y1", required = true, min = 0, max = 1000)
+            integer("x2", required = true, min = 0, max = 1000)
+            integer("y2", required = true, min = 0, max = 1000)
+            integer("duration_ms", min = 1)
         }
 
     /** `tool.global_action`。 */
@@ -141,7 +141,7 @@ public object DeviceToolSpecs {
     public val listApps: ToolSpec =
         toolSpec(name = "list_apps", descriptionPromptId = "tool.list_apps") {
             string("query")
-            integer("limit")
+            integer("limit", min = 1)
         }
 
     /** `tool.device_state`（name 为 `get_device_state`）。 */
@@ -162,8 +162,8 @@ public object DeviceToolSpecs {
     public val readNotifications: ToolSpec =
         toolSpec(name = "read_notifications", descriptionPromptId = "tool.read_notifications") {
             string("package")
-            integer("since_minutes")
-            integer("limit")
+            integer("since_minutes", min = 0, max = 43200)
+            integer("limit", min = 1, max = 50)
         }
 
     /** 全部 spec（测试逐个校验 meta 完整性）。 */
@@ -176,6 +176,8 @@ public object DeviceToolSpecs {
             scroll,
             swipe,
             globalAction,
+            dismissPopup,
+            restartApp,
             openApp,
             openUri,
             wait,

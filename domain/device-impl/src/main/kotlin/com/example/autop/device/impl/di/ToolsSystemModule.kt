@@ -18,7 +18,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 
-/** open_app / open_uri / list_apps / device_state / clipboard_get / clipboard_set。 */
+/** open_app / open_uri / list_apps / device_state / clipboard_get / clipboard_set / dismiss_popup / restart_app。 */
 @Module
 @InstallIn(SingletonComponent::class)
 public object ToolsSystemModule {

@@ -47,6 +47,15 @@ public interface GestureController {
 
     /** 全局动作。 */
     public suspend fun globalAction(action: GlobalAction): Boolean
+
+    /**
+     * shell 注入按键（粘贴/回车等输入管道按键）：同手势通道做盾放行＋自身动作标记；
+     * shell 通道未连接返回 false。
+     */
+    public suspend fun shellKeyEvent(code: Int): Boolean
+
+    /** shell 注入组合键（如 Ctrl+A）；shell 通道未连接返回 false。 */
+    public suspend fun shellKeyCombination(codes: List<Int>): Boolean
 }
 
 /** [GestureController.performAtPath] 的结果。 */

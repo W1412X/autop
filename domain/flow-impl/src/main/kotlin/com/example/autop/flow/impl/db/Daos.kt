@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.Flow
         ApiEndpointEntity::class,
         FlowVersionEntity::class,
     ],
-    version = 2,
+    version = 3,
     exportSchema = true,
 )
 internal abstract class FlowsDb : RoomDatabase() {

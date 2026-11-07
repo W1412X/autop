@@ -1,7 +1,7 @@
 /**
  * [ToolProbeService] 实现（N198）：直接调用工具本身（普通 [Tool.invoke]，屏幕动作
  * 两步 prepare→perform），不走 ToolRouter 的锁与策略——人工自测入口，绕开 Run 编排。
- * 每个工具一份内置默认测试参数（[PROBE_FIXTURES]，新增工具须补），面板可编辑后传回。
+ * 每个工具一份内置默认测试参数（`ToolProbeFixtures`，新增工具须补），面板可编辑后传回。
  * 参数元数据由参数 Schema + 模板 `meta["param.<名>"]` 说明 + fixture 示例组装（N207）。
  * 探测历史留在内存（[MAX_HISTORY]），导出时连同应用运行日志一起给出（定位用）。
  */
@@ -14,6 +14,7 @@ import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.ToolParamKind
+import com.example.autop.agent.ToolProbeFixtures
 import com.example.autop.agent.ToolProbeParam
 import com.example.autop.agent.ToolProbeResult
 import com.example.autop.agent.ToolProbeService
@@ -151,7 +152,7 @@ public class ToolProber(
         runCatching { argsJson?.trim()?.takeIf { it.isNotEmpty() }?.let { json.parseToJsonElement(it) as? JsonObject } }
             .getOrNull()
 
-    private fun fixtureFor(toolName: String): JsonObject = PROBE_FIXTURES[toolName] ?: JsonObject(emptyMap())
+    private fun fixtureFor(toolName: String): JsonObject = ToolProbeFixtures.fixtureFor(toolName)
 
     /** 参数元数据（N207）：Schema 定结构，模板 meta 给说明，fixture 当示例。 */
     private fun paramsFor(tool: Tool): List<ToolProbeParam> {
@@ -320,61 +321,19 @@ private class ProbeRunScope : RunScopedValues {
     ): T = values.getOrPut(key) { create() } as T
 }
 
-/** 会真实操作屏幕的工具名（UI 标注 + 执行时面板让路）。 */
-private val ACTS_ON_SCREEN: Set<String> =
-    setOf("tap", "input_text", "scroll", "swipe", "global_action", "open_app", "open_uri", "clipboard_set")
-
 /**
- * 各工具的默认测试参数（键为 spec.name，N198）。参数名与 toolSpec DSL 一一对应
- * （DeviceToolSpecs / MemoryToolSpecs / 控制工具 spec）；新增工具须在此补条目，
- * 缺失时回退空对象（参数不合法会得到错误结果，也是有效诊断输出）。
+ * 会真实操作屏幕的工具名（UI 标注 + 执行时面板让路）。
+ * restart_app 会重启应用、dismiss_popup 会点击弹窗按钮；clipboard_set 只写剪贴板不碰屏幕。
  */
-private val PROBE_FIXTURES: Map<String, JsonObject> =
-    mapOf(
-        "observe" to jsonObjectOf("mode" to "a11y", "full" to true),
-        "screenshot" to jsonObjectOf("reason" to "工具自测（N198）"),
-        "tap" to jsonObjectOf("x" to 500, "y" to 500),
-        "input_text" to jsonObjectOf("text" to "autop 自测"),
-        "scroll" to jsonObjectOf("direction" to "down"),
-        "swipe" to jsonObjectOf("x1" to 500, "y1" to 700, "x2" to 500, "y2" to 300, "duration_ms" to 300),
-        "global_action" to jsonObjectOf("action" to "notifications"),
-        "open_app" to jsonObjectOf("package" to "com.android.settings"),
-        "open_uri" to jsonObjectOf("uri" to "https://example.com"),
-        "wait" to jsonObjectOf("ms" to 200),
-        "list_apps" to jsonObjectOf("query" to "设置"),
-        "get_device_state" to jsonObjectOf(),
-        "clipboard_get" to jsonObjectOf(),
-        "clipboard_set" to jsonObjectOf("text" to "autop-probe"),
-        "read_notifications" to jsonObjectOf(),
-        "memory_list" to jsonObjectOf("path" to "/"),
-        "memory_read" to jsonObjectOf("path" to "/"),
-        "memory_search" to jsonObjectOf("query" to "自测"),
-        "memory_write" to
-            jsonObjectOf(
-                "path" to "/probe/n198",
-                "mode" to "CREATE",
-                "content" to "工具自测条目（N198）",
-                "reason" to "工具自测",
-            ),
-        "update_plan" to """{"items":[{"step":"工具自测","status":"pending"}]}""".let(::jsonElementOf),
-        "finish" to jsonObjectOf("status" to "success", "summary" to "工具自测"),
-        "ask_user" to jsonObjectOf("question" to "工具自测？"),
-        "note" to jsonObjectOf("text" to "工具自测笔记（N198）"),
-        "history_recall" to jsonObjectOf("query" to "自测"),
-        "notify_user" to jsonObjectOf("title" to "工具自测", "text" to "工具自测通知（N203）"),
+private val ACTS_ON_SCREEN: Set<String> =
+    setOf(
+        "tap",
+        "input_text",
+        "scroll",
+        "swipe",
+        "global_action",
+        "open_app",
+        "open_uri",
+        "restart_app",
+        "dismiss_popup",
     )
-
-/** 简便构造：字符串/数字值的 JSON 对象。 */
-private fun jsonObjectOf(vararg pairs: Pair<String, Any>): JsonObject =
-    JsonObject(
-        pairs.associate { (key, value) ->
-            key to
-                when (value) {
-                    is Number -> kotlinx.serialization.json.JsonPrimitive(value)
-                    else -> kotlinx.serialization.json.JsonPrimitive(value.toString())
-                }
-        },
-    )
-
-/** 文本直通 JSON 元素（结构复杂的 fixture 直接写 JSON 字符串）。 */
-private fun jsonElementOf(text: String): JsonObject = Json.parseToJsonElement(text) as JsonObject

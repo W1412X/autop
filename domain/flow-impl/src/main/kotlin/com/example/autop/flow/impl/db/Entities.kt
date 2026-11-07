@@ -28,6 +28,8 @@ internal data class FlowDraftEntity(
     val flowId: String?,
     val conversationJson: String,
     val draftJson: String?,
+    /** 修订来由（update_flow / patch_flow_node 的 reason），确认生效时写进版本记录。 */
+    val reason: String? = null,
     val updatedAt: Long,
 )
 

@@ -92,7 +92,7 @@ public class PatchFlowNodeTool
             revisedFlow: FlowDefinition,
             reason: String,
         ): ToolOutput =
-            when (val saved = writer.save(revisedFlow, baseFlowId = flowId)) {
+            when (val saved = writer.save(revisedFlow, baseFlowId = flowId, reason = reason)) {
                 is Outcome.Err -> failure(saved.error.code, saved.error.message, saved.error.hint)
                 is Outcome.Ok ->
                     ToolOutput(

@@ -11,6 +11,7 @@ import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
+import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.device.DeviceErrorCodes
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.json.JsonObject
@@ -71,7 +72,8 @@ public class ClipboardSetTool
             args: JsonObject,
             ctx: ToolContext,
         ): ToolOutput {
-            val text = args.str("text").orEmpty()
+            // 与 input_text 同口径：空串视为未提供，不写空剪贴板。
+            val text = args.str("text") ?: return toolError(CommonErrorCodes.INVALID_ARGUMENT, "必须提供 text")
             clipboardManager(context).setPrimaryClip(ClipData.newPlainText("autop", text))
             return textOutput("已写入剪贴板")
         }

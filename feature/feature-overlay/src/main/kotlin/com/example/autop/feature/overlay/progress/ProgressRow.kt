@@ -43,6 +43,8 @@ public sealed interface ProgressRow {
     /** 计划卡（覆盖式，同对话页 PlanCard）。 */
     public data class Plan(
         val items: List<PlanItem>,
+        /** 本次更新的说明（update_plan 的 explanation）。 */
+        val explanation: String? = null,
     ) : ProgressRow
 
     /**

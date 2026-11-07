@@ -198,14 +198,15 @@ public class InputTextTool
                 )
             }
             clipboard().setPrimaryClip(ClipData.newPlainText(CLIP_LABEL, input.text))
+            // N186/N191：注入按键走输入管道，统一经 GestureController 做盾放行＋自身动作标记。
             val ok =
                 if (input.append) {
-                    shell.keyEvent(KEYCODE_MOVE_END) && shell.keyEvent(KEYCODE_PASTE)
+                    gestures.shellKeyEvent(KEYCODE_MOVE_END) && gestures.shellKeyEvent(KEYCODE_PASTE)
                 } else {
-                    shell.keyEvent(KEYCODE_MOVE_END) &&
-                        shell.keyCombination(KEYCODE_CTRL_LEFT, KEYCODE_A) &&
-                        shell.keyEvent(KEYCODE_DEL) &&
-                        shell.keyEvent(KEYCODE_PASTE)
+                    gestures.shellKeyEvent(KEYCODE_MOVE_END) &&
+                        gestures.shellKeyCombination(listOf(KEYCODE_CTRL_LEFT, KEYCODE_A)) &&
+                        gestures.shellKeyEvent(KEYCODE_DEL) &&
+                        gestures.shellKeyEvent(KEYCODE_PASTE)
                 }
             if (!ok) {
                 return Outcome.Err(AppError(code = DeviceErrorCodes.ACTION_FAILED, message = "通过 shell 输入文字失败"))
@@ -221,14 +222,15 @@ public class InputTextTool
             val hasImeEnter = node.snapshot.actions.contains(ACTION_IME_ENTER)
             return when {
                 hasImeEnter && gestures.performNodeAction(node, ACTION_IME_ENTER) -> SUBMIT_OK
-                !hasImeEnter && shell.state.value == ShellState.Connected && shell.keyEvent(KEYCODE_ENTER) -> SUBMIT_OK
+                !hasImeEnter && shell.state.value == ShellState.Connected && gestures.shellKeyEvent(KEYCODE_ENTER) ->
+                    SUBMIT_OK
                 else -> SUBMIT_FAILED
             }
         }
 
         private suspend fun shellSubmitOf(input: InputAction): String {
             if (!input.submit) return ""
-            return if (shell.keyEvent(KEYCODE_ENTER)) SUBMIT_OK else SUBMIT_FAILED
+            return if (gestures.shellKeyEvent(KEYCODE_ENTER)) SUBMIT_OK else SUBMIT_FAILED
         }
 
         private fun typedText(input: InputAction): String =

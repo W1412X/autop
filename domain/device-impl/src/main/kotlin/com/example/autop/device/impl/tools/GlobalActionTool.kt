@@ -49,7 +49,9 @@ public class GlobalActionTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> =
-            when (val got = screenReader.snapshot()) {
+            // N193 空树降级：全局动作不依赖节点树，降级快照即可生成策略主体；
+            // 空树应用的恢复路径（back/home）不能被节点树卡死。
+            when (val got = screenReader.snapshotOrDegraded()) {
                 is Outcome.Err -> got
                 is Outcome.Ok -> prepareWith(got.value, args)
             }

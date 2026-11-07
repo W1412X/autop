@@ -51,7 +51,8 @@ public class OpenAppTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> =
-            when (val got = screenReader.snapshot()) {
+            // N193 空树降级：应用匹配不依赖节点树；空树应用上的恢复路径（open_app）不能被卡死。
+            when (val got = screenReader.snapshotOrDegraded()) {
                 is Outcome.Err -> got
                 is Outcome.Ok -> prepareWith(got.value, args)
             }

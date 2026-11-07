@@ -102,7 +102,7 @@ class ControlToolsTest {
                 },
             )
 
-            assertThat(timeoutFromConfig).isEqualTo(600000L)
+            assertThat(timeoutFromConfig).isEqualTo(595000L)
             assertThat(timeoutFromDefault).isEqualTo(1234L)
         }
 

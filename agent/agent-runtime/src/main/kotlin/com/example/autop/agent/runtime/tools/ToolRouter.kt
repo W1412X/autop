@@ -136,9 +136,11 @@ internal class ToolRouter(
         return executor.runReplay(call, action.replayArgs, ctx)
     }
 
+    /** 只有纯读工具可并行；WRITE_SCREEN/WRITE_MEMORY/WRITE_SYSTEM 与 CONTROL 串行（docs/tech/04 §3.3）。 */
     private fun isParallel(tool: Tool): Boolean =
         tool.access != ToolAccess.WRITE_SCREEN &&
             tool.access != ToolAccess.WRITE_MEMORY &&
+            tool.access != ToolAccess.WRITE_SYSTEM &&
             tool.access != ToolAccess.CONTROL
 
     private suspend fun enrich(

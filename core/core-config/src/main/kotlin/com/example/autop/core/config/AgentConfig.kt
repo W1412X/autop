@@ -81,6 +81,9 @@ public data class AgentToolsSection(
                 "tool.observe" to 300000,
                 "tool.wait" to 120000,
                 "tool.ask_user" to 600000,
+                // 流程执行可能远超默认 30s，预算要盖住整段流程运行（flows.md §14.1），
+                // 否则 withTimeout 会取消整个流程会话并返回 agent.tool_timeout。
+                "tool.run_flow" to 600000,
             )
     }
 }

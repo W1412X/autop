@@ -73,6 +73,9 @@ public data class FlowRunResult(
     val message: String?,
     val outputs: JsonObject?,
     val nodesExecuted: Int,
+    /** 最终导致失败的节点（flows.md §14.1：失败时返回出错的节点与原因）。 */
+    val failedNodeId: String? = null,
+    val failedNodeName: String? = null,
 )
 
 /** 节点之间传播的控制信号（不用异常做控制流）。 */
@@ -151,6 +154,9 @@ public class FlowInterpreter(
     private var deadline: Long? = null
     private var executed = 0
     private var consecutiveFailures = 0
+
+    /** 最终导致失败的节点（id to name；§14.1 失败交回带出错节点）。 */
+    private var failedNode: Pair<String, String?>? = null
     private val lastOk = HashMap<String, Boolean>()
     private val tokens = TokenBudget()
 
@@ -252,7 +258,15 @@ public class FlowInterpreter(
                 if (signal.code == FlowErrorCodes.CANCELLED) {
                     FlowRunResult(RunOutcome.CANCELLED, signal.code, signal.message, null, executed)
                 } else {
-                    FlowRunResult(RunOutcome.FAILED, signal.code, signal.message, null, executed)
+                    FlowRunResult(
+                        RunOutcome.FAILED,
+                        signal.code,
+                        signal.message,
+                        null,
+                        executed,
+                        failedNode?.first,
+                        failedNode?.second,
+                    )
                 }
             Signal.Next, Signal.Break, Signal.Continue ->
                 FlowRunResult(
@@ -353,7 +367,10 @@ public class FlowInterpreter(
         writeTrace(level, handle, start, ended)
         afterNode(node, frame, resolved)
         val extra = consecutiveSignal(resolved, node, frame)
-        return if (resolved.signal is Signal.Next && extra != null) extra else resolved.signal
+        val out = if (resolved.signal is Signal.Next && extra != null) extra else resolved.signal
+        // 失败信号向外传播的节点即"出错的节点"（SKIP/SUCCEED 收尾会转 Next，不会记进来）。
+        if (out is Signal.Fail) failedNode = node.id to node.name
+        return out
     }
 
     private suspend fun writeTrace(

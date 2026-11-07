@@ -89,7 +89,7 @@ internal class HistoryRecallTool(
             val section = sectionOf(event)
             if (section != null) {
                 if (text.length + section.text.length > maxChars) {
-                    text.append(truncatedHint(lastSeq ?: event.seq))
+                    text.append(truncationTail(event.seq, lastSeq, section.text, maxChars))
                     break
                 }
                 text.append(section.text)
@@ -99,6 +99,22 @@ internal class HistoryRecallTool(
         }
         return ToolOutput(ok = true, content = listOf(Block.Text(text.toString())) + blocks)
     }
+
+    /**
+     * 放不下 [text] 时的收尾文本：首条即超限给头部截断的原文并跳过该条（否则续看永远卡在同一条），
+     * 否则续看从"放不下的这条"开始（seq_from 是闭区间，提示上一条会重复取）。
+     */
+    private fun truncationTail(
+        seq: Long,
+        lastSeq: Long?,
+        text: String,
+        maxChars: Int,
+    ): String =
+        if (lastSeq == null) {
+            text.take(maxChars) + truncatedHint(seq + 1)
+        } else {
+            truncatedHint(seq)
+        }
 
     private fun truncatedHint(nextSeq: Long): String = "\n…（已截断，可用 seq_from=$nextSeq 继续查看）"
 

@@ -185,6 +185,8 @@ public data class RunNoteAdded(
 public data class PlanUpdated(
     override val v: Int = 1,
     val items: List<PlanItem>,
+    /** 本次更新的说明（update_plan 的 explanation 参数）。 */
+    val explanation: String? = null,
 ) : EventPayload
 
 /** Run 暂停。 */
@@ -213,4 +215,7 @@ public data class RunFinished(
     val summary: String?,
     val outputs: JsonObject? = null,
     val errorCode: String? = null,
+    /** 最终导致失败的节点（流程运行的失败交回，flows.md §14.1）。 */
+    val failedNodeId: String? = null,
+    val failedNodeName: String? = null,
 ) : EventPayload

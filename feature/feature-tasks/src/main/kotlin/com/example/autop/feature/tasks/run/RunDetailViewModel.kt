@@ -186,7 +186,11 @@ public class RunDetailViewModel
                 is RunPaused -> TimelineUi(TimelineKind.PAUSED, payload.detail.orEmpty())
                 is RunResumed -> TimelineUi(TimelineKind.RESUMED, payload.userNote.orEmpty())
                 is RunNoteAdded -> TimelineUi(TimelineKind.NOTE, payload.text)
-                is PlanUpdated -> TimelineUi(TimelineKind.PLAN, payload.items.joinToString { it.step })
+                is PlanUpdated ->
+                    TimelineUi(
+                        TimelineKind.PLAN,
+                        (listOfNotNull(payload.explanation) + payload.items.map { it.step }).joinToString("\n"),
+                    )
                 else -> TimelineUi(TimelineKind.OTHER, "")
             }
 

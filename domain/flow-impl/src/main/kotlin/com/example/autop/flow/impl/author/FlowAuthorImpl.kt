@@ -221,10 +221,13 @@ internal class FlowAuthorSessionImpl(
         val first = issues.firstOrNull { it.severity == IssueSeverity.ERROR }
         if (first != null) return Outcome.Err(AppError(code = first.code, message = first.message))
         // 修改既有流程时走修订路径：旧定义进版本库，并把新定义推给正在运行的实例（S3）。
+        // 版本记录的原因优先取草稿自带的 reason（update_flow / patch_flow_node 的用户说明）。
         val target = editingFlowId
         val saved =
             if (target != null) {
-                d.revisions.apply(target, draft, REVISION_REASON)
+                val draftRow = d.db.flowDao().draft(draftId)
+                val reason = draftRow?.reason ?: REVISION_REASON
+                d.revisions.apply(target, draft, reason)
             } else {
                 d.store.save(draft)
             }
@@ -438,12 +441,15 @@ internal class FlowAuthorSessionImpl(
     ): String = (d.prompts.render(id, vars) as? Outcome.Ok)?.value?.text.orEmpty()
 
     private suspend fun persist() {
+        // REPLACE upsert 会整行覆盖：草稿自带的 reason（工具生成的修订来由）要保留到确认生效。
+        val draftRow = d.db.flowDao().draft(draftId)
         d.db.flowDao().upsertDraft(
             FlowDraftEntity(
                 draftId = draftId,
                 flowId = editingFlowId,
                 conversationJson = json.encodeToString(ListSerializer(Msg.serializer()), conversation),
                 draftJson = state.value.draft?.let { json.encodeToString(FlowDefinition.serializer(), it) },
+                reason = draftRow?.reason,
                 updatedAt = d.clock.nowMillis(),
             ),
         )

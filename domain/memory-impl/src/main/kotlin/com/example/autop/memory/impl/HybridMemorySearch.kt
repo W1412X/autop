@@ -13,6 +13,7 @@ import com.example.autop.core.config.MemoryConfig
 import com.example.autop.memory.MemoryPath
 import com.example.autop.memory.MemoryRetriever
 import com.example.autop.memory.MemorySearch
+import com.example.autop.memory.MemorySource
 import com.example.autop.memory.SearchHit
 import com.example.autop.memory.impl.db.MemoryDb
 import kotlinx.coroutines.async
@@ -71,6 +72,7 @@ public class HybridMemorySearch
                 snippet = snippet,
                 score = fused.score,
                 channels = fused.channels,
+                source = MemorySource.valueOf(node.source),
             )
         }
     }

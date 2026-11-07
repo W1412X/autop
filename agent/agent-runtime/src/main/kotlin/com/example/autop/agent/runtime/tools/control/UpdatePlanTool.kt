@@ -14,6 +14,7 @@ import com.example.autop.agent.ToolSpec
 import com.example.autop.agent.toolSpec
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -45,7 +46,7 @@ internal class UpdatePlanTool : Tool {
                     status = statusOf(one["status"]!!.jsonPrimitive.content),
                 )
             }
-        ctx.threadStore.append(ctx.threadId, ctx.runId, PlanUpdated(items = items))
+        ctx.threadStore.append(ctx.threadId, ctx.runId, PlanUpdated(items = items, explanation = explanationOf(args)))
         return ToolOutput(ok = true, content = listOf(Block.Text("计划已更新。")))
     }
 
@@ -56,4 +57,12 @@ internal class UpdatePlanTool : Tool {
             "done" -> PlanStatus.DONE
             else -> PlanStatus.DROPPED
         }
+
+    /** 本次更新的说明（空串按未提供处理）。 */
+    private fun explanationOf(args: JsonObject): String? =
+        args["explanation"]
+            ?.jsonPrimitive
+            ?.contentOrNull
+            ?.trim()
+            ?.takeIf { it.isNotEmpty() }
 }

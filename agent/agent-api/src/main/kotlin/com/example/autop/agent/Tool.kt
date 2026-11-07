@@ -57,7 +57,7 @@ public interface Tool {
     public val requiredCapabilities: Set<Capability>
         get() = emptySet()
 
-    /** R1/A5：为真时只在当前主模型支持图片输入时暴露（如 tap 的坐标模式），避免模型没看图就盲点坐标。 */
+    /** R1/A5：为真时只在当前主模型支持图片输入时暴露（如带坐标点击的工具），避免模型没看图就盲点坐标。 */
     public val requiresModelVision: Boolean
         get() = false
 
@@ -160,6 +160,10 @@ public interface ToolContext {
     /** 本次调用来自智能体还是流程；`memory_write` 据此标记记忆来源。 */
     public val origin: ToolOrigin
         get() = ToolOrigin.AGENT
+
+    /** 调用方标签（如 `flow:<流程名>`）；`memory_write` 据此补默认 reason。 */
+    public val originTag: String?
+        get() = null
 
     /** 用于 saveBlob、history_recall。 */
     public val threadStore: ThreadStore

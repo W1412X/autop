@@ -90,7 +90,7 @@ private fun appendPayload(
                 )
         is PlanUpdated -> {
             rows.removeAll { it is ProgressRow.Plan }
-            rows += ProgressRow.Plan(payload.items)
+            rows += ProgressRow.Plan(payload.items, payload.explanation)
         }
         else -> Unit
     }

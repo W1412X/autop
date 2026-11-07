@@ -52,7 +52,9 @@ public class DismissPopupTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> =
-            when (val got = screenReader.snapshot()) {
+            // N193 空树降级：空树时 PopupFinder 找不到弹窗 → popup_not_found，
+            // 而不是被节点树缺失卡成 service_unavailable。
+            when (val got = screenReader.snapshotOrDegraded()) {
                 is Outcome.Err -> got
                 is Outcome.Ok -> prepareWith(got.value)
             }
@@ -82,16 +84,18 @@ public class DismissPopupTool
             if (!gestures.tap(popup.x, popup.y)) {
                 return toolError(DeviceErrorCodes.GESTURE_CANCELLED, "关闭弹窗的点击被取消")
             }
+            // 手势坐标点击：回放记录标 execution=gesture 并带实际落点（docs/tech/05 §13）。
             return epilogue.finish(
                 ctx,
                 "已关闭弹窗（依据：${popup.reason}）",
                 null,
-                ReplayInput(ID, pre, JsonObject(emptyMap()), gesture = null),
+                ReplayInput(ID, pre, JsonObject(emptyMap()), gesture = gestureJson(popup.x, popup.y, TAP_DURATION_MS)),
             )
         }
 
         private companion object {
             const val ID = "tool.dismiss_popup"
             const val EXTRA_REASON = "popupReason"
+            const val TAP_DURATION_MS = 0L
         }
     }

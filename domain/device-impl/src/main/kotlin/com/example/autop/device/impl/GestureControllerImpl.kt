@@ -248,25 +248,22 @@ public class GestureControllerImpl
         override suspend fun globalAction(action: GlobalAction): Boolean {
             // 优先 shell keyevent
             val keyCode = keyCodeOf(action)
-            if (keyCode != null && shellKeyEvent(keyCode)) return true
+            if (keyCode != null && shellKeyEvent(keyCode)) {
+                logger.i(TAG, EVENT_CHANNEL, "op" to OP_GLOBAL_ACTION, "channel" to CHANNEL_SHELL, "keyCode" to keyCode)
+                return true
+            }
             // 回落无障碍 API
             logger.i(TAG, EVENT_CHANNEL, "op" to OP_GLOBAL_ACTION, "channel" to CHANNEL_A11Y)
             return shielded(null) { selfAction { holder.current()?.performGlobalAction(globalId(action)) == true } }
         }
 
-        /** shell 注入按键事件。 */
-        private suspend fun shellKeyEvent(keyCode: Int): Boolean =
-            shellAction(null) { shellInput.keyEvent(keyCode) }.also { ok ->
-                if (ok) {
-                    logger.i(
-                        TAG,
-                        EVENT_CHANNEL,
-                        "op" to OP_GLOBAL_ACTION,
-                        "channel" to CHANNEL_SHELL,
-                        "keyCode" to keyCode,
-                    )
-                }
-            }
+        /** shell 注入按键（input_text 的粘贴/回车等）：统一走盾放行＋自身动作标记。 */
+        override suspend fun shellKeyEvent(code: Int): Boolean = shellAction(null) { shellInput.keyEvent(code) }
+
+        /** shell 注入组合键（如 Ctrl+A）。 */
+        @Suppress("SpreadOperator") // 组合键只有 2 键，一次性小数组拷贝可忽略；vararg 端口只能展开传入
+        override suspend fun shellKeyCombination(codes: List<Int>): Boolean =
+            shellAction(null) { shellInput.keyCombination(*codes.toIntArray()) }
 
         /** GlobalAction 映射到 KeyEvent KEYCODE_*。 */
         private fun keyCodeOf(action: GlobalAction): Int? =

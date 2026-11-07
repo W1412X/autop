@@ -37,6 +37,7 @@ import com.example.autop.flow.impl.author.AuthorDeps
 import com.example.autop.flow.impl.author.FlowAuthorImpl
 import com.example.autop.flow.impl.context.FlowDirectoryContributor
 import com.example.autop.flow.impl.db.FLOWS_MIGRATION_1_2
+import com.example.autop.flow.impl.db.FLOWS_MIGRATION_2_3
 import com.example.autop.flow.impl.db.FlowsDb
 import com.example.autop.flow.impl.ports.ApiPortImpl
 import com.example.autop.flow.impl.recording.RecordingSessionImpl
@@ -100,7 +101,7 @@ public object FlowModule {
                     context,
                     FlowsDb::class.java,
                     "flows.db",
-                ).addMigrations(FLOWS_MIGRATION_1_2)
+                ).addMigrations(FLOWS_MIGRATION_1_2, FLOWS_MIGRATION_2_3)
                 .build()
         val runs = RoomFlowRunStore(db, context.filesDir, configProvider)
         // needsScreen 分析要读取其他流程（子流程）与工具元数据，用延迟获取避免构造期循环。

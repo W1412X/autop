@@ -80,7 +80,8 @@ private fun appendPayload(
             if (entries.lastOrNull()?.item is TimelineItem.PlanCard) {
                 entries.removeAt(entries.lastIndex)
             }
-            entries.add(TimelineEntry(TimelineItem.PlanCard(payload.items), event.seq, forkable = false))
+            val card = TimelineItem.PlanCard(payload.items, payload.explanation)
+            entries.add(TimelineEntry(card, event.seq, forkable = false))
             unpaired
         }
         is RunPaused -> {

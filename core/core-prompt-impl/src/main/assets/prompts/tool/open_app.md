@@ -1,9 +1,9 @@
 ---
 id: tool.open_app
-version: 1
+version: 2
 vars: []
 meta:
   param.package: 应用包名，如 com.tencent.mm
   param.name: 应用名称，不知道包名时使用
 ---
-打开一个应用。package 与 name 二选一；按名称匹配到多个应用时会返回候选列表。
+打开一个应用。package 与 name 二选一（同传时以 package 为准）；按名称匹配到多个应用时会返回候选列表。

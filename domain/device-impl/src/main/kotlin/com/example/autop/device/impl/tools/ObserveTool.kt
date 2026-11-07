@@ -46,20 +46,23 @@ public class ObserveTool
         override fun specFor(ctx: ToolContext): ToolSpec {
             val config = ctx.config[DeviceConfig.OBSERVE]
             val effective = modes.effective(config)
+            // 无生效模式（服务/模型未就绪）时枚举回退配置清单，但明确告知可能不可用，避免模型误以为一切正常。
             val ordered = effective.ifEmpty { config.priority.mapNotNull(ObserveMode::parse) }
+            val warn = if (effective.isEmpty()) "$NO_EFFECTIVE_MODE\n" else ""
             return DeviceToolSpecs.observeFor(
                 modeIds = ordered.map { it.id },
                 modeList =
-                    ordered
-                        .mapIndexed { index, mode ->
-                            val text =
-                                prompts
-                                    .render("$MODE_PROMPT_PREFIX${mode.id}")
-                                    .getOrNull()
-                                    ?.text
-                                    .orEmpty()
-                            if (index == 0) "（优先）$text" else text
-                        }.joinToString("\n"),
+                    warn +
+                        ordered
+                            .mapIndexed { index, mode ->
+                                val text =
+                                    prompts
+                                        .render("$MODE_PROMPT_PREFIX${mode.id}")
+                                        .getOrNull()
+                                        ?.text
+                                        .orEmpty()
+                                if (index == 0) "（优先）$text" else text
+                            }.joinToString("\n"),
             )
         }
 
@@ -109,5 +112,6 @@ public class ObserveTool
         private companion object {
             const val MALFORMED_REGION = "region 必须是 [x1,y1,x2,y2]（0–1000，x1<x2、y1<y2）"
             const val MODE_PROMPT_PREFIX = "tool.observe.mode."
+            const val NO_EFFECTIVE_MODE = "（当前无可用观测模式：服务/模型未就绪，所选模式可能返回 device.mode_unavailable）"
         }
     }

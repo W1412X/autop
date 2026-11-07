@@ -9,6 +9,7 @@ import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.RunRequest
 import com.example.autop.agent.RunStarted
 import com.example.autop.agent.ThreadStore
+import com.example.autop.agent.ToolInvoker
 import com.example.autop.agent.ToolInvokerFactory
 import com.example.autop.agent.ToolProbeService
 import com.example.autop.agent.UserInteraction
@@ -184,6 +185,21 @@ internal class FlowSessionImpl(
 
     private fun cancelled() = FlowRunResult(RunOutcome.CANCELLED, null, null, null, 0)
 
+    /** 流程侧工具上下文：来源标签带流程名（memory_write 的默认 reason 用）。 */
+    private fun flowToolContext(
+        request: FlowRunRequest,
+        invoker: ToolInvoker,
+    ): FlowToolContext =
+        FlowToolContext(
+            runId = request.runId,
+            threadId = request.threadId,
+            config = request.config,
+            threadStore = d.threadStore,
+            interaction = d.interaction,
+            invoker = invoker,
+            tag = "flow:${request.flow.name}",
+        ) { }
+
     private suspend fun execute(
         request: FlowRunRequest,
         handle: FlowRunHandleImpl,
@@ -276,8 +292,7 @@ internal class FlowSessionImpl(
                 ),
                 filter,
             )
-        val ctx =
-            FlowToolContext(request.runId, request.threadId, request.config, d.threadStore, d.interaction, invoker) { }
+        val ctx = flowToolContext(request, invoker)
         val images = FlowImages()
         val access = d.probe().targets().associate { it.name to it.access }
         val observe = ObservePortImpl(invoker, ctx, images, flow.settings.observeMode)
@@ -352,6 +367,8 @@ internal class FlowSessionImpl(
                 summary = summary,
                 outputs = result.outputs,
                 errorCode = result.errorCode,
+                failedNodeId = result.failedNodeId,
+                failedNodeName = result.failedNodeName,
             )
         handle.append(finished)
         handle.complete(finished)

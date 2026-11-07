@@ -128,6 +128,8 @@ public data class SearchHit(
     val snippet: String,
     val score: Double,
     val channels: Set<String>,
+    /** 条目来源（USER/AGENT/FLOW/IMPORT），供读工具区分是谁写的。 */
+    val source: MemorySource,
 )
 
 /** 单通道排名项。 */

@@ -55,7 +55,8 @@
       "timeoutMs": {
         "tool.observe": 300000,
         "tool.wait": 120000,
-        "tool.ask_user": 600000
+        "tool.ask_user": 600000,
+        "tool.run_flow": 600000
       }
     },
     "history": {

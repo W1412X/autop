@@ -63,7 +63,8 @@ public class MemoryWriteTool
                     tags = args.strings("tags"),
                     source = sourceOf(ctx),
                     runId = ctx.runId,
-                    reason = args.str("reason"),
+                    // 流程写入 reason 默认补 flow:<流程名>（docs/tech/06 §3）；模型给了 reason 用模型的。
+                    reason = args.str("reason") ?: ctx.originTag,
                     evidence = evidenceOf(args["evidence"] as? JsonObject),
                 )
             return when (val r = store.write(write)) {

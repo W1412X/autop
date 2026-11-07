@@ -15,6 +15,7 @@ import com.example.autop.core.config.MemoryConfig
 import com.example.autop.memory.MemoryErrorCodes
 import com.example.autop.memory.MemoryPath
 import com.example.autop.memory.MemorySearch
+import com.example.autop.memory.MemorySource
 import com.example.autop.memory.MemoryStore
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
@@ -77,6 +78,7 @@ public class MemoryReadTool
             val meta =
                 buildString {
                     appendLine("标题：${node.title}")
+                    appendLine("来源：${sourceLabel(node.source)}")
                     if (node.tags.isNotEmpty()) appendLine("标签：${node.tags.joinToString("、")}")
                     if (node.links.isNotEmpty()) appendLine("关联：${node.links.joinToString("、")}")
                     appendLine()
@@ -112,7 +114,9 @@ public class MemorySearchTool
                 if (hits.isEmpty()) {
                     "（没有匹配的记忆）"
                 } else {
-                    hits.joinToString(separator = "\n") { "${it.path.value}  ${it.title}：${it.snippet}" }
+                    hits.joinToString(separator = "\n") { hit ->
+                        "${hit.path.value}  [${sourceLabel(hit.source)}] ${hit.title}：${hit.snippet}"
+                    }
                 }
             return textOutput(text)
         }
@@ -129,6 +133,15 @@ internal fun parsePath(raw: String): MemoryPath? =
     }
 
 internal fun pathError(): ToolOutput = toolError(MemoryErrorCodes.INVALID_PATH, "路径非法")
+
+/** 条目来源的展示标签（读工具输出区分用户/agent/流程写入）。 */
+internal fun sourceLabel(source: MemorySource): String =
+    when (source) {
+        MemorySource.USER -> "用户"
+        MemorySource.AGENT -> "agent"
+        MemorySource.FLOW -> "流程"
+        MemorySource.IMPORT -> "导入"
+    }
 
 internal suspend fun listLines(
     store: MemoryStore,
@@ -151,7 +164,9 @@ private suspend fun collectChildren(
 ) {
     for (child in nodes) {
         if (out.size >= limit) return
-        out += "${child.path.value}  ${child.title} — ${child.summary}（${child.childCount}）"
+        out +=
+            "${child.path.value}  ${child.title} — ${child.summary}（${child.childCount}）" +
+            "[${sourceLabel(child.source)}]"
         if (depth > 0) {
             collectChildren(store, store.children(child.path, 0, limit), depth - 1, limit, out)
         }

@@ -4,6 +4,7 @@
  */
 package com.example.autop.flow.impl.tools
 
+import com.example.autop.agent.RunFinished
 import com.example.autop.agent.RunLineage
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.ThreadStore
@@ -27,6 +28,7 @@ import com.example.autop.flow.core.ParamBinder
 import com.example.autop.flow.core.expr.FlowException
 import com.example.autop.llm.Block
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -131,25 +133,23 @@ public class RunFlowTool
                         config = ctx.config,
                     )
                 val finished = coroutineScope { session.start(request, this).await() }
-                return result(finished.status, finished.summary, finished.outputs, finished.errorCode)
+                return result(finished)
             } finally {
                 lineage.unregister(runId)
             }
         }
 
-        private fun result(
-            status: RunOutcome,
-            summary: String?,
-            outputs: JsonObject?,
-            errorCode: String?,
-        ): ToolOutput {
-            val ok = status == RunOutcome.SUCCEEDED
+        /** 失败时附出错节点与原因（flows.md §14.1）。 */
+        private fun result(finished: RunFinished): ToolOutput {
+            val ok = finished.status == RunOutcome.SUCCEEDED
             val body =
                 buildJsonObject {
-                    put("status", status.name.lowercase())
-                    summary?.let { put("summary", it) }
-                    outputs?.let { put("outputs", it) }
-                    errorCode?.let { put("errorCode", it) }
+                    put("status", finished.status.name.lowercase())
+                    finished.summary?.let { put("summary", it) }
+                    finished.outputs?.let { put("outputs", it) }
+                    finished.errorCode?.let { put("errorCode", it) }
+                    finished.failedNodeId?.let { put("failedNodeId", it) }
+                    finished.failedNodeName?.let { put("failedNodeName", it) }
                 }
             return ToolOutput(
                 ok = ok,
@@ -160,8 +160,8 @@ public class RunFlowTool
                         null
                     } else {
                         AppError(
-                            code = errorCode ?: FlowErrorCodes.AGENT_FAILED,
-                            message = summary.orEmpty(),
+                            code = finished.errorCode ?: FlowErrorCodes.AGENT_FAILED,
+                            message = finished.summary.orEmpty(),
                         )
                     },
             )
@@ -188,6 +188,9 @@ public class ListFlowsTool
             args: JsonObject,
             ctx: ToolContext,
         ): ToolOutput {
+            // FlowListItem 带最近一次运行的状态与时间（§14.2），定义细节从 listAll 取。
+            val current = store.observeAll().first()
+            val items = current.associateBy { it.id }
             val list =
                 buildJsonArray {
                     for (stored in store.listAll()) {
@@ -222,6 +225,10 @@ public class ListFlowsTool
                                 )
                                 put("runs", stats.totalRuns)
                                 put("successRate", stats.successRate)
+                                items[stored.id]?.let { item ->
+                                    item.lastRunAt?.let { put("lastRunAt", it) }
+                                    item.lastRunStatus?.let { put("lastRunStatus", it) }
+                                }
                             },
                         )
                     }

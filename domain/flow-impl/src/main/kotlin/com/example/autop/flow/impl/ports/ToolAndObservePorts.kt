@@ -66,12 +66,14 @@ internal class FlowToolContext(
     override val threadStore: ThreadStore,
     private val interaction: UserInteraction,
     private val invoker: ToolInvoker,
+    private val tag: String? = null,
     private val progress: (String) -> Unit,
 ) : ToolContext {
     override val runScope: RunScopedValues = FlowRunScope()
     override val tools: ToolInvoker = invoker
     override val quietActions: Boolean = true
     override val origin = com.example.autop.agent.ToolOrigin.FLOW
+    override val originTag: String? = tag
 
     override suspend fun askUser(
         question: String,

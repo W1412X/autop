@@ -63,6 +63,8 @@ public sealed interface TimelineItem {
     /** 计划卡（PlanUpdated 覆盖式更新）。 */
     public data class PlanCard(
         val items: List<PlanItem>,
+        /** 本次更新的说明（update_plan 的 explanation）。 */
+        val explanation: String? = null,
     ) : TimelineItem
 
     /** 工具调用步骤行（StepRow）。 */

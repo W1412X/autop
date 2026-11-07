@@ -291,6 +291,13 @@ private fun PlanRow(
             style = MaterialTheme.typography.labelMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        item.explanation?.let { explanation ->
+            Text(
+                text = explanation,
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         item.items.forEach { plan -> PlanLine(plan = plan) }
     }
 }

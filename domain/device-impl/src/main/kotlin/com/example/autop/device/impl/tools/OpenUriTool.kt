@@ -8,6 +8,8 @@ import com.example.autop.agent.ScreenActionTool
 import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
+import com.example.autop.core.common.AppError
+import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceErrorCodes
@@ -41,12 +43,22 @@ public class OpenUriTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> {
+            // N193 空树降级：打开链接不依赖节点树。
             val snap =
-                when (val got = screenReader.snapshot()) {
+                when (val got = screenReader.snapshotOrDegraded()) {
                     is Outcome.Ok -> got.value
                     is Outcome.Err -> return got
                 }
             val uri = args.str("uri").orEmpty()
+            if (uri.isBlank()) {
+                return Outcome.Err(
+                    AppError(
+                        code = CommonErrorCodes.INVALID_ARGUMENT,
+                        message = "uri 不能为空",
+                        hint = "uri 需给出完整链接（如 https://example.com）",
+                    ),
+                )
+            }
             val extra =
                 mapOf(
                     EXTRA_URI to uri,

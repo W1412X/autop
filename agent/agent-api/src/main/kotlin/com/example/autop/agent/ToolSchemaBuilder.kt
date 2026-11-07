@@ -24,7 +24,7 @@ public object ToolSchemaBuilder {
                 template.body
             } else {
                 prompts.render(spec.descriptionPromptId, spec.descriptionVars).getOrNull()?.text
-                    ?: error("模板 ${template.id} 渲染失败：缺少 ${spec.descriptionVars.keys}")
+                    ?: error("模板 ${template.id} 渲染失败：缺少 ${template.vars - spec.descriptionVars.keys}")
             }
         val props = spec.parameters["properties"]?.jsonObject.orEmpty()
         val described =
