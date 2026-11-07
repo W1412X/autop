@@ -187,7 +187,13 @@ public class LlmScreenParser
             return LlmRequest(
                 system = listOf(SystemPart(systemText)),
                 messages = listOf(userMessage(prepared, region)),
-                tools = listOf(ToolSchema(spec.name, TOOL_DESCRIPTION, spec.parameters)),
+                // 不支持原生 tools 时不发工具，否则请求被拒或调用被当正文。
+                tools =
+                    if (profile.capabilities.tools) {
+                        listOf(ToolSchema(spec.name, TOOL_DESCRIPTION, spec.parameters))
+                    } else {
+                        emptyList()
+                    },
                 toolChoice = if (force) ToolChoice.required(REPORT_ELEMENTS) else ToolChoice.AUTO,
                 maxOutputTokens = profile.maxOutputTokens,
             )
@@ -375,8 +381,10 @@ public class LlmScreenParser
             return provider.takeIf { it.profile.capabilities.vision }
         }
 
+        /** 强制工具调用仅在模型支持原生 tools 时使用；能力位为假时退文本 JSON 提取。 */
         private fun forceToolChoice(profile: ModelProfile): Boolean =
-            !profile.quirks[QUIRK_FORCE_TOOL_CHOICE].equals("false", ignoreCase = true)
+            profile.capabilities.tools &&
+                !profile.quirks[QUIRK_FORCE_TOOL_CHOICE].equals("false", ignoreCase = true)
 
         private fun variantOf(profile: ModelProfile): String {
             val space = if (profile.coordSpace == CoordSpace.IMAGE_PIXELS) "pixels" else "normalized"
