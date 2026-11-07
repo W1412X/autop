@@ -73,15 +73,10 @@ public class ObserveTool
             val mode = ObserveMode.parse(args.str("mode")) ?: return invalidArgOutput(args)
             val full = args.bool("full") == true
             val region =
-                if (mode == ObserveMode.LLM) {
-                    when (val parsed = regionOf(args.obj("region"))) {
-                        is RegionArg.Malformed ->
-                            return toolError(CommonErrorCodes.INVALID_ARGUMENT, MALFORMED_REGION)
-                        is RegionArg.Value -> parsed.rect
-                        is RegionArg.None -> null
-                    }
-                } else {
-                    null
+                when (val parsed = regionFor(mode, args)) {
+                    is RegionArg.Malformed -> return toolError(CommonErrorCodes.INVALID_ARGUMENT, MALFORMED_REGION)
+                    is RegionArg.Value -> parsed.rect
+                    is RegionArg.None -> null
                 }
             val captureDebug = mode == ObserveMode.VISUAL && ctx.debugImages
             if (captureDebug) debug.begin()
@@ -92,8 +87,10 @@ public class ObserveTool
                     is Outcome.Ok -> got.value
                     is Outcome.Err -> return errorOutput(got.error)
                 }
+            val notes = observationNotes(mode, full, args)
             val blocks =
                 listOf<Block>(Block.Text(observed.observation.text)) +
+                    notes.map { Block.Text(it) } +
                     debugImages.map { Block.Image(it.fileRef, "image/png", it.width, it.height, it.alt) }
             return ToolOutput(
                 ok = true,
@@ -109,9 +106,32 @@ public class ObserveTool
                 "mode 必须是 a11y、visual、llm 之一（收到 ${args.str("mode").orEmpty()}）",
             )
 
+        /** region 只对 llm 生效；其余模式一律忽略（不解析，避免误报格式错误）。 */
+        private fun regionFor(
+            mode: ObserveMode,
+            args: JsonObject,
+        ): RegionArg = if (mode == ObserveMode.LLM) regionOf(args.obj("region")) else RegionArg.None
+
         private companion object {
             const val MALFORMED_REGION = "region 必须是 [x1,y1,x2,y2]（0–1000，x1<x2、y1<y2）"
             const val MODE_PROMPT_PREFIX = "tool.observe.mode."
             const val NO_EFFECTIVE_MODE = "（当前无可用观测模式：服务/模型未就绪，所选模式可能返回 device.mode_unavailable）"
         }
     }
+
+/**
+ * 静默忽略参数会让模型误以为生效；这里把语义差异说清楚（观察模式设计文档 §5.9）。
+ * `region` 只对 llm 生效；llm 恒为完整结果，`full` 无意义。
+ */
+internal fun observationNotes(
+    mode: ObserveMode,
+    full: Boolean,
+    args: JsonObject,
+): List<String> =
+    buildList {
+        if (mode != ObserveMode.LLM && args.containsKey("region")) add(REGION_IGNORED)
+        if (mode == ObserveMode.LLM && full) add(FULL_IGNORED)
+    }
+
+internal const val REGION_IGNORED = "region 只对 mode=llm 生效，本次已忽略；a11y/visual 观测始终是整屏。"
+internal const val FULL_IGNORED = "llm 观测固定返回完整结果，full 已忽略。"

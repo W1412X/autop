@@ -46,7 +46,9 @@ public class WaitTool
                 ms != null -> {
                     val waitMs = ms.coerceIn(0, maxMs)
                     delay(waitMs)
-                    textOutput("已等待 $waitMs 毫秒" + if (waitMs < ms) "（超过上限 $maxMs，已截断）" else "")
+                    val truncated = if (waitMs < ms) "（超过上限 $maxMs，已截断）" else ""
+                    val ignored = if (until != null) "；同时给了 until，但按固定等待处理，until 未生效" else ""
+                    textOutput("已等待 $waitMs 毫秒$truncated$ignored")
                 }
                 until == null -> toolError(CommonErrorCodes.INVALID_ARGUMENT, "需要 ms 或 until 参数")
                 !hasCondition(until) ->
@@ -93,7 +95,21 @@ public class WaitTool
             return if (satisfied) {
                 textOutput("等待条件已满足")
             } else {
-                textOutput("等待超时（$timeout 毫秒），条件未满足")
+                textOutput("等待超时（$timeout 毫秒），${unsatisfiedReason(until)}")
+            }
+        }
+
+        /** 超时时区分“确实未满足”和“界面压根读不到/文字条件无法判定”，别让模型误以为条件一定是假。 */
+        private suspend fun unsatisfiedReason(until: JsonObject): String {
+            val needsText = until.str("text_appears") != null || until.str("text_disappears") != null
+            return when (val snap = screenReader.snapshot()) {
+                is Outcome.Err -> "无法读取当前界面（${snap.error.code}），无法判断条件是否满足"
+                is Outcome.Ok ->
+                    if (needsText && snap.value.nodes.isEmpty()) {
+                        "当前节点树为空，文字条件无法判定；可改用 package_is，或先 observe 视觉/screenshot 确认"
+                    } else {
+                        "条件未满足"
+                    }
             }
         }
 

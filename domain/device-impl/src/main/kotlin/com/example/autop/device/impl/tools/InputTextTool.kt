@@ -35,6 +35,7 @@ import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -50,7 +51,21 @@ private data class InputAction(
     val clickDurationMs: Long,
     /** 命中回执行（没给坐标时不带）。 */
     val receipt: String?,
+    /** 命中树不是实时 a11y 时的说明；null=不需要说明。 */
+    val hitNote: String?,
     val replayArgs: JsonObject,
+)
+
+/** 写入结果：模型可见正文 + 实际执行通道/剪贴板处理说明。 */
+private data class WriteOutcome(
+    val text: String,
+    val traces: List<String>,
+)
+
+/** 剪贴板备份：读取是否成功与原始内容。 */
+private data class ClipboardBackup(
+    val clip: ClipData?,
+    val readable: Boolean,
 )
 
 /** 输入工具。 */
@@ -139,6 +154,7 @@ public class InputTextTool
                     clickPoint = entry.clickPoint,
                     clickDurationMs = tapDurationOf(ctx, long = false),
                     receipt = entry.receipt,
+                    hitNote = entry.receipt?.let { receipts.sourceNote(tree) },
                     replayArgs = replayArgsOf(args, entry.hit),
                 )
             return Outcome.Ok(PreparedAction(subject, action))
@@ -155,23 +171,40 @@ public class InputTextTool
             return ClickArg.Coordinate(x, y)
         }
 
-        private suspend fun writeText(input: InputAction): Outcome<String> {
+        /**
+         * 写入文字：焦点输入框优先 ACTION_SET_TEXT；被拒绝时补一次 shell 剪贴板粘贴并说明；
+         * 没有可编辑焦点时直接走 shell，同时提示焦点不确定（可能没写进目标框）。
+         */
+        private suspend fun writeText(input: InputAction): Outcome<WriteOutcome> {
             val focused = gestures.focusedInput()
             return try {
-                if (focused != null && focused.snapshot.flags and NodeFlags.EDITABLE != 0) {
-                    focusedWrite(focused, input)
-                } else {
-                    shellWrite(input)
+                val editable = focused?.takeIf { it.snapshot.flags and NodeFlags.EDITABLE != 0 }
+                when {
+                    editable != null -> {
+                        val done = focusedWrite(editable, input)
+                        if (done != null) {
+                            Outcome.Ok(done)
+                        } else {
+                            shellWrite(input, fallback = "焦点输入框拒绝了 ACTION_SET_TEXT，改用 shell 粘贴")
+                        }
+                    }
+                    focused != null ->
+                        shellWrite(
+                            input,
+                            fallback = "当前焦点节点不是可编辑输入框，改用 shell 粘贴",
+                        )
+                    else -> shellWrite(input, focusNote = FOCUS_UNKNOWN_NOTE)
                 }
             } finally {
                 (focused as? DirectResolvedNode)?.close()
             }
         }
 
+        /** ACTION_SET_TEXT 写入；返回 null 表示应用拒绝，调用方补一次 shell 粘贴。 */
         private suspend fun focusedWrite(
             node: ResolvedNode,
             input: InputAction,
-        ): Outcome<String> {
+        ): WriteOutcome? {
             val current = node.currentText() ?: node.snapshot.text.orEmpty()
             val value = if (input.append) current + input.text else input.text
             val ok =
@@ -180,24 +213,40 @@ public class InputTextTool
                     ACTION_SET_TEXT,
                     mapOf(ACTION_ARGUMENT_SET_TEXT to value),
                 )
-            if (!ok) {
-                return Outcome.Err(AppError(code = DeviceErrorCodes.ACTION_FAILED, message = "写入文字失败"))
-            }
-            return Outcome.Ok(typedText(input) + submitOf(node, input))
+            if (!ok) return null
+            val traces = mutableListOf(executionLine(ExecMethod.NODE_ACTION, "ACTION_SET_TEXT"))
+            val submit = submitOf(node, input, traces)
+            return WriteOutcome(typedText(input) + submit, traces)
         }
 
         /** 焦点节点不可用：shell 剪贴板粘贴；通道未连接返回 `device.not_editable`。 */
-        private suspend fun shellWrite(input: InputAction): Outcome<String> {
+        private suspend fun shellWrite(
+            input: InputAction,
+            fallback: String? = null,
+            focusNote: String? = null,
+        ): Outcome<WriteOutcome> {
             if (shell.state.value != ShellState.Connected) {
+                val why = fallback?.let { "（$it）" }.orEmpty()
                 return Outcome.Err(
                     AppError(
                         code = DeviceErrorCodes.NOT_EDITABLE,
-                        message = "没有找到可输入的输入框",
+                        message = "没有找到可输入的输入框$why，且 shell 注入通道未连接",
                         hint = NOT_EDITABLE_HINT,
                     ),
                 )
             }
-            clipboard().setPrimaryClip(ClipData.newPlainText(CLIP_LABEL, input.text))
+            val backup = runCatching { clipboard().primaryClip }
+            val saved = ClipboardBackup(backup.getOrNull(), backup.isSuccess)
+            val clipboardOk =
+                runCatching { clipboard().setPrimaryClip(ClipData.newPlainText(CLIP_LABEL, input.text)) }.isSuccess
+            if (!clipboardOk) {
+                return Outcome.Err(
+                    AppError(
+                        code = DeviceErrorCodes.ACTION_FAILED,
+                        message = "无法写入剪贴板，未能通过 shell 输入文字",
+                    ),
+                )
+            }
             // N186/N191：注入按键走输入管道，统一经 GestureController 做盾放行＋自身动作标记。
             val ok =
                 if (input.append) {
@@ -208,29 +257,70 @@ public class InputTextTool
                         gestures.shellKeyEvent(KEYCODE_DEL) &&
                         gestures.shellKeyEvent(KEYCODE_PASTE)
                 }
+            val restoreNote = restoreClipboard(saved)
             if (!ok) {
-                return Outcome.Err(AppError(code = DeviceErrorCodes.ACTION_FAILED, message = "通过 shell 输入文字失败"))
+                return Outcome.Err(
+                    AppError(
+                        code = DeviceErrorCodes.ACTION_FAILED,
+                        message = "通过 shell 输入文字失败；$restoreNote",
+                    ),
+                )
             }
-            return Outcome.Ok(typedText(input) + shellSubmitOf(input))
+            val traces = mutableListOf<String>()
+            fallback?.let { traces += "回退：$it" }
+            focusNote?.let { traces += it }
+            traces += executionLine(ExecMethod.SHELL_KEY, CLIPBOARD_PASTE)
+            traces += restoreNote
+            val submit = shellSubmitOf(input, traces)
+            return Outcome.Ok(WriteOutcome(typedText(input) + submit, traces))
         }
 
+        /** 提交：优先 IME_ENTER 节点动作，失败或没有该动作时补一次 shell Enter；结果写进 [traces]。 */
         private suspend fun submitOf(
             node: ResolvedNode,
             input: InputAction,
+            traces: MutableList<String>,
         ): String {
             if (!input.submit) return ""
             val hasImeEnter = node.snapshot.actions.contains(ACTION_IME_ENTER)
-            return when {
-                hasImeEnter && gestures.performNodeAction(node, ACTION_IME_ENTER) -> SUBMIT_OK
-                !hasImeEnter && shell.state.value == ShellState.Connected && gestures.shellKeyEvent(KEYCODE_ENTER) ->
-                    SUBMIT_OK
-                else -> SUBMIT_FAILED
+            if (hasImeEnter && gestures.performNodeAction(node, ACTION_IME_ENTER)) {
+                traces += executionLine(ExecMethod.NODE_ACTION, "ACTION_IME_ENTER")
+                return SUBMIT_OK
+            }
+            if (shell.state.value == ShellState.Connected && gestures.shellKeyEvent(KEYCODE_ENTER)) {
+                traces += executionLine(ExecMethod.SHELL_KEY, "Enter")
+                return SUBMIT_OK
+            }
+            return SUBMIT_FAILED
+        }
+
+        /** shell 路径的提交：直接 shell Enter，结果与通道写进 [traces]。 */
+        private suspend fun shellSubmitOf(
+            input: InputAction,
+            traces: MutableList<String>,
+        ): String {
+            if (!input.submit) return ""
+            return if (gestures.shellKeyEvent(KEYCODE_ENTER)) {
+                traces += executionLine(ExecMethod.SHELL_KEY, "Enter")
+                SUBMIT_OK
+            } else {
+                SUBMIT_FAILED
             }
         }
 
-        private suspend fun shellSubmitOf(input: InputAction): String {
-            if (!input.submit) return ""
-            return if (gestures.shellKeyEvent(KEYCODE_ENTER)) SUBMIT_OK else SUBMIT_FAILED
+        /**
+         * 恢复动作前的剪贴板（避免覆盖用户内容）。粘贴按键是异步的，先等一小段时间再恢复；
+         * 无法读取原内容时明确告知，不假装已恢复。
+         */
+        private suspend fun restoreClipboard(saved: ClipboardBackup): String {
+            if (!saved.readable) return CLIPBOARD_UNREADABLE
+            val clip = saved.clip ?: return CLIPBOARD_EMPTY
+            delay(CLIP_RESTORE_DELAY_MS)
+            return if (runCatching { clipboard().setPrimaryClip(clip) }.isSuccess) {
+                CLIPBOARD_RESTORED
+            } else {
+                CLIPBOARD_RESTORE_FAILED
+            }
         }
 
         private fun typedText(input: InputAction): String =
@@ -248,22 +338,24 @@ public class InputTextTool
         ): ToolOutput {
             val input = action.payload as InputAction
             val pre = epilogue.begin(ctx)
+            val traces = mutableListOf<String>()
             val gesture =
                 input.clickPoint?.let {
-                    if (!gestures.tap(it.x, it.y, input.clickDurationMs)) {
-                        return errorOutput(
-                            AppError(code = DeviceErrorCodes.GESTURE_CANCELLED, message = "点击手势被取消"),
-                        )
-                    }
+                    val result = gestures.tap(it.x, it.y, input.clickDurationMs)
+                    if (!result.ok) return errorOutput(injectFailed("点击输入框"))
+                    traces += executionLine(ExecMethod.GESTURE, channel = result.channel)
                     epilogue.awaitStable(ctx)
                     gestureJson(it.x, it.y, input.clickDurationMs)
                 }
-            val typed =
+            val written =
                 when (val got = writeText(input)) {
                     is Outcome.Err -> return errorOutput(got.error)
                     is Outcome.Ok -> got.value
                 }
-            val text = listOfNotNull(typed, input.receipt).joinToString("\n")
+            traces += written.traces
+            traces += effectLine(ExecEffect.UNKNOWN, EFFECT_UNKNOWN_NOTE)
+            input.hitNote?.let { traces += it }
+            val text = (listOfNotNull(written.text, input.receipt) + traces).joinToString("\n")
             return epilogue.finish(ctx, text, input.waitMs, ReplayInput(ID, pre, input.replayArgs, gesture))
         }
 
@@ -292,10 +384,19 @@ public class InputTextTool
             const val EXTRA_INPUT_LENGTH = "inputLength"
             const val MODE_APPEND = "append"
             const val CLIP_LABEL = "autop"
+            const val CLIPBOARD_PASTE = "剪贴板粘贴"
             const val NOT_EDITABLE_HINT =
                 "没有找到可输入的输入框，请先点击输入框，或在 input_text 里给出输入框的坐标。"
+            const val FOCUS_UNKNOWN_NOTE =
+                "焦点：写入前没有找到可编辑的焦点节点，已按剪贴板粘贴处理；可能没有写进目标输入框，请用 observe 确认。"
+            const val EFFECT_UNKNOWN_NOTE = "输入工具只确认写入动作被接受，不校验框内文字；需要时用 observe 确认。"
+            const val CLIPBOARD_RESTORED = "剪贴板：已恢复动作前的内容"
+            const val CLIPBOARD_EMPTY = "剪贴板：动作前没有可保存的内容，当前保留输入文字"
+            const val CLIPBOARD_UNREADABLE = "剪贴板：无法读取动作前的内容，未恢复（当前为输入文字）"
+            const val CLIPBOARD_RESTORE_FAILED = "剪贴板：动作前的内容恢复失败（当前为输入文字）"
             const val SUBMIT_OK = "，已回车发送"
             const val SUBMIT_FAILED = "；未能提交，请点击发送按钮"
+            const val CLIP_RESTORE_DELAY_MS = 400L
             val MODES = setOf("replace", "append")
             val ACTION_SET_TEXT: Int = AccessibilityNodeInfo.ACTION_SET_TEXT
             val ACTION_IME_ENTER: Int = AccessibilityNodeInfo.AccessibilityAction.ACTION_IME_ENTER.id

@@ -34,6 +34,7 @@ public object ScreenModelBuilder {
         degenerate: Boolean,
         poor: Boolean,
         effectiveModes: List<ObserveMode>,
+        cached: Boolean = false,
     ): ScreenModel =
         of(
             mode = mode,
@@ -54,6 +55,7 @@ public object ScreenModelBuilder {
             degenerate = degenerate,
             poor = poor,
             effectiveModes = effectiveModes,
+            cached = cached,
         )
 
     /** 已建好的窗口 + quality 统计（llm 解析器直接给树）。 */
@@ -76,7 +78,13 @@ public object ScreenModelBuilder {
                 degenerate = a11y && degenerate,
                 poor = a11y && poor,
                 uncertain = uncertain,
-                suggest = suggestOf(mode, degenerate || poor || interactive == 0, effectiveModes),
+                // 只有 a11y 的“信息不足”给模式建议；视觉路径由模型自己判断是否需要更贵的观测。
+                suggest =
+                    if (a11y) {
+                        suggestOf(mode, degenerate || poor || interactive == 0, effectiveModes)
+                    } else {
+                        null
+                    },
             )
         return ScreenModel(mode = mode, windows = windows, quality = quality, cached = cached)
     }

@@ -19,6 +19,7 @@ import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
+import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -100,12 +101,21 @@ public class OpenAppTool
             if (!apps.launch(targetPkg)) {
                 return toolError(DeviceErrorCodes.LAUNCH_FAILED, "打开 $targetPkg 失败")
             }
-            return epilogue.finish(
-                ctx,
-                "已打开 $targetPkg",
-                null,
-                ReplayInput(ID, pre, app.replayArgs, gesture = null),
-            )
+            val out =
+                epilogue.finish(
+                    ctx,
+                    "已发送启动请求 $targetPkg",
+                    null,
+                    ReplayInput(ID, pre, app.replayArgs, gesture = null),
+                )
+            val fg = out.observation?.packageName
+            val note =
+                if (fg == targetPkg) {
+                    "当前前台：$targetPkg（启动已生效）"
+                } else {
+                    "当前前台：${fg ?: "未获取到"}；启动请求已发出，但尚未确认目标应用已到前台。"
+                }
+            return out.copy(content = out.content + Block.Text(note))
         }
 
         /** 名称匹配多个候选：返回列表让模型用 package 参数指定。 */

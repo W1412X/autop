@@ -137,7 +137,7 @@ public class VisualScreenParserImpl
                 } else if (hit != null &&
                     VisualFrameDiff.unchanged(hit.signature, signature, MAX_HAMMING, MIN_SSIM)
                 ) {
-                    hit.tree
+                    hit.tree.copy(cached = true)
                 } else {
                     null
                 }

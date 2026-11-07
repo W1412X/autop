@@ -171,7 +171,14 @@ public class ScreenObserver
             return Outcome.Ok(
                 Prepared(
                     snapshot = snap,
-                    serialized = serializer.serialize(snap, ObserveMode.VISUAL, ctx.config, effective),
+                    serialized =
+                        serializer.serialize(
+                            snap,
+                            ObserveMode.VISUAL,
+                            ctx.config,
+                            effective,
+                            cached = tree.cached,
+                        ),
                     mode = ObserveMode.VISUAL,
                 ),
             )

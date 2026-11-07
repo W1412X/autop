@@ -19,6 +19,7 @@ import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
+import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -76,16 +77,26 @@ public class GlobalActionTool
         ): ToolOutput {
             val payload = action.payload as GlobalActionPayload
             val pre = epilogue.begin(ctx)
-            val ok = gestures.globalAction(payload.action)
-            if (!ok) {
+            val result = gestures.globalAction(payload.action)
+            if (!result.ok) {
                 return toolError(DeviceErrorCodes.ACTION_FAILED, "全局动作 ${payload.action.name} 执行失败")
             }
-            return epilogue.finish(
-                ctx,
-                "已执行 ${payload.action.name}",
-                null,
-                ReplayInput(ID, pre, payload.replayArgs, gesture = null),
-            )
+            val out =
+                epilogue.finish(
+                    ctx,
+                    "已执行 ${payload.action.name}",
+                    null,
+                    ReplayInput(ID, pre, payload.replayArgs, gesture = null),
+                )
+            val notes =
+                listOf(
+                    executionLine(ExecMethod.GLOBAL_ACTION, channel = result.channel),
+                    effectLine(
+                        ExecEffect.UNKNOWN,
+                        "已送出 ${payload.action.name} 事件，但没有校验界面是否响应；需要时用 observe 确认当前界面。",
+                    ),
+                )
+            return out.copy(content = out.content + notes.map { Block.Text(it) })
         }
 
         private fun actionOf(name: String): GlobalAction? =

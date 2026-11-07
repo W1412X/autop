@@ -1,7 +1,7 @@
 /**
  * `tool.scroll`（docs/design/observation-modes-coordinate-actions §5.1；ADR-0015）：
  * 一步 = 一次人手滑动，距离由可滚动容器的尺寸决定；`steps` 连续多步，内容到头时提前停止。
- * 观测与行动都来自 a11y 且容器支持方向化滚动动作时走节点动作，否则用容器内的手势。
+ * 动作快照有实时 a11y 节点树且目标支持方向化滚动动作时走节点动作，否则用容器内的手势。
  * `x,y` 为滚动区域内一点（缺省内容区中心）；方向沿用 `up` = 手指从下往上滑。
  */
 package com.example.autop.device.impl.tools
@@ -12,10 +12,10 @@ import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.AppError
+import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.DeviceScrollSection
-import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.GestureController
 import com.example.autop.device.Point
 import com.example.autop.device.Rect
@@ -52,6 +52,8 @@ private data class ScrollAction(
     val steps: Int,
     /** 模型请求的步数（大于 [steps] 时被截断，收尾文本要说明）。 */
     val requestedSteps: Int,
+    /** 传了已废弃的 amount（收尾文本说明它被忽略）。 */
+    val amountIgnored: Boolean,
     val replayArgs: JsonObject,
 )
 
@@ -61,6 +63,8 @@ private data class StepResult(
     val moved: Boolean?,
     val gesture: JsonObject?,
     val newlyBlocked: Boolean,
+    /** 这一步实际怎么执行的回执（模型可见）。 */
+    val trace: String,
     val error: AppError? = null,
 )
 
@@ -128,6 +132,7 @@ public class ScrollTool
                     direction = direction,
                     steps = requested.coerceIn(1, maxSteps),
                     requestedSteps = requested,
+                    amountIgnored = args.containsKey("amount"),
                     replayArgs = replayArgsOf(args, receipts.describe(tree, Point(x, y))),
                 )
             return Outcome.Ok(PreparedAction(subject, action))
@@ -145,18 +150,20 @@ public class ScrollTool
             var reachedEnd = false
             var blocked = false
             var firstGesture: JsonObject? = null
+            val traces = mutableListOf<String>()
             while (done < scroll.steps && !reachedEnd) {
                 if (done > 0) snap = screenReader.snapshotOrDegraded().let { (it as? Outcome.Ok)?.value } ?: snap
                 val step = runStep(ctx, scroll, snap, before)
                 if (step.error != null) return errorOutput(step.error)
                 done += 1
+                traces += "第 $done 步 ${step.trace}"
                 blocked = blocked || step.newlyBlocked
                 if (done == 1) firstGesture = step.gesture
                 reachedEnd = step.moved == false
                 if (before != null && !reachedEnd && done < scroll.steps) before = epilogue.fingerprintNow() ?: before
             }
             val replay = ReplayInput(ID, pre, scroll.replayArgs, firstGesture)
-            val out = epilogue.finish(ctx, resultText(scroll, done, reachedEnd), null, replay)
+            val out = epilogue.finish(ctx, resultText(scroll, done, reachedEnd, traces), null, replay)
             return if (blocked) out.copy(content = out.content + Block.Text(BLOCKED_TEXT)) else out
         }
 
@@ -167,21 +174,39 @@ public class ScrollTool
             snap: ScreenSnapshot,
             before: String?,
         ): StepResult {
+            val label = NodeActionIds.scrollLabelOf(scroll.direction)
             val base = contentAreas.base()
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
-            val anchor = mapper.toScreen(scroll.anchor.x, scroll.anchor.y) ?: return StepResult(null, null, false)
+            val anchor = mapper.toScreen(scroll.anchor.x, scroll.anchor.y)
+            if (anchor == null) {
+                return StepResult(
+                    null,
+                    null,
+                    false,
+                    "",
+                    AppError(CommonErrorCodes.INVALID_ARGUMENT, "滚动坐标换算失败"),
+                )
+            }
             val route = router.attempt(nodeRequest(ctx, snap, anchor, scroll.direction))
             if (route is NodeRoute.Done) {
                 val moved = movedAfterAction(ctx, snap, before)
                 router.afterNodeDone(route.packageName, moved)
-                if (moved != false) return StepResult(moved, null, false)
+                if (moved != false) {
+                    return StepResult(moved, null, false, nodeTrace(label, moved))
+                }
             }
             val area = base ?: Rect(0, 0, snap.screenWidth, snap.screenHeight)
             val container =
                 router.scrollContainer(ctx, snap, anchor)?.let { ScrollGeometry.intersectOrSelf(it, area) } ?: area
-            val gesture =
+            val shot =
                 swipe(ctx, container, anchor, scroll.direction)
-                    ?: return StepResult(null, null, false, AppError(DeviceErrorCodes.GESTURE_CANCELLED, "滚动手势被取消"))
+                    ?: return StepResult(
+                        null,
+                        null,
+                        false,
+                        "",
+                        injectFailed("滚动手势"),
+                    )
             val moved = movedAfterAction(ctx, snap, before)
             val learnPkg =
                 when (route) {
@@ -189,8 +214,24 @@ public class ScrollTool
                     is NodeRoute.Rejected -> route.packageName
                     is NodeRoute.Skipped -> route.packageName
                 }
-            return StepResult(moved, gesture, router.afterGesture(ctx, learnPkg, moved))
+            val fallback =
+                if (route is NodeRoute.Done) {
+                    "节点动作无变化（$label），补一次手势"
+                } else {
+                    routeFallback(route, label)
+                }
+            val trace =
+                executionLine(ExecMethod.GESTURE, channel = shot.result.channel, fallback = fallback) +
+                    effectSuffix(moved)
+            return StepResult(moved, shot.replay, router.afterGesture(ctx, learnPkg, moved), trace)
         }
+
+        private fun nodeTrace(
+            label: String,
+            moved: Boolean?,
+        ): String = executionLine(ExecMethod.NODE_ACTION, label) + effectSuffix(moved)
+
+        private fun effectSuffix(moved: Boolean?): String = "；${effectLine(effectOf(moved))}"
 
         private fun nodeRequest(
             ctx: ToolContext,
@@ -200,21 +241,22 @@ public class ScrollTool
         ): NodeRouteRequest =
             NodeRouteRequest(ctx, snap, anchor, NodeKind.SCROLL, NodeActionIds.scrollActionOf(direction))
 
-        /** 执行容器内的单步手势；返回手势 JSON，被取消返回 null。 */
+        /** 执行容器内的单步手势；返回实际通道与回放参数，注入未送达返回 null。 */
         private suspend fun swipe(
             ctx: ToolContext,
             container: Rect,
             anchor: Point,
             direction: ScrollDirection,
-        ): JsonObject? {
+        ): GestureShot? {
             val cfg = ctx.config[DeviceConfig.SCROLL]
             val step = ScrollGeometry.step(container, anchor, direction, paramsOf(cfg))
             val (from, to) =
                 SwipeJitter.endpoints(step.from, step.to, cfg.endpointJitterPx, container) {
                     ThreadLocalRandom.current().nextDouble()
                 }
-            val ok = gestures.swipe(from.x, from.y, to.x, to.y, step.durationMs, cfg.trajectoryJitterPx)
-            return if (ok) gestureJson(from.x, from.y, to.x, to.y, step.durationMs) else null
+            val result = gestures.swipe(from.x, from.y, to.x, to.y, step.durationMs, cfg.trajectoryJitterPx)
+            if (!result.ok) return null
+            return GestureShot(result, gestureJson(from.x, from.y, to.x, to.y, step.durationMs))
         }
 
         private fun paramsOf(cfg: DeviceScrollSection): ScrollGeometryParams =
@@ -245,6 +287,7 @@ public class ScrollTool
             scroll: ScrollAction,
             done: Int,
             reachedEnd: Boolean,
+            traces: List<String>,
         ): String {
             val steps = if (done > 1) "（共 $done 步）" else ""
             val end = if (reachedEnd) "，已到头，继续向该方向滚动不会有新内容" else ""
@@ -254,7 +297,9 @@ public class ScrollTool
                 } else {
                     ""
                 }
-            return "已向${directionName(scroll.direction)}滚动$steps$end$clamped"
+            val ignored = if (scroll.amountIgnored) "；amount 已废弃，本次已忽略（距离由容器尺寸决定）" else ""
+            val detail = traces.takeIf { it.isNotEmpty() }?.joinToString("\n", prefix = "\n") ?: ""
+            return "已向${directionName(scroll.direction)}滚动$steps$end$clamped$ignored$detail"
         }
 
         private fun directionName(direction: ScrollDirection): String =

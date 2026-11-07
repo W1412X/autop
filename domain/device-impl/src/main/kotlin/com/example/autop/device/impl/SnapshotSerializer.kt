@@ -38,7 +38,8 @@ public class SnapshotSerializer
             mode: ObserveMode,
             config: ConfigSnapshot,
             effectiveModes: List<ObserveMode>,
+            cached: Boolean = false,
         ): SerializedScreen =
             ScreenSerializer(rulesLoader.get(), configOf(config))
-                .serialize(snap, mode, { redactor.redact(it) }, appIdentity.packageName, effectiveModes)
+                .serialize(snap, mode, { redactor.redact(it) }, appIdentity.packageName, effectiveModes, cached)
     }

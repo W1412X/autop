@@ -10,10 +10,8 @@ import com.example.autop.agent.ScreenActionTool
 import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
-import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.DeviceConfig
-import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.GestureController
 import com.example.autop.device.Point
 import com.example.autop.device.Rect
@@ -24,8 +22,10 @@ import com.example.autop.device.core.SwipeJitter
 import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.CoordSpaceResolver
 import com.example.autop.device.impl.PolicySubjectBuilder
+import com.example.autop.device.impl.nodeaction.NodeActionRouter
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
+import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.ThreadLocalRandom
 import javax.inject.Inject
@@ -33,16 +33,20 @@ import javax.inject.Singleton
 
 /** prepare 生成的执行载荷（起止点为抖动后的屏幕像素）。 */
 internal data class SwipeGesture(
+    val snapshot: ScreenSnapshot,
     val from: Point,
     val to: Point,
     val durationMs: Long,
     val trajectoryJitterPx: Int,
     val resultText: String,
+    /** 命中树不是实时 a11y 时的说明；null=不需要说明。 */
+    val hitNote: String?,
     val replayArgs: JsonObject,
 )
 
 /** 滑动手势工具。 */
 @Singleton
+@Suppress("LongParameterList") // 装配类：读屏/手势/策略/收尾/坐标/内容区/回执/节点路由均为滑动必需
 public class SwipeTool
     @Inject
     constructor(
@@ -53,6 +57,7 @@ public class SwipeTool
         private val coords: CoordSpaceResolver,
         private val contentAreas: ContentAreaProvider,
         private val receipts: HitReceiptBuilder,
+        private val router: NodeActionRouter,
     ) : ScreenActionTool {
         override val id: String = TOOL_ID
 
@@ -116,12 +121,14 @@ public class SwipeTool
                 )
             val gesture =
                 SwipeGesture(
+                    snapshot = snap,
                     from = jittered.first,
                     to = jittered.second,
                     durationMs = durationMs,
                     trajectoryJitterPx = cfg.trajectoryJitterPx,
                     resultText =
                         "已滑动 (${start.x}, ${start.y}) → (${end.x}, ${end.y})\n${receipts.receipt(tree, startModel)}",
+                    hitNote = receipts.sourceNote(tree),
                     replayArgs = replayArgsOf(args, hit),
                 )
             return Outcome.Ok(PreparedAction(subject, gesture))
@@ -133,7 +140,7 @@ public class SwipeTool
         ): ToolOutput {
             val swipe = action.payload as SwipeGesture
             val pre = epilogue.begin(ctx)
-            val ok =
+            val result =
                 gestures.swipe(
                     swipe.from.x,
                     swipe.from.y,
@@ -142,13 +149,36 @@ public class SwipeTool
                     swipe.durationMs,
                     swipe.trajectoryJitterPx,
                 )
-            if (!ok) {
-                return errorOutput(AppError(code = DeviceErrorCodes.GESTURE_CANCELLED, message = "滑动手势被取消"))
-            }
+            if (!result.ok) return errorOutput(injectFailed("滑动"))
             val gesture =
                 gestureJson(swipe.from.x, swipe.from.y, swipe.to.x, swipe.to.y, swipe.durationMs)
-            return epilogue.finish(ctx, swipe.resultText, null, ReplayInput(TOOL_ID, pre, swipe.replayArgs, gesture))
+            val out = epilogue.finish(ctx, swipe.resultText, null, ReplayInput(TOOL_ID, pre, swipe.replayArgs, gesture))
+            val moved = movedAfter(ctx, swipe.snapshot, pre?.fingerprint)
+            val notes =
+                buildList {
+                    add(executionLine(ExecMethod.GESTURE, channel = result.channel))
+                    add(effectLine(effectOf(moved), effectNoteOf(moved)))
+                    swipe.hitNote?.let { add(it) }
+                }
+            return out.copy(content = out.content + notes.map { Block.Text(it) })
         }
+
+        /** 与 tap 同一口径：非 a11y 来源或没有节点树时不判断效果。 */
+        private suspend fun movedAfter(
+            ctx: ToolContext,
+            snapshot: ScreenSnapshot,
+            preFingerprint: String?,
+        ): Boolean? {
+            if (preFingerprint == null) return null
+            return router.movedOrNull(ctx, snapshot, preFingerprint, epilogue.fingerprintNow())
+        }
+
+        private fun effectNoteOf(moved: Boolean?): String? =
+            when (moved) {
+                false -> "滑动后界面没有变化；如果预期会翻页/滚动，先 observe 确认是否已经到头或手势没被接收。"
+                null -> "滑动是相对位移，当前观测无法比较动作前后的屏幕；需要时用 observe 或 screenshot 复核。"
+                true -> null
+            }
     }
 
 private const val TOOL_ID = "tool.swipe"

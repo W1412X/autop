@@ -14,6 +14,7 @@ import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.device.GestureController
 import com.example.autop.device.GlobalAction
+import com.example.autop.device.InjectionResult
 import com.example.autop.device.NodeActionOutcome
 import com.example.autop.device.Rect
 import com.example.autop.device.ResolvedNode
@@ -82,10 +83,10 @@ public class GestureControllerImpl
             x: Int,
             y: Int,
             durationMs: Long,
-        ): Boolean {
-            if (shellTap(x, y, durationMs)) return true
+        ): InjectionResult {
+            if (shellTap(x, y, durationMs)) return InjectionResult.shell(ok = true)
             val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
-            return stroke(path, durationMs, OP_TAP, pointRect(x, y))
+            return InjectionResult.accessibility(stroke(path, durationMs, OP_TAP, pointRect(x, y)))
         }
 
         /**
@@ -99,10 +100,12 @@ public class GestureControllerImpl
             toY: Int,
             durationMs: Long,
             jitterPx: Int,
-        ): Boolean {
-            if (shellSwipe(fromX, fromY, toX, toY, durationMs)) return true
+        ): InjectionResult {
+            if (shellSwipe(fromX, fromY, toX, toY, durationMs)) return InjectionResult.shell(ok = true)
             val path = buildSwipePath(fromX, fromY, toX, toY, jitterPx)
-            return stroke(path, durationMs, OP_SWIPE, spanRect(fromX, fromY, toX, toY))
+            return InjectionResult.accessibility(
+                stroke(path, durationMs, OP_SWIPE, spanRect(fromX, fromY, toX, toY)),
+            )
         }
 
         /** 当前焦点输入框；没有返回 null（§5.3）。 */
@@ -245,16 +248,17 @@ public class GestureControllerImpl
          * 全局动作。优先走 shell keyevent 注入（真实按键事件，应用无法屏蔽），
          * 失败回落无障碍 performGlobalAction。
          */
-        override suspend fun globalAction(action: GlobalAction): Boolean {
+        override suspend fun globalAction(action: GlobalAction): InjectionResult {
             // 优先 shell keyevent
             val keyCode = keyCodeOf(action)
             if (keyCode != null && shellKeyEvent(keyCode)) {
                 logger.i(TAG, EVENT_CHANNEL, "op" to OP_GLOBAL_ACTION, "channel" to CHANNEL_SHELL, "keyCode" to keyCode)
-                return true
+                return InjectionResult.shell(ok = true)
             }
             // 回落无障碍 API
             logger.i(TAG, EVENT_CHANNEL, "op" to OP_GLOBAL_ACTION, "channel" to CHANNEL_A11Y)
-            return shielded(null) { selfAction { holder.current()?.performGlobalAction(globalId(action)) == true } }
+            val ok = shielded(null) { selfAction { holder.current()?.performGlobalAction(globalId(action)) == true } }
+            return InjectionResult.accessibility(ok)
         }
 
         /** shell 注入按键（input_text 的粘贴/回车等）：统一走盾放行＋自身动作标记。 */

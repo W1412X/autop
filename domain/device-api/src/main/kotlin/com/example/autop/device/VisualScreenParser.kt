@@ -21,6 +21,8 @@ public data class VisualFrame(
 public data class VisualTree(
     val rootIdx: Int,
     val nodes: List<NodeSnapshot>,
+    /** 帧差缓存命中（屏幕与上次视觉解析一致），观测文本据此标注 `cached`。 */
+    val cached: Boolean = false,
 )
 
 /** 视觉屏幕解析器：截图 → 伪节点树。 */

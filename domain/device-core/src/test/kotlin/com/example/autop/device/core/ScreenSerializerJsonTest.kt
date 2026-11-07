@@ -144,6 +144,38 @@ class ScreenSerializerJsonTest {
         assertThat(result.observation.text).endsWith("[device.observation.suggest_mode]visual")
     }
 
+    @Test
+    fun `visual cached result is labelled and never suggests another mode`() {
+        val result =
+            ScreenSerializer(TestScreens.rules, TestScreens.config())
+                .serialize(
+                    screen(),
+                    ObserveMode.VISUAL,
+                    { RedactionMode.NONE },
+                    TestScreens.OWN_PACKAGE,
+                    effectiveModes = listOf(ObserveMode.VISUAL, ObserveMode.LLM),
+                    cached = true,
+                )
+        val screenJson =
+            Json
+                .parseToJsonElement(result.observation.text)
+                .jsonObject
+                .getValue("screen")
+                .jsonObject
+        assertThat(screenJson.getValue("cached").jsonPrimitive.content).isEqualTo("true")
+        assertThat(screenJson.getValue("quality").jsonObject).doesNotContainKey("suggest")
+        assertThat(result.observation.text).doesNotContain("[device.observation.suggest_mode]")
+    }
+
+    @Test
+    fun `a11y result is not labelled cached`() {
+        val screenJson =
+            jsonOf(screen())
+                .getValue("screen")
+                .jsonObject
+        assertThat(screenJson).doesNotContainKey("cached")
+    }
+
     private fun screen(
         contentArea: Rect? = null,
         screenHeight: Int = 1920,

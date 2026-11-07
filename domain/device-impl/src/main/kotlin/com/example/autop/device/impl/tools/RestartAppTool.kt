@@ -26,6 +26,7 @@ import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
 import com.example.autop.device.impl.popup.PopupRulesLoader
+import com.example.autop.llm.Block
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
@@ -102,13 +103,22 @@ public class RestartAppTool
             if (!apps.launch(pkg)) {
                 return toolError(DeviceErrorCodes.LAUNCH_FAILED, "重新打开 $pkg 失败")
             }
-            return epilogue.finish(
-                ctx,
-                "已重启 $pkg",
-                null,
-                // 回放参数带上解析后的包名（含缺省时取的前台应用），否则回放会重启到别的应用。
-                ReplayInput(ID, pre, buildJsonObject { put("package", pkg) }, gesture = null),
-            )
+            val out =
+                epilogue.finish(
+                    ctx,
+                    "已发送重启请求 $pkg（force-stop 已执行，随后请求启动）",
+                    null,
+                    // 回放参数带上解析后的包名（含缺省时取的前台应用），否则回放会重启到别的应用。
+                    ReplayInput(ID, pre, buildJsonObject { put("package", pkg) }, gesture = null),
+                )
+            val fg = out.observation?.packageName
+            val note =
+                if (fg == pkg) {
+                    "当前前台：$pkg（重启已生效）"
+                } else {
+                    "当前前台：${fg ?: "未获取到"}；重启请求已发出，但尚未确认应用已回到前台。"
+                }
+            return out.copy(content = out.content + Block.Text(note))
         }
 
         private companion object {

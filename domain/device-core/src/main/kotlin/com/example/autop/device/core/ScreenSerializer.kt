@@ -32,6 +32,7 @@ public class ScreenSerializer(
         redaction: (WindowSnapshot) -> RedactionMode,
         ownPackage: String,
         effectiveModes: List<ObserveMode> = listOf(mode),
+        cached: Boolean = false,
     ): SerializedScreen {
         val index = SnapshotIndex(snapshot)
         val geometry = TapPointResolver.Geometry(snapshot)
@@ -61,6 +62,7 @@ public class ScreenSerializer(
                 degenerate = degenerate(snapshot),
                 poor = poor,
                 effectiveModes = effectiveModes,
+                cached = cached,
             )
         val suggestion =
             model.quality.suggest?.let {

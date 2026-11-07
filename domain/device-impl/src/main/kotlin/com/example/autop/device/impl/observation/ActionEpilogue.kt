@@ -85,11 +85,22 @@ public class ActionEpilogue
             val mode = ctx.deviceHistory().lastMode ?: ObserveMode.A11Y
             if (mode == ObserveMode.LLM) {
                 val post = probe.sample().getOrNull()
-                val changed =
-                    post != null && replay.pre != null && post.fingerprint != replay.pre.fingerprint
+                // 三态：true/false 是能比较出的结论；null 表示缺少前后状态，不能当成“没变化”。
+                val changed: Boolean? =
+                    if (post != null && replay.pre != null) {
+                        post.fingerprint != replay.pre.fingerprint
+                    } else {
+                        null
+                    }
                 val line =
                     buildJsonObject {
-                        put("screen_changed", changed)
+                        if (changed == null) {
+                            put("screen_changed", "unknown")
+                            put("note", "动作前后缺少可比较的屏幕状态，无法判断是否变化；需要时用 observe 或 screenshot 复核")
+                        } else {
+                            put("screen_changed", changed)
+                        }
+                        put("mode", "llm")
                         put("app", post?.packageName.orEmpty())
                         put("page", post?.activity?.substringAfterLast('.').orEmpty())
                     }.toString()

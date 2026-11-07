@@ -1,8 +1,8 @@
 /**
  * `tool.tap`（docs/design/observation-modes-coordinate-actions §5.1、§5.2；ADR-0015）：
  * 按内容区 0–1000 坐标点击或长按；按压时长与落点抖动由配置内部处理，不对模型开放。
- * 观测与行动都来自 a11y 时优先对落点处的节点执行 ACTION_CLICK / ACTION_LONG_CLICK，
- * 否则、或节点动作被拒时，用坐标手势。结果附命中回执（§5.4），回放参数带 `_hit`（§5.7）。
+ * 动作快照有实时无障碍节点树时优先对落点处的节点执行 ACTION_CLICK / ACTION_LONG_CLICK，
+ * 否则、或节点动作被拒时，用坐标手势。结果附命中回执（§5.4）、执行/效果回执（§5.9），回放参数带 `_hit`（§5.7）。
  */
 package com.example.autop.device.impl.tools
 
@@ -11,10 +11,10 @@ import com.example.autop.agent.ScreenActionTool
 import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
-import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
-import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.GestureController
+import com.example.autop.device.InjectionChannel
+import com.example.autop.device.InjectionResult
 import com.example.autop.device.Point
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ScreenSnapshot
@@ -48,6 +48,8 @@ private data class TapAction(
     val hitKnown: Boolean,
     /** 有节点树但落点不在任何节点内（回执 `hit:none`）。 */
     val hitNone: Boolean,
+    /** 命中树不是实时 a11y 时的说明；null=不需要说明。 */
+    val hitNote: String?,
     val resultText: String,
     val replayArgs: JsonObject,
 )
@@ -120,6 +122,7 @@ public class TapTool
                     waitMs = args.long("wait_ms"),
                     hitKnown = tree != null,
                     hitNone = tree != null && receipts.node(tree, modelPoint) == null,
+                    hitNote = receipts.sourceNote(tree),
                     resultText = resultTextOf(x, y, long, receipts.receipt(tree, actualModel)),
                     replayArgs = replayArgsOf(args, receipts.describe(tree, actualModel)),
                 )
@@ -137,11 +140,36 @@ public class TapTool
                 if (route is NodeRoute.Done) {
                     null
                 } else {
-                    tapGesture(tap) ?: return errorOutput(AppError(DeviceErrorCodes.GESTURE_CANCELLED, "点击手势被取消"))
+                    tapGesture(tap) ?: return errorOutput(injectFailed("点击"))
                 }
-            val out = epilogue.finish(ctx, tap.resultText, tap.waitMs, ReplayInput(ID, pre, tap.replayArgs, gesture))
+            val out =
+                epilogue.finish(
+                    ctx,
+                    tap.resultText,
+                    tap.waitMs,
+                    ReplayInput(ID, pre, tap.replayArgs, gesture?.replay),
+                )
             val moved = movedAfter(ctx, tap.snapshot, pre?.fingerprint)
-            return annotate(out, learn(ctx, route, moved), moved, tap.hitKnown, tap.hitNone)
+            val execution = executionText(tap, route, gesture?.result)
+            return annotate(out, execution, learn(ctx, route, moved), moved, tap)
+        }
+
+        /** 实际执行方式：节点动作，或带通道与回退原因的坐标手势。 */
+        private fun executionText(
+            tap: TapAction,
+            route: NodeRoute,
+            gesture: InjectionResult?,
+        ): String {
+            val label = if (tap.long) ACTION_LONG_CLICK else ACTION_CLICK
+            return if (route is NodeRoute.Done) {
+                executionLine(ExecMethod.NODE_ACTION, label)
+            } else {
+                executionLine(
+                    ExecMethod.GESTURE,
+                    channel = gesture?.channel ?: InjectionChannel.NONE,
+                    fallback = routeFallback(route, label),
+                )
+            }
         }
 
         private fun routeRequest(
@@ -178,33 +206,40 @@ public class TapTool
                 is NodeRoute.Skipped -> router.afterGesture(ctx, route.packageName, moved)
             }
 
-        private suspend fun tapGesture(tap: TapAction): JsonObject? =
-            if (gestures.tap(tap.point.x, tap.point.y, tap.durationMs)) {
-                gestureJson(tap.point.x, tap.point.y, tap.durationMs)
-            } else {
-                null
-            }
+        private suspend fun tapGesture(tap: TapAction): GestureShot? {
+            val result = gestures.tap(tap.point.x, tap.point.y, tap.durationMs)
+            if (!result.ok) return null
+            return GestureShot(result, gestureJson(tap.point.x, tap.point.y, tap.durationMs))
+        }
 
-        /** 补充显式提示：落点未命中 / 命中无法判断 / 效果不可验证 / 无变化 / 新判定屏蔽。 */
+        /** 补充显式回执：实际执行方式 / 落点未命中 / 效果三态 / 新判定屏蔽。 */
         private fun annotate(
             out: ToolOutput,
+            execution: String,
             newlyBlocked: Boolean,
             moved: Boolean?,
-            hitKnown: Boolean,
-            hitNone: Boolean,
+            tap: TapAction,
         ): ToolOutput {
             val notes =
                 buildList {
+                    add(execution)
+                    add(effectLine(effectOf(moved), effectNoteOf(moved)))
                     when {
-                        !hitKnown -> add(HIT_UNKNOWN_TEXT)
-                        hitNone -> add(HIT_NONE_TEXT)
+                        !tap.hitKnown -> add(HIT_UNKNOWN_TEXT)
+                        tap.hitNone -> add(HIT_NONE_TEXT)
                     }
-                    if (moved == false) add(NO_EFFECT_TEXT)
-                    if (moved == null) add(EFFECT_UNVERIFIED_TEXT)
+                    tap.hitNote?.let { add(it) }
                     if (newlyBlocked) add(BLOCKED_TEXT)
                 }
-            return if (notes.isEmpty()) out else out.copy(content = out.content + notes.map { Block.Text(it) })
+            return out.copy(content = out.content + notes.map { Block.Text(it) })
         }
+
+        private fun effectNoteOf(moved: Boolean?): String? =
+            when (moved) {
+                false -> NO_EFFECT_NOTE
+                null -> EFFECT_UNKNOWN_NOTE
+                true -> null
+            }
 
         private fun resultTextOf(
             x: Int,
@@ -219,24 +254,26 @@ public class TapTool
         private companion object {
             const val ID = "tool.tap"
 
+            const val ACTION_CLICK = "ACTION_CLICK"
+            const val ACTION_LONG_CLICK = "ACTION_LONG_CLICK"
+
             /** 指纹未变：提示模型换方式，而不是把它当成失败（有些点击本就不改变页面）。 */
-            val NO_EFFECT_TEXT =
-                "屏幕没有变化（${DeviceErrorCodes.NO_EFFECT}）：这次点击可能没有生效。" +
-                    "可以先 wait 等页面加载，或换一个位置，或用 observe 重新确认界面后再点。"
+            const val NO_EFFECT_NOTE =
+                "这次点击可能没有生效。可以先 wait 等页面加载，或换一个位置，" +
+                    "或用 observe 重新确认界面后再点。"
 
             /** 有节点树但落点不在任何节点内：坐标多半偏了，提醒先核对而不是重复点。 */
             const val HIT_NONE_TEXT =
                 "落点没有命中任何元素（hit:none）：坐标可能偏了或在空白区。" +
-                    "先用 screenshot 核对位置再点，或改用节点 id 点击。"
+                    "先用 screenshot 或 observe 核对位置，再按元素的 at 重新点击。"
 
             /** 连节点树都没有（应用屏蔽无障碍）：命中与否无法判断，不要把它当成成功。 */
             const val HIT_UNKNOWN_TEXT =
                 "当前没有可用的节点树（无障碍节点可能被应用屏蔽），无法判断落点是否命中元素；可用 screenshot 核对。"
 
             /** 动作前后缺少可比较屏幕状态（盲操作/视觉观测）：效果无法验证。 */
-            const val EFFECT_UNVERIFIED_TEXT =
-                "无法确认这次点击是否生效（动作前后缺少可比较的屏幕状态）；" +
-                    "不要盲目重复相同坐标，先用 screenshot 或 observe 复核界面。"
+            const val EFFECT_UNKNOWN_NOTE =
+                "动作前后缺少可比较的屏幕状态；不要盲目重复相同坐标，先用 screenshot 或 observe 复核界面。"
 
             /** 新判定应用屏蔽节点动作：告知模型，之后工具自动改用手势，模型无需处理。 */
             const val BLOCKED_TEXT = "该应用不响应无障碍节点操作，已记录；之后对它的点击、长按、滚动会自动改用手势。"

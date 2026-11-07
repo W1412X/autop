@@ -17,6 +17,7 @@ import com.example.autop.device.ScreenReader
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
+import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -78,7 +79,13 @@ public class OpenUriTool
                 return toolError(DeviceErrorCodes.URI_FAILED, "无法打开 $uri")
             }
             val replayArgs = buildJsonObject { put(EXTRA_URI, uri) }
-            return epilogue.finish(ctx, "已打开 $uri", null, ReplayInput(ID, pre, replayArgs, gesture = null))
+            val out = epilogue.finish(ctx, "已发送打开请求 $uri", null, ReplayInput(ID, pre, replayArgs, gesture = null))
+            val fg = out.observation?.packageName
+            return out.copy(
+                content =
+                    out.content +
+                        Block.Text("当前前台：${fg ?: "未获取到"}；链接已交给系统处理，是否打开成功以当前界面为准。"),
+            )
         }
 
         private companion object {

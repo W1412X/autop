@@ -9,6 +9,7 @@ import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.DeviceConfig
+import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NodeFlags
 import com.example.autop.device.NodeSnapshot
 import com.example.autop.device.Point
@@ -46,6 +47,14 @@ internal fun errorOutput(error: AppError): ToolOutput {
 
 /** 成功文本输出。 */
 internal fun textOutput(text: String): ToolOutput = ToolOutput(ok = true, content = listOf(Block.Text(text)))
+
+/** 坐标手势注入失败（shell 与无障碍通道都没有送达），不是“用户/系统取消了手势”。 */
+internal fun injectFailed(action: String): AppError =
+    AppError(
+        code = DeviceErrorCodes.ACTION_FAILED,
+        message = "${action}注入失败：shell 与无障碍通道均未送达",
+        hint = "检查无线调试连接与无障碍服务是否可用，再重试。",
+    )
 
 /** 参数缺失/类型错误（docs/design/observation-modes-coordinate-actions §5.1）。 */
 internal fun invalidArg(message: String): Outcome.Err =

@@ -66,6 +66,14 @@ public class HitReceiptBuilder
             point: Point,
         ): String = HitResolver.receipt(point, tree?.model, tree?.from)
 
+        /** 命中树不是实时 a11y 时，明确告诉模型回执只是参考（视觉伪树/旧树）。 */
+        internal fun sourceNote(tree: HitTree?): String? =
+            tree
+                ?.takeIf { it.from != ObserveMode.A11Y }
+                ?.let {
+                    "命中回执来自最近一次 ${it.from.id} 观测树，不是实时无障碍树；坐标命中仅供参考。"
+                }
+
         /** 回放参数里的 `_hit` 描述（未命中时为 null）。 */
         internal fun describe(
             tree: HitTree?,
