@@ -5,6 +5,7 @@
  */
 package com.example.autop.agent.runtime
 
+import com.example.autop.agent.AgentErrorCodes
 import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.ContextRequest
 import com.example.autop.agent.RenderItem
@@ -29,6 +30,7 @@ import com.example.autop.core.prompt.PromptSource
 import com.example.autop.llm.Block
 import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.LlmStreamEvent
+import com.example.autop.llm.Msg
 import com.example.autop.llm.SystemPart
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.NonCancellable
@@ -62,6 +64,7 @@ internal class TurnLoop(
     private var finalRound = false
     private var finalRoundByBudget = false
     private var budgetPromptInjected = false
+    private var nativeTools = true
 
     /**
      * 运行入口。取消时不重新抛出（句柄的 await/complete 仍要收口），
@@ -105,6 +108,7 @@ internal class TurnLoop(
             }
         guards.bindProfile(provider.profile)
         sampler.bindProfile(provider)
+        nativeTools = provider.profile.capabilities.tools
         val context =
             ContextRequest(
                 runId = req.runId,
@@ -251,11 +255,25 @@ internal class TurnLoop(
         }
         val steers = journal.drainSteers()
         return if (calls.isEmpty() && steers.isEmpty()) {
-            naturalEnd(finalText ?: lastTextOf(completed.message))
+            naturalEndOf(finalText, completed.message)
         } else {
             midTurnCompact(sys)
         }
     }
+
+    /**
+     * 自然结束的最终文本：回退协议以 `final` 为准；解析重试超限（无 final）显式报错收口，
+     * 不把协议原文当回复（同流程创作侧 LLM_INVALID_OUTPUT 口径）。
+     */
+    private suspend fun naturalEndOf(
+        finalText: String?,
+        message: Msg,
+    ): LoopStep =
+        if (finalText == null && !nativeTools) {
+            fail(AppError(code = AgentErrorCodes.FALLBACK_PARSE_FAILED, message = "回退协议解析重试超限，仍无可用正文"))
+        } else {
+            naturalEnd(finalText ?: lastTextOf(message))
+        }
 
     /** 控制工具：Finish 与 steer 竞争（R1/B2）；Pause 关门等 resume 后继续守卫流程。 */
     private suspend fun handleControl(outputs: List<ToolOutput>): LoopStep? {
