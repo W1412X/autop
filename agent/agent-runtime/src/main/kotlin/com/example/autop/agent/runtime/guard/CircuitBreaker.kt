@@ -52,7 +52,8 @@ internal class CircuitBreaker(
     }
 
     private fun observeOne(entry: BreakerEntry): BreakerVerdict {
-        val changed = screenChanged(entry.output)
+        // 无法判断（前/后可比较指纹缺失）按“未变化”计：盲操作里连续同动作也必须能被拦住。
+        val changed = screenChanged(entry.output) == true
         val repeat = observeRepeat(entry, changed)
         if (repeat != null) return repeat
         return if (entry.output.ok) {
@@ -127,12 +128,14 @@ internal class CircuitBreaker(
 
     /**
      * 屏幕是否变化：优先比较 `replay.postFingerprint` 与 `pre.fingerprint`，
-     * 其次用动作后观测的 fingerprint；无法判断时按“有变化”处理，避免误熔断。
+     * 其次用动作后观测的 fingerprint；前/后任一缺失返回 null（无法判断）。
+     * 调用方把 null 当作“未变化”，否则应用屏蔽节点树（盲操作）时重复动作永远触发不了熔断。
      */
-    private fun screenChanged(output: ToolOutput): Boolean {
+    private fun screenChanged(output: ToolOutput): Boolean? {
         val pre = output.replay?.pre?.fingerprint
         val now = output.replay?.postFingerprint ?: output.observation?.fingerprint
-        return pre == null || now == null || now != pre
+        if (pre == null || now == null) return null
+        return now != pre
     }
 
     private fun maxOf(

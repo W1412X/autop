@@ -110,7 +110,14 @@ public class ActionEpilogue
                 is Outcome.Err ->
                     ToolOutput(
                         ok = true,
-                        content = listOf(Block.Text(resultText), Block.Text("屏幕观测失败：${observed.error.code}")),
+                        content =
+                            listOf(
+                                Block.Text(resultText),
+                                Block.Text(
+                                    "屏幕观测失败：${observed.error.code}；无法确认这次动作是否生效，" +
+                                        "可用 screenshot 复核界面后再决定下一步。",
+                                ),
+                            ),
                         replay = buildReplay(replay, postFingerprint = null),
                     )
             }

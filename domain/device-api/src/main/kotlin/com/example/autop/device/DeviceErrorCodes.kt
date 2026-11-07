@@ -9,6 +9,9 @@ public object DeviceErrorCodes {
     /** 无障碍服务未连接。 */
     public const val SERVICE_UNAVAILABLE: String = "device.service_unavailable"
 
+    /** 应用窗口节点树为空（应用可能屏蔽无障碍节点；a11y 观测不可用，可自动降级视觉）。 */
+    public const val APP_TREE_EMPTY: String = "device.app_tree_empty"
+
     /** 点击后屏幕指纹未变化（点击可能没有生效；结果附提示，不算失败）。 */
     public const val NO_EFFECT: String = "device.no_effect"
 

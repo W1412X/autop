@@ -43,7 +43,7 @@ public class ReplayStateProbeImpl
                 semanticsVersion = REPLAY_SEMANTICS_VERSION,
                 keys =
                     screen.model
-                        .flatten()
+                        .appFlatten()
                         .map { it.key }
                         .filter { it.isNotEmpty() }
                         .distinct()

@@ -88,14 +88,18 @@ public class SnapshotCapturer
                 )
             }
 
-        /** 空树重试耗尽（docs/tech/05 §2.3）。N192：附降级指引（部分应用屏蔽无障碍节点）。 */
+        /**
+         * 空树重试耗尽（docs/tech/05 §2.3）。N192：附降级指引（部分应用屏蔽无障碍节点）。
+         * 这里只说明 a11y 不可用；是否改走视觉由 [com.example.autop.device.impl.observation.ScreenObserver]
+         * 决定（视觉已启用时会自动切换），不能在这层声称“视觉兜底未生效”。
+         */
         private fun emptyTreeUnavailable(): Outcome<ScreenSnapshot> =
             Outcome.Err(
                 AppError(
-                    code = DeviceErrorCodes.SERVICE_UNAVAILABLE,
+                    code = DeviceErrorCodes.APP_TREE_EMPTY,
                     message =
-                        "应用窗口节点树为空（该应用可能屏蔽了无障碍节点），视觉合成树兑底未生效；" +
-                            "可改用 screenshot 查看界面后用 tap 按坐标点击、swipe 按坐标滑动继续操作",
+                        "应用窗口节点树为空（该应用可能屏蔽了无障碍节点），当前无障碍观测不可用；" +
+                            "视觉观测可用时会自动切换，也可先用 screenshot 查看界面后按坐标 tap/swipe 继续操作",
                     retryable = true,
                 ),
             )
@@ -173,7 +177,7 @@ public class SnapshotCapturer
         ): ScreenSnapshot {
             val display = context.getSystemService(DisplayManager::class.java)?.getDisplay(Display.DEFAULT_DISPLAY)
             val metrics = metricsOf(display)
-            val fg = foreground.current.value
+            val fg = resolveForeground(windows)
             // N204：内容区随快照带出。降级快照（无窗口）回填最近缓存（与截图裁剪同源，
             // 避免图按缓存裁、坐标按全屏换算的双源不一致），仍不覆盖缓存；无缓存为 null=全屏。
             val area =
@@ -194,6 +198,25 @@ public class SnapshotCapturer
                 keyguardLocked = keyguardLocked(),
                 contentArea = area,
                 truncated = truncated,
+            )
+        }
+
+        /**
+         * 前台应用以前台窗口列表为准（不用事件留下的旧值冒充当前屏幕）：
+         * 有窗口时取最上层/活跃的 APPLICATION 窗口；只剩系统 UI 等非应用窗口时为 null
+         * （例如应用选择器关闭后 TYPE_WINDOW_STATE_CHANGED 未再上报，旧包名会误导模型）。
+         * 窗口列表完全为空（视觉/降级快照没有窗口信息）时才退回事件跟踪值作为展示标签。
+         * activity 只在事件包名与窗口包名一致时保留，避免把上一个应用的 Activity 挂到当前屏幕。
+         */
+        private fun resolveForeground(windows: List<WindowSnapshot>): ForegroundApp? {
+            val tracked = foreground.current.value
+            if (windows.isEmpty()) return tracked
+            val apps = windows.filter { it.type == WindowType.APPLICATION && !it.packageName.isNullOrBlank() }
+            val target = apps.firstOrNull { it.active } ?: apps.maxByOrNull { it.layer } ?: return null
+            val packageName = target.packageName ?: return null
+            return ForegroundApp(
+                packageName = packageName,
+                activity = tracked?.activity?.takeIf { tracked.packageName == packageName },
             )
         }
 

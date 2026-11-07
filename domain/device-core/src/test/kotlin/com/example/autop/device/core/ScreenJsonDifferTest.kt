@@ -7,6 +7,9 @@ package com.example.autop.device.core
 import com.example.autop.device.NodeFlags
 import com.example.autop.device.ObservationMode
 import com.example.autop.device.ObserveMode
+import com.example.autop.device.Rect
+import com.example.autop.device.ScreenSnapshot
+import com.example.autop.device.WindowType
 import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
@@ -66,12 +69,60 @@ class ScreenJsonDifferTest {
     }
 
     @Test
+    fun `system window changes do not change fingerprint`() {
+        val loose = TestScreens.config { hideSystemDecoration = false }
+        val prev = TestScreens.serialize(screenWithStatusBar("12:00"), loose)
+        val cur = TestScreens.serialize(screenWithStatusBar("12:01"), loose)
+        // 状态栏时钟变了，但应用窗口没变：指纹必须相同，否则“屏幕未变化”永远判不出来。
+        assertThat(cur.observation.fingerprint).isEqualTo(prev.observation.fingerprint)
+    }
+
+    @Test
     fun `page change returns full`() {
         val prev = TestScreens.serialize(screen("确定"))
         val other = screen("确定").copy(activity = "com.example.app.OtherActivity")
         assertThat(ScreenJsonDiffer.diff(prev, TestScreens.serialize(other), config).mode)
             .isEqualTo(ObservationMode.FULL)
     }
+
+    /** 应用窗口 + 系统状态栏窗口（时钟按 [clock] 变化）。 */
+    private fun screenWithStatusBar(clock: String): ScreenSnapshot =
+        TestScreens.snapshot(
+            windows =
+                listOf(
+                    TestScreens.window(windowId = 1) {
+                        title = "设置"
+                        rootIdx = 1
+                    },
+                    TestScreens.window(windowId = 2) {
+                        type = WindowType.SYSTEM
+                        packageName = "com.android.systemui"
+                        title = "系统"
+                        layer = 10
+                        active = false
+                        focused = false
+                        rootIdx = 3
+                    },
+                ),
+            nodes =
+                listOf(
+                    TestScreens.node(1) { children = listOf(2) },
+                    TestScreens.node(2) {
+                        parent = 1
+                        className = "android.widget.Button"
+                        text = "确定"
+                        viewId = "confirm"
+                        flags = NodeFlags.VISIBLE or NodeFlags.CLICKABLE or NodeFlags.ENABLED
+                    },
+                    TestScreens.node(3) { children = listOf(4) },
+                    TestScreens.node(4) {
+                        parent = 3
+                        className = "android.widget.TextView"
+                        text = clock
+                        bounds = Rect(900, 0, 1080, 60)
+                    },
+                ),
+        )
 
     private fun screen(
         label: String,

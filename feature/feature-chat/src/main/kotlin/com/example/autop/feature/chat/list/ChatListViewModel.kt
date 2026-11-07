@@ -17,6 +17,8 @@ import com.example.autop.core.common.ThreadId
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.ShellInput
+import com.example.autop.device.ShellState
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunService
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -49,6 +51,7 @@ public class ChatListViewModel
         private val accessibility: AccessibilityStatus,
         private val capabilities: PlatformCapabilities,
         private val configProvider: ConfigProvider,
+        private val shellInput: ShellInput,
     ) : ViewModel() {
         private val page = MutableStateFlow(PageAccum())
         private val sheet = MutableStateFlow(ChatListSheet())
@@ -59,11 +62,13 @@ public class ChatListViewModel
                 runService.observeActive(),
                 page,
                 sheet,
-            ) { connected, active, accum, sheets ->
+                shellInput.state,
+            ) { connected, active, accum, sheets, shell ->
                 val budget = configProvider.current()[AgentConfig.BUDGET].maxSteps
                 ChatListUiState(
                     accessibilityConnected = connected,
                     restrictedSettings = capabilities.has(Capability.RESTRICTED_SETTINGS),
+                    shellConnected = shell is ShellState.Connected,
                     threads = accum.items.map(::toRow),
                     paging =
                         ChatPaging(

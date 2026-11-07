@@ -77,10 +77,11 @@ public class ScreenSerializer(
                 text = text,
                 mode = ObservationMode.FULL,
                 observeMode = mode,
-                fingerprint = ScreenFingerprint.of(snapshot.foregroundPackage, snapshot.activity, model.flatten()),
+                // 只对应用窗口做指纹：系统状态栏时钟/网速等易变节点会让“屏幕未变化”永远判不出来。
+                fingerprint = ScreenFingerprint.of(snapshot.foregroundPackage, snapshot.activity, model.appFlatten()),
                 packageName = snapshot.foregroundPackage,
                 activity = snapshot.activity,
-                summaryLine = summaryLine(snapshot, windows),
+                summaryLine = summaryLine(snapshot, windows, model.quality.nodes),
                 interactiveCount = model.quality.interactive,
                 nodeCount = model.quality.nodes,
                 semanticPoor = mode == ObserveMode.A11Y && poor,
@@ -120,6 +121,7 @@ public class ScreenSerializer(
                     ?.substringAfterLast('.')
                     ?.takeIf { it.isNotEmpty() && window.packageName == context.snapshot.foregroundPackage },
             type = rules.windowTypeLabels[window.type.name]?.takeIf { it.isNotEmpty() },
+            kind = window.type,
             active = window.active,
             focus = focusOf(window, context),
             collapsed = ime,
@@ -187,10 +189,12 @@ public class ScreenSerializer(
     private fun summaryLine(
         snapshot: ScreenSnapshot,
         windows: List<WindowSnapshot>,
+        nodeCount: Int,
     ): String {
         val appName = windows.firstOrNull { it.active }?.title ?: snapshot.foregroundPackage.orEmpty()
         val activityShort = snapshot.activity?.substringAfterLast('.').orEmpty()
-        return "$appName / $activityShort，${snapshot.nodes.size} 个节点"
+        // 用序列化后的节点数（与 quality.nodes 同口径），避免摘要与正文数字不一致。
+        return "$appName / $activityShort，$nodeCount 个节点"
     }
 
     private companion object {

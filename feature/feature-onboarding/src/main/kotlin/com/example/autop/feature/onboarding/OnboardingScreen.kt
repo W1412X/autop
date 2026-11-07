@@ -127,6 +127,14 @@ private fun CheckCard(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
+            if (item.id == CheckId.ACCESSIBILITY) {
+                // 可选增强：只提示，不作为必需设置（不配对也能正常使用无障碍注入）。
+                Text(
+                    text = stringResource(R.string.onboarding_shell_hint),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
         }
         Spacer(modifier = Modifier.width(spacing.md))
         AutopTonalButton(

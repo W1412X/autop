@@ -10,11 +10,14 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ThreadSummary
 import com.example.autop.core.common.Capability
+import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.ShellInput
+import com.example.autop.device.ShellState
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
@@ -139,6 +142,7 @@ class ChatListViewModelTest {
             accessibility = FakeAccessibility(),
             capabilities = FakeCapabilities(),
             configProvider = FakeConfigProvider(),
+            shellInput = FakeShellInput(),
         )
 
     private companion object {
@@ -296,4 +300,36 @@ private class FakeAccessibility : AccessibilityStatus {
 
 private class FakeCapabilities : PlatformCapabilities {
     override fun has(c: Capability): Boolean = false
+}
+
+/** 只读状态的 [ShellInput] 假实现（对话列表只订阅连接态）。 */
+private class FakeShellInput : ShellInput {
+    override val state: StateFlow<ShellState> = MutableStateFlow(ShellState.Disconnected)
+
+    override val paired: StateFlow<Boolean> = MutableStateFlow(false)
+
+    override suspend fun pair(
+        pairingPort: Int,
+        pairCode: String,
+    ): Outcome<Unit> = Outcome.Ok(Unit)
+
+    override suspend fun connect(): Boolean = true
+
+    override suspend fun tap(
+        x: Int,
+        y: Int,
+        durationMs: Long,
+    ): Boolean = true
+
+    override suspend fun swipe(
+        fromX: Int,
+        fromY: Int,
+        toX: Int,
+        toY: Int,
+        durationMs: Long,
+    ): Boolean = true
+
+    override suspend fun keyEvent(code: Int): Boolean = true
+
+    override suspend fun keyCombination(vararg codes: Int): Boolean = true
 }

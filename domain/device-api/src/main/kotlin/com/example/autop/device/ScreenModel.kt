@@ -59,6 +59,8 @@ public data class ScreenWindow(
     val app: String,
     val page: String? = null,
     val type: String? = null,
+    /** 窗口类型；指纹/差量只取 APPLICATION 窗口，避免状态栏时钟等易变内容干扰。 */
+    val kind: WindowType? = null,
     val active: Boolean = false,
     /** 焦点输入框 bounds（0–1000）。 */
     val focus: Rect? = null,
@@ -97,6 +99,16 @@ public data class ScreenModel(
 
     /** 深度优先展开全部节点。 */
     public fun flatten(): List<ScreenNode> = windows.flatMap { it.kids }.flatMap { flatten(it) }
+
+    /**
+     * 仅应用窗口的节点（指纹/差量用）：系统窗口（状态栏时钟、实时网速等）变化频繁，
+     * 纳入会让“屏幕是否变化”恒为真；视觉/llm 伪树的 [ScreenWindow.kind] 为空，按应用窗口处理。
+     */
+    public fun appFlatten(): List<ScreenNode> =
+        windows
+            .filter { it.kind == null || it.kind == WindowType.APPLICATION }
+            .flatMap { it.kids }
+            .flatMap { flatten(it) }
 
     private fun flatten(node: ScreenNode): List<ScreenNode> = listOf(node) + node.kids.flatMap { flatten(it) }
 }

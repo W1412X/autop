@@ -20,8 +20,9 @@ public object ScreenJsonDiffer {
         val full = cur.observation
         val base = prev
         if (base == null || !comparable(base, cur)) return full
-        val prevNodes = base.model.flatten()
-        val curNodes = cur.model.flatten()
+        // 只比较应用窗口：系统窗口（状态栏时钟/网速等）一直变，掺进来会让差量永远“有变化”。
+        val prevNodes = base.model.appFlatten()
+        val curNodes = cur.model.appFlatten()
         val prevByKey = prevNodes.filter { it.key.isNotEmpty() }.associateBy { it.key }
         val curByKey = curNodes.filter { it.key.isNotEmpty() }.associateBy { it.key }
         val added = curNodes.filter { it.key.isEmpty() || it.key !in prevByKey }

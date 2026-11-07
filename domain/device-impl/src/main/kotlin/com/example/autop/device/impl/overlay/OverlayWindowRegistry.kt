@@ -60,7 +60,14 @@ public class OverlayWindowRegistry
             if (channel != null) attach(id, channel)
         }
 
-        /** 更新窗口布局。 */
+        /**
+         * 更新窗口布局。
+         *
+         * 窗口已附着时不能再改 `type`（系统抛 `IllegalArgumentException:
+         * Window type can not be changed after the window is added`）：通道切换与
+         * [update] 并发时（[OverlayWindowManager] 的通道收集与工具更新可能先后到达），
+         * 必须先在旧通道移除，再按新通道重新附着；通道相同时以附着时的通道构建参数。
+         */
         public fun update(
             id: String,
             spec: OverlaySpec,
@@ -69,12 +76,16 @@ public class OverlayWindowRegistry
             val entry = entries[id] ?: return
             entry.spec = spec
             val window = entry.window
-            if (window != null && channel != null) {
-                window.windowManager.updateViewLayout(
-                    window.view,
-                    buildOverlayParams(channel, spec, hidden, entry.blocked),
-                )
+            if (window == null || channel == null) return
+            if (window.channel != channel) {
+                detach(entry)
+                attach(id, channel)
+                return
             }
+            window.windowManager.updateViewLayout(
+                window.view,
+                buildOverlayParams(window.channel, spec, hidden, entry.blocked),
+            )
         }
 
         /** 隐藏并移除窗口。 */

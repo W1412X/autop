@@ -44,6 +44,10 @@ private data class TapAction(
     val durationMs: Long,
     val long: Boolean,
     val waitMs: Long?,
+    /** 动作前是否有可用节点树（false=命中无法判断）。 */
+    val hitKnown: Boolean,
+    /** 有节点树但落点不在任何节点内（回执 `hit:none`）。 */
+    val hitNone: Boolean,
     val resultText: String,
     val replayArgs: JsonObject,
 )
@@ -114,6 +118,8 @@ public class TapTool
                     durationMs = tapDurationOf(ctx, long),
                     long = long,
                     waitMs = args.long("wait_ms"),
+                    hitKnown = tree != null,
+                    hitNone = tree != null && receipts.node(tree, modelPoint) == null,
                     resultText = resultTextOf(x, y, long, receipts.receipt(tree, actualModel)),
                     replayArgs = replayArgsOf(args, receipts.describe(tree, actualModel)),
                 )
@@ -135,7 +141,7 @@ public class TapTool
                 }
             val out = epilogue.finish(ctx, tap.resultText, tap.waitMs, ReplayInput(ID, pre, tap.replayArgs, gesture))
             val moved = movedAfter(ctx, tap.snapshot, pre?.fingerprint)
-            return annotate(out, learn(ctx, route, moved), moved)
+            return annotate(out, learn(ctx, route, moved), moved, tap.hitKnown, tap.hitNone)
         }
 
         private fun routeRequest(
@@ -179,14 +185,22 @@ public class TapTool
                 null
             }
 
+        /** 补充显式提示：落点未命中 / 命中无法判断 / 效果不可验证 / 无变化 / 新判定屏蔽。 */
         private fun annotate(
             out: ToolOutput,
             newlyBlocked: Boolean,
             moved: Boolean?,
+            hitKnown: Boolean,
+            hitNone: Boolean,
         ): ToolOutput {
             val notes =
                 buildList {
+                    when {
+                        !hitKnown -> add(HIT_UNKNOWN_TEXT)
+                        hitNone -> add(HIT_NONE_TEXT)
+                    }
                     if (moved == false) add(NO_EFFECT_TEXT)
+                    if (moved == null) add(EFFECT_UNVERIFIED_TEXT)
                     if (newlyBlocked) add(BLOCKED_TEXT)
                 }
             return if (notes.isEmpty()) out else out.copy(content = out.content + notes.map { Block.Text(it) })
@@ -209,6 +223,20 @@ public class TapTool
             val NO_EFFECT_TEXT =
                 "屏幕没有变化（${DeviceErrorCodes.NO_EFFECT}）：这次点击可能没有生效。" +
                     "可以先 wait 等页面加载，或换一个位置，或用 observe 重新确认界面后再点。"
+
+            /** 有节点树但落点不在任何节点内：坐标多半偏了，提醒先核对而不是重复点。 */
+            const val HIT_NONE_TEXT =
+                "落点没有命中任何元素（hit:none）：坐标可能偏了或在空白区。" +
+                    "先用 screenshot 核对位置再点，或改用节点 id 点击。"
+
+            /** 连节点树都没有（应用屏蔽无障碍）：命中与否无法判断，不要把它当成成功。 */
+            const val HIT_UNKNOWN_TEXT =
+                "当前没有可用的节点树（无障碍节点可能被应用屏蔽），无法判断落点是否命中元素；可用 screenshot 核对。"
+
+            /** 动作前后缺少可比较屏幕状态（盲操作/视觉观测）：效果无法验证。 */
+            const val EFFECT_UNVERIFIED_TEXT =
+                "无法确认这次点击是否生效（动作前后缺少可比较的屏幕状态）；" +
+                    "不要盲目重复相同坐标，先用 screenshot 或 observe 复核界面。"
 
             /** 新判定应用屏蔽节点动作：告知模型，之后工具自动改用手势，模型无需处理。 */
             const val BLOCKED_TEXT = "该应用不响应无障碍节点操作，已记录；之后对它的点击、长按、滚动会自动改用手势。"

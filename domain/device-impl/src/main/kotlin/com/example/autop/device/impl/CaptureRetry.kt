@@ -1,7 +1,7 @@
 /**
  * 空树重试（docs/tech/05 §2.3，R1/A3）：刚打开应用时 getWindows() 偶尔返回空根，属瞬时状态。
  * 应用窗口没有节点或根节点为空时按 `device.capture.emptyTreeRetries`、
- * `device.capture.emptyTreeRetryDelayMs` 重试采集；仍为空 → `device.service_unavailable`。
+ * `device.capture.emptyTreeRetryDelayMs` 重试采集；仍为空 → `device.app_tree_empty`。
  */
 package com.example.autop.device.impl
 

@@ -10,12 +10,14 @@ import com.example.autop.device.ScreenModel
 import com.example.autop.device.ScreenNode
 import com.example.autop.device.ScreenQuality
 import com.example.autop.device.ScreenWindow
+import com.example.autop.device.WindowType
 
 /** 一个窗口的装配输入（无障碍/视觉）。 */
 internal data class WindowDraft(
     val app: String,
     val page: String?,
     val type: String?,
+    val kind: WindowType?,
     val active: Boolean,
     val focus: Rect?,
     val collapsed: Boolean,
@@ -41,6 +43,7 @@ public object ScreenModelBuilder {
                         app = it.app,
                         page = it.page,
                         type = it.type,
+                        kind = it.kind,
                         active = it.active,
                         focus = it.focus,
                         collapsed = it.collapsed,

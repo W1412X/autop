@@ -48,7 +48,7 @@ class CaptureRetryTest {
         }
 
     @Test
-    fun `still empty after retries maps to service unavailable`() =
+    fun `still empty after retries maps to app tree empty`() =
         runTest {
             var calls = 0
             val got =
@@ -64,7 +64,7 @@ class CaptureRetryTest {
                 )
             // 首次采集 + 3 次重试
             assertThat(calls).isEqualTo(4)
-            assertThat((got as Outcome.Err).error.code).isEqualTo("device.service_unavailable")
+            assertThat((got as Outcome.Err).error.code).isEqualTo("device.app_tree_empty")
         }
 
     @Test
@@ -106,7 +106,7 @@ class CaptureRetryTest {
             assertThat((got as Outcome.Err).error.code).isEqualTo("device.timeout")
         }
 
-    private fun unavailable(): AppError = AppError(code = "device.service_unavailable", message = "empty tree")
+    private fun unavailable(): AppError = AppError(code = "device.app_tree_empty", message = "empty tree")
 
     private fun screen(
         window: WindowSnapshot,

@@ -84,23 +84,67 @@ public class ScreenObserver
                 }
             return when (current) {
                 is Outcome.Err -> current
-                is Outcome.Ok -> Outcome.Ok(record(ctx, mode, full, current.value))
+                // 用实际观测方式记录（a11y 可能已自动降级为视觉），差量基线/后续收尾都按它走。
+                is Outcome.Ok -> Outcome.Ok(record(ctx, current.value.mode, full, current.value))
             }
         }
 
+        /**
+         * 无障碍观测；应用窗口缺失或节点树为空时自动改用视觉观测（§2.3 兜底）：
+         * - `device.app_tree_empty`：应用屏蔽无障碍节点；
+         * - 快照里没有任何 APPLICATION 窗口：只剩系统 UI，事件跟踪的前台包名已不可信。
+         * 视觉未启用/模型未就绪时保留原错误，不谎称兜底已尝试。
+         */
         private suspend fun a11y(
             ctx: ToolContext,
             effective: List<ObserveMode>,
-        ): Outcome<Prepared> =
-            when (val got = screenReader.snapshot()) {
-                is Outcome.Err -> got
+        ): Outcome<Prepared> {
+            val visualAvailable = ObserveMode.VISUAL in effective
+            return when (val got = screenReader.snapshot()) {
+                is Outcome.Err ->
+                    if (visualAvailable && got.error.code == DeviceErrorCodes.APP_TREE_EMPTY) {
+                        withFallbackNote(visual(ctx, effective), REASON_EMPTY_TREE)
+                    } else {
+                        got
+                    }
                 is Outcome.Ok ->
+                    if (visualAvailable && got.value.windows.none { it.type == WindowType.APPLICATION }) {
+                        withFallbackNote(visual(ctx, effective), REASON_NO_APP_WINDOW)
+                    } else {
+                        Outcome.Ok(
+                            Prepared(
+                                snapshot = got.value,
+                                serialized = serializer.serialize(got.value, ObserveMode.A11Y, ctx.config, effective),
+                                mode = ObserveMode.A11Y,
+                            ),
+                        )
+                    }
+            }
+        }
+
+        /** 视觉兜底成功后附一行说明（强制完整观测，确保模型看得到切换提示）。 */
+        private fun withFallbackNote(
+            result: Outcome<Prepared>,
+            reason: String,
+        ): Outcome<Prepared> =
+            when (result) {
+                is Outcome.Err -> result
+                is Outcome.Ok -> {
+                    val prepared = result.value
+                    val observation = prepared.serialized.observation
                     Outcome.Ok(
-                        Prepared(
-                            snapshot = got.value,
-                            serialized = serializer.serialize(got.value, ObserveMode.A11Y, ctx.config, effective),
+                        prepared.copy(
+                            serialized =
+                                prepared.serialized.copy(
+                                    observation =
+                                        observation.copy(
+                                            text = observation.text + "\n（$reason，已自动切换到视觉观测 visual）",
+                                        ),
+                                ),
+                            fallback = true,
                         ),
                     )
+                }
             }
 
         /**
@@ -124,7 +168,13 @@ public class ScreenObserver
                     return Outcome.Err(parseFailed("视觉解析超时（${timeoutMs}ms）：${e.message}"))
                 } ?: return Outcome.Err(parseFailed("视觉解析失败（截图不可解析或 secure 窗口）"))
             val snap = adoptVisualTree(base, tree)
-            return Outcome.Ok(Prepared(snap, serializer.serialize(snap, ObserveMode.VISUAL, ctx.config, effective)))
+            return Outcome.Ok(
+                Prepared(
+                    snapshot = snap,
+                    serialized = serializer.serialize(snap, ObserveMode.VISUAL, ctx.config, effective),
+                    mode = ObserveMode.VISUAL,
+                ),
+            )
         }
 
         /** llm 观测：独立 VISION 请求，只把 JSON 作为工具结果（§4）。 */
@@ -152,7 +202,14 @@ public class ScreenObserver
                     )
             ) {
                 is Outcome.Err -> got
-                is Outcome.Ok -> Outcome.Ok(Prepared(base, serializedOf(ctx, got.value, base)))
+                is Outcome.Ok ->
+                    Outcome.Ok(
+                        Prepared(
+                            snapshot = base,
+                            serialized = serializedOf(ctx, got.value, base),
+                            mode = ObserveMode.LLM,
+                        ),
+                    )
             }
         }
 
@@ -165,7 +222,7 @@ public class ScreenObserver
             val history = ctx.deviceHistory()
             val serialized = prepared.serialized
             val observation =
-                if (mode == ObserveMode.LLM || full) {
+                if (mode == ObserveMode.LLM || full || prepared.fallback) {
                     serialized.observation
                 } else {
                     ScreenJsonDiffer.diff(history.baselines[mode], serialized, serializer.configOf(ctx.config))
@@ -183,6 +240,7 @@ public class ScreenObserver
                         summaryLine = observation.summaryLine,
                         nodeCount = serialized.model.quality.nodes,
                         hasImage = false,
+                        isDiff = observation.mode == ObservationMode.DIFF,
                     ),
                 screen = serialized,
             )
@@ -211,7 +269,7 @@ public class ScreenObserver
                     text = text,
                     mode = ObservationMode.FULL,
                     observeMode = ObserveMode.LLM,
-                    fingerprint = ScreenFingerprint.of(base.foregroundPackage, base.activity, model.flatten()),
+                    fingerprint = ScreenFingerprint.of(base.foregroundPackage, base.activity, model.appFlatten()),
                     packageName = base.foregroundPackage,
                     activity = base.activity,
                     summaryLine =
@@ -287,13 +345,21 @@ public class ScreenObserver
                 retryable = true,
             )
 
-        /** 观测所需的快照与序列化结果。 */
-        private class Prepared(
+        /** 观测所需的快照与序列化结果；[mode] 为实际观测方式（可能由 a11y 降级而来）。 */
+        private data class Prepared(
             val snapshot: ScreenSnapshot,
             val serialized: SerializedScreen,
+            val mode: ObserveMode,
+            val fallback: Boolean = false,
         )
 
         private companion object {
             const val VAR_MODE: String = "mode"
+
+            /** 应用窗口节点树为空 → 视觉兜底。 */
+            const val REASON_EMPTY_TREE: String = "应用窗口节点树为空"
+
+            /** 快照中没有应用窗口（只剩系统 UI）→ 视觉兜底。 */
+            const val REASON_NO_APP_WINDOW: String = "未找到应用窗口"
         }
     }

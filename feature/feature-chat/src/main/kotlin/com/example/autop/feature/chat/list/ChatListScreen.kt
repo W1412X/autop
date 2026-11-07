@@ -78,6 +78,7 @@ public fun ChatListScreen(
             connected = state.accessibilityConnected,
             restrictedSettings = state.restrictedSettings,
             onEnable = { onAction(ChatListAction.EnableAccessibility) },
+            shellHint = state.accessibilityConnected && !state.shellConnected,
         )
         state.active?.let { model ->
             ActiveRunCard(

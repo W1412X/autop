@@ -5,6 +5,7 @@
  */
 package com.example.autop.feature.chat.list
 
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -36,6 +37,7 @@ import com.example.autop.feature.chat.R
  *
  * @param connected 无障碍服务是否已连接。
  * @param restrictedSettings 该设备上侧载应用开无障碍需先"允许受限设置"（Capability.RESTRICTED_SETTINGS）。
+ * @param shellHint 是否提示可选的 shell 注入通道（未配对时显示，不阻塞任何功能）。
  * @param onEnable "去开启"确认后的回调（跳系统无障碍设置）。
  * @param modifier 组合修饰。
  */
@@ -45,9 +47,10 @@ public fun AccessibilityNotice(
     restrictedSettings: Boolean,
     onEnable: () -> Unit,
     modifier: Modifier = Modifier,
+    shellHint: Boolean = false,
 ) {
     if (connected) {
-        ConnectedRow(modifier = modifier)
+        ConnectedRow(shellHint = shellHint, modifier = modifier)
     } else {
         DisabledBanner(
             restrictedSettings = restrictedSettings,
@@ -58,26 +61,38 @@ public fun AccessibilityNotice(
 }
 
 @Composable
-private fun ConnectedRow(modifier: Modifier) {
-    Row(
+private fun ConnectedRow(
+    shellHint: Boolean,
+    modifier: Modifier,
+) {
+    Column(
         modifier =
             modifier
                 .padding(horizontal = LocalSpacing.current.screenEdge)
                 .padding(vertical = LocalSpacing.current.sm),
-        verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = AutopIcons.CheckCircle,
-            contentDescription = null,
-            modifier = Modifier.size(IconSize.Xs.scaled()),
-            tint = MaterialTheme.colorScheme.primary,
-        )
-        Spacer(modifier = Modifier.width(LocalSpacing.current.xs))
-        Text(
-            text = stringResource(R.string.chat_a11y_running),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(
+                imageVector = AutopIcons.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(IconSize.Xs.scaled()),
+                tint = MaterialTheme.colorScheme.primary,
+            )
+            Spacer(modifier = Modifier.width(LocalSpacing.current.xs))
+            Text(
+                text = stringResource(R.string.chat_a11y_running),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (shellHint) {
+            Text(
+                text = stringResource(R.string.chat_a11y_shell_hint),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.padding(top = LocalSpacing.current.xs),
+            )
+        }
     }
 }
 

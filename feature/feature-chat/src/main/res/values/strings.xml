@@ -20,6 +20,7 @@
     <string name="chat_age_hours">%1$d 小时前</string>
     <string name="chat_age_days">%1$d 天前</string>
     <string name="chat_a11y_running">无障碍服务运行中</string>
+    <string name="chat_a11y_shell_hint">点击/滑动被应用拦截？可在「设置 → 注入通道（无线调试）」配对后改用 shell 注入（可选，不设置也能正常使用）。</string>
     <string name="chat_a11y_title">AutoP 需要无障碍权限才能工作</string>
     <string name="chat_a11y_body">开启后才能观察屏幕和替你操作手机</string>
     <string name="chat_a11y_enable">去开启</string>

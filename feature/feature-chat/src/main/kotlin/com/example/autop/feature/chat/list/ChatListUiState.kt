@@ -85,6 +85,8 @@ public data class ChatListUiState(
     val accessibilityConnected: Boolean = true,
     /** SDK ≥ 33 时"去开启"前需先弹受限设置说明（Capability.RESTRICTED_SETTINGS）。 */
     val restrictedSettings: Boolean = false,
+    /** shell 注入通道已连接（未连接时无障碍提示下附可选开启提示，不阻塞使用）。 */
+    val shellConnected: Boolean = false,
     val threads: List<ChatThreadRow> = emptyList(),
     val paging: ChatPaging = ChatPaging(),
     /** 运行中的 Run（无则不显示卡片）。 */
