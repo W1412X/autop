@@ -101,7 +101,8 @@ internal class TaskAuthorTools(
             "inspect_screen" -> {
                 activity("inspect_screen")
                 call(
-                    "tool.observe",
+                    // ToolInvoker 按模型可见名调用（如 `observe`），不是工具 id（`tool.observe`）。
+                    "observe",
                     buildJsonObject {
                         put("mode", args.str("mode") ?: "a11y")
                         put("full", true)
@@ -109,8 +110,8 @@ internal class TaskAuthorTools(
                 )
             }
             "memory_search" ->
-                call("tool.memory_search", buildJsonObject { put("query", args.str("query").orEmpty()) })
-            "list_flows" -> call("tool.list_flows", buildJsonObject { })
+                call("memory_search", buildJsonObject { put("query", args.str("query").orEmpty()) })
+            "list_flows" -> call("list_flows", buildJsonObject { })
             else -> """{"error":"unknown tool $name"}"""
         }
 
@@ -144,7 +145,10 @@ internal class TaskAuthorTools(
     private companion object {
         const val TOOLS_TEMPLATE = "task.author.tools"
 
-        /** 只放行只读工具：创作会话不执行任何写屏/写记忆动作。 */
+        /**
+         * 只放行只读工具：创作会话不执行任何写屏/写记忆动作。
+         * 这里是**工具 id**（ToolRouter.visibleTools 按 id 过滤；invoke 用模型可见名）。
+         */
         val TOOL_FILTER: Set<String> = setOf("tool.observe", "tool.memory_search", "tool.list_flows")
     }
 }
