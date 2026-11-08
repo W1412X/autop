@@ -50,17 +50,20 @@ public class AlarmScheduler(
         }
     }
 
-    /** 安排（或重排）任务的下一次触发；返回触发时刻（null = 不安排）。 */
+    /** 安排（或重排）任务的下一次触发；返回触发时刻（null = 不安排）。
+     *  任务禁用/无下一次时顺带取消既有闹钟——停用即真停，不留陈旧闹钟。 */
     public fun schedule(task: Task): Long? {
         val at = if (task.enabled) nextFireAt(task) else null
-        if (at != null) {
-            val pending = pendingIntent(task.id)
-            if (exactAllowed()) {
-                alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
-            } else {
-                logger.w(TAG, "exact_alarm_unavailable", "taskId" to task.id.value)
-                scheduleInexact(task, at)
-            }
+        if (at == null) {
+            cancel(task.id)
+            return null
+        }
+        val pending = pendingIntent(task.id)
+        if (exactAllowed()) {
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, at, pending)
+        } else {
+            logger.w(TAG, "exact_alarm_unavailable", "taskId" to task.id.value)
+            scheduleInexact(task, at)
         }
         return at
     }

@@ -21,6 +21,7 @@ import com.example.autop.feature.overlay.progress.ProgressController
 import com.example.autop.feature.overlay.record.RecordController
 import com.example.autop.task.impl.InterruptedRunRecovery
 import com.example.autop.task.impl.di.AppScope
+import com.example.autop.task.impl.schedule.AlarmSync
 import com.example.autop.task.impl.store.AuditCleaner
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
@@ -71,6 +72,8 @@ class AutopApplication : Application() {
 
     @Inject lateinit var pairingCardController: PairingCardController
 
+    @Inject lateinit var alarmSync: AlarmSync
+
     @Inject lateinit var runRecovery: InterruptedRunRecovery
 
     @Inject lateinit var auditCleaner: AuditCleaner
@@ -110,6 +113,8 @@ class AutopApplication : Application() {
         pairingDiscovery.start(appScope)
         // 配对卡：发现即可配对设备即浮出输入小窗（零跳转，不依赖通知权限）。
         pairingCardController.start()
+        // 定时任务闹钟同步（2026-11-09 修复"到点不执行"）：任务变更即重排闹钟，首值覆盖启动重排。
+        alarmSync.start(appScope)
         auditCleaner.ensureScheduled()
         appScope.launch { runRecovery.markInterrupted() }
         // 视觉模型预热：模型资产约 72MB，首次加载要读资产＋校验＋建会话（含 NNAPI 编译），
