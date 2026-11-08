@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- 任务列表 -->
-    <string name="tasks_title">任务</string>
+    <string name="tasks_title">自动化</string>
     <string name="tasks_new">新建任务</string>
     <string name="tasks_flow_new">新建流程</string>
     <string name="tasks_page_tasks">任务</string>
