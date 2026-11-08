@@ -5,7 +5,7 @@ import com.example.autop.device.VisualTree
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
-/** 视觉解析编排（设计稿 §3/§6；vp8c ADR-0008）：就绪门槛、部署阈值、单类细化/多类直出、状态分类。 */
+/** 视觉解析编排（简化版）：就绪门槛、部署阈值、单类细化/多类直出、状态分类、逐叶子采集。 */
 internal class VisualParsePipelineTest {
     private class FakeDetector(
         override val ready: Boolean,
@@ -16,11 +16,21 @@ internal class VisualParsePipelineTest {
         override fun detect(image: VisionImage): List<VisualDetection> = dets
     }
 
-    private class FakeOcr(
+    /** 识别桩：按框回放固定文本（每个叶子都会被调到）。 */
+    private class FakeRecognizer(
         override val ready: Boolean,
-        private val lines: List<VisualOcrLine>,
-    ) : VisualOcrEngine {
-        override fun recognize(image: VisionImage): List<VisualOcrLine> = lines
+        private val textOf: (OcrBox) -> String? = { null },
+    ) : TextRecognizer {
+        val seen = mutableListOf<Rect>()
+
+        override fun recognize(
+            image: VisionImage,
+            box: OcrBox,
+        ): VisualOcrLine? {
+            seen += box.bounds
+            val text = textOf(box) ?: return null
+            return VisualOcrLine(text, 0.95, box.bounds)
+        }
     }
 
     /** 状态分类桩：按类别给固定三态。 */
@@ -47,7 +57,7 @@ internal class VisualParsePipelineTest {
 
     private fun parse(
         detector: FakeDetector,
-        ocr: FakeOcr,
+        recognizer: FakeRecognizer,
         states: FakeStates = FakeStates(null),
         minConfidence: Double = 0.35,
         area: Rect? = null,
@@ -56,56 +66,54 @@ internal class VisualParsePipelineTest {
             .parse(
                 image(),
                 detector,
-                ocr,
+                recognizer,
                 states,
-                ParseOptions(minConfidence = minConfidence, area = area, rescanEnabled = false),
+                ParseOptions(minConfidence = minConfidence, area = area),
             )?.tree
 
     @Test
     fun `returns null when engines not ready`() {
-        val tree = parse(FakeDetector(false, emptyList()), FakeOcr(true, emptyList()))
+        val tree = parse(FakeDetector(false, emptyList()), FakeRecognizer(true))
         assertThat(tree).isNull()
+        val tree2 = parse(FakeDetector(true, emptyList()), FakeRecognizer(false))
+        assertThat(tree2).isNull()
     }
 
     @Test
-    fun `attaches ocr text to detection`() {
-        val line = VisualOcrLine("确定", 0.95, Rect(30, 40, 70, 60))
-        val tree = parse(FakeDetector(true, listOf(det(0.9, 10, 30, 90, 70))), FakeOcr(true, listOf(line)))
-        val texted = tree!!.nodes.first { it.text != null }
-        assertThat(texted.text).isEqualTo("确定")
+    fun `every leaf gets ocr regardless of category`() {
+        val left = det(0.9, 5, 5, 45, 45)
+        val right = det(0.9, 55, 5, 95, 45)
+        val recognizer = FakeRecognizer(true) { if (it.bounds.l == 5) "确定" else "取消" }
+        val tree = parse(FakeDetector(true, listOf(left, right)), recognizer)
+        val texts = tree!!.nodes.mapNotNull { it.text }
+        assertThat(texts).containsExactly("确定", "取消")
+        assertThat(recognizer.seen).containsExactly(left.bounds, right.bounds)
     }
 
     @Test
-    fun `low confidence detections dropped and orphan ocr promoted`() {
-        val line = VisualOcrLine("设置", 0.95, Rect(10, 10, 60, 30))
-        val tree = parse(FakeDetector(true, listOf(det(0.1, 5, 5, 80, 40))), FakeOcr(true, listOf(line)))
-        val nodes = tree!!.nodes
-        assertThat(nodes.none { it.className == CategoryMapper.classNameOf(VisualCategory.BUTTON) }).isTrue()
-        assertThat(nodes.any { it.text == "设置" }).isTrue()
+    fun `low confidence detections dropped without orphan promotion`() {
+        val tree = parse(FakeDetector(true, listOf(det(0.1, 5, 5, 80, 40))), FakeRecognizer(true) { "设置" })
+        assertThat(tree!!.nodes.none { it.className == CategoryMapper.classNameOf(VisualCategory.BUTTON) }).isTrue()
+        assertThat(tree.nodes.none { it.text == "设置" }).isTrue()
     }
 
     @Test
-    fun `detections and ocr lines outside content area are dropped`() {
-        // N204：装饰区（顶部 30px）的框/文本不进视觉合成树。
+    fun `detections outside content area are dropped and not scanned`() {
+        // N204：装饰区（顶部 30px）的框不进视觉合成树，也不进 OCR。
         val inArea = det(0.9, 10, 5, 80, 25)
         val outside = det(0.9, 10, 40, 80, 70)
-        val outsideLine = VisualOcrLine("12:34", 0.95, Rect(10, 35, 60, 55))
-        val tree =
-            parse(
-                FakeDetector(true, listOf(inArea, outside)),
-                FakeOcr(true, listOf(outsideLine)),
-                area = Rect(0, 0, 100, 30),
-            )
+        val recognizer = FakeRecognizer(true) { "12:34" }
+        val tree = parse(FakeDetector(true, listOf(inArea, outside)), recognizer, area = Rect(0, 0, 100, 30))
         val nodes = tree!!.nodes
         assertThat(nodes.any { it.bounds == Rect(10, 5, 80, 25) }).isTrue()
         assertThat(nodes.any { it.bounds == Rect(10, 40, 80, 70) }).isFalse()
-        assertThat(nodes.any { it.text == "12:34" }).isFalse()
+        assertThat(recognizer.seen).containsExactly(Rect(10, 5, 80, 25))
     }
 
     @Test
     fun `multi class dets skip subtype refining`() {
         // ADR-0008 决策 3：v2 多类直出不再细化（单类档同框会细化成 icon-clickable）。
-        val tree = parse(FakeDetector(true, listOf(det(0.9, 10, 30, 90, 70))), FakeOcr(true, emptyList()))
+        val tree = parse(FakeDetector(true, listOf(det(0.9, 10, 30, 90, 70))), FakeRecognizer(true))
         assertThat(tree!!.nodes.any { it.className == "visual.Button" }).isTrue()
     }
 
@@ -114,7 +122,7 @@ internal class VisualParsePipelineTest {
         val tree =
             parse(
                 FakeDetector(true, listOf(det(0.9, 10, 30, 90, 70)), singleClass = true),
-                FakeOcr(true, emptyList()),
+                FakeRecognizer(true),
             )
         assertThat(tree!!.nodes.any { it.className == "visual.ImageButton" }).isTrue()
     }
@@ -125,7 +133,7 @@ internal class VisualParsePipelineTest {
         val tree =
             parse(
                 FakeDetector(true, listOf(det(0.3, 10, 30, 90, 70)), deployConf = 0.26),
-                FakeOcr(true, emptyList()),
+                FakeRecognizer(true),
                 minConfidence = 0.5,
             )
         assertThat(tree!!.nodes.any { it.bounds == Rect(10, 30, 90, 70) }).isTrue()
@@ -136,7 +144,7 @@ internal class VisualParsePipelineTest {
         val tree =
             parse(
                 FakeDetector(true, listOf(det(0.9, 10, 30, 90, 70))),
-                FakeOcr(true, emptyList()),
+                FakeRecognizer(true),
                 FakeStates(true),
             )
         val node = tree!!.nodes.first { it.bounds == Rect(10, 30, 90, 70) }
@@ -145,16 +153,14 @@ internal class VisualParsePipelineTest {
     }
 
     @Test
-    fun `parse exposes final detections and ocr lines as stages`() {
-        // N208：调试图渲染取细化+状态后的检测框与 OCR 行（与建树同口径）。
-        val line = VisualOcrLine("确定", 0.95, Rect(30, 40, 70, 60))
+    fun `parse exposes final detections and leaf ocr lines as stages`() {
         val result =
             VisualParsePipeline.parse(
                 image(),
                 FakeDetector(true, listOf(det(0.9, 10, 30, 90, 70))),
-                FakeOcr(true, listOf(line)),
+                FakeRecognizer(true) { "确定" },
                 FakeStates(true),
-                ParseOptions(minConfidence = 0.35, rescanEnabled = false),
+                ParseOptions(minConfidence = 0.35),
             )!!
         assertThat(result.detections).hasSize(1)
         assertThat(result.detections.single().checked).isTrue()

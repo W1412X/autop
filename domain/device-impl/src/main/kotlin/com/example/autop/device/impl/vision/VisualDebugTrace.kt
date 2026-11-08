@@ -10,17 +10,22 @@ private const val PERCENT: Int = 100
 /** 逐框裁剪图上限（更靠后的框只进检测渲染图，防调试图爆量）。 */
 internal const val MAX_CROP_IMAGES: Int = 40
 
-/** 汇总逐框调试数据（阅读序排序并编号，OCR 归属与建树同口径：vp9 §3.2 [TextOwnership]）。 */
+/** 汇总逐框调试数据（阅读序排序并编号，OCR 文本按中心落入的最小框归属）。 */
 internal fun boxesOf(
     detections: List<VisualDetection>,
     lines: List<VisualOcrLine>,
 ): List<VisualDebugBox> {
     val ordered = detections.sortedWith(compareBy({ it.bounds.t }, { it.bounds.l }))
-    val ownership = TextOwnership.assign(ordered, lines, TextOwnership.DEFAULT_SPAN_OVERLAP)
     val texts = arrayOfNulls<String>(ordered.size)
-    for ((box, lineIdxs) in ownership.leafLines) {
-        val seen = mutableSetOf<String>()
-        texts[box] = lineIdxs.mapNotNull { if (seen.add(lines[it].text)) lines[it].text else null }.joinToString(" ")
+    for (line in lines) {
+        val winner =
+            ordered.indices
+                .filter { line.bounds.centerIn(ordered[it].bounds) }
+                .minByOrNull { ordered[it].bounds.area }
+        if (winner != null) {
+            val cur = texts[winner]
+            texts[winner] = if (cur == null) line.text else "$cur ${line.text}"
+        }
     }
     return ordered.mapIndexed { i, det ->
         VisualDebugBox(i + 1, det.category, det.confidence, det.bounds, texts[i], det.checked)
@@ -39,12 +44,6 @@ internal fun captionOf(box: VisualDebugBox): String {
     val conf = (box.confidence * PERCENT).toInt()
     return "#${box.index} ${box.category} $conf%｜输入=框内裁剪｜OCR 归属=$text｜状态=${stateOf(box.checked)}"
 }
-
-/** 补扫拼图画布说明（vp9 §4.4）。 */
-internal fun mosaicCaptionOf(
-    width: Int,
-    height: Int,
-): String = "补扫拼图画布（vp9 §4.4）：$width×$height（块按高度降序装箱，det 一次推理）"
 
 /** 状态三态文案（N208）。 */
 internal fun stateOf(checked: Boolean?): String =

@@ -65,7 +65,7 @@ public class VisualDebugCapture
             pruneOld()
         }
 
-        /** 记录一帧解析数据并渲染落盘（vp9 §6.3：补扫框/图标区域/拼图画布；失败静默忽略）。 */
+        /** 记录一帧解析数据并渲染落盘（失败静默忽略）。 */
         internal fun record(
             image: VisionImage,
             result: VisualParseResult,
@@ -84,8 +84,8 @@ public class VisualDebugCapture
             }
 
         /**
-         * 渲染一帧：先从干净帧裁逐框识别输入图，再就地标注帧画检测渲染图（补扫框黄、
-         * 图标区域与结果），拼图画布单独成图（输出按检测图在前排序）。
+         * 渲染一帧：先从干净帧裁逐框识别输入图，再就地标注帧画检测渲染图（类别/OCR 文本/图标区域与结果，
+         * 输出按检测图在前排序）。
          */
         private fun render(
             image: VisionImage,
@@ -96,11 +96,10 @@ public class VisualDebugCapture
             val crops = renderCrops(frame, boxes)
             val detection = renderDetection(frame, image, boxes, result)
             frame.recycle()
-            val mosaic = result.mosaicCanvas?.let { renderMosaic(it) }
-            return listOfNotNull(detection) + listOfNotNull(mosaic) + crops
+            return listOfNotNull(detection) + crops
         }
 
-        /** 检测渲染图：红框（类别/置信度）＋绿 OCR 行＋黄补扫框＋图标区域/结果（vp9 §6.3）。 */
+        /** 检测渲染图：红框（类别/置信度）＋绿 OCR 文本＋图标区域/结果。 */
         private fun renderDetection(
             frame: Bitmap,
             image: VisionImage,
@@ -116,10 +115,6 @@ public class VisualDebugCapture
             for (line in result.lines) {
                 canvas.drawText(line.text, line.bounds.l.toFloat(), line.bounds.b.toFloat(), linePaint)
             }
-            for (region in result.rescanRegions) {
-                val b = region
-                canvas.drawRect(b.l.toFloat(), b.t.toFloat(), b.r.toFloat(), b.b.toFloat(), rescanPaint)
-            }
             for ((idx, region) in result.iconRegions) {
                 val b = region
                 canvas.drawRect(b.l.toFloat(), b.t.toFloat(), b.r.toFloat(), b.b.toFloat(), iconPaint)
@@ -129,15 +124,6 @@ public class VisualDebugCapture
             val file = savePng("det", frame) ?: return null
             val caption = detectionCaptionOf(boxes.size, result.lines.size)
             return VisualDebugImage(file.absolutePath, image.width, image.height, caption)
-        }
-
-        /** 补扫拼图画布图（vp9 §4.4）。 */
-        private fun renderMosaic(canvas: VisionImage): VisualDebugImage? {
-            val bmp = frameBitmap(canvas)
-            val file = savePng("mosaic", bmp) ?: return null
-            bmp.recycle()
-            val caption = mosaicCaptionOf(canvas.width, canvas.height)
-            return VisualDebugImage(file.absolutePath, canvas.width, canvas.height, caption)
         }
 
         /** 逐框识别 I/O 裁剪图：裁剪＝识别输入，OCR 归属/状态＝识别输出（上限 [MAX_CROP_IMAGES]）。 */
@@ -214,14 +200,6 @@ public class VisualDebugCapture
                     color = Color.GREEN
                     textSize = 24f
                     isAntiAlias = true
-                }
-
-            /** 补扫框（vp9 §6.3：黄）。 */
-            val rescanPaint =
-                Paint().apply {
-                    color = Color.YELLOW
-                    style = Paint.Style.STROKE
-                    strokeWidth = 5f
                 }
 
             /** 图标区域（vp9 §6.3：蓝）。 */

@@ -1,7 +1,7 @@
 /**
- * ONNX 图标分类引擎（vp9 §5.3，icon_cls/mobilenet_v3_small 102 类）：候选叶子按
- * [IconRegion] 裁图 → [IconClsWire] letterbox → logits softmax＋拒识 → [IconLabelTable]
- * 显示键。metadata（labels/icon_conf/icon_margin/reject_labels）只读模型部署参数；
+ * ONNX 图标分类引擎（vp9 §5.3，icon_cls/mobilenet_v3_small 102 类）：候选叶子
+ * （吸收所得 iconRegion 优先，否则整框）→ [IconClsWire] letterbox → logits softmax＋拒识 →
+ * [IconLabelTable] 显示键。metadata（labels/icon_conf/icon_margin/reject_labels）只读模型部署参数；
  * 校验失败 `ready=false`，所有 `icon=""`，其余链路照常。
  */
 package com.example.autop.device.impl.vision
@@ -16,7 +16,6 @@ import java.nio.FloatBuffer
 internal class OnnxIconClassifier(
     private val store: VisionModelStore,
     private val table: IconLabelTable,
-    private val minIconSide: Double = DEFAULT_MIN_ICON_SIDE,
 ) : VisualIconClassifier {
     private val meta: Map<String, String> by lazy {
         val custom = store.session(MODEL)?.metadata?.customMetadata
@@ -45,11 +44,7 @@ internal class OnnxIconClassifier(
         candidates: List<IconCandidate>,
     ): Map<Int, String> {
         if (!ready) return emptyMap()
-        val regions = mutableListOf<Pair<Int, Rect>>()
-        for ((i, cand) in candidates.withIndex()) {
-            val region = IconRegion.cropRegion(cand.bounds, cand.iconRegion, cand.textLines, minIconSide) ?: continue
-            regions += i to region
-        }
+        val regions = candidates.mapIndexed { i, cand -> i to (cand.iconRegion ?: cand.bounds) }
         return if (regions.isEmpty()) {
             emptyMap()
         } else {
@@ -130,6 +125,5 @@ internal class OnnxIconClassifier(
 
     private companion object {
         const val MODEL = "icon_cls.onnx"
-        const val DEFAULT_MIN_ICON_SIDE: Double = 0.6
     }
 }

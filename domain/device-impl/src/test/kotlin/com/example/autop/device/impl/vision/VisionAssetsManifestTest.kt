@@ -49,8 +49,6 @@ internal class VisionAssetsManifestTest {
                 "gui_detect.onnx",
                 "state_cls.onnx",
                 "icon_cls.onnx",
-                "ocr_det.onnx",
-                "ocr_rec.onnx",
                 "ocr_rec_server.onnx",
                 "ppocr_keys.txt",
                 "ocr_lexicon.txt",

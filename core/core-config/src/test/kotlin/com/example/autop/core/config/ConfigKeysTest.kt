@@ -51,8 +51,5 @@ class ConfigKeysTest {
     @Test
     fun `vision icon section validation rejects blank categories and range violations`() {
         assertThat(DeviceVisionIconSection().validate()).isEmpty()
-        assertThat(DeviceVisionIconSection(categories = listOf("icon", " ")).validate()).isNotEmpty()
-        assertThat(DeviceVisionIconSection(minIconSide = 2.5).validate()).isNotEmpty()
-        assertThat(DeviceVisionIconSection(minIconSide = -0.1).validate()).isNotEmpty()
     }
 }

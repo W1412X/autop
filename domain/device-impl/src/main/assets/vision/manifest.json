@@ -2,8 +2,6 @@
   "gui_detect.onnx": "5e43779e4151c406cd4e45afa96864b15833fbc7397ef0f62f46a73313017860",
   "state_cls.onnx": "02a3515a2a69f6cfc6d656c21dab75a9037fb76de5dc9bc0fe499413d2567a50",
   "icon_cls.onnx": "8877f4f214e41dc318bbb7042799cbba9a3c1d8601fb0568fce9f12beb720650",
-  "ocr_det.onnx": "d5de5df358366210d16419b9636a2fc1efa5d7a20688f38a7869ec7b1a4f4f7d",
-  "ocr_rec.onnx": "0030c6b05fbe29b07a93701503938d637efe7423325e2efb2bd7c8f220d40a8d",
   "ocr_rec_server.onnx": "5ab89697ae3fbf27ccae38387fac7245ebef3d867060ac06ff7edfb21dd107a9",
   "ppocr_keys.txt": "e5f8ca61ba03d3a247d06b013119982fa6de2bd48a846018b67bca57ffc56de1",
   "ocr_lexicon.txt": "761f1c8c365f23fcdf4f1418721e1628c7122f1ddc5c98d517450dea0399e371",

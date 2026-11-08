@@ -13,10 +13,9 @@ import android.util.Log
 import com.example.autop.device.Rect
 import java.nio.FloatBuffer
 
-/** PP-OCR rec 识别器（mobile/server 共用实现，[recAsset] 切换权重档位）。 */
+/** PP-OCR rec 识别器（单模型：PP-OCRv5 server rec，逐叶子裁剪识别）。 */
 internal class OnnxTextRecognizer(
     private val store: VisionModelStore,
-    private val recAsset: String = REC,
 ) : TextRecognizer {
     private val charset: List<String> by lazy {
         store.text(KEYS)?.lines()?.dropLastWhile { it.isEmpty() } ?: emptyList()
@@ -27,13 +26,13 @@ internal class OnnxTextRecognizer(
     private var charsetOk: Boolean = true
 
     override val ready: Boolean
-        get() = charsetOk && charset.isNotEmpty() && store.session(recAsset) != null
+        get() = charsetOk && charset.isNotEmpty() && store.session(REC) != null
 
     override fun recognize(
         image: VisionImage,
         box: OcrBox,
     ): VisualOcrLine? {
-        val session = store.session(recAsset).takeIf { ready } ?: return null
+        val session = store.session(REC).takeIf { ready } ?: return null
         return runCatching { runRec(session, image, box) }.getOrDefault(null)
     }
 
@@ -75,7 +74,7 @@ internal class OnnxTextRecognizer(
                 val classes = value[0][0].size
                 if (!PpOcrCodec.charsetMatches(classes, charset)) {
                     charsetOk = false
-                    Log.e(TAG, "rec($recAsset) 输出类数 $classes 与字典 ${charset.size}+1 不符，OCR 识别停用")
+                    Log.e(TAG, "rec 输出类数 $classes 与字典 ${charset.size}+1 不符，OCR 识别停用")
                     return emptyList()
                 }
                 return value.map { decodeWindow(it) }
@@ -93,11 +92,8 @@ internal class OnnxTextRecognizer(
     }
 
     internal companion object {
-        /** PP-OCRv5 mobile rec（现用快档）。 */
-        const val REC: String = "ocr_rec.onnx"
-
-        /** PP-OCRv5 server rec（精档，ocr-accuracy-uplift 阶段 B；资产缺失自动退 mobile）。 */
-        const val REC_SERVER: String = "ocr_rec_server.onnx"
+        /** PP-OCRv5 server rec（最优档，量化 conv_sym 27.79MB；692 样本与 fp32 解码一致）。 */
+        const val REC: String = "ocr_rec_server.onnx"
 
         /** UI 域词典（beam 重打分用，ocr-accuracy-uplift 阶段 A）。 */
         const val LEXICON: String = "ocr_lexicon.txt"

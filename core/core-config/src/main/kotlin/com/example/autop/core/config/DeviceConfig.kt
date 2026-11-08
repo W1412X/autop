@@ -171,125 +171,11 @@ public data class DeviceVisionParseSection(
     }
 }
 
-/** `device.vision.rescan`：视觉两阶段补扫（vp9 §4.3–§4.7）。 */
-@Serializable
-public data class DeviceVisionRescanSection(
-    @SerialName("enabled") val enabled: Boolean = true,
-    /** 每帧补扫框上限（缓存命中不计名额）。 */
-    @SerialName("maxBoxes") val maxBoxes: Int = 6,
-    /** 裁剪外扩比例（×框短边，至少 4px，vp9 §4.4）。 */
-    @SerialName("padRatio") val padRatio: Double = 0.1,
-    /** det 放大目标字高（px）。 */
-    @SerialName("targetTextPx") val targetTextPx: Int = 32,
-    /** det 放大倍率上限。 */
-    @SerialName("maxScale") val maxScale: Double = 3.0,
-    /** 低置信补扫阈值（C 类候选，vp9 §4.3）。 */
-    @SerialName("lowConf") val lowConf: Double = 0.6,
-    /** 行重叠判定阈值（vp9 §4.5；文字唯一归属不变量 ④ 同值）。 */
-    @SerialName("dupIou") val dupIou: Double = 0.5,
-    /** 跨框行判定重叠阈值（vp9 §3.2 A 步）。 */
-    @SerialName("spanOverlap") val spanOverlap: Double = 0.3,
-    /** 补扫块拼图开关（vp9 §4.4）。 */
-    @SerialName("mosaic") val mosaic: Boolean = true,
-    /** 拼图块间隔（px）。 */
-    @SerialName("mosaicGap") val mosaicGap: Int = 24,
-    /** input 提示语亮度差阈值（vp9 §4.6）。 */
-    @SerialName("hintContrast") val hintContrast: Int = 60,
-    /** 框级缓存容量（vp9 §4.7）。 */
-    @SerialName("cacheSize") val cacheSize: Int = 64,
-) : ConfigSection {
-    override fun validate(): List<String> =
-        buildList {
-            if (maxBoxes !in BOXES_MIN..BOXES_MAX) add("maxBoxes must be within $BOXES_MIN..$BOXES_MAX, was $maxBoxes")
-            if (padRatio !in PAD_MIN..PAD_MAX) add("padRatio must be within $PAD_MIN..$PAD_MAX, was $padRatio")
-            if (targetTextPx !in TARGET_MIN..TARGET_MAX) {
-                add("targetTextPx must be within $TARGET_MIN..$TARGET_MAX, was $targetTextPx")
-            }
-            if (maxScale !in SCALE_MIN..SCALE_MAX) add("maxScale must be within $SCALE_MIN..$SCALE_MAX, was $maxScale")
-            if (lowConf !in RATIO_MIN..RATIO_MAX) add("lowConf must be within $RATIO_MIN..$RATIO_MAX, was $lowConf")
-            if (dupIou !in IOU_MIN..IOU_MAX) add("dupIou must be within $IOU_MIN..$IOU_MAX, was $dupIou")
-            if (spanOverlap !in IOU_MIN..IOU_MAX) add("spanOverlap must be within $IOU_MIN..$IOU_MAX, was $spanOverlap")
-            if (mosaicGap !in GAP_MIN..GAP_MAX) add("mosaicGap must be within $GAP_MIN..$GAP_MAX, was $mosaicGap")
-            if (hintContrast !in CONTRAST_MIN..CONTRAST_MAX) {
-                add("hintContrast must be within $CONTRAST_MIN..$CONTRAST_MAX, was $hintContrast")
-            }
-            if (cacheSize !in CACHE_MIN..CACHE_MAX) {
-                add("cacheSize must be within $CACHE_MIN..$CACHE_MAX, was $cacheSize")
-            }
-        }
-
-    public companion object {
-        public const val BOXES_MIN: Int = 0
-        public const val BOXES_MAX: Int = 20
-        public const val PAD_MIN: Double = 0.0
-        public const val PAD_MAX: Double = 0.5
-        public const val TARGET_MIN: Int = 16
-        public const val TARGET_MAX: Int = 64
-        public const val SCALE_MIN: Double = 1.0
-        public const val SCALE_MAX: Double = 4.0
-        public const val RATIO_MIN: Double = 0.0
-        public const val RATIO_MAX: Double = 1.0
-        public const val IOU_MIN: Double = 0.1
-        public const val IOU_MAX: Double = 0.9
-        public const val GAP_MIN: Int = 8
-        public const val GAP_MAX: Int = 64
-        public const val CONTRAST_MIN: Int = 0
-        public const val CONTRAST_MAX: Int = 255
-        public const val CACHE_MIN: Int = 0
-        public const val CACHE_MAX: Int = 512
-    }
-}
-
-/** `device.vision.rec`：OCR 识别双档级联（docs/design/ocr-accuracy-uplift 阶段 B）。 */
-@Serializable
-public data class DeviceVisionRecSection(
-    /** 档位：mobile=只用快档；cascade=快档＋低置信行升级精档；server=全量精档。 */
-    @SerialName("mode") val mode: String = "cascade",
-    /** 行置信度（CTC 行分）低于此值升级精档重识。 */
-    @SerialName("upgradeConf") val upgradeConf: Double = 0.9,
-    /** 每帧升级名额（精档重识次数上限，控 P95）。 */
-    @SerialName("maxUpgrades") val maxUpgrades: Int = 6,
-) : ConfigSection {
-    override fun validate(): List<String> =
-        buildList {
-            if (mode !in MODES) add("mode must be one of $MODES, was '$mode'")
-            if (upgradeConf !in UPGRADE_CONF_MIN..UPGRADE_CONF_MAX) {
-                add("upgradeConf must be within $UPGRADE_CONF_MIN..$UPGRADE_CONF_MAX, was $upgradeConf")
-            }
-            if (maxUpgrades !in UPGRADES_MIN..UPGRADES_MAX) {
-                add("maxUpgrades must be within $UPGRADES_MIN..$UPGRADES_MAX, was $maxUpgrades")
-            }
-        }
-
-    public companion object {
-        /** 支持的级联档位。 */
-        public val MODES: Set<String> = setOf("mobile", "cascade", "server")
-        private const val UPGRADE_CONF_MIN: Double = 0.0
-        private const val UPGRADE_CONF_MAX: Double = 1.0
-        private const val UPGRADES_MIN: Int = 0
-        private const val UPGRADES_MAX: Int = 20
-    }
-}
-
-/** `device.vision.icon`：视觉图标分类（vp9 §5/§7，icon_cls）。 */
+/** `device.vision.icon`：视觉图标分类（icon_cls；逐叶子全量推理，拒识即无图标）。 */
 @Serializable
 public data class DeviceVisionIconSection(
     @SerialName("enabled") val enabled: Boolean = true,
-    /** 推理的检测类别键（vp9 §5.1）：icon/button/input/tab/item。 */
-    @SerialName("categories") val categories: List<String> = DEFAULT_CATEGORIES,
-    /** 图标裁图最小宽（§5.2：文字列块宽 < minIconSide×框高 不推理）。 */
-    @SerialName("minIconSide") val minIconSide: Double = 0.6,
-) : ConfigSection {
-    override fun validate(): List<String> =
-        buildList {
-            if (categories.any { it.isBlank() }) add("categories must not contain blank entries")
-            if (minIconSide !in 0.0..2.0) add("minIconSide must be within 0.0..2.0, was $minIconSide")
-        }
-
-    public companion object {
-        public val DEFAULT_CATEGORIES: List<String> = listOf("icon", "button", "input", "tab", "item")
-    }
-}
+) : ConfigSection
 
 /** `device.overlay`：悬浮窗隐藏稳定。 */
 @Serializable
@@ -450,10 +336,6 @@ public object DeviceConfig {
         ConfigKey("device.vision", DeviceVisionParseSection.serializer()) { DeviceVisionParseSection() }
     public val VISION_ICON: ConfigKey<DeviceVisionIconSection> =
         ConfigKey("device.vision.icon", DeviceVisionIconSection.serializer()) { DeviceVisionIconSection() }
-    public val VISION_RESCAN: ConfigKey<DeviceVisionRescanSection> =
-        ConfigKey("device.vision.rescan", DeviceVisionRescanSection.serializer()) { DeviceVisionRescanSection() }
-    public val VISION_REC: ConfigKey<DeviceVisionRecSection> =
-        ConfigKey("device.vision.rec", DeviceVisionRecSection.serializer()) { DeviceVisionRecSection() }
     public val OVERLAY: ConfigKey<DeviceOverlaySection> =
         ConfigKey("device.overlay", DeviceOverlaySection.serializer()) { DeviceOverlaySection() }
     public val TOUCH: ConfigKey<DeviceTouchSection> =
@@ -481,8 +363,6 @@ public object DeviceConfig {
             OBSERVE,
             VISION,
             VISION_ICON,
-            VISION_RESCAN,
-            VISION_REC,
             OVERLAY,
             TOUCH,
             TAP,

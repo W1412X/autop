@@ -1,6 +1,6 @@
 /**
- * [com.example.autop.device.VisualScreenParser] 实现（docs/design/visual-screen-parsing §5.1；
- * vp9 §4.2 编排）：解码截图 → 帧差复用（§7）→ 检测＋OCR＋状态＋图标＋补扫＋伪树合成。
+ * [com.example.autop.device.VisualScreenParser] 实现（docs/design/visual-screen-parsing §5.1）：
+ * 解码截图 → 帧差复用（§7）→ YOLO 检测＋状态分类＋建树分析＋逐叶子 OCR/图标 → 伪树合成。
  * 引擎未就绪/解析失败返回 null，不抛错。
  */
 package com.example.autop.device.impl.vision
@@ -11,7 +11,6 @@ import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.DeviceVisionParseSection
-import com.example.autop.core.config.DeviceVisionRecSection
 import com.example.autop.device.VisualFrame
 import com.example.autop.device.VisualScreenParser
 import com.example.autop.device.VisualTree
@@ -32,12 +31,8 @@ public class VisualScreenParserImpl
     ) : VisualScreenParser {
         private val store = VisionModelStore(context.assets)
         private val detector: VisualDetector = OnnxVisualDetector(store)
-        private val fastRecognizer: TextRecognizer = OnnxTextRecognizer(store)
-        private val serverRecognizer: TextRecognizer = OnnxTextRecognizer(store, OnnxTextRecognizer.REC_SERVER)
-        private val tieredRecognizer: TextRecognizer = TieredTextRecognizer(fastRecognizer, serverRecognizer)
-        private val ocr: VisualOcrEngine = OnnxVisualOcrEngine(store, tieredRecognizer)
+        private val recognizer: TextRecognizer = OnnxTextRecognizer(store)
         private val states: VisualStateClassifier = OnnxStateClassifier(store)
-        private val rescanCache = RescanCache(DEFAULT_CACHE_SIZE)
         private val iconTable: IconLabelTable by lazy {
             val text =
                 runCatching {
@@ -46,31 +41,26 @@ public class VisualScreenParserImpl
             IconLabelTable.parse(text)
         }
         private val iconClassifier: VisualIconClassifier by lazy { OnnxIconClassifier(store, iconTable) }
-        private val textDetector: TextDetector = OnnxTextDetector(store)
         private val cacheLock = Any()
         private var cached: CachedTree? = null
 
         override val available: Boolean
-            get() = configProvider.current()[DeviceConfig.VISION].enabled && detector.ready && ocr.ready
+            get() = configProvider.current()[DeviceConfig.VISION].enabled && detector.ready && recognizer.ready
 
         /**
-         * 预热：把 5 个 ONNX 会话（检测/OCR 检测/OCR 识别/状态/图标）的加载挪到空闲期。
-         * 模型资产合计约 72MB，首次加载要读资产＋校验 SHA-256＋建会话（含 NNAPI 编译），
-         * 放在观测调用里会撞穿解析预算并抬高瞬时内存峰值。
-         * server rec（阶段 B 精档）在非 mobile 档下一并预热（资产缺失时 ready 短路为 false）。
+         * 预热：把 ONNX 会话（检测/OCR 识别/状态/图标）的加载挪到空闲期。
+         * 首次加载要读资产＋校验 SHA-256＋建会话（含 NNAPI 编译），放在观测调用里会撞穿解析预算。
          */
         override suspend fun warmUp() {
             val cfg = configProvider.current()[DeviceConfig.VISION]
             if (!cfg.enabled) return
             val iconCfg = configProvider.current()[DeviceConfig.VISION_ICON]
-            val recCfg = configProvider.current()[DeviceConfig.VISION_REC]
             withContext(dispatchers.io) {
                 runCatching {
                     detector.ready
-                    ocr.ready
+                    recognizer.ready
                     states.ready
                     if (iconCfg.enabled) iconClassifier.ready
-                    if (RecCascadeMode.parse(recCfg.mode) != RecCascadeMode.MOBILE) serverRecognizer.ready
                 }
             }
         }
@@ -85,50 +75,29 @@ public class VisualScreenParserImpl
                     cachedTree(image, frame, cfg)?.let { return@withContext it }
                 }
                 val iconCfg = configProvider.current()[DeviceConfig.VISION_ICON]
-                val rescanCfg = configProvider.current()[DeviceConfig.VISION_RESCAN]
-                val recCfg = configProvider.current()[DeviceConfig.VISION_REC]
-                val engines =
-                    OptionalEngines(
-                        icons = if (iconCfg.enabled) iconClassifier else null,
-                        rescan =
-                            RescanEngines(textDetector, tieredRecognizer, rescanCache),
-                    )
-                val options = parseOptions(cfg, iconCfg, rescanCfg, recCfg, frame)
                 val result =
-                    VisualParsePipeline.parse(image, detector, ocr, states, options, engines)
-                        ?: return@withContext null
+                    VisualParsePipeline.parse(
+                        image = image,
+                        detector = detector,
+                        recognizer = recognizer,
+                        states = states,
+                        options = parseOptions(cfg, frame),
+                        icons = if (iconCfg.enabled) iconClassifier else null,
+                    ) ?: return@withContext null
                 if (debug.isActive) debug.record(image, result)
                 storeTree(image, frame, result.tree)
                 result.tree
             }
         }
 
-        /** 配置 → 解析参数（vp9 §7）。 */
+        /** 配置 → 解析参数。 */
         private fun parseOptions(
             cfg: DeviceVisionParseSection,
-            iconCfg: com.example.autop.core.config.DeviceVisionIconSection,
-            rescanCfg: com.example.autop.core.config.DeviceVisionRescanSection,
-            recCfg: DeviceVisionRecSection,
             frame: VisualFrame,
         ): ParseOptions =
             ParseOptions(
                 minConfidence = cfg.minConfidence,
                 area = frame.contentArea,
-                iconCategories = iconCfg.categories.toSet(),
-                minIconSide = iconCfg.minIconSide,
-                rescanEnabled = rescanCfg.enabled,
-                maxBoxes = rescanCfg.maxBoxes,
-                padRatio = rescanCfg.padRatio,
-                targetTextPx = rescanCfg.targetTextPx,
-                maxScale = rescanCfg.maxScale,
-                lowConf = rescanCfg.lowConf,
-                dupIou = rescanCfg.dupIou,
-                spanOverlap = rescanCfg.spanOverlap,
-                mosaic = rescanCfg.mosaic,
-                mosaicGap = rescanCfg.mosaicGap,
-                hintContrast = rescanCfg.hintContrast,
-                recCascade =
-                    RecCascadeOptions(RecCascadeMode.parse(recCfg.mode), recCfg.upgradeConf, recCfg.maxUpgrades),
             )
 
         /** 帧差缓存命中（§7：Hamming ≤ [MAX_HAMMING] 且 SSIM ≥ [MIN_SSIM] 判无变化）。 */
@@ -142,7 +111,6 @@ public class VisualScreenParserImpl
             return synchronized(cacheLock) {
                 val hit = cached
                 if (hit != null && hit.rotation != frame.rotation) {
-                    rescanCache.clear()
                     null
                 } else if (hit != null &&
                     VisualFrameDiff.unchanged(hit.signature, signature, MAX_HAMMING, MIN_SSIM)
@@ -176,8 +144,5 @@ public class VisualScreenParserImpl
         private companion object {
             const val MAX_HAMMING: Int = 6
             const val MIN_SSIM: Double = 0.98
-
-            /** 框级缓存初值（§4.7 容量以配置为准时重建；此处给缺省）。 */
-            const val DEFAULT_CACHE_SIZE: Int = 64
         }
     }

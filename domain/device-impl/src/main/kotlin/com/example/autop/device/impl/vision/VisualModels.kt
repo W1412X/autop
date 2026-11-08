@@ -23,11 +23,10 @@ internal data class VisualOcrLine(
     val bounds: Rect,
 )
 
-/** 图标分类候选（vp9 §5.1/§5.2）：叶子框＋吸收所得 iconRegion＋归属文字行。 */
+/** 图标分类候选（vp9 §5.1/§5.2）：叶子框＋吸收所得 iconRegion（裁图优先用之）。 */
 internal data class IconCandidate(
     val bounds: Rect,
     val iconRegion: Rect? = null,
-    val textLines: List<Rect> = emptyList(),
 )
 
 /**

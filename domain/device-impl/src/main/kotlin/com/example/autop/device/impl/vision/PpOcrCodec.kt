@@ -1,8 +1,6 @@
 /**
- * PP-OCR 前后处理（vp9 §4.1，PP-OCRv5 mobile）：det 概率图→文本行框、rec→CTC 解码。
- * v5 预处理：det/rec 均 BGR 通道；det 用 ImageNet 均值方差，rec 用 (x/255−0.5)/0.5；
- * det 后处理按框内平均概率 box_thresh 过滤。UI 截图文本行近似水平，
- * det 后处理用轴对齐连通域（免旋转多边形）；纯 Kotlin 可单测。
+ * PP-OCR 前后处理（vp9 §4.1，PP-OCRv5 server rec）：rec 裁剪/切窗/预处理与 CTC 编解码。
+ * v5 预处理：rec 输入 BGR 通道、(x/255)（导出图内置归一化）；纯 Kotlin 可单测。
  */
 package com.example.autop.device.impl.vision
 
@@ -10,7 +8,7 @@ import com.example.autop.device.Rect
 import kotlin.math.ceil
 import kotlin.math.floor
 
-/** det 产出的候选文本行（框＋框内平均概率）。 */
+/** rec 识别的候选文本框（框＋检测置信度）。 */
 internal data class OcrBox(
     val bounds: Rect,
     val score: Double,
@@ -18,34 +16,12 @@ internal data class OcrBox(
 
 /** PP-OCR 编解码器。 */
 internal object PpOcrCodec {
-    /** det 输入最长边（PP-OCRv4 mobile 惯例 960，等比缩放）。 */
-    const val DET_LIMIT_SIDE: Int = 960
-
     /** rec 输入形状（官方口径：48 高、宽按比例 ≤320。N211 曾升 64×426，越出训练分布致 CTC 全空，已回退）。 */
     const val REC_HEIGHT: Int = 48
     const val REC_WIDTH: Int = 320
 
     /** 单窗最大宽高比（[REC_WIDTH]/[REC_HEIGHT]，超出切窗防截断）。 */
     val REC_MAX_ASPECT: Double = REC_WIDTH.toDouble() / REC_HEIGHT
-
-    /** 概率图二值化阈值（DB `thresh`）。 */
-    private const val BINARIZE: Double = 0.3
-
-    /** 框内平均概率下限（DB `box_thresh`，低于此分数的连通域丢弃，vp9 §4.1）。 */
-    private const val BOX_THRESH: Double = 0.6
-
-    /** 连通域最小像素数（过滤噪声）。 */
-    private const val MIN_PIXELS: Int = 4
-
-    /** det 缩放后框外扩像素（补偿收缩）。 */
-    private const val BOX_PAD: Int = 2
-
-    /** det 输入边长对齐倍数（网络下采样要求）。 */
-    private const val DET_ALIGN: Int = 32
-
-    /** det 归一化（v5 ImageNet 均值方差，BGR 排列对应值）。 */
-    private val DET_MEAN = floatArrayOf(0.485f, 0.456f, 0.406f)
-    private val DET_STD = floatArrayOf(0.229f, 0.224f, 0.225f)
 
     /** rec 归一化：模型导出时已内置归一化（inference.yml 无 NormalizeImage op），输入为 x/255（0..1）。
      * 曾按训练侧文档口径用 (x/255−0.5)/0.5，实测同一裁剪两种口径在 mobile/server rec 上
@@ -67,66 +43,6 @@ internal object PpOcrCodec {
 
     /** 相邻切窗重叠比例（防切字）。 */
     private const val WINDOW_OVERLAP: Double = 0.15
-
-    /** det 等比缩放参数（map 坐标 × [scale] = 原图坐标）。 */
-    internal class DetMap(
-        val prob: FloatArray,
-        val width: Int,
-        val height: Int,
-        val scale: Double,
-    )
-
-    /** det 预处理几何：等比缩放到最长边 [DET_LIMIT_SIDE]，边长对齐 32 的倍数。 */
-    fun detSize(
-        imageWidth: Int,
-        imageHeight: Int,
-    ): Pair<Int, Int> {
-        val side = maxOf(imageWidth, imageHeight)
-        val ratio = DET_LIMIT_SIDE.toDouble() / side
-        val w = roundUp32((imageWidth * ratio).toInt())
-        val h = roundUp32((imageHeight * ratio).toInt())
-        return w to h
-    }
-
-    /** det 后处理：概率图二值化 → 连通域 → 轴对齐文本行框（映射回原图坐标，box_thresh 过滤）。 */
-    fun detBoxes(map: DetMap): List<OcrBox> {
-        val mask = BooleanArray(map.width * map.height) { i -> map.prob[i] > BINARIZE }
-        val seen = BooleanArray(mask.size)
-        val boxes = mutableListOf<OcrBox>()
-        for (start in mask.indices) {
-            if (!mask[start] || seen[start]) continue
-            val region = flood(mask, seen, start, map.width, map.height)
-            val box = boundsOf(region, map.width, map.scale)
-            if (box != null && region.size >= MIN_PIXELS) {
-                val score = meanProb(map, region)
-                if (score >= BOX_THRESH) boxes += OcrBox(box, score)
-            }
-        }
-        return boxes
-    }
-
-    /** det 预处理（v5）：画布缩放到 mapW×mapH 的 CHW 张量，BGR 通道＋ImageNet 均值方差。 */
-    fun detInput(
-        image: VisionImage,
-        mapW: Int,
-        mapH: Int,
-    ): FloatArray {
-        val plane = mapW * mapH
-        val chw = FloatArray(COLOR_CHANNELS * plane)
-        for (y in 0 until mapH) {
-            val sy = y * image.height / mapH
-            for (x in 0 until mapW) {
-                val sx = x * image.width / mapW
-                val p = image.argb[sy * image.width + sx]
-                val dst = y * mapW + x
-                chw[dst] = normalizeDet((p and BYTE_MASK) / BYTE_MAX, 0)
-                chw[plane + dst] = normalizeDet(((p shr GREEN_SHIFT) and BYTE_MASK) / BYTE_MAX, 1)
-                chw[(COLOR_CHANNELS - 1) * plane + dst] =
-                    normalizeDet(((p shr RED_SHIFT) and BYTE_MASK) / BYTE_MAX, 2)
-            }
-        }
-        return chw
-    }
 
     /** rec 裁剪框（N211 外扩：上下 10% 高、左右 5% 宽，保笔画，钳制图内）。 */
     fun recCrop(
@@ -256,74 +172,6 @@ internal object PpOcrCodec {
         return out.toString()
     }
 
-    /** 深度优先泛洪收集连通域像素索引。 */
-    private fun flood(
-        mask: BooleanArray,
-        seen: BooleanArray,
-        start: Int,
-        width: Int,
-        height: Int,
-    ): List<Int> {
-        val region = mutableListOf<Int>()
-        val stack = mutableListOf(start)
-        seen[start] = true
-        while (stack.isNotEmpty()) {
-            val i = stack.removeAt(stack.size - 1)
-            region += i
-            val x = i % width
-            val y = i / width
-            if (x > 0) pushNeighbor(stack, mask, seen, i - 1)
-            if (x + 1 < width) pushNeighbor(stack, mask, seen, i + 1)
-            if (y > 0) pushNeighbor(stack, mask, seen, i - width)
-            if (y + 1 < height) pushNeighbor(stack, mask, seen, i + width)
-        }
-        return region
-    }
-
-    /** 压栈未访问的前景邻域像素（越界由调用方按轴向排除）。 */
-    private fun pushNeighbor(
-        stack: MutableList<Int>,
-        mask: BooleanArray,
-        seen: BooleanArray,
-        i: Int,
-    ) {
-        if (!mask[i] || seen[i]) return
-        seen[i] = true
-        stack += i
-    }
-
-    /** 连通域 → 原图坐标框（外扩 [BOX_PAD]）。 */
-    private fun boundsOf(
-        region: List<Int>,
-        width: Int,
-        scale: Double,
-    ): Rect? {
-        if (region.isEmpty()) return null
-        var minX = Int.MAX_VALUE
-        var minY = Int.MAX_VALUE
-        var maxX = 0
-        var maxY = 0
-        for (i in region) {
-            val x = i % width
-            val y = i / width
-            if (x < minX) minX = x
-            if (y < minY) minY = y
-            if (x > maxX) maxX = x
-            if (y > maxY) maxY = y
-        }
-        val l = ((minX - BOX_PAD) * scale).toInt()
-        val t = ((minY - BOX_PAD) * scale).toInt()
-        val r = ((maxX + 1 + BOX_PAD) * scale).toInt()
-        val b = ((maxY + 1 + BOX_PAD) * scale).toInt()
-        return Rect(l, t, r, b)
-    }
-
-    /** 框内平均概率（置信度）。 */
-    private fun meanProb(
-        map: DetMap,
-        region: List<Int>,
-    ): Double = region.sumOf { map.prob[it].toDouble() } / maxOf(1, region.size)
-
     /** 找 [from, from+count) 的最大值索引。 */
     private fun argmax(
         data: FloatArray,
@@ -336,13 +184,4 @@ internal object PpOcrCodec {
         }
         return best - from
     }
-
-    /** 边长对齐 [DET_ALIGN] 的倍数（det 网络下采样要求）。 */
-    private fun roundUp32(value: Int): Int = (value + DET_ALIGN - 1) / DET_ALIGN * DET_ALIGN
-
-    /** det 通道归一化：(x − mean_c) / std_c（c 按 BGR 排列取值）。 */
-    private fun normalizeDet(
-        value: Float,
-        channel: Int,
-    ): Float = (value - DET_MEAN[channel]) / DET_STD[channel]
 }

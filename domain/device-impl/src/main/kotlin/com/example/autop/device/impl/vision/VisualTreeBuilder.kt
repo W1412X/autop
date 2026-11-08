@@ -1,8 +1,8 @@
 /**
- * 伪树合成（docs/design/visual-screen-parsing §6.2；vp9 §3.1/§3.2）：
- * 原子吸收（[AtomicAbsorber]）→ 文字唯一归属（[TextOwnership]）→ 包含关系 → 阅读序 →
- * 先序编号；v2 多类直出带检测置信度与勾选三态，标签栏几何识别与 icon-in-item 去点在
- * 此层处理。与 PoC（poc/visual-parsing）行为一致。
+ * 伪树合成（docs/design/visual-screen-parsing §6.2）：原子吸收（[AtomicAbsorber]）→ 包含关系
+ * 建树 → 阅读序 → 先序编号。叶子内容（OCR 文本/图标显示名/提示语）由编排层逐叶采集后直挂，
+ * 无文本归属/补扫环节；v2 多类直出带检测置信度与勾选三态，标签栏几何识别与 icon-in-item
+ * 去点在此层处理。
  */
 package com.example.autop.device.impl.vision
 
@@ -16,71 +16,51 @@ import kotlin.math.max
 
 /** 伪树合成器。 */
 internal object VisualTreeBuilder {
-    /**
-     * 合成一帧伪树（root idx＝0，节点按先序编号排列）。vp9 §3.1/§3.2：先原子吸收再文字
-     * 唯一归属；不变量（§3.4）[debug] 违反即抛，否则记 [warn]（注入判别，不读 BuildConfig）。
-     * 无补扫/图标推理的兼容入口（完整流水见 [analyze]＋[build]）。
-     */
-    fun build(
-        detections: List<VisualDetection>,
-        ocrLines: List<VisualOcrLine>,
-        screenWidth: Int,
-        screenHeight: Int,
-        debug: Boolean = false,
-        warn: (String) -> Unit = {},
-    ): VisualTree {
-        val analysis = analyze(detections, ocrLines)
-        return build(FinalInput(analysis, ocrLines), screenWidth, screenHeight, debug, warn)
-    }
-
-    /** 分析中间态（vp9 §4.2 前半：骨架＋原子吸收＋文字归属）。 */
+    /** 分析中间态：原子吸收＋包含关系（叶子＝无子框的框）。 */
     internal data class Analysis(
         val absorbed: List<Absorbed>,
         val boxes: List<VisualDetection>,
-        val ownership: Ownership,
         val kids: Map<Int, List<Int>>,
+    ) {
+        /** 叶子框索引（吸收后、无子框）。 */
+        fun leaves(): List<Int> = boxes.indices.filter { kids[it].isNullOrEmpty() }
+    }
+
+    /** 叶子采集内容（编排层逐叶产出，直挂节点）。 */
+    internal data class LeafInput(
+        /** OCR 文本（空文本传 null）。 */
+        val text: String? = null,
+        /** input 提示语（非 null 时文字进 hint 不进 text，vp9 §4.6）。 */
+        val hint: String? = null,
+        /** 图标分类显示名（拒识为 null）。 */
+        val iconLabel: String? = null,
     )
 
-    /** 定稿输入（vp9 §4.2 后半）：吸收结果＋最终行/归属＋图标显示名＋input 提示行。 */
-    internal data class FinalInput(
-        val analysis: Analysis,
-        val lines: List<VisualOcrLine>,
-        val ownership: Ownership = analysis.ownership,
-        val iconLabels: Map<Int, String> = emptyMap(),
-        val dupIou: Double = TextOwnership.DEFAULT_DUP_IOU,
-        /** 框索引 → 判为提示语的行索引（vp9 §4.6，进 hint 不进 text）。 */
-        val hintLines: Map<Int, List<Int>> = emptyMap(),
-    )
-
-    /** 一段（§4.2）：原子吸收＋文字唯一归属。 */
-    fun analyze(
-        detections: List<VisualDetection>,
-        ocrLines: List<VisualOcrLine>,
-        spanOverlap: Double = TextOwnership.DEFAULT_SPAN_OVERLAP,
-    ): Analysis {
+    /** 一段：吸收＋包含关系（检测→叶子的唯一依据，与 OCR 无关）。 */
+    fun analyze(detections: List<VisualDetection>): Analysis {
         val absorbed = AtomicAbsorber.absorb(detections)
         val boxes = absorbed.map { it.detection }
-        val ownership = TextOwnership.assign(boxes, ocrLines, spanOverlap)
-        val alive = boxes.indices.filterNot { it in ownership.drops }.toSet()
-        return Analysis(absorbed, boxes, ownership, TextOwnership.childrenOf(boxes, alive))
+        return Analysis(absorbed, boxes, childrenOf(boxes))
     }
 
     /**
-     * 二段（§4.2）：定稿伪树（补扫合并后的 [input] → 编号树）；不变量检查用 [input.dupIou]。
+     * 二段：定稿伪树（叶子内容 [leaves] 按框索引直挂 → 编号树）。
+     * [debug] 违反树形约定即抛，否则记 [warn]。
      */
     fun build(
-        input: FinalInput,
+        analysis: Analysis,
+        leaves: Map<Int, LeafInput>,
         screenWidth: Int,
         screenHeight: Int,
         debug: Boolean = false,
         warn: (String) -> Unit = {},
     ): VisualTree {
-        val nodes = assemble(input.analysis.absorbed, input.lines, input.ownership, input.iconLabels, input.hintLines)
+        val nodes = assemble(analysis, leaves)
         addTabBars(nodes, screenHeight)
         val ordered = readingOrder(nodes)
         val all = link(ordered, screenWidth, screenHeight)
         demoteIconInItem(all)
-        TextOwnership.check(input.analysis.boxes, input.ownership, input.lines, input.dupIou, debug, warn)
+        checkTree(all, debug, warn)
         return VisualTree(rootIdx = 0, nodes = all.map { it.toSnapshot() })
     }
 
@@ -91,7 +71,7 @@ internal object VisualTreeBuilder {
         var text: String? = null,
         val confidence: Double? = null,
         val checked: Boolean? = null,
-        /** 吸收的 icon 子框（[AtomicAbsorber]，§5.2 裁图用）。 */
+        /** 吸收的 icon 子框（[AtomicAbsorber]，裁图用）。 */
         val iconRegion: Rect? = null,
     ) {
         var idx: Int = 0
@@ -101,62 +81,42 @@ internal object VisualTreeBuilder {
         var drawingOrder: Int = 0
         var dropClickable: Boolean = false
 
-        /** 图标分类显示名（§5.4，分类器接入后写入）。 */
+        /** 图标分类显示名（分类器接入后写入）。 */
         var iconLabel: String? = null
 
         /** input 提示语（vp9 §4.6，亮度差不足时文字改写到此）。 */
         var hint: String? = null
     }
 
-    /** 检测框（吸收后）＋文字归属 → 草稿节点（合成 text 进树，vp9 §3.2 D/E；图标显示名、
-     * input 提示语写入，§4.6 hint 行不进 text）。 */
+    /** 检测框（吸收后）＋叶子采集内容 → 草稿节点。 */
     private fun assemble(
-        absorbed: List<Absorbed>,
-        lines: List<VisualOcrLine>,
-        ownership: Ownership,
-        iconLabels: Map<Int, String>,
-        hintLines: Map<Int, List<Int>>,
+        analysis: Analysis,
+        leaves: Map<Int, LeafInput>,
     ): MutableList<PNode> {
         val nodes = mutableListOf<PNode>()
-        val byBox = HashMap<Int, PNode>()
-        for ((i, a) in absorbed.withIndex()) {
-            if (i in ownership.drops) continue
+        for ((i, a) in analysis.absorbed.withIndex()) {
+            val leaf = leaves[i]
             val node =
                 PNode(
                     a.detection.category,
                     a.detection.bounds,
+                    text = leaf?.text,
                     confidence = a.detection.confidence,
                     checked = a.detection.checked,
                     iconRegion = a.iconRegion,
                 )
-            node.iconLabel = iconLabels[i]
+            node.iconLabel = leaf?.iconLabel
+            node.hint = leaf?.hint
             nodes += node
-            byBox[i] = node
-        }
-        for ((boxIdx, lineIdxs) in ownership.leafLines) {
-            val hintIdx = hintLines[boxIdx].orEmpty().toSet()
-            val node = byBox[boxIdx] ?: continue
-            node.text = joinTexts(lineIdxs.filterNot { it in hintIdx }.map { lines[it].text })
-            val hint = joinTexts(lineIdxs.filter { it in hintIdx }.map { lines[it].text })
-            if (hint.isNotEmpty()) node.hint = hint
-        }
-        for (s in ownership.synthetic) {
-            nodes += PNode(VisualCategory.TEXT, s.bounds, s.text, s.confidence)
         }
         return nodes
-    }
-
-    /** 文字拼接（vp9 §3.2 C）：阅读序、完全相同的串跳过。 */
-    private fun joinTexts(texts: List<String>): String {
-        val seen = mutableSetOf<String>()
-        return texts.filter { seen.add(it) }.joinToString(" ")
     }
 
     /** 行带聚类（按 y 中心）＋行内按 x 排序，产出阅读序。 */
     private fun readingOrder(nodes: List<PNode>): List<PNode> {
         if (nodes.isEmpty()) return emptyList()
         val heights = nodes.map { it.bounds.height }.sorted()
-        val band = max(TextOwnership.ROW_BAND_MIN, (TextOwnership.ROW_BAND_RATIO * heights[heights.size / 2]).toInt())
+        val band = max(ROW_BAND_MIN, (ROW_BAND_RATIO * heights[heights.size / 2]).toInt())
         val rows = mutableListOf<MutableList<PNode>>()
         for (node in nodes.sortedBy { it.bounds.centerY }) {
             val hit = rows.firstOrNull { abs(node.bounds.centerY - it.first().bounds.centerY) <= band }
@@ -208,6 +168,16 @@ internal object VisualTreeBuilder {
         node: PNode,
         nodes: List<PNode>,
     ): Int? = Containment.parentIndexOf(node.bounds, nodes.map { it.bounds })
+
+    /** 包含关系：框索引 → 直接子框索引（纯几何，叶子＝无子框）。 */
+    private fun childrenOf(boxes: List<VisualDetection>): Map<Int, List<Int>> {
+        val kids = boxes.indices.associateWith { mutableListOf<Int>() }
+        for ((i, box) in boxes.withIndex()) {
+            val p = Containment.parentIndexOf(box.bounds, boxes.map { it.bounds })
+            if (p != null && p != i) kids.getValue(p) += i
+        }
+        return kids
+    }
 
     /** 草稿定稿：类别映射 className/flags/actions（vp8 §8.2）；状态写 stateDesc，置信度写 visualConf。 */
     private fun PNode.toSnapshot(): NodeSnapshot =
@@ -272,4 +242,26 @@ internal object VisualTreeBuilder {
         }
         return false
     }
+
+    /** 树形约定：容器不持文字、节点索引连续（debug 抛出，release 记 warn）。 */
+    private fun checkTree(
+        nodes: List<PNode>,
+        debug: Boolean,
+        warn: (String) -> Unit,
+    ) {
+        val violations = mutableListOf<String>()
+        for (node in nodes) {
+            if (node.children.isNotEmpty() && node.text != null) {
+                violations += "container ${node.idx} 持有 text"
+            }
+        }
+        nodes.forEachIndexed { i, n -> if (n.idx != i) violations += "idx 序断裂：$i 处为 ${n.idx}" }
+        if (violations.isEmpty()) return
+        val msg = "[vision] tree_violation: " + violations.joinToString("; ")
+        if (debug) error(msg) else warn(msg)
+    }
+
+    /** 行带高度容差（阅读序聚类）。 */
+    private const val ROW_BAND_MIN: Int = 8
+    private const val ROW_BAND_RATIO: Double = 0.6
 }
