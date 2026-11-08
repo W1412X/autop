@@ -34,12 +34,12 @@ internal fun PermissionsSection(
         SectionTitle(text = stringResource(R.string.me_section_permissions))
         NavRow(
             title = stringResource(R.string.me_nav_permission_check),
-            subtitle = stringResource(R.string.me_sub_permission_check),
+            subtitle = null,
             onClick = { onOpen(SettingsSection.PERMISSIONS) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_budget),
-            subtitle = stringResource(R.string.me_sub_budget),
+            subtitle = null,
             onClick = { onOpen(SettingsSection.BUDGET) },
         )
         OptionRow(
@@ -50,7 +50,7 @@ internal fun PermissionsSection(
         )
         SwitchRow(
             title = stringResource(R.string.me_overlay_enabled),
-            subtitle = stringResource(R.string.me_sub_overlay_enabled),
+            subtitle = null,
             checked = state.overlayEnabled,
             onCheckedChange = { onAction(MeAction.SetOverlayEnabled(it)) },
         )
@@ -67,13 +67,13 @@ internal fun PermissionsSection(
         )
         SwitchRow(
             title = stringResource(R.string.me_host_persistent),
-            subtitle = stringResource(R.string.me_sub_host_persistent),
+            subtitle = null,
             checked = state.hostPersistent,
             onCheckedChange = { onAction(MeAction.SetHostPersistent(it)) },
         )
         SwitchRow(
             title = stringResource(R.string.me_return_to_origin),
-            subtitle = stringResource(R.string.me_sub_return_to_origin),
+            subtitle = null,
             checked = state.returnToOriginApp,
             onCheckedChange = { onAction(MeAction.SetReturnToOriginApp(it)) },
         )

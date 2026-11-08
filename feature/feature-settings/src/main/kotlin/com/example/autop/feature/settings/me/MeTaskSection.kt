@@ -37,18 +37,18 @@ internal fun TasksReminderSection(
         )
         ActionRow(
             title = stringResource(R.string.me_reminder_sound),
-            subtitle = stringResource(R.string.me_sub_reminder_sound),
+            subtitle = null,
             onClick = { onAction(MeAction.OpenReminderSound) },
         )
         OptionRow(
             title = stringResource(R.string.me_snooze_default),
-            subtitle = stringResource(R.string.me_sub_snooze_default),
+            subtitle = null,
             value = stringResource(R.string.me_minutes, state.snoozeMinutes),
             onClick = onOpenSnoozeSheet,
         )
         InfoRow(
             title = stringResource(R.string.me_reminder_expire),
-            subtitle = stringResource(R.string.me_sub_reminder_expire),
+            subtitle = null,
             value =
                 stringResource(
                     R.string.me_reminder_expire_value,
@@ -74,7 +74,7 @@ internal fun AboutSection() {
         SectionTitle(text = stringResource(R.string.me_section_about))
         InfoRow(
             title = stringResource(R.string.me_version),
-            subtitle = stringResource(R.string.me_sub_version),
+            subtitle = null,
             value = version,
         )
         AboutLink(R.string.me_about_project, R.string.me_about_project_url, uriHandler)

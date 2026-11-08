@@ -46,7 +46,7 @@
     <!-- 配对卡（无线调试配对码输入小窗） -->
     <string name="pairing_card_title">发现可配对设备</string>
     <string name="pairing_card_port">配对端口 %1$d 已自动就绪</string>
-    <string name="pairing_card_hint">输入系统「使用配对码配对设备」窗口中的 6 位配对码即可完成配对，无需切换应用</string>
+    <string name="pairing_card_hint">输入系统配对窗口中的 6 位码即可完成配对</string>
     <string name="pairing_card_code">6 位配对码</string>
     <string name="pairing_card_action">配对</string>
     <string name="pairing_card_research">重新搜索</string>
