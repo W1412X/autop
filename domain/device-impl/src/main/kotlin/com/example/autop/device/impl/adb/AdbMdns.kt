@@ -77,8 +77,10 @@ class AdbMdns(
 
     private fun isPortAvailable(port: Int) =
         try {
+            // N22x：绑定 0.0.0.0 判"端口是否有人监听"（127.0.0.1 只覆盖环回，服务只监听
+            // WLAN 地址的 ROM 上会误判空闲、把真服务过滤掉）；bind 成功＝空闲＝不是真服务。
             ServerSocket().use {
-                it.bind(InetSocketAddress("127.0.0.1", port), 1)
+                it.bind(InetSocketAddress("0.0.0.0", port), 1)
                 false
             }
         } catch (e: IOException) {

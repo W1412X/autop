@@ -14,6 +14,7 @@ import com.example.autop.feature.overlay.OverlayBallController
 import com.example.autop.feature.overlay.OverlayWindowIds
 import com.example.autop.feature.overlay.ball.BallMenuController
 import com.example.autop.feature.overlay.indicator.IndicatorController
+import com.example.autop.feature.overlay.pairing.PairingCardController
 import com.example.autop.feature.overlay.panel.PanelController
 import com.example.autop.feature.overlay.probe.ProbeController
 import com.example.autop.feature.overlay.progress.ProgressController
@@ -68,6 +69,8 @@ class AutopApplication : Application() {
 
     @Inject lateinit var pairingDiscovery: PairingDiscovery
 
+    @Inject lateinit var pairingCardController: PairingCardController
+
     @Inject lateinit var runRecovery: InterruptedRunRecovery
 
     @Inject lateinit var auditCleaner: AuditCleaner
@@ -91,6 +94,7 @@ class AutopApplication : Application() {
         overlayWindows.register(OverlayWindowIds.PROBE, probeController.probeFactory())
         overlayWindows.register(OverlayWindowIds.RECORD, recordController.recordFactory())
         overlayWindows.register(OverlayWindowIds.PICKER, recordController.pickerFactory())
+        overlayWindows.register(OverlayWindowIds.PAIRING, pairingCardController.cardFactory())
         // ADR-0014：执行期指示在盾之上（不可触摸，不挡注入）。
         overlayWindows.register(OverlayWindowIds.INDICATOR, indicatorController.indicatorFactory())
         indicatorController.start()
@@ -104,6 +108,8 @@ class AutopApplication : Application() {
         }
         // 无线调试配对自动发现（未配对时后台监听可配对服务，发现即通知；配对成功自动停用）。
         pairingDiscovery.start(appScope)
+        // 配对卡：发现即可配对设备即浮出输入小窗（零跳转，不依赖通知权限）。
+        pairingCardController.start()
         auditCleaner.ensureScheduled()
         appScope.launch { runRecovery.markInterrupted() }
         // 视觉模型预热：模型资产约 72MB，首次加载要读资产＋校验＋建会话（含 NNAPI 编译），

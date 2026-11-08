@@ -43,6 +43,18 @@
     <string name="ball_menu_record">录制流程</string>
     <string name="ball_menu_hide">隐藏悬浮球</string>
 
+    <!-- 配对卡（无线调试配对码输入小窗） -->
+    <string name="pairing_card_title">发现可配对设备</string>
+    <string name="pairing_card_port">配对端口 %1$d 已自动就绪</string>
+    <string name="pairing_card_hint">输入系统「使用配对码配对设备」窗口中的 6 位配对码即可完成配对，无需切换应用</string>
+    <string name="pairing_card_code">6 位配对码</string>
+    <string name="pairing_card_action">配对</string>
+    <string name="pairing_card_research">重新搜索</string>
+    <string name="pairing_card_close">关闭</string>
+    <string name="pairing_card_missing">请先输入 6 位配对码</string>
+    <string name="pairing_card_failed">配对失败：%1$s</string>
+    <string name="pairing_card_paring">配对中…</string>
+
     <!-- 流程录制面板（flows-recording-recovery.md V5） -->
     <string name="overlay_ball_recording_description">正在录制流程，单击展开录制面板</string>
     <string name="indicator_operating">AutoP 正在操作手机 · 第 %1$d 步</string>

@@ -71,6 +71,16 @@ public class PairingDiscoveryImpl
             teardown()
         }
 
+        /** 手动重启一轮发现（配对卡"重新搜索"：错过广播/进程回收后自愈）。 */
+        @Synchronized
+        override fun refresh() {
+            if (shellInput.paired.value) return
+            mdns?.stop()
+            mdns = null
+            _discoveredPort.value = null
+            ensureDiscovery()
+        }
+
         @Synchronized
         private fun teardown() {
             mdns?.stop()

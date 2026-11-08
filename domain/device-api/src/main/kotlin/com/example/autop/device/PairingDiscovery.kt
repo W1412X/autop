@@ -18,6 +18,9 @@ public interface PairingDiscovery {
     /** 停止发现并清理发现通知。 */
     public fun stop()
 
+    /** 手动重启一轮发现（配对卡"重新搜索"兜底：错过广播/进程回收后自愈）。 */
+    public fun refresh()
+
     public companion object {
         /** 通知点击深链的路由 extra 键（值为应用路由，如 [OPEN_ROUTE_SHELL]）。 */
         public const val EXTRA_OPEN_ROUTE: String = "open_route"
