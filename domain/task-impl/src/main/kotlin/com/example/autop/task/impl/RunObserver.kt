@@ -16,19 +16,25 @@ import com.example.autop.core.common.Clock
 import com.example.autop.core.common.RunId
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.flow.FlowProgressFeed
 import com.example.autop.llm.Block
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus
 import com.example.autop.task.impl.store.RunStore
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
-import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.util.concurrent.ConcurrentHashMap
@@ -38,13 +44,18 @@ public class RunObserver(
     private val runStore: RunStore,
     private val configProvider: ConfigProvider,
     private val clock: Clock,
+    private val flowFeed: FlowProgressFeed,
 ) {
     private val handles = ConcurrentHashMap<RunId, RunHandle>()
     private val eventFlows = ConcurrentHashMap<RunId, MutableSharedFlow<AgentEvent>>()
     private val _active = MutableStateFlow<ActiveRunInfo?>(null)
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
-    /** 当前活跃 Run（悬浮球与对话页使用）。 */
-    val active: StateFlow<ActiveRunInfo?> = _active.asStateFlow()
+    /** 当前活跃 Run（悬浮球与对话页使用）；流程执行时附带根 Run 名下的流程进度（P1-2）。 */
+    val active: StateFlow<ActiveRunInfo?> =
+        combine(_active, flowFeed.active) { run, flows ->
+            run?.copy(flow = flows[run.run.id.value])
+        }.stateIn(scope, SharingStarted.Eagerly, null)
 
     /** Run 启动：登记句柄并置初始活跃信息。 */
     fun begin(

@@ -54,6 +54,7 @@ private val PreviewCallbacks =
         onAnswer = {},
         onPauseResume = {},
         onStop = {},
+        onStopFlow = {},
         onOpenThread = {},
         onSteer = {},
         onContinueBlocked = {},

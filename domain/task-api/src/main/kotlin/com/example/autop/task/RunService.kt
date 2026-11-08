@@ -13,6 +13,7 @@ import com.example.autop.core.common.ThreadId
 import com.example.autop.flow.FlowDebugControl
 import com.example.autop.flow.FlowProgress
 import com.example.autop.flow.FlowRunOptions
+import com.example.autop.flow.FlowRunProgress
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonObject
@@ -104,4 +105,6 @@ public data class ActiveRunInfo(
     val currentStep: String?,
     val stepCount: Int,
     val plan: List<PlanItem>,
+    /** 根 Run 名下进行中的流程进度（run_flow/任务流程；无流程为 null，P1-2 进度互通）。 */
+    val flow: FlowRunProgress? = null,
 )

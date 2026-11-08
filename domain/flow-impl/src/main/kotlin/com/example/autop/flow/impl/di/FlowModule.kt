@@ -26,6 +26,7 @@ import com.example.autop.flow.EndpointStore
 import com.example.autop.flow.EndpointTester
 import com.example.autop.flow.FlowAuthor
 import com.example.autop.flow.FlowBundleService
+import com.example.autop.flow.FlowProgressFeed
 import com.example.autop.flow.FlowRunStore
 import com.example.autop.flow.FlowSession
 import com.example.autop.flow.FlowStateStore
@@ -41,6 +42,7 @@ import com.example.autop.flow.impl.db.FLOWS_MIGRATION_2_3
 import com.example.autop.flow.impl.db.FlowsDb
 import com.example.autop.flow.impl.ports.ApiPortImpl
 import com.example.autop.flow.impl.recording.RecordingSessionImpl
+import com.example.autop.flow.impl.run.FlowProgressFeedImpl
 import com.example.autop.flow.impl.run.FlowSessionDeps
 import com.example.autop.flow.impl.run.FlowSessionImpl
 import com.example.autop.flow.impl.service.EndpointTesterImpl
@@ -119,6 +121,11 @@ public object FlowModule {
     @Provides
     @Singleton
     public fun provideFlowStore(storage: FlowStorage): FlowStore = storage.flows
+
+    /** 流程进度登记表（根 Run → 进度，悬浮球/进度窗直读）。 */
+    @Provides
+    @Singleton
+    public fun provideFlowProgressFeed(impl: FlowProgressFeedImpl): FlowProgressFeed = impl
 
     @Provides
     @Singleton

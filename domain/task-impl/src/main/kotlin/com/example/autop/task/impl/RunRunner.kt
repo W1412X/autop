@@ -27,6 +27,8 @@ import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.ScreenLease
 import com.example.autop.flow.FlowErrorCodes
+import com.example.autop.flow.FlowProgressFeed
+import com.example.autop.flow.FlowRunHandle
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.flow.FlowRunRequest
 import com.example.autop.flow.FlowSession
@@ -61,6 +63,7 @@ public class RunRunner(
     private val agentSession: AgentSession,
     private val flowSession: FlowSession,
     private val flowStore: FlowStore,
+    private val flowFeed: FlowProgressFeed,
     private val runStore: RunStore,
     private val pending: PendingRuns,
     private val observer: RunObserver,
@@ -157,6 +160,10 @@ public class RunRunner(
                 )
             }
         observer.begin(record, handle)
+        // 流程运行登记到根 Run（进度互通 P1-2；进度窗可"只停流程" P1-3）。
+        if (flowLaunch != null && handle is FlowRunHandle) {
+            flowFeed.register(record.id, flowLaunch.definition.name, handle)
+        }
         val watcher = scope.launch { observer.watch(record.id, handle) }
         val shieldWatcher = scope.launch { touchShieldWatcher.watch(handle) }
         try {

@@ -64,11 +64,12 @@ private val STATUS_BAR_HEIGHT = 3.dp
 private const val HEADER_TRANSITION_MS: Int = 250
 
 /** 进度悬浮窗动作回调聚合（由 ProgressController 构造，动作实现在 PanelRunActions）。 */
-@Suppress("LongParameterList") // 回调聚合容器：八个动作入口不可再减（questions.md N114 口径）
+@Suppress("LongParameterList") // 回调聚合容器：九个动作入口不可再减（questions.md N114 口径）
 internal class ProgressCallbacks(
     val onAnswer: (String) -> Unit,
     val onPauseResume: () -> Unit,
     val onStop: () -> Unit,
+    val onStopFlow: () -> Unit,
     val onOpenThread: () -> Unit,
     val onSteer: (String) -> Unit,
     val onContinueBlocked: () -> Unit,
@@ -106,7 +107,7 @@ internal fun ProgressScreen(
         val header = progressHeaderSpec(active = active, finished = finished)
         HeaderBlock(
             header = header,
-            currentStep = active?.currentStep,
+            currentStep = flowHintOf(active) ?: active?.currentStep,
             onClose = callbacks.onClose,
         )
         MessageList(rows = rows, modifier = Modifier.weight(1f))
@@ -384,12 +385,32 @@ private fun ControlRow(
                 text = stringResource(R.string.panel_action_stop),
                 onClick = callbacks.onStop,
             )
+            // 流程执行中：只停流程、对话继续（P1-3 取消粒度）。
+            if (active?.flow != null) {
+                AutopTonalButton(
+                    text = stringResource(R.string.panel_action_stop_flow),
+                    onClick = callbacks.onStopFlow,
+                )
+            }
         }
         AutopTonalButton(
             text = stringResource(R.string.panel_action_open_chat),
             onClick = callbacks.onOpenThread,
         )
     }
+}
+
+/** 流程执行中的提示行（P1-2）：流程名 · 当前节点 · 已完成步数。 */
+private fun flowHintOf(active: ActiveRunInfo?): String? {
+    val flow = active?.flow ?: return null
+    val node = flow.progress.currentNodeName ?: flow.progress.currentNodeId ?: return flow.flowName
+    val done =
+        if (flow.progress.completedNodes > 0) {
+            "已完成 ${flow.progress.completedNodes} 步"
+        } else {
+            null
+        }
+    return listOfNotNull("流程：${flow.flowName}", node, done).joinToString(" · ")
 }
 
 /** steer 补充指令输入行（同运行面板 SteerRow）。 */

@@ -126,7 +126,7 @@ private class ObserverFixture {
     val db: TasksDb =
         Room.inMemoryDatabaseBuilder(context, TasksDb::class.java).allowMainThreadQueries().build()
     val runStore = RunStore(db)
-    val observer = RunObserver(runStore, config, clock)
+    val observer = RunObserver(runStore, config, clock, FakeFlowProgressFeed)
     val interaction = ChatUserInteraction(runStore, FakeLogger)
 
     suspend fun saveRecord(): RunRecord {

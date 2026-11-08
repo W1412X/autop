@@ -17,6 +17,7 @@
     <string name="panel_action_pause">暂停</string>
     <string name="panel_action_resume">继续</string>
     <string name="panel_action_stop">停止</string>
+    <string name="panel_action_stop_flow">停止流程</string>
     <string name="panel_action_open_chat">打开对话</string>
     <string name="panel_ask_self">自己输入</string>
     <string name="panel_blocked_reason_default">需要你确认如何继续</string>

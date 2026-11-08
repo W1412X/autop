@@ -30,6 +30,7 @@ import com.example.autop.feature.overlay.ball.BallStateHolder
 import com.example.autop.feature.overlay.composeOverlayView
 import com.example.autop.feature.overlay.panel.PanelRootView
 import com.example.autop.feature.overlay.panel.PanelRunActions
+import com.example.autop.flow.FlowProgressFeed
 import com.example.autop.task.RunService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -69,6 +70,7 @@ public class ProgressController
         private val runService: RunService,
         private val threadStore: ThreadStore,
         private val actions: PanelRunActions,
+        private val flowFeed: FlowProgressFeed,
         private val logger: Logger,
         dispatchers: DispatcherProvider,
     ) {
@@ -196,6 +198,12 @@ public class ProgressController
                         onAnswer = actions::answer,
                         onPauseResume = actions::pauseResume,
                         onStop = actions::stop,
+                        onStopFlow = {
+                            // 只停流程、对话继续（P1-3）；停的是根 Run 名下登记的流程句柄。
+                            val active = runService.observeActive()
+                            val rootRunId = active.value?.run?.id
+                            if (rootRunId != null) flowFeed.cancel(rootRunId)
+                        },
                         onOpenThread = { actions.openThread(lastThreadState.value) },
                         onSteer = actions::steer,
                         onContinueBlocked = actions::continueBlocked,

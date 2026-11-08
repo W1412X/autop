@@ -20,6 +20,7 @@ import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.RunId
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.flow.FlowErrorCodes
+import com.example.autop.flow.FlowProgressFeed
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.flow.FlowRunRequest
 import com.example.autop.flow.FlowRunStore
@@ -95,6 +96,7 @@ public class RunFlowTool
         private val threads: ThreadStore,
         private val lineage: RunLineage,
         private val ids: IdGenerator,
+        private val progressFeed: FlowProgressFeed,
     ) : Tool {
         override val id: String = "tool.run_flow"
         override val spec: ToolSpec = FlowToolSpecs.runFlow
@@ -140,7 +142,13 @@ public class RunFlowTool
                             ),
                         config = ctx.config,
                     )
-                val finished = coroutineScope { session.start(request, this).await() }
+                val finished =
+                    coroutineScope {
+                        val handle = session.start(request, this)
+                        // 进度挂到根 Run：悬浮球/进度窗可见当前节点，可"只停流程"（P1-2/P1-3）。
+                        progressFeed.register(ctx.runId, flow.name, handle)
+                        handle.await()
+                    }
                 return result(finished, cappedByToolBudget = capped)
             } finally {
                 lineage.unregister(runId)

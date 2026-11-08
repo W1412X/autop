@@ -23,6 +23,7 @@ import com.example.autop.device.ScreenLease
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.TouchShield
 import com.example.autop.device.UserActivityMonitor
+import com.example.autop.flow.FlowProgressFeed
 import com.example.autop.flow.FlowSession
 import com.example.autop.flow.FlowStore
 import com.example.autop.flow.FlowValidationService
@@ -125,7 +126,8 @@ public object TaskModule {
         runStore: RunStore,
         configProvider: ConfigProvider,
         clock: Clock,
-    ): RunObserver = RunObserver(runStore, configProvider, clock)
+        flowFeed: FlowProgressFeed,
+    ): RunObserver = RunObserver(runStore, configProvider, clock, flowFeed)
 
     @Provides
     @Singleton
@@ -138,6 +140,7 @@ public object TaskModule {
         agentSession: AgentSession,
         flowSession: FlowSession,
         flowStore: FlowStore,
+        flowFeed: FlowProgressFeed,
         runStore: RunStore,
         pending: PendingRuns,
         observer: RunObserver,
@@ -158,6 +161,7 @@ public object TaskModule {
             agentSession = agentSession,
             flowSession = flowSession,
             flowStore = flowStore,
+            flowFeed = flowFeed,
             runStore = runStore,
             pending = pending,
             observer = observer,
