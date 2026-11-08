@@ -15,6 +15,7 @@ import com.example.autop.flow.EndNode
 import com.example.autop.flow.FinalAction
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowErrorCodes
+import com.example.autop.flow.FlowRunOptions
 import com.example.autop.flow.FlowSettings
 import com.example.autop.flow.IfNode
 import com.example.autop.flow.LoopMode
@@ -213,6 +214,18 @@ class FlowInterpreterTest {
         val r = run(listOf(loop))
         assertEquals(RunOutcome.SUCCEEDED, r.status)
         assertEquals(listOf("say:i=0", "say:i=1", "say:i=2"), calls)
+    }
+
+    @Test
+    fun `effective max duration takes smaller of settings and caller cap`() {
+        // 工具预算截断语义（run_flow）：定义上限与调用方上限取更小者；<=0 视为不限。
+        assertEquals(5_000L, FlowRunOptions(maxDurationCapMs = 5_000).effectiveMaxDurationMs(10_000))
+        assertEquals(3_000L, FlowRunOptions(maxDurationCapMs = 5_000).effectiveMaxDurationMs(3_000))
+        assertEquals(5_000L, FlowRunOptions(maxDurationCapMs = 5_000).effectiveMaxDurationMs(null))
+        assertEquals(3_000L, FlowRunOptions().effectiveMaxDurationMs(3_000))
+        assertEquals(null, FlowRunOptions().effectiveMaxDurationMs(null))
+        // settings <=0 视为不限，调用方上限仍然生效。
+        assertEquals(5_000L, FlowRunOptions(maxDurationCapMs = 5_000).effectiveMaxDurationMs(0))
     }
 
     @Test

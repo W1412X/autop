@@ -199,8 +199,8 @@ public class FlowInterpreter(
             }
         nodes = NodeRunner(ports, runCfg, llmCfg, agentCfg, screens, conditions, tokens, input, host, recoveryCfg)
         deadline =
-            input.flow.settings.maxDurationMs
-                ?.takeIf { it > 0 }
+            input.options
+                .effectiveMaxDurationMs(input.flow.settings.maxDurationMs)
                 ?.let { meta.startedAt + it }
         return try {
             definitions[input.flow.id] = input.flow

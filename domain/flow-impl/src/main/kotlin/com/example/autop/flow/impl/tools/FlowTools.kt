@@ -18,6 +18,7 @@ import com.example.autop.core.common.AppError
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.RunId
+import com.example.autop.core.config.AgentConfig
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.flow.FlowRunRequest
@@ -118,6 +119,12 @@ public class RunFlowTool
             val runId = RunId(ids.newId())
             val thread = threads.createThread(title = flow.name, parent = null)
             lineage.register(runId, ctx.runId)
+            // 工具级超时（600s）会连工具一起取消：给流程一个略小的有效上限，让它先优雅收口
+            // （RunFinished 含出错节点）而不是只剩 agent.tool_timeout。
+            val toolBudgetMs = ctx.config[AgentConfig.TOOLS].timeoutMs[id] ?: DEFAULT_TOOL_TIMEOUT_MS
+            val capMs = (toolBudgetMs - TOOL_TIMEOUT_MARGIN_MS).coerceAtLeast(1L)
+            val flowMaxDurationMs = flow.settings.maxDurationMs
+            val capped = flowMaxDurationMs == null || flowMaxDurationMs > capMs
             try {
                 val request =
                     FlowRunRequest(
@@ -129,18 +136,22 @@ public class RunFlowTool
                         options =
                             FlowRunOptions(
                                 startAt = (args["start_at"] as? JsonPrimitive)?.content?.takeIf { it.isNotBlank() },
+                                maxDurationCapMs = capMs,
                             ),
                         config = ctx.config,
                     )
                 val finished = coroutineScope { session.start(request, this).await() }
-                return result(finished)
+                return result(finished, cappedByToolBudget = capped)
             } finally {
                 lineage.unregister(runId)
             }
         }
 
-        /** 失败时附出错节点与原因（flows.md §14.1）。 */
-        private fun result(finished: RunFinished): ToolOutput {
+        /** 失败时附出错节点与原因（flows.md §14.1）；[cappedByToolBudget] 声明本次运行受工具预算截断。 */
+        private fun result(
+            finished: RunFinished,
+            cappedByToolBudget: Boolean,
+        ): ToolOutput {
             val ok = finished.status == RunOutcome.SUCCEEDED
             val body =
                 buildJsonObject {
@@ -150,6 +161,7 @@ public class RunFlowTool
                     finished.errorCode?.let { put("errorCode", it) }
                     finished.failedNodeId?.let { put("failedNodeId", it) }
                     finished.failedNodeName?.let { put("failedNodeName", it) }
+                    if (cappedByToolBudget) put("cappedByToolBudget", true)
                 }
             return ToolOutput(
                 ok = ok,
@@ -169,6 +181,12 @@ public class RunFlowTool
 
         private companion object {
             const val ORIGIN_AGENT = "agent"
+
+            /** 工具超时取不到配置时的兜底（与 agent.json `tool.run_flow` 同值）。 */
+            const val DEFAULT_TOOL_TIMEOUT_MS: Long = 600_000
+
+            /** 有效上限在工具超时上留的余量（ms）：保证流程先于工具取消收口。 */
+            const val TOOL_TIMEOUT_MARGIN_MS: Long = 5_000
         }
     }
 

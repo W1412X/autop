@@ -28,7 +28,21 @@ public data class FlowRunOptions(
     val overrides: JsonObject = JsonObject(emptyMap()),
     /** 带 `resumeKey` 的循环从保存的进度继续。 */
     val resume: Boolean = false,
-)
+    /**
+     * 调用方施加的最长运行时长上限（相对启动，毫秒；null=不限）。
+     * 与流程定义的 `settings.maxDurationMs` 取更小者生效（[effectiveMaxDurationMs]）——
+     * run_flow 的工具级超时（600s）会连工具一起取消，流程自己先按此上限优雅收口，
+     * 才能保住 RunFinished（含出错节点）而不是只剩 `agent.tool_timeout`。
+     */
+    val maxDurationCapMs: Long? = null,
+) {
+    /** 有效最长运行时长（毫秒）：定义上限与调用方上限取更小者；<=0 视为不限。 */
+    public fun effectiveMaxDurationMs(settingsMaxDurationMs: Long?): Long? =
+        listOfNotNull(
+            settingsMaxDurationMs?.takeIf { it > 0 },
+            maxDurationCapMs?.takeIf { it > 0 },
+        ).minOrNull()
+}
 
 /** 一次流程运行的启动请求。 */
 public data class FlowRunRequest(
