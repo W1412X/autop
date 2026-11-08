@@ -35,5 +35,7 @@ public data class BrowseUiState(
     val searching: Boolean = false,
     /** 根目录时展示的“最近变更”入口计数（agent 来源条数）。 */
     val recentChangesCount: Int? = null,
+    /** 待删除的行路径（非 null 时弹删除确认；目录整树递归删）。 */
+    val pendingDelete: String? = null,
     val error: String? = null,
 )

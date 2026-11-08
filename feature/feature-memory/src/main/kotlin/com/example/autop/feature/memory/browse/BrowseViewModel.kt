@@ -73,6 +73,9 @@ public class BrowseViewModel
                 }
                 BrowseAction.LoadMore -> loadMore()
                 is BrowseAction.Create -> create(action)
+                is BrowseAction.RequestDelete -> _uiState.value = _uiState.value.copy(pendingDelete = action.path)
+                BrowseAction.ConfirmDelete -> delete()
+                BrowseAction.DismissDelete -> _uiState.value = _uiState.value.copy(pendingDelete = null)
                 BrowseAction.Retry ->
                     openCrumb(
                         _uiState.value.crumbs.lastIndex
@@ -175,6 +178,20 @@ public class BrowseViewModel
             _uiState.value = _uiState.value.copy(recentChangesCount = count)
         }
 
+        /** 删除待删行（目录整树递归删）；observeTree 自动刷新列表。 */
+        private fun delete() {
+            val path = _uiState.value.pendingDelete ?: return
+            viewModelScope.launch {
+                val target = MemoryPath.parse(path).getOrNull() ?: MemoryPath.ROOT
+                val result = store.delete(target, recursive = true, source = MemorySource.USER, runId = null)
+                _uiState.value =
+                    _uiState.value.copy(
+                        pendingDelete = null,
+                        error = (result as? Outcome.Err)?.error?.message,
+                    )
+            }
+        }
+
         private fun create(action: BrowseAction.Create) {
             val name = action.name.trim()
             val parent = MemoryPath.parse(_uiState.value.path).getOrNull() ?: MemoryPath.ROOT
@@ -193,7 +210,9 @@ public class BrowseViewModel
                             path = target,
                             mode = WriteMode.CREATE,
                             title = action.title ?: name,
-                            content = "",
+                            // 目录＝内容空白（行判定 isBlank 即目录）：条目必须落非空内容，
+                            // 选填内容留空时以标题兜底，防止"新建条目"被误建成目录。
+                            content = action.content.ifBlank { if (action.title != null) name else "" },
                             source = MemorySource.USER,
                         ),
                     )

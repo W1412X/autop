@@ -9,6 +9,7 @@
     <string name="memory_cancel">取消</string>
     <string name="memory_confirm">确认</string>
     <string name="memory_name_placeholder">名称</string>
+    <string name="memory_content_placeholder">初始内容（选填）</string>
     <string name="memory_search_placeholder">搜索记忆</string>
     <string name="memory_searching">搜索中…</string>
     <string name="memory_search_empty">没有匹配的记忆</string>

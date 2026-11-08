@@ -5,6 +5,7 @@
 package com.example.autop.feature.memory.browse
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -30,6 +31,7 @@ import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopTextButton
+import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ErrorState
 import com.example.autop.core.ui.component.InputBarSpec
@@ -87,7 +89,34 @@ public fun BrowseScreen(
         }
     }
 
-    if (showCreateSheet) {
+    CreateFlow(
+        showSheet = showCreateSheet,
+        pendingKind = createRequest,
+        onAction = onAction,
+        onSheetVisible = { showCreateSheet = it },
+        onPendingKind = { createRequest = it },
+    )
+    if (state.pendingDelete != null) {
+        ConfirmDialog(
+            title = stringResource(R.string.memory_delete_title),
+            text = stringResource(R.string.memory_delete_text),
+            onConfirm = { onAction(BrowseAction.ConfirmDelete) },
+            onDismiss = { onAction(BrowseAction.DismissDelete) },
+            destructive = true,
+        )
+    }
+}
+
+/** 新建流程（类型弹层 → 命名对话框；条目带选填初始内容）。 */
+@Composable
+private fun CreateFlow(
+    showSheet: Boolean,
+    pendingKind: String?,
+    onAction: (BrowseAction) -> Unit,
+    onSheetVisible: (Boolean) -> Unit,
+    onPendingKind: (String?) -> Unit,
+) {
+    if (showSheet) {
         OptionSheet(
             title = stringResource(R.string.memory_create_new),
             options =
@@ -97,20 +126,26 @@ public fun BrowseScreen(
                 ),
             selectedId = null,
             onSelect = { id ->
-                showCreateSheet = false
-                createRequest = id
+                onSheetVisible(false)
+                onPendingKind(id)
             },
-            onDismiss = { showCreateSheet = false },
+            onDismiss = { onSheetVisible(false) },
         )
     }
-    createRequest?.let { kind ->
+    pendingKind?.let { kind ->
         CreateNameDialog(
             isDirectory = kind == CREATE_DIR_ID,
-            onConfirm = { name ->
-                onAction(BrowseAction.Create(title = if (kind == CREATE_DIR_ID) null else name, name = name))
-                createRequest = null
+            onConfirm = { name, content ->
+                onAction(
+                    BrowseAction.Create(
+                        title = if (kind == CREATE_DIR_ID) null else name,
+                        name = name,
+                        content = content,
+                    ),
+                )
+                onPendingKind(null)
             },
-            onDismiss = { createRequest = null },
+            onDismiss = { onPendingKind(null) },
         )
     }
 }
@@ -238,13 +273,17 @@ private fun ChildRow(
                 null
             },
         modifier =
-            Modifier.clickable {
-                if (row.isDirectory) {
-                    onAction(BrowseAction.OpenRow(row.path, isDirectory = true))
-                } else {
-                    onOpenNode(row.path)
-                }
-            },
+            Modifier.combinedClickable(
+                onClick = {
+                    if (row.isDirectory) {
+                        onAction(BrowseAction.OpenRow(row.path, isDirectory = true))
+                    } else {
+                        onOpenNode(row.path)
+                    }
+                },
+                // 长按＝删除入口（弹确认，防误触；目录整树递归删）。
+                onLongClick = { onAction(BrowseAction.RequestDelete(row.path)) },
+            ),
     )
 }
 
@@ -275,10 +314,11 @@ private fun SearchResults(
 @Composable
 private fun CreateNameDialog(
     isDirectory: Boolean,
-    onConfirm: (String) -> Unit,
+    onConfirm: (name: String, content: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
     var name by remember { mutableStateOf("") }
+    var content by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
@@ -291,17 +331,31 @@ private fun CreateNameDialog(
             )
         },
         text = {
-            AutopInputBar(
-                value = name,
-                onValueChange = { name = it },
-                spec = InputBarSpec(placeholder = stringResource(R.string.memory_name_placeholder)),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            Column {
+                AutopInputBar(
+                    value = name,
+                    onValueChange = { name = it },
+                    spec = InputBarSpec(placeholder = stringResource(R.string.memory_name_placeholder)),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                if (!isDirectory) {
+                    AutopInputBar(
+                        value = content,
+                        onValueChange = { content = it },
+                        spec =
+                            InputBarSpec(
+                                placeholder = stringResource(R.string.memory_content_placeholder),
+                                maxLines = 3,
+                            ),
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                }
+            }
         },
         confirmButton = {
             AutopTextButton(
                 text = stringResource(R.string.memory_confirm_create),
-                onClick = { if (name.isNotBlank()) onConfirm(name) },
+                onClick = { if (name.isNotBlank()) onConfirm(name, content) },
             )
         },
         dismissButton = {
