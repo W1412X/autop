@@ -2,6 +2,9 @@
  * 悬浮球窗口 spec（docs/tech/08 §5.1）：球 52dp＋光晕外扩、可触摸不可聚焦、按球位置摆放。
  * N217：窗口比球每侧大出 [HALO_PAD]（呼吸光晕画在球外需要余量，见 [BALL_WINDOW_SIZE]），
  * 窗口以球为中心，x/y 为球左上角减去外扩。
+ * fullScreen=true（N22x）：默认悬浮窗被摆在系统栏之内、出屏坐标被钳回，贴边/细条形态
+ * 的负坐标落不下去（球整体被推进屏内、离屏幕缘一大截）——必须拿物理屏幕坐标系
+ * （与触摸盾同口径，见 [com.example.autop.device.OverlaySpec.fullScreen] 说明）。
  */
 package com.example.autop.feature.overlay
 
@@ -34,5 +37,6 @@ internal fun ballSpec(
         touchable = true,
         focusable = false,
         gravity = OverlayGravity.TOP_LEFT,
+        fullScreen = true,
     )
 }

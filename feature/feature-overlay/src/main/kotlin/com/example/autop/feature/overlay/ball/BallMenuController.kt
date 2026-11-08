@@ -159,7 +159,8 @@ public class BallMenuController
         }
     }
 
-/** 菜单窗口 spec（N182）：整屏透明、可触摸不可聚焦（不需要输入法）。 */
+/** 菜单窗口 spec（N182）：整屏透明、可触摸不可聚焦（不需要输入法）。
+ *  fullScreen=true：与球窗同坐标系（物理屏幕），球心/按钮摆位不受系统栏 inset 影响。 */
 internal fun menuSpec(context: Context): OverlaySpec {
     val metrics = context.resources.displayMetrics
     return OverlaySpec(
@@ -170,5 +171,6 @@ internal fun menuSpec(context: Context): OverlaySpec {
         touchable = true,
         focusable = false,
         gravity = OverlayGravity.TOP_LEFT,
+        fullScreen = true,
     )
 }
