@@ -61,8 +61,15 @@ public class TriggerHub(
         taskId: TaskId,
         atMillis: Long,
     ) {
-        val task = taskStore.get(taskId) ?: return
-        if (!task.enabled) return
+        val task = taskStore.get(taskId)
+        if (task == null) {
+            logger.w(TAG, "fire_skipped_task_missing", "taskId" to taskId.value)
+            return
+        }
+        if (!task.enabled) {
+            logger.i(TAG, "fire_skipped_task_disabled", "taskId" to taskId.value)
+            return
+        }
         val event =
             TriggerEvent(
                 sourceId = SCHEDULE_SOURCE,
@@ -127,13 +134,19 @@ public class TriggerHub(
     ) {
         mutex.withLock {
             val result = evaluate(task, event)
-            if (!result.filter.match) return
+            if (!result.filter.match) {
+                logger.d(TAG, "filter_not_match", "taskId" to task.id.value, "source" to event.sourceId)
+                return
+            }
             if (result.gate != null) {
                 logger.d(TAG, "gate_blocked", "taskId" to task.id.value, "reason" to result.gate)
                 return
             }
             val judged = result.judged
-            if (judged != null && !judged.match) return
+            if (judged != null && !judged.match) {
+                logger.d(TAG, "llm_not_match", "taskId" to task.id.value, "source" to event.sourceId)
+                return
+            }
             if (!allowGlobalHour()) {
                 logger.w(TAG, "global_hour_limit")
                 return
@@ -143,6 +156,7 @@ public class TriggerHub(
             val window = configProvider.current()[TaskConfig.DEDUPE].window
             stateStore.save(task.id, FireGate.record(state, event.key, clock.nowMillis(), zone, window))
             val vars = buildVars(event, judged)
+            logger.i(TAG, "trigger_fired", "taskId" to task.id.value, "origin" to origin.name)
             runner.enqueueTask(task, origin, vars)
         }
     }
