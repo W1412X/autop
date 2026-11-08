@@ -118,6 +118,10 @@ internal sealed interface Attempt {
 /**
  * 流程解释器（docs/design/flows.md §8）：纯 Kotlin 协程，不依赖 Android。
  * 每个节点：暂停检查 → enabled → 确认 → 执行（带超时）→ 失败处理 → 记录 → 更新 last。
+ *
+ * 口径备注（P2-7 熔断双轨）：流程节点不经过智能体的 CircuitBreaker 熔断——自愈由
+ * `pauseOnConsecutive`（连续失败自动暂停）与恢复阶梯承担；run_flow 的**输出**仍被
+ * 父 Run 的熔断器观察。流程节点也不计父 Run 步数预算（run_flow=1 step）。
  */
 public class FlowInterpreter(
     private val ports: FlowPorts,

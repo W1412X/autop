@@ -119,7 +119,9 @@ public class RunFlowTool
                     return failure(e.code, e.message.orEmpty(), "按 list_flows 返回的参数声明补齐参数")
                 }
             val runId = RunId(ids.newId())
-            val thread = threads.createThread(title = flow.name, parent = null)
+            // 流程线程挂到对话线程下（P2-6）：不再与对话线程平铺混排；锚点取最近可分叉消息。
+            val anchorSeq = threads.forkablePoints(ctx.threadId).lastOrNull()
+            val thread = threads.createThread(title = flow.name, parent = anchorSeq?.let { ctx.threadId to it })
             lineage.register(runId, ctx.runId)
             // 工具级超时（600s）会连工具一起取消：给流程一个略小的有效上限，让它先优雅收口
             // （RunFinished 含出错节点）而不是只剩 agent.tool_timeout。

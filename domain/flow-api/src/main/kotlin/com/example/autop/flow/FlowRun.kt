@@ -53,7 +53,9 @@ public data class FlowRunRequest(
     /** 触发上下文（`trigger.` 前缀已去掉）。 */
     val trigger: JsonObject = JsonObject(emptyMap()),
     val taskId: TaskId? = null,
-    /** 运行来源标签，如 `manual` / `schedule` / `condition` / `agent`。 */
+    /** 运行来源标签，取值域固定为 `agent`（对话内 run_flow）/ `task_manual` / `schedule` /
+     *  `condition` / `resume` / `fork`（即 [com.example.autop.task.RunOrigin] 名的小写；
+     *  注意与 RunOrigin 枚举、线程消息的 MessageOrigin 是三套不同概念，勿混）。 */
     val origin: String,
     val options: FlowRunOptions = FlowRunOptions(),
     val config: ConfigSnapshot,
