@@ -146,6 +146,8 @@ public class AppearanceSettingsViewModel
                 is MeAction.SetDensity -> write(UiConfig.APPEARANCE.path + SUFFIX_DENSITY, JsonPrimitive(action.value))
                 is MeAction.SetMotionEnabled ->
                     write(UiConfig.APPEARANCE.path + SUFFIX_MOTION_ENABLED, JsonPrimitive(action.enabled))
+                is MeAction.SetLanguage ->
+                    write(UiConfig.APPEARANCE.path + SUFFIX_LANGUAGE, JsonPrimitive(action.value))
                 is MeAction.SetOverlayWindowType -> write(OVERLAY_WINDOW_TYPE_PATH, JsonPrimitive(action.value))
                 is MeAction.SetOverlayEnabled -> write(OVERLAY_ENABLED_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetOverlayDisplayMode -> write(OVERLAY_DISPLAY_MODE_PATH, JsonPrimitive(action.value))
@@ -226,6 +228,7 @@ public class AppearanceSettingsViewModel
             const val SUFFIX_ICON_SCALE = ".iconScale"
             const val SUFFIX_DENSITY = ".density"
             const val SUFFIX_MOTION_ENABLED = ".motionEnabled"
+            const val SUFFIX_LANGUAGE = ".language"
 
             /** 悬浮窗通道写入路径（ui.overlay.windowType，docs/tech/05 §10）。 */
             const val OVERLAY_WINDOW_TYPE_PATH = "ui.overlay.windowType"

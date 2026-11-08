@@ -8,7 +8,8 @@
       "fontScale": 1.0,
       "iconScale": 1.0,
       "density": "STANDARD",
-      "motionEnabled": true
+      "motionEnabled": true,
+      "language": "system"
     },
     "nav": {
       "showLabels": false

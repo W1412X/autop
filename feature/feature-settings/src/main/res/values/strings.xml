@@ -127,6 +127,10 @@
     <string name="me_density_standard">标准</string>
     <string name="me_density_comfortable">宽松</string>
     <string name="me_appearance_motion">动效</string>
+    <string name="me_appearance_language">语言</string>
+    <string name="me_language_system">跟随系统</string>
+    <string name="me_language_zh">中文</string>
+    <string name="me_language_en">English</string>
 
     <!-- 模型配置页（docs/tech/08 §4.5 me/models） -->
     <string name="models_title">模型配置</string>

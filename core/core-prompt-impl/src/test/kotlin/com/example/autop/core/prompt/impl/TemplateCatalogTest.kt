@@ -124,6 +124,7 @@ class TemplateCatalogTest {
                 "agent.replay.diverged",
                 "agent.resume.after_interrupt",
                 "agent.resume.reobserve",
+                "agent.system.output",
                 "agent.system.role",
                 "agent.system.run_mode.background",
                 "agent.system.run_mode.foreground",

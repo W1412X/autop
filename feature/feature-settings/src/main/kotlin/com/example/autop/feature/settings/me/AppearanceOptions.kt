@@ -16,4 +16,10 @@ internal object AppearanceOptions {
     val SEED_INDEXES: List<Int> = (0 until SeedColors.COUNT).toList()
     val FONT_SCALES: List<Double> = listOf(0.9, 1.0, 1.15, 1.3)
     val ICON_SCALES: List<Double> = listOf(0.9, 1.0, 1.15)
+
+    /** 输出语言档位（`ui.appearance.language` 原值）。 */
+    const val LANG_SYSTEM: String = "system"
+    const val LANG_ZH: String = "zh"
+    const val LANG_EN: String = "en"
+    val LANGUAGES: List<String> = listOf(LANG_SYSTEM, LANG_ZH, LANG_EN)
 }

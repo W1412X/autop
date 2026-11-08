@@ -10,7 +10,10 @@ import com.example.autop.agent.ContextPart
 import com.example.autop.agent.ContextRequest
 import com.example.autop.agent.Placement
 import com.example.autop.core.common.getOrNull
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.UiConfig
 import com.example.autop.core.prompt.PromptRepository
+import java.util.Locale
 
 /** 模板贡献基类：渲染固定模板，记录版本。 */
 internal abstract class TemplateContributor(
@@ -60,6 +63,30 @@ internal class ToolGuideContributor(
     override val id: String = "context.tool_guide"
     override val templateId: String = "agent.system.tool_guide"
     override val placement: Placement = Placement.SYSTEM_STATIC
+}
+
+/** `context.output`：输出要求（语言 + 简洁；语言取 `ui.appearance.language`，system 跟随系统）。 */
+internal class OutputContributor(
+    prompts: PromptRepository,
+    private val configProvider: ConfigProvider,
+) : TemplateContributor(prompts) {
+    override val id: String = "context.output"
+    override val templateId: String = "agent.system.output"
+    override val placement: Placement = Placement.SYSTEM_STATIC
+
+    override fun vars(req: ContextRequest): Map<String, String> = mapOf("lang" to languageLabel())
+
+    private fun languageLabel(): String =
+        when (configProvider.current()[UiConfig.APPEARANCE].language) {
+            LANG_EN -> "English"
+            LANG_ZH -> "中文"
+            else -> if (Locale.getDefault().language == LANG_EN) "English" else "中文"
+        }
+
+    private companion object {
+        const val LANG_EN: String = "en"
+        const val LANG_ZH: String = "zh"
+    }
 }
 
 /** `context.run_mode`：前台对话 / 后台任务（`vars["runMode"]`）。 */

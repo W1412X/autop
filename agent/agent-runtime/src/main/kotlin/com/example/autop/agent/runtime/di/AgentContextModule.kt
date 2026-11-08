@@ -6,11 +6,13 @@ package com.example.autop.agent.runtime.di
 
 import com.example.autop.agent.ContextContributor
 import com.example.autop.agent.runtime.GoalContributor
+import com.example.autop.agent.runtime.OutputContributor
 import com.example.autop.agent.runtime.RoleContributor
 import com.example.autop.agent.runtime.RunModeContributor
 import com.example.autop.agent.runtime.SafetyContributor
 import com.example.autop.agent.runtime.ToolGuideContributor
 import com.example.autop.agent.runtime.TriggerContributor
+import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.prompt.PromptRepository
 import dagger.Module
 import dagger.Provides
@@ -34,6 +36,14 @@ public object AgentContextModule {
     @IntoSet
     public fun provideToolGuideContributor(prompts: PromptRepository): ContextContributor =
         ToolGuideContributor(prompts)
+
+    /** 输出要求（语言 + 简洁，`ui.appearance.language` 驱动）。 */
+    @Provides
+    @IntoSet
+    public fun provideOutputContributor(
+        prompts: PromptRepository,
+        configProvider: ConfigProvider,
+    ): ContextContributor = OutputContributor(prompts, configProvider)
 
     @Provides
     @IntoSet

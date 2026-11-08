@@ -42,6 +42,11 @@ public sealed interface MeAction {
         val enabled: Boolean,
     ) : MeAction
 
+    /** 输出语言（`ui.appearance.language`：system / zh / en）。 */
+    public data class SetLanguage(
+        val value: String,
+    ) : MeAction
+
     /** 悬浮窗通道（auto / accessibility / application，docs/tech/05 §10）。 */
     public data class SetOverlayWindowType(
         val value: String,

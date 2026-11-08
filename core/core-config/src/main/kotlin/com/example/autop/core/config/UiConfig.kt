@@ -17,6 +17,8 @@ public data class UiAppearanceSection(
     @SerialName("iconScale") val iconScale: Double = 1.0,
     @SerialName("density") val density: String = "STANDARD",
     @SerialName("motionEnabled") val motionEnabled: Boolean = true,
+    /** 输出语言（`system` 跟随系统 / `zh` 中文 / `en` English）：决定助手面向用户的输出语言。 */
+    @SerialName("language") val language: String = "system",
 ) : ConfigSection
 
 /** `ui.nav`：底部导航。 */

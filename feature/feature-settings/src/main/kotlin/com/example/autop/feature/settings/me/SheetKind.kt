@@ -21,6 +21,7 @@ internal enum class SheetKind(
     FONT_SCALE(R.string.me_appearance_font_scale),
     ICON_SCALE(R.string.me_appearance_icon_scale),
     DENSITY(R.string.me_appearance_density),
+    LANGUAGE(R.string.me_appearance_language),
     ;
 
     /** 当前选择的选项 id（与写入配置的原值一致）。 */
@@ -31,6 +32,7 @@ internal enum class SheetKind(
             FONT_SCALE -> appearance.fontScale.toString()
             ICON_SCALE -> appearance.iconScale.toString()
             DENSITY -> appearance.density
+            LANGUAGE -> appearance.language
         }
 
     /** 选项 id → 页面操作。 */
@@ -41,6 +43,7 @@ internal enum class SheetKind(
             FONT_SCALE -> MeAction.SetFontScale(id.toDouble())
             ICON_SCALE -> MeAction.SetIconScale(id.toDouble())
             DENSITY -> MeAction.SetDensity(id)
+            LANGUAGE -> MeAction.SetLanguage(id)
         }
 }
 
@@ -58,6 +61,8 @@ internal fun SheetKind.options(): List<OptionItem> =
             AppearanceOptions.ICON_SCALES.map { OptionItem(id = it.toString(), label = scaleLabel(it)) }
         SheetKind.DENSITY ->
             AppearanceOptions.DENSITIES.map { OptionItem(id = it, label = densityLabel(it)) }
+        SheetKind.LANGUAGE ->
+            AppearanceOptions.LANGUAGES.map { OptionItem(id = it, label = languageLabel(it)) }
     }
 
 /** 当前选择 id 的显示文案。 */
@@ -98,4 +103,12 @@ private fun densityLabel(value: String): String =
         UiDensity.COMPACT.name -> stringResource(R.string.me_density_compact)
         UiDensity.COMFORTABLE.name -> stringResource(R.string.me_density_comfortable)
         else -> stringResource(R.string.me_density_standard)
+    }
+
+@Composable
+private fun languageLabel(value: String): String =
+    when (value) {
+        AppearanceOptions.LANG_EN -> stringResource(R.string.me_language_en)
+        AppearanceOptions.LANG_ZH -> stringResource(R.string.me_language_zh)
+        else -> stringResource(R.string.me_language_system)
     }

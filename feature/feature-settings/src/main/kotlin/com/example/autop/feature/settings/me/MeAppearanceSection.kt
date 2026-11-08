@@ -64,6 +64,12 @@ internal fun AppearanceSection(
             checked = appearance.motionEnabled,
             onCheckedChange = { onAction(MeAction.SetMotionEnabled(it)) },
         )
+        OptionRow(
+            title = stringResource(R.string.me_appearance_language),
+            subtitle = null,
+            value = SheetKind.LANGUAGE.labelOf(appearance.language),
+            onClick = { onOpenSheet(SheetKind.LANGUAGE) },
+        )
     }
 }
 
