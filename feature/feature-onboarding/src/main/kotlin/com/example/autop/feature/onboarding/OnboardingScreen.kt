@@ -120,26 +120,42 @@ private fun CheckCard(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
-            if (restrictedSettingsNote) {
-                Text(
-                    text = stringResource(R.string.onboarding_restricted_settings_note),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            if (item.id == CheckId.ACCESSIBILITY) {
-                // 可选增强：只提示，不作为必需设置（不配对也能正常使用无障碍注入）。
-                Text(
-                    text = stringResource(R.string.onboarding_shell_hint),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
+            CheckNotes(item = item, restrictedSettingsNote = restrictedSettingsNote)
         }
         Spacer(modifier = Modifier.width(spacing.md))
         AutopTonalButton(
             text = stringResource(R.string.onboarding_go_settings),
             onClick = { onAction(OnboardingAction.OpenCheck(item.id)) },
+        )
+    }
+}
+
+/** 卡片附加提示（受限设置/注入通道引导，仅相关卡片显示）。 */
+@Composable
+private fun CheckNotes(
+    item: CheckItem,
+    restrictedSettingsNote: Boolean,
+) {
+    if (restrictedSettingsNote) {
+        Text(
+            text = stringResource(R.string.onboarding_restricted_settings_note),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (item.id == CheckId.SHELL_PAIRING) {
+        Text(
+            text = stringResource(R.string.onboarding_check_shell_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+    if (item.id == CheckId.ACCESSIBILITY) {
+        // 可选增强：只提示，不作为必需设置（不配对也能正常使用无障碍注入）。
+        Text(
+            text = stringResource(R.string.onboarding_shell_hint),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
     }
 }
@@ -166,6 +182,7 @@ private fun titleRes(id: CheckId): Int =
     when (id) {
         CheckId.MODEL -> R.string.onboarding_check_model_title
         CheckId.ACCESSIBILITY -> R.string.onboarding_check_accessibility_title
+        CheckId.SHELL_PAIRING -> R.string.onboarding_check_shell_title
         CheckId.OVERLAY -> R.string.onboarding_check_overlay_title
         CheckId.NOTIFICATIONS -> R.string.onboarding_check_notifications_title
         CheckId.NOTIFICATION_LISTENER -> R.string.onboarding_check_listener_title
@@ -180,6 +197,7 @@ private fun descriptionRes(id: CheckId): Int =
     when (id) {
         CheckId.MODEL -> R.string.onboarding_check_model_desc
         CheckId.ACCESSIBILITY -> R.string.onboarding_check_accessibility_desc
+        CheckId.SHELL_PAIRING -> R.string.onboarding_check_shell_desc
         CheckId.OVERLAY -> R.string.onboarding_check_overlay_desc
         CheckId.NOTIFICATIONS -> R.string.onboarding_check_notifications_desc
         CheckId.NOTIFICATION_LISTENER -> R.string.onboarding_check_listener_desc

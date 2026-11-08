@@ -177,10 +177,43 @@ class OnboardingViewModelTest {
             quirks = FakeQuirks(quirks),
             accessibilityStatus = FakeAccessibility(),
             notificationFeed = feed,
+            shellInput = FakeShellInput(),
             modelProfiles = FakeModelProfileStore(initialRoles = ModelRoles()),
             dispatchers = TestDispatcherProvider(testDispatcher),
             logger = logger,
         )
+}
+
+private class FakeShellInput : com.example.autop.device.ShellInput {
+    override val state: StateFlow<com.example.autop.device.ShellState> =
+        MutableStateFlow(com.example.autop.device.ShellState.Disconnected)
+
+    override val paired: StateFlow<Boolean> = MutableStateFlow(false)
+
+    override suspend fun pair(
+        pairingPort: Int,
+        pairCode: String,
+    ): Outcome<Unit> = Outcome.Ok(Unit)
+
+    override suspend fun connect(): Boolean = true
+
+    override suspend fun tap(
+        x: Int,
+        y: Int,
+        durationMs: Long,
+    ): Boolean = true
+
+    override suspend fun swipe(
+        fromX: Int,
+        fromY: Int,
+        toX: Int,
+        toY: Int,
+        durationMs: Long,
+    ): Boolean = true
+
+    override suspend fun keyEvent(code: Int): Boolean = true
+
+    override suspend fun keyCombination(vararg codes: Int): Boolean = true
 }
 
 private class FakePermissionChecks : PermissionChecks {

@@ -59,6 +59,16 @@ public fun ShellChannelScreen(
             SectionTitle(text = stringResource(R.string.me_shell_section_status))
             StatusRow(state = state, onAction = onAction)
             SectionTitle(text = stringResource(R.string.me_shell_section_pair))
+            Text(
+                text = stringResource(R.string.me_shell_steps),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier =
+                    Modifier.padding(
+                        horizontal = LocalSpacing.current.screenEdge,
+                        vertical = LocalSpacing.current.xs,
+                    ),
+            )
             PairForm(state = state, onAction = onAction)
         }
     }

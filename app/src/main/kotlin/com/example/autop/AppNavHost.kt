@@ -253,8 +253,13 @@ private fun createOnboardingNavigator(
     context: Context,
 ): OnboardingNavigator =
     object : OnboardingNavigator {
-        override fun openModelConfig() {
-            navController.navigate(AutopRoutes.meSection(SettingsSection.MODEL.id))
+        override fun openAppPage(page: OnboardingNavigator.AppPage) {
+            val sectionId =
+                when (page) {
+                    OnboardingNavigator.AppPage.MODEL -> SettingsSection.MODEL.id
+                    OnboardingNavigator.AppPage.SHELL -> SettingsSection.SHELL.id
+                }
+            navController.navigate(AutopRoutes.meSection(sectionId))
         }
 
         override fun openAccessibilitySettings() {

@@ -7,8 +7,17 @@ package com.example.autop.feature.onboarding
 
 /** 引导与健康检查页的导航回调。 */
 public interface OnboardingNavigator {
-    /** 打开模型配置页（app 跳 `me/models`）。 */
-    public fun openModelConfig()
+    /** 应用内设置子页（[openAppPage] 的目标）。 */
+    public enum class AppPage {
+        /** 模型配置（`me/models`）。 */
+        MODEL,
+
+        /** 注入通道（`me/shell`，无线调试配对引导）。 */
+        SHELL,
+    }
+
+    /** 打开应用内设置子页（app 按 [AppPage] 路由）。 */
+    public fun openAppPage(page: AppPage)
 
     /** 系统无障碍设置。 */
     public fun openAccessibilitySettings()

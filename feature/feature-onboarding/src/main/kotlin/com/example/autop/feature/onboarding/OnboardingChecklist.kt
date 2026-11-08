@@ -12,6 +12,9 @@ public enum class CheckId {
     /** 无障碍服务（必需）。 */
     ACCESSIBILITY,
 
+    /** 注入通道（无线调试配对，可选推荐：微信/支付宝等屏蔽无障碍操作的应用需要它）。 */
+    SHELL_PAIRING,
+
     /** 悬浮窗权限（推荐）。 */
     OVERLAY,
 
