@@ -55,6 +55,16 @@ public fun TaskEditScreen(
                 )
             },
         )
+        state.error?.let { code ->
+            StatusBanner(
+                tone = StatusTone.BLOCKED,
+                message = errorText(code),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(LocalSpacing.current.screenEdge),
+            )
+        }
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item { DraftSection(state = state, onAction = onAction) }
             item { BasicSection(state = state, onAction = onAction) }
@@ -66,16 +76,6 @@ public fun TaskEditScreen(
                 item { SimulateSection(state = state, onAction = onAction) }
             }
         }
-    }
-    state.error?.let { code ->
-        StatusBanner(
-            tone = StatusTone.BLOCKED,
-            message = errorText(code),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(LocalSpacing.current.screenEdge),
-        )
     }
 }
 

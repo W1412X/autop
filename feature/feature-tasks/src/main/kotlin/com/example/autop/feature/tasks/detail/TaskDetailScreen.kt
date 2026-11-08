@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -36,7 +37,7 @@ public fun TaskDetailScreen(
     onAction: (TaskDetailAction) -> Unit,
 ) {
     if (state.notFound) {
-        Column(modifier = Modifier.fillMaxSize()) {
+        Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             SubPageTopBar(
                 title = stringResource(R.string.task_detail_title),
                 onBack = { onAction(TaskDetailAction.Back) },
@@ -48,7 +49,7 @@ public fun TaskDetailScreen(
         }
         return
     }
-    Column(modifier = Modifier.fillMaxSize()) {
+    Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
         SubPageTopBar(
             title = stringResource(R.string.task_detail_title),
             onBack = { onAction(TaskDetailAction.Back) },
