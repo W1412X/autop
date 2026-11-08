@@ -24,43 +24,43 @@ internal fun AppearanceSection(
         SectionTitle(text = stringResource(R.string.me_section_appearance))
         OptionRow(
             title = stringResource(R.string.me_appearance_dark_mode),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_dark_mode),
             value = SheetKind.DARK_MODE.labelOf(appearance.darkMode),
             onClick = { onOpenSheet(SheetKind.DARK_MODE) },
         )
         SwitchRow(
             title = stringResource(R.string.me_appearance_dynamic_color),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_dynamic_color),
             checked = appearance.dynamicColor,
             onCheckedChange = { onAction(MeAction.SetDynamicColor(it)) },
         )
         OptionRow(
             title = stringResource(R.string.me_appearance_seed),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_seed),
             value = SheetKind.SEED.labelOf(appearance.seedIndex.toString()),
             onClick = { onOpenSheet(SheetKind.SEED) },
         )
         OptionRow(
             title = stringResource(R.string.me_appearance_font_scale),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_font_scale),
             value = SheetKind.FONT_SCALE.labelOf(appearance.fontScale.toString()),
             onClick = { onOpenSheet(SheetKind.FONT_SCALE) },
         )
         OptionRow(
             title = stringResource(R.string.me_appearance_icon_scale),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_icon_scale),
             value = SheetKind.ICON_SCALE.labelOf(appearance.iconScale.toString()),
             onClick = { onOpenSheet(SheetKind.ICON_SCALE) },
         )
         OptionRow(
             title = stringResource(R.string.me_appearance_density),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_density),
             value = SheetKind.DENSITY.labelOf(appearance.density),
             onClick = { onOpenSheet(SheetKind.DENSITY) },
         )
         SwitchRow(
             title = stringResource(R.string.me_appearance_motion),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_motion),
             checked = appearance.motionEnabled,
             onCheckedChange = { onAction(MeAction.SetMotionEnabled(it)) },
         )

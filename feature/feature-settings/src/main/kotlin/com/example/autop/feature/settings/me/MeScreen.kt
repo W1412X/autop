@@ -194,7 +194,7 @@ private fun ModelLinksSection(
         )
         NavRow(
             title = stringResource(R.string.me_nav_observe),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_observe),
             onClick = { onOpen(SettingsSection.OBSERVE) },
         )
         NavRow(
@@ -221,22 +221,22 @@ private fun SecuritySection(onOpen: (SettingsSection) -> Unit) {
         SectionTitle(text = stringResource(R.string.me_section_security))
         NavRow(
             title = stringResource(R.string.me_nav_rules),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_rules),
             onClick = { onOpen(SettingsSection.RULES) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_blocked_apps),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_blocked_apps),
             onClick = { onOpen(SettingsSection.BLOCKED_APPS) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_node_action),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_node_action),
             onClick = { onOpen(SettingsSection.NODE_ACTION) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_audit),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_audit),
             onClick = { onOpen(SettingsSection.AUDIT) },
         )
     }
@@ -253,37 +253,37 @@ private fun AdvancedSection(
         SectionTitle(text = stringResource(R.string.me_section_advanced))
         NavRow(
             title = stringResource(R.string.me_nav_advanced_config),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_advanced_config),
             onClick = { onOpen(SettingsSection.ADVANCED) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_prompts),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_prompts),
             onClick = { onOpen(SettingsSection.PROMPTS) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_debug),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_debug),
             onClick = { onOpen(SettingsSection.DEBUG) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_logs),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_logs),
             onClick = { onOpen(SettingsSection.LOGS) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_probe_history),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_probe_history),
             onClick = { onOpen(SettingsSection.PROBE) },
         )
         ActionRow(
             title = stringResource(R.string.me_backup_export),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_backup_export),
             onClick = onExport,
         )
         ActionRow(
             title = stringResource(R.string.me_backup_import),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_backup_import),
             onClick = onImport,
         )
     }

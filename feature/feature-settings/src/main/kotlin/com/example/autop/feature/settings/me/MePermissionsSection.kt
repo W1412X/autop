@@ -34,29 +34,29 @@ internal fun PermissionsSection(
         SectionTitle(text = stringResource(R.string.me_section_permissions))
         NavRow(
             title = stringResource(R.string.me_nav_permission_check),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_permission_check),
             onClick = { onOpen(SettingsSection.PERMISSIONS) },
         )
         NavRow(
             title = stringResource(R.string.me_nav_budget),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_budget),
             onClick = { onOpen(SettingsSection.BUDGET) },
         )
         OptionRow(
             title = stringResource(R.string.me_overlay_channel),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_overlay_channel),
             value = WindowTypeLabel(state.overlayWindowType),
             onClick = onOpenWindowTypeSheet,
         )
         SwitchRow(
             title = stringResource(R.string.me_overlay_enabled),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_overlay_enabled),
             checked = state.overlayEnabled,
             onCheckedChange = { onAction(MeAction.SetOverlayEnabled(it)) },
         )
         OptionRow(
             title = stringResource(R.string.me_overlay_display_mode),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_display_mode),
             value = DisplayModeLabel(state.overlayDisplayMode),
             onClick = onOpenDisplayModeSheet,
         )
@@ -67,13 +67,13 @@ internal fun PermissionsSection(
         )
         SwitchRow(
             title = stringResource(R.string.me_host_persistent),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_host_persistent),
             checked = state.hostPersistent,
             onCheckedChange = { onAction(MeAction.SetHostPersistent(it)) },
         )
         SwitchRow(
             title = stringResource(R.string.me_return_to_origin),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_sub_return_to_origin),
             checked = state.returnToOriginApp,
             onCheckedChange = { onAction(MeAction.SetReturnToOriginApp(it)) },
         )
