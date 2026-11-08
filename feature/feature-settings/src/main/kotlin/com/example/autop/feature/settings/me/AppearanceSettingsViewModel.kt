@@ -100,6 +100,8 @@ public class AppearanceSettingsViewModel
                     mainModelName = roles.main?.let { id -> profiles.firstOrNull { it.id == id }?.displayName },
                     embeddingProviderId = snapshot[LlmConfig.EMBEDDING].provider,
                     overlayWindowType = snapshot[UiConfig.OVERLAY].windowType,
+                    overlayEnabled = snapshot[UiConfig.OVERLAY].enabled,
+                    overlayDisplayMode = snapshot[UiConfig.OVERLAY].displayMode,
                     hostPersistent = snapshot[TaskConfig.HOST].persistent,
                     returnToOriginApp = snapshot[TaskConfig.TASK].returnToOriginApp,
                     conditionsEnabled = snapshot[TaskConfig.CONDITIONS].enabled,
@@ -145,6 +147,8 @@ public class AppearanceSettingsViewModel
                 is MeAction.SetMotionEnabled ->
                     write(UiConfig.APPEARANCE.path + SUFFIX_MOTION_ENABLED, JsonPrimitive(action.enabled))
                 is MeAction.SetOverlayWindowType -> write(OVERLAY_WINDOW_TYPE_PATH, JsonPrimitive(action.value))
+                is MeAction.SetOverlayEnabled -> write(OVERLAY_ENABLED_PATH, JsonPrimitive(action.enabled))
+                is MeAction.SetOverlayDisplayMode -> write(OVERLAY_DISPLAY_MODE_PATH, JsonPrimitive(action.value))
                 is MeAction.SetHostPersistent -> write(HOST_PERSISTENT_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetReturnToOriginApp -> write(RETURN_TO_ORIGIN_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetConditionsEnabled -> write(CONDITIONS_ENABLED_PATH, JsonPrimitive(action.enabled))
@@ -225,6 +229,12 @@ public class AppearanceSettingsViewModel
 
             /** 悬浮窗通道写入路径（ui.overlay.windowType，docs/tech/05 §10）。 */
             const val OVERLAY_WINDOW_TYPE_PATH = "ui.overlay.windowType"
+
+            /** 悬浮球显隐写入路径（ui.overlay.enabled）。 */
+            const val OVERLAY_ENABLED_PATH = "ui.overlay.enabled"
+
+            /** 悬浮球显示方式写入路径（ui.overlay.displayMode）。 */
+            const val OVERLAY_DISPLAY_MODE_PATH = "ui.overlay.displayMode"
 
             /** 常驻后台写入路径（task.host.persistent，docs/tech/07 §4.5）。 */
             const val HOST_PERSISTENT_PATH = "task.host.persistent"

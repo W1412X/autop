@@ -21,12 +21,13 @@ import com.example.autop.device.ShellState
 import com.example.autop.feature.settings.R
 import com.example.autop.feature.settings.SettingsSection
 
-/** 权限与运行分组：权限检查入口 + 悬浮窗通道 + 常驻后台/返回原应用开关 + 运行预算入口。 */
+/** 权限与运行分组：权限检查入口 + 悬浮窗通道/悬浮球显隐与显示方式 + 常驻后台/返回原应用开关 + 运行预算入口。 */
 @Composable
 internal fun PermissionsSection(
     state: MeUiState,
     onOpen: (SettingsSection) -> Unit,
     onOpenWindowTypeSheet: () -> Unit,
+    onOpenDisplayModeSheet: () -> Unit,
     onAction: (MeAction) -> Unit,
 ) {
     Column {
@@ -46,6 +47,18 @@ internal fun PermissionsSection(
             subtitle = null,
             value = WindowTypeLabel(state.overlayWindowType),
             onClick = onOpenWindowTypeSheet,
+        )
+        SwitchRow(
+            title = stringResource(R.string.me_overlay_enabled),
+            subtitle = null,
+            checked = state.overlayEnabled,
+            onCheckedChange = { onAction(MeAction.SetOverlayEnabled(it)) },
+        )
+        OptionRow(
+            title = stringResource(R.string.me_overlay_display_mode),
+            subtitle = null,
+            value = DisplayModeLabel(state.overlayDisplayMode),
+            onClick = onOpenDisplayModeSheet,
         )
         NavRow(
             title = stringResource(R.string.me_nav_shell),
@@ -89,6 +102,40 @@ internal fun WindowTypeSheet(
     )
 }
 
+/** 悬浮球显示方式选择弹层。 */
+@Composable
+internal fun DisplayModeSheet(
+    selectedId: String,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    OptionSheet(
+        title = stringResource(R.string.me_overlay_display_mode),
+        options = DisplayModeOptions(),
+        selectedId = selectedId,
+        onSelect = onSelect,
+        onDismiss = onDismiss,
+    )
+}
+
+/** 悬浮球显示方式选项（id 与 `ui.overlay.displayMode` 原值一致）。 */
+@Composable
+private fun DisplayModeOptions(): List<OptionItem> =
+    listOf(
+        OptionItem(id = DISPLAY_MODE_AUTO, label = stringResource(R.string.me_overlay_display_mode_auto)),
+        OptionItem(id = DISPLAY_MODE_ALWAYS, label = stringResource(R.string.me_overlay_display_mode_always)),
+        OptionItem(id = DISPLAY_MODE_EDGE, label = stringResource(R.string.me_overlay_display_mode_edge)),
+    )
+
+/** 悬浮球显示方式显示文案。 */
+@Composable
+private fun DisplayModeLabel(value: String): String =
+    when (value) {
+        DISPLAY_MODE_ALWAYS -> stringResource(R.string.me_overlay_display_mode_always)
+        DISPLAY_MODE_EDGE -> stringResource(R.string.me_overlay_display_mode_edge)
+        else -> stringResource(R.string.me_overlay_display_mode_auto)
+    }
+
 /** 悬浮窗通道选项（id 与 `ui.overlay.windowType` 原值一致，docs/tech/05 §10）。 */
 @Composable
 private fun WindowTypeOptions(): List<OptionItem> =
@@ -124,3 +171,12 @@ private const val WINDOW_TYPE_ACCESSIBILITY = "accessibility"
 
 /** 普通悬浮窗通道。 */
 private const val WINDOW_TYPE_APPLICATION = "application"
+
+/** `ui.overlay.displayMode` 取值：静置自动收拢（贴边→细条）。 */
+private const val DISPLAY_MODE_AUTO = "auto"
+
+/** 保持展开（不自动收拢）。 */
+private const val DISPLAY_MODE_ALWAYS = "always"
+
+/** 松手即收边细条。 */
+private const val DISPLAY_MODE_EDGE = "edge"

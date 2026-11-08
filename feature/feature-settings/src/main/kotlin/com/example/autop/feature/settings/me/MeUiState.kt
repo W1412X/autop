@@ -38,6 +38,10 @@ public data class MeUiState(
     val embeddingProviderId: String = "none",
     /** `ui.overlay.windowType`（悬浮窗通道：auto / accessibility / application，docs/tech/05 §10）。 */
     val overlayWindowType: String = "auto",
+    /** `ui.overlay.enabled`（悬浮球是否显示）。 */
+    val overlayEnabled: Boolean = true,
+    /** `ui.overlay.displayMode`（悬浮球显示方式：auto / always / edge）。 */
+    val overlayDisplayMode: String = "auto",
     /** `task.host.persistent`（常驻后台，docs/tech/07 §4.5）。 */
     val hostPersistent: Boolean = false,
     /** `task.returnToOriginApp`（任务结束后返回原应用，docs/tech/07 §4.5）。 */

@@ -116,7 +116,8 @@ public class BallStateHolder
 
         /**
          * 拖动结束：近边缘磁吸成半贴边态，否则自由停留（松手就地，不强制吸边）；
-         * 持久化并启动静置自动收拢（半贴边 → 细条）。
+         * 持久化并按 `ui.overlay.displayMode` 收拢——edge=松手即收细条、
+         * always=保持展开、auto=静置 [AUTO_COLLAPSE_MS] 自动收细条。
          */
         public fun onDragEnd(
             ballSizePx: Int,
@@ -130,7 +131,22 @@ public class BallStateHolder
             val released = releasePosition(current.x, current.y, ballSizePx, screenWidthPx, magnetPx)
             _position.value = released
             positionStore.save(released)
-            scheduleCollapse()
+            when (configProvider.current()[UiConfig.OVERLAY].displayMode) {
+                DISPLAY_MODE_EDGE -> collapseNow()
+                DISPLAY_MODE_ALWAYS -> collapseJob?.cancel()
+                else -> scheduleCollapse()
+            }
+        }
+
+        /** 立即收拢为细条（edge 显示方式）。 */
+        private fun collapseNow() {
+            collapseJob?.cancel()
+            val current = _position.value
+            val collapsed = collapseToSliver(current, geom.ballSizePx, geom.screenWidthPx, geom.sliverPx)
+            if (collapsed != current) {
+                _position.value = collapsed
+                positionStore.save(collapsed)
+            }
         }
 
         /** 唤出（细条/半贴边 → 自由态）：球整体回到屏内并持久化。 */
@@ -235,6 +251,10 @@ public class BallStateHolder
 
             /** 半贴边静置收拢为细条的时长（ms）。 */
             public const val AUTO_COLLAPSE_MS: Long = 3000
+
+            /** `ui.overlay.displayMode` 取值（edge=松手即收边细条 / always=保持展开）。 */
+            private const val DISPLAY_MODE_EDGE: String = "edge"
+            private const val DISPLAY_MODE_ALWAYS: String = "always"
         }
     }
 

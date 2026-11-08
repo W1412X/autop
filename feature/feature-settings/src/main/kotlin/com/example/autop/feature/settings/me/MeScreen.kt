@@ -45,6 +45,7 @@ public fun MeScreen(
 ) {
     var sheet by remember { mutableStateOf<SheetKind?>(null) }
     var windowTypeSheet by remember { mutableStateOf(false) }
+    var displayModeSheet by remember { mutableStateOf(false) }
     var snoozeSheet by remember { mutableStateOf(false) }
     val importLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -80,6 +81,7 @@ public fun MeScreen(
                     state = state,
                     onOpen = onOpenSection,
                     onOpenWindowTypeSheet = { windowTypeSheet = true },
+                    onOpenDisplayModeSheet = { displayModeSheet = true },
                     onAction = onAction,
                 )
             }
@@ -127,6 +129,16 @@ public fun MeScreen(
                 windowTypeSheet = false
             },
             onDismiss = { windowTypeSheet = false },
+        )
+    }
+    if (displayModeSheet) {
+        DisplayModeSheet(
+            selectedId = state.overlayDisplayMode,
+            onSelect = { id ->
+                onAction(MeAction.SetOverlayDisplayMode(id))
+                displayModeSheet = false
+            },
+            onDismiss = { displayModeSheet = false },
         )
     }
     if (snoozeSheet) {

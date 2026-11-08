@@ -79,12 +79,25 @@ public data class UiMemorySection(
 public data class UiOverlaySection(
     @SerialName("enabled") val enabled: Boolean = true,
     @SerialName("windowType") val windowType: String = "auto",
-    /** 贴边隐藏比例（N217：收边只露一小点，点按露头全部唤出）。 */
+    /** 悬浮球显示方式：auto=静置自动收拢（贴边→细条）；always=保持展开；edge=松手即收边细条。 */
+    @SerialName("displayMode") val displayMode: String = "auto",
     @SerialName("edgeHideRatio") val edgeHideRatio: Double = 0.8,
     @SerialName("breathMs") val breathMs: Long = 1600,
     @SerialName("doubleTapStops") val doubleTapStops: Boolean = true,
     @SerialName("attachScreenDefault") val attachScreenDefault: Boolean = true,
-) : ConfigSection
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (displayMode !in DISPLAY_MODES) {
+                add("displayMode must be one of $DISPLAY_MODES, was '$displayMode'")
+            }
+        }
+
+    public companion object {
+        /** 悬浮球显示方式取值。 */
+        public val DISPLAY_MODES: Set<String> = setOf("auto", "always", "edge")
+    }
+}
 
 /** `ui.indicator`：执行期状态指示（屏幕边缘光 + 顶部胶囊；ADR-0014）。颜色取自主题，不在配置里。 */
 @Serializable

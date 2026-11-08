@@ -33,6 +33,11 @@
     <string name="me_overlay_channel_auto">自动</string>
     <string name="me_overlay_channel_accessibility">无障碍窗口</string>
     <string name="me_overlay_channel_application">普通悬浮窗</string>
+    <string name="me_overlay_enabled">显示悬浮球</string>
+    <string name="me_overlay_display_mode">悬浮球显示方式</string>
+    <string name="me_overlay_display_mode_auto">自动收拢</string>
+    <string name="me_overlay_display_mode_always">保持展开</string>
+    <string name="me_overlay_display_mode_edge">收边小条</string>
     <string name="me_nav_shell">注入通道（无线调试）</string>
     <string name="me_shell_title">注入通道（无线调试）</string>
     <string name="me_shell_status_off">未连接（手势注入回落无障碍通道）</string>
