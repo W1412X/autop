@@ -10,6 +10,13 @@
         tools:ignore="QueryAllPackagesPermission" />
     <!-- 悬浮窗备用通道 TYPE_APPLICATION_OVERLAY 所需（docs/tech/01 第 7 节、ADR-0004，WP7）。 -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <!-- 无线调试配对（NSD/mDNS 发现、Wi-Fi 状态检查，P1x）：均为可选增强权限，
+         缺失只影响发现与提示，不影响基础功能。 -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
 
     <application>
         <service

@@ -21,7 +21,6 @@ import com.example.autop.core.config.ConfigEditor
 import com.example.autop.core.config.UiConfig
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.NotificationFeed
-import com.example.autop.device.ShellInput
 import com.example.autop.llm.ModelProfileStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -44,7 +43,6 @@ public class OnboardingViewModel
         private val quirks: DeviceQuirks,
         accessibilityStatus: AccessibilityStatus,
         private val notificationFeed: NotificationFeed,
-        shellInput: ShellInput,
         modelProfiles: ModelProfileStore,
         private val dispatchers: DispatcherProvider,
         private val logger: Logger,
@@ -60,14 +58,13 @@ public class OnboardingViewModel
                 accessibilityStatus.connected,
                 notificationFeed.connected,
                 modelProfiles.roles,
-                combine(shellInput.paired, completed) { paired, done -> Pair(paired, done) },
-            ) { _, accessibilityConnected, _, roles, (shellPaired, done) ->
+                completed,
+            ) { _, accessibilityConnected, _, roles, done ->
                 OnboardingUiState(
                     items =
                         buildItems(
                             mainModelAssigned = roles.main != null,
                             accessibilityConnected = accessibilityConnected,
-                            shellPaired = shellPaired,
                         ),
                     restrictedSettings = capabilities.has(Capability.RESTRICTED_SETTINGS),
                     vendorComponentSpec = quirks.value(QUIRK_AUTOSTART),
@@ -99,12 +96,10 @@ public class OnboardingViewModel
         private fun buildItems(
             mainModelAssigned: Boolean,
             accessibilityConnected: Boolean,
-            shellPaired: Boolean,
         ): List<CheckItem> =
             listOf(
                 CheckItem(CheckId.MODEL, done = mainModelAssigned, required = true, visible = true),
                 CheckItem(CheckId.ACCESSIBILITY, done = accessibilityConnected, required = true, visible = true),
-                CheckItem(CheckId.SHELL_PAIRING, done = shellPaired, required = false, visible = true),
                 CheckItem(CheckId.OVERLAY, done = permissionChecks.canDrawOverlay(), required = false, visible = true),
                 CheckItem(
                     CheckId.NOTIFICATIONS,

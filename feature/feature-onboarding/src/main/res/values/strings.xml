@@ -12,10 +12,7 @@
     <string name="onboarding_check_accessibility_title">无障碍服务</string>
     <string name="onboarding_check_accessibility_desc">这是使用 AutoP 的前提：开启无障碍服务后，AutoP 才能读取屏幕并代你操作。</string>
     <string name="onboarding_restricted_settings_note">提示：若系统提示“允许受限设置”，请先在应用信息页打开该开关，再回来启用无障碍服务。</string>
-    <string name="onboarding_shell_hint">可选：若点击/滑动被应用拦截，可在「设置 → 注入通道（无线调试）」配对后改用 shell 注入；不开启也能正常使用。</string>
-    <string name="onboarding_check_shell_title">注入通道（无线调试，可选推荐）</string>
-    <string name="onboarding_check_shell_desc">微信、支付宝等应用会屏蔽无障碍操作，未启用注入通道时可能无法操控它们；启用后点击/输入与真手触摸无差别，更稳。可选项，不影响基础功能。</string>
-    <string name="onboarding_check_shell_hint">配对三步：① 系统设置 → 开发者选项 → 无线调试（开启）；② 点「使用配对码配对设备」并保持窗口打开；③ 回来等配对通知，通知栏直接回填 6 位配对码即可。</string>
+    <string name="onboarding_shell_hint">可选：若点击/滑动被应用拦截，完成引导后在「注入通道（无线调试）」配对后改用 shell 注入；不开启也能正常使用。</string>
     <string name="onboarding_check_overlay_title">悬浮窗权限</string>
     <string name="onboarding_check_overlay_desc">推荐开启：无障碍断开时悬浮球仍能提醒你。</string>
     <string name="onboarding_check_notifications_title">通知权限</string>

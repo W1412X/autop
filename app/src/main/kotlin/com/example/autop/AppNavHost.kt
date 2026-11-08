@@ -343,7 +343,8 @@ private fun createOnboardingNavigator(
         }
 
         override fun finishOnboarding() {
-            // 引导页出栈换成对话列表（避免返回键回到引导）。
+            // 引导页出栈先入主界面再压注入通道引导页（可跳过：返回键即进主界面，
+            // 权限已就位，正是设置无线调试配对的时机）。
             navController.navigate(AutopRoutes.CHAT_LIST) {
                 navController.currentBackStackEntry
                     ?.destination
@@ -351,6 +352,7 @@ private fun createOnboardingNavigator(
                     ?.let { popUpTo(it) { inclusive = true } }
                 launchSingleTop = true
             }
+            navController.navigate(AutopRoutes.meSection(SettingsSection.SHELL.id))
         }
     }
 

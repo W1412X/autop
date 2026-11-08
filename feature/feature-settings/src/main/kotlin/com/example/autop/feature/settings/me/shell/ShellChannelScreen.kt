@@ -58,6 +58,7 @@ public fun ShellChannelScreen(
         ) {
             SectionTitle(text = stringResource(R.string.me_shell_section_status))
             StatusRow(state = state, onAction = onAction)
+            PairingGuideSection()
             SectionTitle(text = stringResource(R.string.me_shell_section_pair))
             Text(
                 text = stringResource(R.string.me_shell_steps),

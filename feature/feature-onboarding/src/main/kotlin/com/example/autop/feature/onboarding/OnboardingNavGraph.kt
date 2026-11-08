@@ -88,7 +88,6 @@ private fun openCheck(
     when (id) {
         CheckId.MODEL -> navigator.openAppPage(OnboardingNavigator.AppPage.MODEL)
         CheckId.ACCESSIBILITY -> navigator.openAccessibilitySettings()
-        CheckId.SHELL_PAIRING -> navigator.openAppPage(OnboardingNavigator.AppPage.SHELL)
         CheckId.OVERLAY -> navigator.openOverlaySettings()
         CheckId.NOTIFICATIONS -> navigator.openNotificationSettings()
         CheckId.NOTIFICATION_LISTENER -> navigator.openNotificationListenerSettings()
