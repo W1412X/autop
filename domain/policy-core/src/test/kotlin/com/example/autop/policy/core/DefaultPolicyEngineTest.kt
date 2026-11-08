@@ -204,6 +204,40 @@ class DefaultPolicyEngineTest {
         assertThat(engine.redaction(null)).isFalse()
     }
 
+    @Test
+    fun `blocked target package is intercepted without any rule`() =
+        runTest {
+            val engine = engine(emptyList(), blockedPackages = listOf("com.blocked.app"))
+            val decision =
+                engine.evaluate(
+                    subject().copy(extra = mapOf("targetPackage" to "com.blocked.app")),
+                    PolicyOverrides(),
+                )
+            assertThat(decision)
+                .isEqualTo(PolicyDecision.Block("builtin.blocked_package", "屏蔽的应用", "policy_reason_blocked_app"))
+        }
+
+    @Test
+    fun `blocked foreground package intercepts in-app actions`() =
+        runTest {
+            val engine = engine(emptyList(), blockedPackages = listOf("com.blocked.app"))
+            val decision = engine.evaluate(subject().copy(packageName = "com.blocked.app"), PolicyOverrides())
+            assertThat(decision)
+                .isEqualTo(PolicyDecision.Block("builtin.blocked_package", "屏蔽的应用", "policy_reason_blocked_app"))
+        }
+
+    @Test
+    fun `unblocked subject falls through to allow`() =
+        runTest {
+            val engine = engine(emptyList(), blockedPackages = listOf("com.blocked.app"))
+            val decision =
+                engine.evaluate(
+                    subject().copy(packageName = "com.other.app", extra = mapOf("targetPackage" to "com.other.app")),
+                    PolicyOverrides(),
+                )
+            assertThat(decision).isEqualTo(PolicyDecision.Allow)
+        }
+
     private fun engine(
         builtinRules: List<String>,
         userRules: List<String> = emptyList(),

@@ -36,6 +36,7 @@ public class DefaultPolicyEngine
             subject: PolicySubject,
             overrides: PolicyOverrides,
         ): PolicyDecision {
+            blockedDecision(subject)?.let { return it }
             val rules = rulesFor(configProvider.current()[PolicyConfig.POLICY])
             return rules.rules.firstNotNullOfOrNull { decisionFor(it, subject, overrides, rules.categories) }
                 ?: PolicyDecision.Allow
@@ -43,6 +44,21 @@ public class DefaultPolicyEngine
 
         override fun redaction(packageName: String?): Boolean =
             packageName != null && packageName in configProvider.current()[PolicyConfig.POLICY].blockedPackages
+
+        /**
+         * 屏蔽应用（`policy.blockedPackages`）：打开目标（工具自报 `targetPackage`）或
+         * 前台命中一律拦截并暂停——此前该名单只参与观测脱敏（[redaction]）、不进求值，
+         * 设置形同虚设（2026-11-09 修复）。
+         */
+        private fun blockedDecision(subject: PolicySubject): PolicyDecision? {
+            val blocked = configProvider.current()[PolicyConfig.POLICY].blockedPackages
+            val hit = subject.extra[EXTRA_TARGET_PACKAGE] in blocked || subject.packageName in blocked
+            return if (hit) {
+                PolicyDecision.Block(BLOCKED_RULE_ID, BLOCKED_CATEGORY, BLOCKED_REASON_KEY)
+            } else {
+                null
+            }
+        }
 
         /** 单条规则的决定：命中且未被覆盖 → Block；否则返回 null 继续下一条。 */
         private fun decisionFor(
@@ -84,5 +100,15 @@ public class DefaultPolicyEngine
                 }
             }
             return checkNotNull(cachedRules)
+        }
+
+        private companion object {
+            /** 工具自报的目标包键（open_app/open_uri 的 extra）。 */
+            const val EXTRA_TARGET_PACKAGE: String = "targetPackage"
+
+            /** 屏蔽应用内置拦截：规则标识与文案键；category 直排进拦截提示模板。 */
+            const val BLOCKED_RULE_ID: String = "builtin.blocked_package"
+            const val BLOCKED_CATEGORY: String = "屏蔽的应用"
+            const val BLOCKED_REASON_KEY: String = "policy_reason_blocked_app"
         }
     }
