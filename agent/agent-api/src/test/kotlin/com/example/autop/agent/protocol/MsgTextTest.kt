@@ -50,4 +50,41 @@ class MsgTextTest {
         val text = "<function=tap></function>"
         assertThat(displayTextOf(text)).isEqualTo("$TOOL_MARK_NOTE\n\n$text")
     }
+
+    // ---- finalSummaryOf：收口总结净化（N170 审计） ----
+
+    /** 拼接构造工具调用标记，避免源码出现连续标记字面量。 */
+    private val toolMarkup =
+        "<" + "tool_call><" + "function=screenshot><" + "parameter=reason>核实</" + "parameter></" +
+            "function></" + "tool_call>"
+
+    @Test
+    fun `净化保留纯文本正文`() {
+        assertThat(finalSummaryOf("卡在搜索页，未能发送消息。")).isEqualTo("卡在搜索页，未能发送消息。")
+    }
+
+    @Test
+    fun `净化整体工具调用块返回 null`() {
+        assertThat(finalSummaryOf(toolMarkup)).isNull()
+    }
+
+    @Test
+    fun `净化正文混工具块只留正文`() {
+        assertThat(finalSummaryOf("卡在搜索页。\n$toolMarkup")).isEqualTo("卡在搜索页。")
+    }
+
+    @Test
+    fun `净化回退协议 tool_calls 返回 null`() {
+        assertThat(finalSummaryOf("""{"tool_calls":[{"name":"tap","arguments":{}}]}""")).isNull()
+    }
+
+    @Test
+    fun `净化回退协议 final 取正文`() {
+        assertThat(finalSummaryOf("""{"final":"已完成"}""")).isEqualTo("已完成")
+    }
+
+    @Test
+    fun `净化空白返回 null`() {
+        assertThat(finalSummaryOf("   \n  ")).isNull()
+    }
 }

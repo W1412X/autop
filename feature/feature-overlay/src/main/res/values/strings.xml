@@ -29,6 +29,7 @@
     <string name="panel_status_succeeded">已完成</string>
     <string name="panel_status_failed">失败</string>
     <string name="panel_status_budget">步数用尽</string>
+    <string name="panel_status_breaker">熔断停止</string>
     <string name="panel_status_stopped">已停止</string>
     <string name="panel_status_blocked">被拦截</string>
 
@@ -98,6 +99,7 @@
     <string name="progress_outcome_failed">失败</string>
     <string name="progress_outcome_cancelled">已中止</string>
     <string name="progress_outcome_budget">步数用尽</string>
+    <string name="progress_outcome_breaker">熔断停止</string>
     <string name="progress_outcome_interrupted">已中断</string>
     <string name="progress_result_stats">%1$d 步 · %2$s · %3$d token</string>
     <string name="progress_hint_waiting">正在等待你的回答</string>

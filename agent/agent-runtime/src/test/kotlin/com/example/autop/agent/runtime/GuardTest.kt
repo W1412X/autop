@@ -4,6 +4,7 @@
  */
 package com.example.autop.agent.runtime
 
+import com.example.autop.agent.AgentErrorCodes
 import com.example.autop.agent.PlanStatus
 import com.example.autop.agent.PlanUpdated
 import com.example.autop.agent.RunOutcome
@@ -69,7 +70,7 @@ class GuardTest {
         }
 
     @Test
-    fun `10b 熔断 Stop：注入提示并进入 finalRound 收口`() =
+    fun `10b 熔断 Stop：注入提示并以 BREAKER_STOPPED 收口（区别于预算耗尽）`() =
         runTest {
             val tool = failingTool()
             val h =
@@ -86,7 +87,8 @@ class GuardTest {
 
             val finished = h.start(this, threadId = thread).await()
 
-            assertThat(finished.status).isEqualTo(RunOutcome.BUDGET_EXHAUSTED)
+            assertThat(finished.status).isEqualTo(RunOutcome.BREAKER_STOPPED)
+            assertThat(finished.errorCode).isEqualTo(AgentErrorCodes.BREAKER_STOPPED)
             assertThat(finished.summary).isEqualTo("无法继续")
             assertThat(h.llm.requests).hasSize(3)
             assertThat(injectedTexts(h, thread)).isNotEmpty()

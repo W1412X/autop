@@ -41,6 +41,9 @@ internal class CircuitBreaker(
     private var lastArgsKey: Pair<String, String>? = null
     private var repeatCount = 0
 
+    /** 最近一次观测指纹（任意工具的同源 post 观测）：用于无 replay 时判断屏幕是否变化。 */
+    private var lastFingerprint: String? = null
+
     /** 按调用顺序观察一批结果，返回最高级别判定（Stop > Warn）。 */
     fun observe(entries: List<BreakerEntry>): BreakerVerdict {
         var verdict: BreakerVerdict = BreakerVerdict.None
@@ -59,6 +62,8 @@ internal class CircuitBreaker(
         return if (entry.output.ok) {
             lastErrorKey = null
             sameErrorCount = 0
+            // 屏幕变了就重置原地打转计数，READ_SCREEN（observe/screenshot）观测到变化同样算数。
+            if (changed) stuckCount = 0
             observeWriteScreen(entry, changed)
         } else {
             stuckCount = 0
@@ -127,11 +132,19 @@ internal class CircuitBreaker(
     }
 
     /**
-     * 屏幕是否变化：优先比较 `replay.postFingerprint` 与 `pre.fingerprint`，
-     * 其次用动作后观测的 fingerprint；前/后任一缺失返回 null（无法判断）。
-     * 调用方把 null 当作“未变化”，否则应用屏蔽节点树（盲操作）时重复动作永远触发不了熔断。
+     * 屏幕是否变化（N170 审计修复）：优先用连续的观测指纹做同源比较——本次 post 观测指纹
+     * 对比上一次观测指纹。应用屏蔽节点树时 replay 缺失（pre 取不到），但 visual 观测仍带指纹，
+     * 据此可判断屏幕其实一直在变，不再把“拿不到 replay”误判成“没变化”而错误熔断。
+     * 没有观测指纹时退回 replay 的 pre/post；两者都缺返回 null（无法判断）。
+     * 调用方把 null 当作“未变化”，否则完全盲操作（无任何指纹）时重复动作永远触发不了熔断。
      */
     private fun screenChanged(output: ToolOutput): Boolean? {
+        val current = output.observation?.fingerprint
+        if (current != null) {
+            val previous = lastFingerprint
+            lastFingerprint = current
+            if (previous != null) return current != previous
+        }
         val pre = output.replay?.pre?.fingerprint
         val now = output.replay?.postFingerprint ?: output.observation?.fingerprint
         if (pre == null || now == null) return null

@@ -14,6 +14,7 @@ public object AgentErrorCodes {
     public const val COMPACTION_FAILED: String = "agent.compaction_failed"
     public const val FALLBACK_PARSE_FAILED: String = "agent.fallback_parse_failed"
     public const val BUDGET_EXHAUSTED: String = "agent.budget_exhausted"
+    public const val BREAKER_STOPPED: String = "agent.breaker_stopped"
     public const val REPLAY_STATE_MISMATCH: String = "agent.replay_state_mismatch"
     public const val REPLAY_STEP_FAILED: String = "agent.replay_step_failed"
 }

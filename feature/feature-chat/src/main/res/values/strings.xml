@@ -14,6 +14,7 @@
     <string name="chat_outcome_failed">失败</string>
     <string name="chat_outcome_cancelled">已取消</string>
     <string name="chat_outcome_budget">超出预算</string>
+    <string name="chat_outcome_breaker">熔断停止</string>
     <string name="chat_outcome_interrupted">已中断</string>
     <string name="chat_age_now">刚刚</string>
     <string name="chat_age_minutes">%1$d 分钟前</string>

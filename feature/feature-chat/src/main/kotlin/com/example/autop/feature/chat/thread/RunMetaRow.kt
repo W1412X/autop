@@ -128,6 +128,7 @@ private fun outcomeMetaColor(outcome: RunOutcome): Color =
         RunOutcome.FAILED -> MaterialTheme.colorScheme.error
         RunOutcome.CANCELLED,
         RunOutcome.BUDGET_EXHAUSTED,
+        RunOutcome.BREAKER_STOPPED,
         RunOutcome.INTERRUPTED,
         -> MaterialTheme.colorScheme.onSurfaceVariant
     }
@@ -149,6 +150,7 @@ private fun outcomeText(outcome: RunOutcome): String =
             RunOutcome.FAILED -> R.string.chat_outcome_failed
             RunOutcome.CANCELLED -> R.string.chat_outcome_cancelled
             RunOutcome.BUDGET_EXHAUSTED -> R.string.chat_outcome_budget
+            RunOutcome.BREAKER_STOPPED -> R.string.chat_outcome_breaker
             RunOutcome.INTERRUPTED -> R.string.chat_outcome_interrupted
         },
     )

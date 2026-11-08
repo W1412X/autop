@@ -27,5 +27,6 @@ internal fun RunOutcome.toRunStatus(): RunStatus =
         RunOutcome.FAILED -> RunStatus.FAILED
         RunOutcome.CANCELLED -> RunStatus.CANCELLED
         RunOutcome.BUDGET_EXHAUSTED -> RunStatus.BUDGET_EXHAUSTED
+        RunOutcome.BREAKER_STOPPED -> RunStatus.BREAKER_STOPPED
         RunOutcome.INTERRUPTED -> RunStatus.INTERRUPTED
     }

@@ -269,6 +269,7 @@ internal class AuthorTools(
                 RunStatus.EXPIRED,
                 RunStatus.INTERRUPTED,
                 RunStatus.BUDGET_EXHAUSTED,
+                RunStatus.BREAKER_STOPPED,
             )
         val TOOL_FILTER: Set<String> = setOf("tool.observe", "tool.memory_search")
     }

@@ -57,6 +57,9 @@ public enum class RunOutcome {
     FAILED,
     CANCELLED,
     BUDGET_EXHAUSTED,
+
+    /** 熔断 Stop 收口（连续无变化/同错误重复）：与预算耗尽区分，避免误标“预算用尽”。 */
+    BREAKER_STOPPED,
     INTERRUPTED,
 }
 

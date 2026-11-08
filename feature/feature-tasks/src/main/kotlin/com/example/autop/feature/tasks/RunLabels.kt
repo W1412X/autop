@@ -32,6 +32,7 @@ internal fun runStatusTextRes(statusName: String): Int =
         "EXPIRED" -> R.string.run_status_EXPIRED
         "INTERRUPTED" -> R.string.run_status_INTERRUPTED
         "BUDGET_EXHAUSTED" -> R.string.run_status_BUDGET_EXHAUSTED
+        "BREAKER_STOPPED" -> R.string.run_status_BREAKER_STOPPED
         else -> R.string.run_status_CANCELLED
     }
 
@@ -42,6 +43,6 @@ internal fun runStatusTone(statusName: String): StatusTone =
         "WAITING_SCREEN", "WAITING_USER" -> StatusTone.WAITING
         "PAUSED" -> StatusTone.PAUSED
         "SUCCEEDED" -> StatusTone.SUCCEEDED
-        "FAILED", "BUDGET_EXHAUSTED" -> StatusTone.BLOCKED
+        "FAILED", "BUDGET_EXHAUSTED", "BREAKER_STOPPED" -> StatusTone.BLOCKED
         else -> StatusTone.NEUTRAL
     }

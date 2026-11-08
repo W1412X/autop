@@ -55,4 +55,7 @@ public enum class RunStatus {
     EXPIRED,
     INTERRUPTED,
     BUDGET_EXHAUSTED,
+
+    /** 熔断 Stop 收口（连续无变化/同错误重复）；终态，与预算耗尽区分。 */
+    BREAKER_STOPPED,
 }

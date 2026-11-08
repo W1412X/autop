@@ -186,6 +186,7 @@ public fun outcomeTextOf(outcome: RunOutcome): Int =
         RunOutcome.FAILED -> R.string.progress_outcome_failed
         RunOutcome.CANCELLED -> R.string.progress_outcome_cancelled
         RunOutcome.BUDGET_EXHAUSTED -> R.string.progress_outcome_budget
+        RunOutcome.BREAKER_STOPPED -> R.string.progress_outcome_breaker
         RunOutcome.INTERRUPTED -> R.string.progress_outcome_interrupted
     }
 
@@ -256,7 +257,7 @@ internal fun statusToneOf(status: RunStatus?): StatusTone =
         RunStatus.RUNNING -> StatusTone.RUNNING
         RunStatus.PAUSED -> StatusTone.PAUSED
         RunStatus.SUCCEEDED -> StatusTone.SUCCEEDED
-        RunStatus.FAILED, RunStatus.BUDGET_EXHAUSTED -> StatusTone.BLOCKED
+        RunStatus.FAILED, RunStatus.BUDGET_EXHAUSTED, RunStatus.BREAKER_STOPPED -> StatusTone.BLOCKED
         RunStatus.CANCELLED, RunStatus.EXPIRED, RunStatus.INTERRUPTED -> StatusTone.NEUTRAL
     }
 
@@ -270,5 +271,6 @@ internal fun statusTextOf(status: RunStatus?): Int =
         RunStatus.SUCCEEDED -> R.string.panel_status_succeeded
         RunStatus.FAILED -> R.string.panel_status_failed
         RunStatus.BUDGET_EXHAUSTED -> R.string.panel_status_budget
+        RunStatus.BREAKER_STOPPED -> R.string.panel_status_breaker
         RunStatus.CANCELLED, RunStatus.EXPIRED, RunStatus.INTERRUPTED -> R.string.panel_status_stopped
     }

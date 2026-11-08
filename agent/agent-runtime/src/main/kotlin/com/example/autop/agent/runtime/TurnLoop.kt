@@ -19,6 +19,7 @@ import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
 import com.example.autop.agent.protocol.ResolvedCalls
+import com.example.autop.agent.protocol.finalSummaryOf
 import com.example.autop.agent.protocol.lastTextOf
 import com.example.autop.agent.runtime.guard.BreakerVerdict
 import com.example.autop.agent.runtime.replay.ReplayRunner
@@ -307,9 +308,28 @@ internal class TurnLoop(
         }
     }
 
-    /** 自然结束判定（docs/tech/04 §3.2）：finalRound → BUDGET_EXHAUSTED；计划门拦一次；否则成功。 */
+    /**
+     * 自然结束判定（docs/tech/04 §3.2）：预算触顶 → BUDGET_EXHAUSTED；熔断 Stop → BREAKER_STOPPED
+     * （两者都用 finalRound 收口，但状态/文案必须区分，N170 审计）；计划门拦一次；否则成功。
+     * 总结文本经 [finalSummaryOf] 净化，避免 finalRound 幻觉出的工具调用原文成为 summary。
+     */
     private suspend fun naturalEnd(text: String): LoopStep {
-        if (finalRound) return LoopStep.End(journal.finishEvent(RunOutcome.BUDGET_EXHAUSTED, text, null, null))
+        if (finalRound) {
+            val summary = finalSummaryOf(text)
+            return if (finalRoundByBudget) {
+                LoopStep.End(journal.finishEvent(RunOutcome.BUDGET_EXHAUSTED, summary, null, null))
+            } else {
+                parts.engines.ports.logger
+                    .i(
+                        TAG,
+                        "run_breaker_stopped",
+                        "runId" to req.runId,
+                    )
+                LoopStep.End(
+                    journal.finishEvent(RunOutcome.BREAKER_STOPPED, summary, null, AgentErrorCodes.BREAKER_STOPPED),
+                )
+            }
+        }
         val open = guards.planGateItems()
         return if (open != null) {
             journal.inject(ID_UNFINISHED, mapOf("items" to open.planText()))

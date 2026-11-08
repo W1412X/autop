@@ -322,6 +322,7 @@ internal fun outcomeToneOf(outcome: RunOutcome): StatusTone =
         RunOutcome.FAILED -> StatusTone.BLOCKED
         RunOutcome.CANCELLED -> StatusTone.NEUTRAL
         RunOutcome.BUDGET_EXHAUSTED -> StatusTone.PAUSED
+        RunOutcome.BREAKER_STOPPED -> StatusTone.BLOCKED
         RunOutcome.INTERRUPTED -> StatusTone.PAUSED
     }
 

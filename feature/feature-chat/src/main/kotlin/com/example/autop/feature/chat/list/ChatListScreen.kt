@@ -218,6 +218,7 @@ private fun statusText(status: RunOutcome): String =
             RunOutcome.FAILED -> R.string.chat_outcome_failed
             RunOutcome.CANCELLED -> R.string.chat_outcome_cancelled
             RunOutcome.BUDGET_EXHAUSTED -> R.string.chat_outcome_budget
+            RunOutcome.BREAKER_STOPPED -> R.string.chat_outcome_breaker
             RunOutcome.INTERRUPTED -> R.string.chat_outcome_interrupted
         },
     )
@@ -229,6 +230,7 @@ private fun statusIcon(status: RunOutcome?): ImageVector =
         RunOutcome.FAILED -> AutopIcons.Error
         RunOutcome.CANCELLED -> AutopIcons.Close
         RunOutcome.BUDGET_EXHAUSTED -> AutopIcons.Warning
+        RunOutcome.BREAKER_STOPPED -> AutopIcons.Warning
         RunOutcome.INTERRUPTED -> AutopIcons.Pause
     }
 
