@@ -62,6 +62,7 @@ public class TasksListViewModel
                 is TasksListAction.OpenDetail -> navigator.openDetail(action.taskId)
                 is TasksListAction.OpenEdit -> navigator.openEdit(action.taskId)
                 TasksListAction.CreateTask -> navigator.openEdit(NEW_TASK_ID)
+                TasksListAction.CreateTaskAi -> navigator.openTaskAuthor()
                 is TasksListAction.ToggleEnabled ->
                     launch {
                         taskRepository.setEnabled(

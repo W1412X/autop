@@ -10,6 +10,8 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.example.autop.feature.tasks.author.TaskAuthorScreen
+import com.example.autop.feature.tasks.author.TaskAuthorViewModel
 import com.example.autop.feature.tasks.detail.TaskDetailScreen
 import com.example.autop.feature.tasks.detail.TaskDetailViewModel
 import com.example.autop.feature.tasks.edit.TaskEditScreen
@@ -35,6 +37,7 @@ public const val NEW_TASK_ID: String = "new"
  * @param editRoute 编辑路由模板（app 的 `AutopRoutes.TASK_EDIT`）。
  * @param detailRoute 详情路由模板（app 的 `AutopRoutes.TASK_DETAIL`）。
  * @param runRoute Run 详情路由模板（app 的 `AutopRoutes.RUN_DETAIL`）。
+ * @param authorRoute AI 创建路由（app 的 `AutopRoutes.TASK_AUTHOR`）。
  * @param navigator 导航回调。
  * @param flowsContent 「流程」页签的内容（由 app 提供 feature-flows 的列表）。
  */
@@ -43,6 +46,7 @@ public fun NavGraphBuilder.tasksGraph(
     editRoute: String,
     detailRoute: String,
     runRoute: String,
+    authorRoute: String,
     navigator: TasksNavigator,
     flowsContent: @Composable () -> Unit = {},
 ) {
@@ -57,6 +61,9 @@ public fun NavGraphBuilder.tasksGraph(
     }
     composable(runRoute) {
         RunDetailRoute(navigator = navigator)
+    }
+    composable(authorRoute) {
+        TaskAuthorRoute(navigator = navigator)
     }
 }
 
@@ -81,6 +88,18 @@ private fun TaskEditRoute(
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     TaskEditScreen(
+        state = state,
+        onAction = { action -> viewModel.onAction(action, navigator) },
+    )
+}
+
+@Composable
+private fun TaskAuthorRoute(
+    navigator: TasksNavigator,
+    viewModel: TaskAuthorViewModel = hiltViewModel(),
+) {
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    TaskAuthorScreen(
         state = state,
         onAction = { action -> viewModel.onAction(action, navigator) },
     )

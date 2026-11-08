@@ -121,6 +121,7 @@ internal fun AppNavHost(
                 editRoute = AutopRoutes.TASK_EDIT,
                 detailRoute = AutopRoutes.TASK_DETAIL,
                 runRoute = AutopRoutes.RUN_DETAIL,
+                authorRoute = AutopRoutes.TASK_AUTHOR,
                 navigator = tasksNavigator,
                 flowsContent = { FlowsListContent(navigator = flowsNavigator) },
             )
@@ -410,6 +411,10 @@ private fun createTasksNavigator(navController: NavHostController): TasksNavigat
     object : TasksNavigator {
         override fun openEdit(taskId: String?) {
             navController.navigate(AutopRoutes.taskEdit(taskId ?: NEW_TASK_ID))
+        }
+
+        override fun openTaskAuthor() {
+            navController.navigate(AutopRoutes.TASK_AUTHOR)
         }
 
         override fun openDetail(taskId: String) {

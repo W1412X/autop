@@ -50,35 +50,21 @@ public fun TasksListScreen(
     flowsContent: @Composable () -> Unit = {},
 ) {
     var menuTaskId by remember { mutableStateOf<String?>(null) }
+    var showCreate by remember { mutableStateOf(false) }
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
     ) {
-        TopLevelHeader(
-            title = stringResource(R.string.tasks_title),
-            actions = {
-                val onAdd =
-                    if (state.page == TasksPage.FLOWS) {
-                        TasksListAction.CreateFlow
-                    } else {
-                        TasksListAction.CreateTask
-                    }
-                AutopIconButton(
-                    icon = AutopIcons.Add,
-                    contentDescription =
-                        stringResource(
-                            if (state.page ==
-                                TasksPage.FLOWS
-                            ) {
-                                R.string.tasks_flow_new
-                            } else {
-                                R.string.tasks_new
-                            },
-                        ),
-                    onClick = { onAction(onAdd) },
-                )
+        ListHeader(
+            page = state.page,
+            onAdd = {
+                if (state.page == TasksPage.FLOWS) {
+                    onAction(TasksListAction.CreateFlow)
+                } else {
+                    showCreate = true
+                }
             },
         )
         PageTabs(page = state.page, onAction = onAction)
@@ -87,6 +73,15 @@ public fun TasksListScreen(
         } else {
             TaskList(state = state, onAction = onAction, onLongPress = { menuTaskId = it })
         }
+    }
+    if (showCreate) {
+        CreateSheet(
+            onSelect = { selected ->
+                showCreate = false
+                onAction(if (selected == CREATE_AI) TasksListAction.CreateTaskAi else TasksListAction.CreateTask)
+            },
+            onDismiss = { showCreate = false },
+        )
     }
     TaskDialogs(
         menuTaskId = menuTaskId,
@@ -99,6 +94,49 @@ public fun TasksListScreen(
                 MENU_EDIT -> onAction(TasksListAction.OpenEdit(id))
                 MENU_DELETE -> onAction(TasksListAction.RequestDelete(id))
             }
+        },
+    )
+}
+
+/** 新建任务入口：AI 创建（对话式）/ 手动创建（表单）。 */
+@Composable
+private fun CreateSheet(
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    OptionSheet(
+        title = null,
+        options =
+            listOf(
+                OptionItem(id = CREATE_AI, label = stringResource(R.string.task_create_ai)),
+                OptionItem(id = CREATE_MANUAL, label = stringResource(R.string.task_create_manual)),
+            ),
+        selectedId = null,
+        onSelect = onSelect,
+        onDismiss = onDismiss,
+    )
+}
+
+private const val CREATE_AI = "ai"
+private const val CREATE_MANUAL = "manual"
+
+/** 顶部标题栏：右上「＋」——任务页签弹新建入口，流程页签直接进流程创建页。 */
+@Composable
+private fun ListHeader(
+    page: TasksPage,
+    onAdd: () -> Unit,
+) {
+    TopLevelHeader(
+        title = stringResource(R.string.tasks_title),
+        actions = {
+            AutopIconButton(
+                icon = AutopIcons.Add,
+                contentDescription =
+                    stringResource(
+                        if (page == TasksPage.FLOWS) R.string.tasks_flow_new else R.string.tasks_new,
+                    ),
+                onClick = onAdd,
+            )
         },
     )
 }

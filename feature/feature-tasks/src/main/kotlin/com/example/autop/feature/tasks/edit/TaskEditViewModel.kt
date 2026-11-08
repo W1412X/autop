@@ -20,7 +20,6 @@ import com.example.autop.task.ConditionResult
 import com.example.autop.task.FilterOp
 import com.example.autop.task.RunService
 import com.example.autop.task.Task
-import com.example.autop.task.TaskDraftGenerator
 import com.example.autop.task.TaskRepository
 import com.example.autop.task.TriggerEvent
 import com.example.autop.task.TriggerSimulator
@@ -41,7 +40,6 @@ public class TaskEditViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val taskRepository: TaskRepository,
-        private val draftGenerator: TaskDraftGenerator,
         private val simulator: TriggerSimulator,
         private val runService: RunService,
         private val sources: Set<@JvmSuppressWildcards TriggerSource>,
@@ -74,8 +72,6 @@ public class TaskEditViewModel
             navigator: TasksNavigator,
         ) {
             when (action) {
-                is TaskEditAction.SetDescription -> _uiState.update { it.copy(description = action.value) }
-                TaskEditAction.GenerateDraft -> generate()
                 is TaskEditAction.SetName -> _uiState.update { it.copy(name = action.value) }
                 is TaskEditAction.SetGoal -> _uiState.update { it.copy(goal = action.value) }
                 is TaskEditAction.SetNeedsScreen -> _uiState.update { it.copy(needsScreen = action.value) }
@@ -161,21 +157,6 @@ public class TaskEditViewModel
                     return@launch
                 }
                 _uiState.update { state -> state.from(task) }
-            }
-        }
-
-        private fun generate() {
-            val description = _uiState.value.description
-            if (description.isBlank()) return
-            _uiState.update { it.copy(generating = true) }
-            viewModelScope.launch {
-                when (val result = draftGenerator.draft(description)) {
-                    is Outcome.Ok -> _uiState.update { it.copy(generating = false).from(result.value) }
-                    is Outcome.Err ->
-                        _uiState.update {
-                            it.copy(generating = false, error = result.error.code)
-                        }
-                }
             }
         }
 

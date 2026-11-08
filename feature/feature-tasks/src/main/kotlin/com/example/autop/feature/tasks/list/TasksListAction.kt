@@ -26,6 +26,9 @@ public sealed interface TasksListAction {
     /** 新建任务。 */
     public data object CreateTask : TasksListAction
 
+    /** 新建任务（AI 创建，进入 AI 创作对话页）。 */
+    public data object CreateTaskAi : TasksListAction
+
     /** 启停任务。 */
     public data class ToggleEnabled(
         val taskId: String,

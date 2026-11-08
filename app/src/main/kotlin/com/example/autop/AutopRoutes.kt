@@ -125,6 +125,9 @@ object AutopRoutes {
     /** 任务编辑路由：[taskId] 取 feature-tasks 的 [NEW_TASK_ID]（新建）或真实任务 id。 */
     fun taskEdit(taskId: String = NEW_TASK_ID): String = "tasks/edit/$taskId"
 
+    /** AI 创建任务路由。 */
+    const val TASK_AUTHOR: String = "tasks/author"
+
     /** 任务详情路由。 */
     fun taskDetail(taskId: String): String = "tasks/detail/$taskId"
 

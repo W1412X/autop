@@ -7,14 +7,6 @@ import java.time.LocalDate
 
 /** 编辑页意图。 */
 public sealed interface TaskEditAction {
-    /** 一句话描述（草稿生成输入）。 */
-    public data class SetDescription(
-        val value: String,
-    ) : TaskEditAction
-
-    /** 生成草稿。 */
-    public data object GenerateDraft : TaskEditAction
-
     /** 名称。 */
     public data class SetName(
         val value: String,

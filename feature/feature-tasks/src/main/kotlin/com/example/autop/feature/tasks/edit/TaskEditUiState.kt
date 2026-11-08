@@ -23,9 +23,6 @@ import java.time.ZoneId
 public data class TaskEditUiState(
     val isNew: Boolean = true,
     val loaded: Boolean = false,
-    // 草稿生成
-    val description: String = "",
-    val generating: Boolean = false,
     // 基本
     val name: String = "",
     val goal: String = "",
