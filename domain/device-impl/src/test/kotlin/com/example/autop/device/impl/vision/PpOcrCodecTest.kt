@@ -103,15 +103,39 @@ internal class PpOcrCodecTest {
     }
 
     @Test
-    fun `rec input expands bounds to protect strokes`() {
+    fun `rec crop expands bounds to protect strokes`() {
         // 框外贴边的笔画（白列 x=45..49）被外扩采样进来；不外扩时最左列是框内黑。
         val pixels = IntArray(100 * 100) { 0xFF000000.toInt() }
         for (y in 0 until 100) {
             for (x in 45..49) pixels[y * 100 + x] = 0xFFFFFFFF.toInt()
         }
         val image = VisionImage(100, 100, pixels)
-        val input = PpOcrCodec.recInput(image, Rect(50, 50, 70, 70))
+        val crop = PpOcrCodec.recCrop(image, Rect(50, 50, 70, 70))
+        val input = PpOcrCodec.recInput(image, crop)
         assertThat(input[0]).isGreaterThan(0f)
+    }
+
+    @Test
+    fun `rec windows single for normal aspect`() {
+        val crop = Rect(0, 0, 300, 50)
+        assertThat(PpOcrCodec.recWindows(crop)).containsExactly(crop)
+    }
+
+    @Test
+    fun `rec windows cover long box with overlap and legal aspect`() {
+        val crop = Rect(0, 0, 1000, 50)
+        val windows = PpOcrCodec.recWindows(crop)
+        assertThat(windows.size).isGreaterThan(1)
+        assertThat(windows.first().l).isEqualTo(crop.l)
+        assertThat(windows.last().r).isEqualTo(crop.r)
+        for (w in windows) {
+            assertThat(w.width.toDouble() / w.height).isAtMost(PpOcrCodec.REC_MAX_ASPECT)
+            assertThat(w.l).isAtLeast(crop.l)
+            assertThat(w.r).isAtMost(crop.r)
+        }
+        for (i in 1 until windows.size) {
+            assertThat(windows[i].l).isLessThan(windows[i - 1].r)
+        }
     }
 
     @Test

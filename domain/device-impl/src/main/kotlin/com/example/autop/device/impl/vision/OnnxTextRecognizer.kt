@@ -10,6 +10,7 @@ import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
 import ai.onnxruntime.OrtSession
 import android.util.Log
+import com.example.autop.device.Rect
 import java.nio.FloatBuffer
 
 /** PP-OCR rec 识别器（mobile/server 共用实现，[recAsset] 切换权重档位）。 */
@@ -36,37 +37,59 @@ internal class OnnxTextRecognizer(
         return runCatching { runRec(session, image, box) }.getOrDefault(null)
     }
 
-    /** rec 会话：单文本行 → 文字＋CTC 行分；空文本丢弃。 */
+    /** rec 会话：裁剪框切窗批量识别 → 文本拼接（长行切窗，消除 320 宽截断）；空文本丢弃。 */
     private fun runRec(
         session: OrtSession,
         image: VisionImage,
         box: OcrBox,
     ): VisualOcrLine? {
-        val input = PpOcrCodec.recInput(image, box.bounds)
+        val windows = PpOcrCodec.recWindows(PpOcrCodec.recCrop(image, box.bounds))
+        val parts = runBatch(session, image, windows)
+        val text = CtcDecoder.stitch(parts.map { it.text })
+        if (text.isEmpty()) return null
+        val totalLen = parts.sumOf { it.text.length }
+        val confidence = if (totalLen == 0) 0.0 else parts.sumOf { it.confidence * it.text.length } / totalLen
+        return VisualOcrLine(text, confidence, box.bounds)
+    }
+
+    /** 切窗批量推理（一次 session.run）→ 逐窗 CTC 解码。 */
+    private fun runBatch(
+        session: OrtSession,
+        image: VisionImage,
+        windows: List<Rect>,
+    ): List<CtcResult> {
+        val plane = COLOR_CHANNELS * PpOcrCodec.REC_HEIGHT * PpOcrCodec.REC_WIDTH
+        val batch = FloatArray(windows.size * plane)
+        windows.forEachIndexed { i, crop -> PpOcrCodec.recInput(image, crop).copyInto(batch, i * plane) }
         val env = OrtEnvironment.getEnvironment()
         val shape =
-            longArrayOf(1, COLOR_CHANNELS.toLong(), PpOcrCodec.REC_HEIGHT.toLong(), PpOcrCodec.REC_WIDTH.toLong())
-        OnnxTensor.createTensor(env, FloatBuffer.wrap(input), shape).use { tensor ->
+            longArrayOf(
+                windows.size.toLong(),
+                COLOR_CHANNELS.toLong(),
+                PpOcrCodec.REC_HEIGHT.toLong(),
+                PpOcrCodec.REC_WIDTH.toLong(),
+            )
+        OnnxTensor.createTensor(env, FloatBuffer.wrap(batch), shape).use { tensor ->
             session.run(mapOf(session.inputNames.first() to tensor)).use { result ->
                 val value = result.get(0).value as Array<Array<FloatArray>>
-                val timesteps = value[0].size
                 val classes = value[0][0].size
                 if (!PpOcrCodec.charsetMatches(classes, charset)) {
                     charsetOk = false
                     Log.e(TAG, "rec($recAsset) 输出类数 $classes 与字典 ${charset.size}+1 不符，OCR 识别停用")
-                    return null
+                    return emptyList()
                 }
-                val logits = FloatArray(timesteps * classes)
-                value[0].forEachIndexed { t, row -> row.copyInto(logits, t * classes) }
-                val decoded =
-                    CtcDecoder.decode(logits, timesteps, classes, charset, CtcDecodeOptions(lexicon = lexicon))
-                return if (decoded.text.isEmpty()) {
-                    null
-                } else {
-                    VisualOcrLine(decoded.text, decoded.confidence, box.bounds)
-                }
+                return value.map { decodeWindow(it) }
             }
         }
+    }
+
+    /** 单窗输出 → CTC 解码（beam＋词典）。 */
+    private fun decodeWindow(rows: Array<FloatArray>): CtcResult {
+        val timesteps = rows.size
+        val classes = rows[0].size
+        val logits = FloatArray(timesteps * classes)
+        rows.forEachIndexed { t, row -> row.copyInto(logits, t * classes) }
+        return CtcDecoder.decode(logits, timesteps, classes, charset, CtcDecodeOptions(lexicon = lexicon))
     }
 
     internal companion object {

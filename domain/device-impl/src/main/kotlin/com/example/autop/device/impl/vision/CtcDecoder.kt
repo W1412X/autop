@@ -97,12 +97,49 @@ internal object CtcDecoder {
             ?.toSet()
             ?: emptySet()
 
+    /** 长行切窗识别的文本拼接：相邻窗按最长公共前后缀（≤ [SEAM_MAX] 字符）去重后拼接。 */
+    fun stitch(parts: List<String>): String {
+        val out = StringBuilder()
+        for (part in parts) {
+            if (part.isNotEmpty()) {
+                val seam = if (out.isEmpty()) 0 else seamOf(out, part)
+                out.append(part, seam, part.length)
+            }
+        }
+        return out.toString()
+    }
+
     /** beam 条目：前缀的 blank / 非 blank 两条 log 概率＋末位 token（CTC 重复合并判定）。 */
     private class Beam(
         var pBlank: Double,
         var pNonBlank: Double,
         var last: String,
     )
+
+    /** 相邻窗文本的最大重叠字符数（超出不成词，防误并）。 */
+    private const val SEAM_MAX: Int = 6
+
+    /** [part] 与已拼接文本尾部的最大公共前后缀长度（重叠去重）。 */
+    private fun seamOf(
+        out: CharSequence,
+        part: String,
+    ): Int {
+        var k = minOf(SEAM_MAX, out.length, part.length)
+        while (k > 0 && !endsWith(out, part, k)) k--
+        return k
+    }
+
+    /** [out] 尾部 k 字符是否等于 [part] 头部 k 字符。 */
+    private fun endsWith(
+        out: CharSequence,
+        part: String,
+        k: Int,
+    ): Boolean {
+        for (j in 0 until k) {
+            if (out[out.length - k + j] != part[j]) return false
+        }
+        return true
+    }
 
     /** CTC prefix beam search（log 域）＋终选词典重打分。 */
     private fun beamSearch(

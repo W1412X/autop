@@ -70,6 +70,17 @@ internal class CtcDecoderTest {
         assertThat(lexicon).containsExactly("微信", "设置", "朋友圈")
     }
 
+    @Test
+    fun `stitch dedups overlapping window texts`() {
+        assertThat(CtcDecoder.stitch(listOf("你好世界", "世界和平"))).isEqualTo("你好世界和平")
+        assertThat(CtcDecoder.stitch(listOf("消息发送", "发送成功"))).isEqualTo("消息发送成功")
+    }
+
+    @Test
+    fun `stitch concatenates without overlap and skips empties`() {
+        assertThat(CtcDecoder.stitch(listOf("", "abc", "", "def"))).isEqualTo("abcdef")
+    }
+
     private fun putRow(
         logits: FloatArray,
         t: Int,
