@@ -41,9 +41,13 @@ public class TriggerHub(
 ) {
     private val mutex = Mutex()
     private val hourWindow = ArrayDeque<Long>()
+    private var started = false
 
-    /** 启动：按需收集事件源。 */
+    /** 启动：按需收集事件源（幂等；2026-11-09 前生产代码从未调用，条件触发全链死）。 */
+    @Synchronized
     public fun start() {
+        if (started) return
+        started = true
         sources.forEach { source ->
             source
                 .events()

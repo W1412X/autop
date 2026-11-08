@@ -42,6 +42,15 @@
             </intent-filter>
         </receiver>
 
+        <!-- 解锁事件（trigger.screen_unlock 事件源，2026-11-09 接线）。 -->
+        <receiver
+            android:name="com.example.autop.task.impl.sources.UnlockReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.USER_PRESENT" />
+            </intent-filter>
+        </receiver>
+
         <!-- 锁屏提醒三动作与稍后到期（docs/tech/07 §4.4）；通知动作按钮（§7）。 -->
         <receiver
             android:name="com.example.autop.task.impl.reminder.ReminderActionReceiver"
