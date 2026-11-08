@@ -35,6 +35,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -83,19 +84,20 @@ public class AgentHostService : Service() {
         shellKeepAlive.start(scope)
         observeJob =
             scope.launch {
-                combine(runService.observeActive(), runStore.observeUnfinished(), shellInput.paired) {
-                    active,
-                    unfinished,
-                    paired,
-                    ->
-                    Triple(active, unfinished.size, paired)
-                }.collect { (active, unfinishedCount, paired) ->
-                    syncWakeLock(held = active != null)
-                    if (shouldStop(active, unfinishedCount, paired)) {
+                combine(
+                    runService.observeActive(),
+                    runStore.observeUnfinished(),
+                    shellInput.paired,
+                    config.observe().map { snapshot -> snapshot[TaskConfig.HOST].persistent },
+                ) { active, unfinished, paired, persistent ->
+                    HostSnapshot(active, unfinished.size, paired, persistent)
+                }.collect { snapshot ->
+                    syncWakeLock(held = snapshot.active != null)
+                    if (shouldStop(snapshot.active, snapshot.unfinishedCount, snapshot.paired, snapshot.persistent)) {
                         stopSelf()
                         return@collect
                     }
-                    updateNotification(active)
+                    updateNotification(snapshot.active)
                 }
             }
     }
@@ -137,11 +139,12 @@ public class AgentHostService : Service() {
         active: ActiveRunInfo?,
         unfinishedCount: Int,
         paired: Boolean,
+        persistent: Boolean,
     ): Boolean =
         when {
             active != null || unfinishedCount > 0 -> false
             paired -> false
-            else -> !config.current()[TaskConfig.HOST].persistent
+            else -> !persistent
         }
 
     private fun createChannel() {
@@ -247,3 +250,11 @@ public class AgentHostService : Service() {
         const val WAKE_LOCK_TAG = "autop:run"
     }
 }
+
+/** 保活判定的聚合状态。 */
+private data class HostSnapshot(
+    val active: ActiveRunInfo?,
+    val unfinishedCount: Int,
+    val paired: Boolean,
+    val persistent: Boolean,
+)

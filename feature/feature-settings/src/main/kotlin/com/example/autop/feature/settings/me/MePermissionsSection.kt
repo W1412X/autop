@@ -67,7 +67,7 @@ internal fun PermissionsSection(
         )
         SwitchRow(
             title = stringResource(R.string.me_host_persistent),
-            subtitle = null,
+            subtitle = stringResource(R.string.me_host_persistent_desc),
             checked = state.hostPersistent,
             onCheckedChange = { onAction(MeAction.SetHostPersistent(it)) },
         )

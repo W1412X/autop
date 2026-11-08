@@ -373,6 +373,7 @@
     <string name="me_health_bad">未开启</string>
     <string name="me_health_fix">去处理</string>
     <string name="me_host_persistent">常驻后台</string>
+    <string name="me_host_persistent_desc">保持服务常驻，任务触发更可靠；略增耗电</string>
     <string name="me_return_to_origin">任务结束后返回原应用</string>
     <string name="me_conditions_enabled">条件触发任务</string>
     <string name="me_shield_enabled">执行期屏蔽触摸</string>

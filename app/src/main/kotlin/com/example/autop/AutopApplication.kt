@@ -2,6 +2,7 @@ package com.example.autop
 
 import android.app.Application
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.TaskConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.platform.AndroidLogger
 import com.example.autop.core.platform.CrashLogger
@@ -21,6 +22,7 @@ import com.example.autop.feature.overlay.progress.ProgressController
 import com.example.autop.feature.overlay.record.RecordController
 import com.example.autop.task.impl.InterruptedRunRecovery
 import com.example.autop.task.impl.di.AppScope
+import com.example.autop.task.impl.host.AgentHostStarter
 import com.example.autop.task.impl.schedule.AlarmSync
 import com.example.autop.task.impl.schedule.TriggerHub
 import com.example.autop.task.impl.store.AuditCleaner
@@ -77,6 +79,8 @@ class AutopApplication : Application() {
 
     @Inject lateinit var triggerHub: TriggerHub
 
+    @Inject lateinit var hostStarter: AgentHostStarter
+
     @Inject lateinit var runRecovery: InterruptedRunRecovery
 
     @Inject lateinit var auditCleaner: AuditCleaner
@@ -120,6 +124,15 @@ class AutopApplication : Application() {
         alarmSync.start(appScope)
         // 条件触发事件订阅（2026-11-09 修复"条件不触发"）：通知/前台/充电/网络/解锁事件流接入。
         triggerHub.start()
+        // 常驻后台随 task.host.persistent 生效：开启即拉起前台服务（启动首值也覆盖），
+        // 进程不死才能持续收充电/网络/切前台等条件事件；关闭由服务自评停服。
+        appScope.launch {
+            configProvider
+                .observe()
+                .map { it[TaskConfig.HOST].persistent }
+                .distinctUntilChanged()
+                .collect { persistent -> if (persistent) hostStarter.ensureRunning() }
+        }
         auditCleaner.ensureScheduled()
         appScope.launch { runRecovery.markInterrupted() }
         // 视觉模型预热：模型资产约 72MB，首次加载要读资产＋校验＋建会话（含 NNAPI 编译），
