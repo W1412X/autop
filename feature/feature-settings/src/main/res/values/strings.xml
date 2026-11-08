@@ -47,6 +47,8 @@
     <string name="me_shell_pair">配对</string>
     <string name="me_shell_port">配对端口</string>
     <string name="me_shell_code">配对码</string>
+    <string name="me_shell_discovering">正在自动搜索可配对设备… 打开系统「无线调试 → 使用配对码配对设备」窗口后，端口会自动填入</string>
+    <string name="me_shell_discover_hint">端口支持自动发现：在系统「无线调试 → 使用配对码配对设备」窗口打开时会自动填入，只需输入 6 位配对码</string>
     <string name="me_shell_guide">开发者选项 → 无线调试 →「使用配对码配对设备」，填弹窗里的端口与 6 位配对码。连接端口无需填写，配对后自动发现；配对一次后自动重连。</string>
     <string name="me_shell_pair_failed">配对失败：%1$s</string>
     <string name="me_shell_input_missing">请填写配对端口与配对码</string>

@@ -30,6 +30,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -85,9 +86,14 @@ private val TOP_LEVEL_ROUTES: Set<String> =
 internal fun AppNavHost(
     showLabels: Boolean,
     startDestination: String = AutopRoutes.CHAT_LIST,
+    openRoute: String? = null,
     debugPage: DebugPage? = null,
 ) {
     val navController = rememberNavController()
+    // 通知深链（如配对发现通知 → 注入通道页）：路由变化即导航。
+    LaunchedEffect(openRoute) {
+        if (openRoute != null) navController.navigate(openRoute)
+    }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
     // 转场 lambda 不是 composable 上下文，先取值再捕获。

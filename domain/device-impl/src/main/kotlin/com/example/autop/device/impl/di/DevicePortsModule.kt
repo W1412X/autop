@@ -11,6 +11,7 @@ import com.example.autop.device.ElementPicker
 import com.example.autop.device.GestureController
 import com.example.autop.device.NodeActionBlockStore
 import com.example.autop.device.ObserveModeAvailability
+import com.example.autop.device.PairingDiscovery
 import com.example.autop.device.ScreenLease
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ShellInput
@@ -30,6 +31,7 @@ import com.example.autop.device.impl.observation.ReplayStateProbeImpl
 import com.example.autop.device.impl.observation.ReplayTargetResolverImpl
 import com.example.autop.device.impl.record.ElementPickerImpl
 import com.example.autop.device.impl.shell.AdbShellInput
+import com.example.autop.device.impl.shell.PairingDiscoveryImpl
 import com.example.autop.device.impl.shell.ShellKeepAliveImpl
 import com.example.autop.device.impl.touch.TouchShieldController
 import com.example.autop.device.impl.vision.VisualScreenParserImpl
@@ -96,6 +98,11 @@ public object DevicePortsModule {
     @Provides
     @Singleton
     public fun provideShellKeepAlive(impl: ShellKeepAliveImpl): ShellKeepAlive = impl
+
+    /** 无线调试配对自动发现（mDNS 可配对服务 → 通知/自动填端口）。 */
+    @Provides
+    @Singleton
+    public fun providePairingDiscovery(impl: PairingDiscoveryImpl): PairingDiscovery = impl
 
     /** 节点动作屏蔽记录（ADR-0015）。 */
     @Provides

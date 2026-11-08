@@ -9,6 +9,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Outcome
+import com.example.autop.device.PairingDiscovery
 import com.example.autop.device.ShellInput
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,6 +27,7 @@ public class ShellChannelViewModel
     @Inject
     constructor(
         private val shellInput: ShellInput,
+        private val discovery: PairingDiscovery,
         private val dispatchers: DispatcherProvider,
     ) : ViewModel() {
         private val portText = MutableStateFlow("")
@@ -36,13 +38,33 @@ public class ShellChannelViewModel
 
         private val notice = MutableStateFlow<ShellNotice?>(null)
 
+        init {
+            // 自动发现端口回填：端口为空且非忙碌时填入（用户手输优先，不覆盖）。
+            viewModelScope.launch(dispatchers.default) {
+                discovery.discoveredPort.collect { port ->
+                    if (port != null && portText.value.isEmpty() && !busy.value) {
+                        portText.update { port.toString() }
+                    }
+                }
+            }
+        }
+
         public val uiState: StateFlow<ShellChannelUiState> =
-            combine(shellInput.state, portText, codeText, busy, notice) { state, port, code, running, hint ->
+            combine(
+                combine(shellInput.state, shellInput.paired, discovery.discoveredPort) { state, paired, port ->
+                    Triple(state, paired, port)
+                },
+                portText,
+                codeText,
+                busy,
+                notice,
+            ) { channel, port, code, running, hint ->
                 ShellChannelUiState(
-                    shellState = state,
+                    shellState = channel.first,
                     portText = port,
                     codeText = code,
                     busy = running,
+                    discovering = !channel.second && channel.third == null,
                     notice = hint,
                 )
             }.stateIn(

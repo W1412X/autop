@@ -5,6 +5,7 @@ import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.platform.AndroidLogger
 import com.example.autop.core.platform.CrashLogger
+import com.example.autop.device.PairingDiscovery
 import com.example.autop.device.UserActivityMonitor
 import com.example.autop.device.VisualScreenParser
 import com.example.autop.device.impl.overlay.OverlayWindowManager
@@ -65,6 +66,8 @@ class AutopApplication : Application() {
 
     @Inject lateinit var visionParser: VisualScreenParser
 
+    @Inject lateinit var pairingDiscovery: PairingDiscovery
+
     @Inject lateinit var runRecovery: InterruptedRunRecovery
 
     @Inject lateinit var auditCleaner: AuditCleaner
@@ -99,6 +102,8 @@ class AutopApplication : Application() {
                 .distinctUntilChanged()
                 .collect { enabled -> if (enabled) ballController.start() else ballController.hide() }
         }
+        // 无线调试配对自动发现（未配对时后台监听可配对服务，发现即通知；配对成功自动停用）。
+        pairingDiscovery.start(appScope)
         auditCleaner.ensureScheduled()
         appScope.launch { runRecovery.markInterrupted() }
         // 视觉模型预热：模型资产约 72MB，首次加载要读资产＋校验＋建会话（含 NNAPI 编译），

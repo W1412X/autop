@@ -27,6 +27,8 @@ public data class ShellChannelUiState(
     val codeText: String = "",
     /** 配对/连接进行中。 */
     val busy: Boolean = false,
+    /** 后台自动搜索可配对设备中（未配对且尚未发现端口）。 */
+    val discovering: Boolean = false,
     /** 配对提示（null=无）。 */
     val notice: ShellNotice? = null,
 )

@@ -34,6 +34,10 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+        <!-- 配对发现通知的内联回填（无线调试自动发现，N22x）。 -->
+        <receiver
+            android:name=".shell.PairingReplyReceiver"
+            android:exported="false" />
     </application>
 
 </manifest>

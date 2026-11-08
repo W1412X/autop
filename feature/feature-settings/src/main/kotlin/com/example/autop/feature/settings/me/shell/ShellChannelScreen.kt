@@ -102,6 +102,15 @@ private fun PairForm(
                 .fillMaxWidth()
                 .padding(horizontal = LocalSpacing.current.screenEdge),
     ) {
+        Text(
+            text =
+                stringResource(
+                    if (state.discovering) R.string.me_shell_discovering else R.string.me_shell_discover_hint,
+                ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(bottom = LocalSpacing.current.xs),
+        )
         OutlinedTextField(
             value = state.portText,
             onValueChange = { onAction(ShellChannelAction.UpdatePort(it)) },

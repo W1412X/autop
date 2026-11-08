@@ -1,10 +1,13 @@
 package com.example.autop
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.autop.core.common.AnimationScaleReader
 import com.example.autop.core.common.Capability
@@ -35,9 +38,13 @@ class MainActivity : ComponentActivity() {
     /** 调试页（debug 源集实现；release 为 empty，docs/tech/08 §4.6）。 */
     @Inject lateinit var debugPage: Optional<DebugPage>
 
+    /** 通知深链目标路由（如注入通道页；[com.example.autop.device.PairingDiscovery.EXTRA_OPEN_ROUTE]）。 */
+    private var openRoute by mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        openRoute = intent?.getStringExtra(EXTRA_OPEN_ROUTE)
         setContent {
             val snapshot by configProvider.observe().collectAsStateWithLifecycle()
             val appearance =
@@ -55,9 +62,21 @@ class MainActivity : ComponentActivity() {
                         } else {
                             AutopRoutes.ONBOARDING
                         },
+                    openRoute = openRoute,
                     debugPage = debugPage.orElse(null),
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        // 通知深链（CLEAR_TOP|SINGLE_TOP 复用实例时）：更新目标路由触发导航。
+        intent.getStringExtra(EXTRA_OPEN_ROUTE)?.let { openRoute = it }
+    }
+
+    private companion object {
+        /** 通知深链路由 extra 键（与 PairingDiscovery.EXTRA_OPEN_ROUTE 同值）。 */
+        const val EXTRA_OPEN_ROUTE: String = "open_route"
     }
 }
