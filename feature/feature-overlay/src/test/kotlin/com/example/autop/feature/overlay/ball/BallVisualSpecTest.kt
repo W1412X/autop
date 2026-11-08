@@ -17,37 +17,39 @@ class BallVisualSpecTest {
     }
 
     @Test
-    fun `running draws progress ring with breath halo when motion on`() {
+    fun `running draws inner breath glow without ring or outer halo when motion on`() {
         val spec =
             ballVisualSpec(
                 BallMode.Running(stepCount = 3, progress = 0.5f, toolCategory = ToolCategory.GESTURE),
                 motionEnabled = true,
             )
         assertThat(spec.ringTone).isEqualTo(StatusTone.RUNNING)
-        assertThat(spec.ringKind).isEqualTo(RingKind.PROGRESS)
-        assertThat(spec.ringProgress).isEqualTo(0.5f)
-        assertThat(spec.haloKind).isEqualTo(HaloKind.BREATH)
+        assertThat(spec.ringKind).isEqualTo(RingKind.NONE)
+        assertThat(spec.haloKind).isEqualTo(HaloKind.NONE)
+        assertThat(spec.innerGlow).isEqualTo(InnerGlowKind.BREATH)
     }
 
     @Test
-    fun `running without budget draws indeterminate ring`() {
+    fun `running without budget still draws inner breath glow`() {
         val spec =
             ballVisualSpec(
                 BallMode.Running(stepCount = 3, progress = null, toolCategory = null),
                 motionEnabled = true,
             )
-        assertThat(spec.ringKind).isEqualTo(RingKind.INDETERMINATE)
+        assertThat(spec.ringKind).isEqualTo(RingKind.NONE)
+        assertThat(spec.innerGlow).isEqualTo(InnerGlowKind.BREATH)
     }
 
     @Test
-    fun `motion off drops breath halo but keeps progress ring`() {
+    fun `motion off drops inner breath glow too`() {
         val spec =
             ballVisualSpec(
                 BallMode.Running(stepCount = 3, progress = 0.5f, toolCategory = null),
                 motionEnabled = false,
             )
         assertThat(spec.haloKind).isEqualTo(HaloKind.NONE)
-        assertThat(spec.ringKind).isEqualTo(RingKind.PROGRESS)
+        assertThat(spec.ringKind).isEqualTo(RingKind.NONE)
+        assertThat(spec.innerGlow).isEqualTo(InnerGlowKind.NONE)
     }
 
     @Test

@@ -6,6 +6,7 @@ package com.example.autop.feature.overlay.ball
 
 import com.example.autop.task.ActiveRunInfo
 import kotlin.math.cos
+import kotlin.math.min
 import kotlin.math.sin
 
 /** 圆弧菜单动作（docs/tech/08 §5.1，N182）。 */
@@ -80,13 +81,16 @@ public fun arcSpots(
     itemHeightPx: Float,
 ): List<MenuSpot> {
     val facingRight = ballCenterX * 2 < screenWidthPx
-    val stepDeg = if (actions.size > 1) SPREAD_DEG / (actions.size - 1) else 0f
+    // 按钮间距下限：步距 ≥ [MIN_STEP_DEG] 弦距才不重叠（R=2.2 球时弦距 ≈ 59dp > 48dp 钮）；
+    // 总扇面钳制在 [SPREAD_MAX_DEG] 内，防止球贴顶/贴底时按钮绕到背后。
+    val stepDeg = if (actions.size > 1) min(MIN_STEP_DEG, SPREAD_MAX_DEG / (actions.size - 1)) else 0f
+    val spreadDeg = stepDeg * (actions.size - 1)
     val halfWidth = itemWidthPx / 2
     val top = buttonSizePx / 2
     val bottom = screenHeightPx - itemHeightPx + buttonSizePx / 2
     return actions.mapIndexed { index, action ->
         // 扇面从上缘向下均分（两侧一致）；单按钮居中水平。
-        val offsetDeg = if (actions.size > 1) SPREAD_DEG / 2 - stepDeg * index else 0f
+        val offsetDeg = if (actions.size > 1) spreadDeg / 2 - stepDeg * index else 0f
         val deg = if (facingRight) offsetDeg else HALF_CIRCLE_DEG - offsetDeg
         val rad = Math.toRadians(deg.toDouble())
         val x = ballCenterX + radiusPx * cos(rad).toFloat()
@@ -99,8 +103,11 @@ public fun arcSpots(
     }
 }
 
-/** 菜单扇面角（度）：两个按钮分列 ±35°。 */
-private const val SPREAD_DEG: Float = 70f
+/** 相邻按钮最小步距（度）：R=2.2 球半径下弦距 ≈ 59dp，两个 48dp 钮不重叠。 */
+private const val MIN_STEP_DEG: Float = 30f
+
+/** 扇面上限（度）：按钮再多也不绕到球背后。 */
+private const val SPREAD_MAX_DEG: Float = 120f
 
 /** 半圆角度（朝左开口的基准角）。 */
 private const val HALF_CIRCLE_DEG: Float = 180f

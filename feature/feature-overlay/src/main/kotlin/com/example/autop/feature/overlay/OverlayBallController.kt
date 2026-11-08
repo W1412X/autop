@@ -10,6 +10,7 @@ import android.content.Intent
 import android.provider.Settings
 import android.view.View
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
@@ -59,7 +60,6 @@ public class OverlayBallController
             y: Int,
         ) {
             holder.onMoved(x, y)
-            host.update(OverlayWindowIds.BALL, ballSpec(context, BallPosition(x, y)))
         }
 
         override fun onDragEnd(
@@ -69,7 +69,6 @@ public class OverlayBallController
             magnetPx: Int,
         ) {
             holder.onDragEnd(ballSizePx, screenWidthPx, sliverPx, magnetPx)
-            host.update(OverlayWindowIds.BALL, ballSpec(context, holder.position.value))
         }
 
         override fun onFirstLayout(
@@ -79,7 +78,6 @@ public class OverlayBallController
             sliverPx: Int,
         ) {
             holder.placeDefault(screenWidthPx, screenHeightPx, ballSizePx, sliverPx)
-            host.update(OverlayWindowIds.BALL, ballSpec(context, holder.position.value))
         }
 
         /**
@@ -95,7 +93,6 @@ public class OverlayBallController
             ballSizePx: Int,
         ) {
             holder.onReveal(screenWidthPx, ballSizePx)
-            host.update(OverlayWindowIds.BALL, ballSpec(context, holder.position.value))
         }
 
         override fun onDoubleTap() {
@@ -112,11 +109,19 @@ public class OverlayBallController
             )
         }
 
-        /** 球窗口内容：把 [BallStateHolder] 的状态接到 [BallScreen]。 */
+        /**
+         * 球窗口内容：状态接 [BallScreen]；窗口位置由 [BallStateHolder.position] 统一驱动
+         * （含静置自动收拢的定时变更），避免视觉形态与窗口位置错位（收拢后球留在原地的 bug）。
+         */
         @Composable
         private fun BallContent() {
             val uiState by holder.uiState.collectAsState()
             val position by holder.position.collectAsState()
+            LaunchedEffect(position) {
+                if (position.x != BallStateHolder.UNSET) {
+                    host.update(OverlayWindowIds.BALL, ballSpec(context, position))
+                }
+            }
             BallScreen(uiState, position, callbacks = this)
         }
     }

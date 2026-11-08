@@ -29,9 +29,8 @@ import kotlin.math.roundToInt
 /** 松手磁吸判定距离（球心距边缘，dp）。 */
 private val MAGNET_SIZE = 28.dp
 
-/** 半贴边态的弱化透明度与缩小比例（视觉随形态递减）。 */
+/** 半贴边态的弱化透明度（贴边时球与屏幕缘齐平，不做缩放——缩放会以中心为锚内缩留缝）。 */
 private const val DOCK_ALPHA = 0.6f
-private const val DOCK_SCALE = 0.85f
 
 /** 球窗口视口（位置与尺寸，手势层用）。 */
 private data class BallViewport(
@@ -98,15 +97,7 @@ internal fun BallScreen(
     ) {
         when (position.dock) {
             BallDock.SLIVER -> BallSliver(uiState, position.side)
-            BallDock.EDGE ->
-                BallVisual(
-                    uiState,
-                    Modifier.graphicsLayer {
-                        alpha = DOCK_ALPHA
-                        scaleX = DOCK_SCALE
-                        scaleY = DOCK_SCALE
-                    },
-                )
+            BallDock.EDGE -> BallVisual(uiState, Modifier.graphicsLayer { alpha = DOCK_ALPHA })
             BallDock.NONE -> BallVisual(uiState)
         }
     }

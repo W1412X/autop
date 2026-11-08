@@ -47,6 +47,15 @@ public enum class BadgeKind {
     PULSE,
 }
 
+/** 球内呼吸灯形态（运行态新口径：取消外圈加载环与外侧光晕，改为球内呼吸灯）。 */
+public enum class InnerGlowKind {
+    /** 无内呼吸灯。 */
+    NONE,
+
+    /** 呼吸灯（状态色径向渐变在球内起伏）。 */
+    BREATH,
+}
+
 /** 悬浮球视觉参数（N185 状态差异化）。 */
 @Immutable
 public data class BallVisualSpec(
@@ -62,6 +71,8 @@ public data class BallVisualSpec(
     val badgeKind: BadgeKind,
     /** 中心图标透明度（无障碍断开时弱化）。 */
     val iconAlpha: Float,
+    /** 球内呼吸灯形态（运行态）。 */
+    val innerGlow: InnerGlowKind = InnerGlowKind.NONE,
 )
 
 /** 无障碍断开时中心图标的弱化透明度。 */
@@ -105,11 +116,12 @@ public fun ballVisualSpec(
         is BallMode.Running ->
             BallVisualSpec(
                 ringTone = StatusTone.RUNNING,
-                ringKind = if (mode.progress == null) RingKind.INDETERMINATE else RingKind.PROGRESS,
-                ringProgress = mode.progress,
-                haloKind = if (motionEnabled) HaloKind.BREATH else HaloKind.NONE,
+                ringKind = RingKind.NONE,
+                ringProgress = null,
+                haloKind = HaloKind.NONE,
                 badgeKind = BadgeKind.NONE,
                 iconAlpha = ICON_ALPHA_FULL,
+                innerGlow = if (motionEnabled) InnerGlowKind.BREATH else InnerGlowKind.NONE,
             )
         BallMode.WaitingAnswer ->
             BallVisualSpec(

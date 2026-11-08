@@ -33,8 +33,8 @@ import kotlin.math.roundToInt
 
 /**
  * 菜单按钮中心到球心的距离（球边长倍数，docs/tech/08 §5.1）。
- * 弧面相邻按钮中心间距 ≈ R·sin35°，须大于按钮直径；2.2 时约 65dp > 48dp 钮，
- * 留有余量且构图紧凑。
+ * 相邻按钮弦距 = 2R·sin(步距/2)；步距由 [arcSpots] 按 30° 保底给出，
+ * 2.2 球半径时弦距 ≈ 59dp > 48dp 钮，留有余量且构图紧凑。
  */
 private const val MENU_RADIUS_BALLS: Float = 2.2f
 

@@ -114,6 +114,13 @@ private const val HALO_SCALE_MIN = 0.9f
 private const val HALO_MID_STOP = 0.55f
 private const val HALO_MID_ALPHA = 0.45f
 
+/** 球内呼吸灯：整层 alpha 起伏区间与径向渐变（中心亮、边缘归零）。 */
+private const val INNER_ALPHA_MIN = 0.55f
+private const val INNER_ALPHA_MAX = 1f
+private const val INNER_CENTER_ALPHA = 0.5f
+private const val INNER_MID_ALPHA = 0.2f
+private const val INNER_MID_STOP = 0.7f
+
 /** 脉冲（角标/光晕）半周期（最暗到最亮）。 */
 private const val PULSE_PERIOD_MS = 1200
 
@@ -147,6 +154,7 @@ internal fun BallVisual(
                     .size(BALL_SIZE),
         ) {
             BallBody()
+            InnerGlow(kind = spec.innerGlow, color = anim.ringColor, breathMs = uiState.breathMs)
             BallRing(
                 color = anim.ringColor,
                 sweep = anim.sweep,
@@ -271,6 +279,36 @@ private fun BoxScope.BallBody() {
             .matchParentSize()
             .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f), CircleShape),
     )
+}
+
+/**
+ * 球内呼吸灯（运行态新口径）：状态色径向渐变在球内起伏，替代外圈加载环与外侧光晕。
+ * 画在底圆之上、图标之下；渐变边缘 alpha 归零，不越出球体。
+ */
+@Composable
+private fun BoxScope.InnerGlow(
+    kind: InnerGlowKind,
+    color: Color,
+    breathMs: Long,
+) {
+    if (kind == InnerGlowKind.NONE) return
+    val breath = rememberBreath(halfPeriodMs = breathMs, enabled = true)
+    Canvas(
+        Modifier.matchParentSize().graphicsLayer {
+            alpha = INNER_ALPHA_MIN + (INNER_ALPHA_MAX - INNER_ALPHA_MIN) * breath.value
+        },
+    ) {
+        drawCircle(
+            brush =
+                Brush.radialGradient(
+                    0f to color.copy(alpha = INNER_CENTER_ALPHA),
+                    INNER_MID_STOP to color.copy(alpha = INNER_MID_ALPHA),
+                    1f to color.copy(alpha = 0f),
+                    center = center,
+                    radius = size.minDimension / 2,
+                ),
+        )
+    }
 }
 
 /**
