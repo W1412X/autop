@@ -20,6 +20,7 @@ class BallMenuLogicTest {
                     BallMenuAction.OPEN_APP,
                     BallMenuAction.RECORD,
                     BallMenuAction.TOOL_TEST,
+                    BallMenuAction.HIDE_BALL,
                 ),
             )
     }

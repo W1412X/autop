@@ -13,6 +13,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import com.example.autop.core.common.DispatcherProvider
+import com.example.autop.core.common.Logger
+import com.example.autop.core.common.onErr
+import com.example.autop.core.config.ConfigEditor
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlayHost
@@ -25,7 +29,11 @@ import com.example.autop.feature.overlay.probe.ProbeController
 import com.example.autop.feature.overlay.progress.ProgressController
 import com.example.autop.feature.overlay.record.RecordController
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -43,7 +51,11 @@ public class BallMenuController
         private val progressController: ProgressController,
         private val probeController: ProbeController,
         private val recordController: RecordController,
+        private val configEditor: ConfigEditor,
+        private val logger: Logger,
+        dispatchers: DispatcherProvider,
     ) {
+        private val scope = CoroutineScope(SupervisorJob() + dispatchers.io)
         private val openState = MutableStateFlow(false)
 
         /** 菜单窗口内容工厂（app 组装层注册到 `OverlayWindowManager`）。 */
@@ -116,6 +128,21 @@ public class BallMenuController
                 BallMenuAction.ABORT_RUN -> actions.stop()
                 BallMenuAction.RECORD -> recordController.show()
                 BallMenuAction.TOOL_TEST -> probeController.show()
+                BallMenuAction.HIDE_BALL -> hideBall()
+            }
+        }
+
+        /** 隐藏悬浮球：写 `ui.overlay.enabled=false`（配置观察流即时收球，设置页可再开）。 */
+        private fun hideBall() {
+            scope.launch {
+                configEditor.setOverride(OVERLAY_ENABLED_PATH, JsonPrimitive(false)).onErr { error ->
+                    logger.e(
+                        tag = TAG,
+                        event = "hide_ball_failed",
+                        "code" to error.code,
+                        error = error.cause,
+                    )
+                }
             }
         }
 
@@ -124,6 +151,11 @@ public class BallMenuController
         private companion object {
             /** 未摆放时菜单默认高度：屏高 / 3。 */
             const val DEFAULT_Y_FRACTION: Float = 3f
+
+            /** 悬浮球显隐写入路径（ui.overlay.enabled）。 */
+            const val OVERLAY_ENABLED_PATH = "ui.overlay.enabled"
+
+            const val TAG = "BallMenu"
         }
     }
 

@@ -65,9 +65,10 @@ public class OverlayBallController
         override fun onDragEnd(
             ballSizePx: Int,
             screenWidthPx: Int,
-            edgeHideRatio: Double,
+            sliverPx: Int,
+            magnetPx: Int,
         ) {
-            holder.onSnap(ballSizePx, screenWidthPx, edgeHideRatio)
+            holder.onDragEnd(ballSizePx, screenWidthPx, sliverPx, magnetPx)
             host.update(OverlayWindowIds.BALL, ballSpec(context, holder.position.value))
         }
 
@@ -75,22 +76,26 @@ public class OverlayBallController
             screenWidthPx: Int,
             screenHeightPx: Int,
             ballSizePx: Int,
+            sliverPx: Int,
         ) {
-            holder.placeDefault(screenWidthPx, screenHeightPx, ballSizePx)
+            holder.placeDefault(screenWidthPx, screenHeightPx, ballSizePx, sliverPx)
             host.update(OverlayWindowIds.BALL, ballSpec(context, holder.position.value))
         }
 
         /**
-         * 单击（N217）：贴边收起态先全部唤出（露头点按展开），已唤出才展开/收起圆弧菜单（N182）。
+         * 单击：细条/半贴边态先唤出到自由态（[onReveal]），自由态才展开/收起圆弧菜单（N182）。
+         * 无障碍断开态由 [BallScreen] 直发 [onAccessibilityTap]，不走此路径。
          */
         override fun onTap(screenWidthPx: Int) {
-            val position = holder.position.value
-            if (position.hidden) {
-                holder.onReveal(screenWidthPx, ballSizePx(context))
-                host.update(OverlayWindowIds.BALL, ballSpec(context, holder.position.value))
-            } else {
-                ballMenuController.toggle()
-            }
+            ballMenuController.toggle()
+        }
+
+        override fun onReveal(
+            screenWidthPx: Int,
+            ballSizePx: Int,
+        ) {
+            holder.onReveal(screenWidthPx, ballSizePx)
+            host.update(OverlayWindowIds.BALL, ballSpec(context, holder.position.value))
         }
 
         override fun onDoubleTap() {

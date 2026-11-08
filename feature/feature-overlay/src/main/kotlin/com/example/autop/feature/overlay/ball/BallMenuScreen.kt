@@ -1,22 +1,19 @@
 /**
  * 悬浮球圆弧菜单（docs/tech/08 §5.1，N182）：点球后按钮沿圆弧环绕球展开（开口朝屏幕内侧），
- * 点空白或选中动作即收起。MENU 窗口整屏透明，按钮为「圆形图标 + 下方文字」。
+ * 点空白或选中动作即收起。MENU 窗口整屏透明，按钮为纯图标圆钮（N22x：文字标签曾与相邻
+ * 按钮重叠，改为图标钮＋无障碍描述，视觉干净）。
  */
 package com.example.autop.feature.overlay.ball
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,33 +21,28 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.theme.AutopDimens
-import com.example.autop.core.ui.theme.IconSize
-import com.example.autop.core.ui.theme.LocalSpacing
-import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.overlay.R
 import kotlin.math.roundToInt
 
 /**
  * 菜单按钮中心到球心的距离（球边长倍数，docs/tech/08 §5.1）。
- * N217：弧面相邻按钮中心间距 = R·sin35°，须大于整块按钮高（圆 + 文字），
- * 否则上一个按钮的文字被下一个按钮的圆压住；1.8 不够（53dp < 76dp），调到 2.6。
+ * 弧面相邻按钮中心间距 ≈ R·sin35°，须大于按钮直径；2.2 时约 65dp > 48dp 钮，
+ * 留有余量且构图紧凑。
  */
-private const val MENU_RADIUS_BALLS: Float = 2.6f
+private const val MENU_RADIUS_BALLS: Float = 2.2f
 
 /** 菜单按钮圆形直径（dp）。 */
 private val MENU_BUTTON_SIZE: Dp = AutopDimens.minTouchTarget
 
-/** 整块按钮宽（圆 + 文字外接盒，dp；[MenuButton] 定宽，超宽文字省略）。 */
-private val MENU_ITEM_WIDTH: Dp = 76.dp
-
-/** 文字行高上限（dp，含放大字号余量）：弧面间距与贴边钳制用。 */
-private val MENU_LABEL_HEIGHT: Dp = 24.dp
+/** 按钮图标尺寸（图标钮比带文字时放大一号）。 */
+private val MENU_ICON_SIZE: Dp = 28.dp
 
 /** 圆弧菜单动作回调（由 BallMenuController 实现）。 */
 internal class BallMenuCallbacks(
@@ -71,8 +63,6 @@ internal fun BallMenuScreen(
     val windowSize = LocalWindowInfo.current.containerSize
     val radiusPx = with(density) { (BALL_SIZE * MENU_RADIUS_BALLS).toPx() }
     val buttonSizePx = with(density) { MENU_BUTTON_SIZE.toPx() }
-    val itemWidthPx = with(density) { MENU_ITEM_WIDTH.toPx() }
-    val itemHeightPx = with(density) { (MENU_BUTTON_SIZE + LocalSpacing.current.xs + MENU_LABEL_HEIGHT).toPx() }
     val spots =
         arcSpots(
             actions = actions,
@@ -82,10 +72,9 @@ internal fun BallMenuScreen(
             screenWidthPx = windowSize.width.toFloat(),
             screenHeightPx = windowSize.height.toFloat(),
             buttonSizePx = buttonSizePx,
-            itemWidthPx = itemWidthPx,
-            itemHeightPx = itemHeightPx,
+            itemWidthPx = buttonSizePx,
+            itemHeightPx = buttonSizePx,
         )
-    val halfWidth = itemWidthPx / 2
     val circleHalf = buttonSizePx / 2
     Box(
         modifier =
@@ -97,11 +86,10 @@ internal fun BallMenuScreen(
             MenuButton(
                 action = spot.action,
                 onClick = { callbacks.onAction(spot.action) },
-                // 圆心落在弧线上（N217）：定宽整块按钮，左上角 = 圆心 - (半宽, 圆半径)。
                 modifier =
                     Modifier.offset {
                         IntOffset(
-                            (spot.x - halfWidth).roundToInt(),
+                            (spot.x - circleHalf).roundToInt(),
                             (spot.y - circleHalf).roundToInt(),
                         )
                     },
@@ -110,7 +98,7 @@ internal fun BallMenuScreen(
     }
 }
 
-/** 菜单按钮：圆形图标 + 下方文字；「中止任务」用 error 色（危险动作，docs/tech/08 §6）。 */
+/** 菜单按钮：纯图标圆钮（无文字防重叠）；「中止任务」用 error 色（危险动作，docs/tech/08 §6）。 */
 @Composable
 private fun MenuButton(
     action: BallMenuAction,
@@ -124,32 +112,21 @@ private fun MenuButton(
         } else {
             MaterialTheme.colorScheme.onSurface
         }
-    Column(
-        modifier = modifier.width(MENU_ITEM_WIDTH),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.xs),
+    val label = menuLabelOf(action)
+    Box(
+        modifier =
+            modifier
+                .size(MENU_BUTTON_SIZE)
+                .semantics { contentDescription = label }
+                .background(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape)
+                .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .size(MENU_BUTTON_SIZE)
-                    .background(color = MaterialTheme.colorScheme.surfaceContainerHigh, shape = CircleShape)
-                    .clickable(onClick = onClick),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = menuIconOf(action),
-                contentDescription = null,
-                modifier = Modifier.size(IconSize.Md.scaled()),
-                tint = tint,
-            )
-        }
-        Text(
-            text = menuLabelOf(action),
-            style = MaterialTheme.typography.labelSmall,
-            color = tint,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Icon(
+            imageVector = menuIconOf(action),
+            contentDescription = null,
+            modifier = Modifier.size(MENU_ICON_SIZE),
+            tint = tint,
         )
     }
 }
@@ -163,9 +140,10 @@ private fun menuIconOf(action: BallMenuAction): ImageVector =
         BallMenuAction.ABORT_RUN -> AutopIcons.Stop
         BallMenuAction.RECORD -> AutopIcons.Record
         BallMenuAction.TOOL_TEST -> AutopIcons.Settings
+        BallMenuAction.HIDE_BALL -> AutopIcons.VisibilityOff
     }
 
-/** 动作 → 文案。 */
+/** 动作 → 无障碍描述文案（视觉无文字，读屏仍可辨）。 */
 @Composable
 private fun menuLabelOf(action: BallMenuAction): String =
     stringResource(
@@ -176,5 +154,6 @@ private fun menuLabelOf(action: BallMenuAction): String =
             BallMenuAction.ABORT_RUN -> R.string.ball_menu_abort
             BallMenuAction.RECORD -> R.string.ball_menu_record
             BallMenuAction.TOOL_TEST -> R.string.ball_menu_tool_test
+            BallMenuAction.HIDE_BALL -> R.string.ball_menu_hide
         },
     )

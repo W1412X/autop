@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.Block
@@ -59,6 +60,15 @@ internal val HALO_PAD = 12.dp
 
 /** 球窗口尺寸（球 + 光晕外扩；窗口 spec 用，[com.example.autop.feature.overlay.ballSpec]）。 */
 internal val BALL_WINDOW_SIZE = BALL_SIZE + HALO_PAD * 2
+
+/** 隐身态细条宽（贴屏幕缘的胶囊，「特别小」）。 */
+internal val SLIVER_WIDTH = 3.dp
+
+/** 隐身态细条高（居中，抓取/点按余量在窗口本身）。 */
+private val SLIVER_HEIGHT = 48.dp
+
+/** 隐身态细条透明度（弱化但状态色可辨）。 */
+private const val SLIVER_ALPHA = 0.35f
 
 /** 外圈进度环宽度（docs/tech/08 §5.1"外圈 3dp 进度环"）。 */
 private val RING_WIDTH = 3.dp
@@ -166,6 +176,31 @@ internal fun BallVisual(
                     modifier = Modifier.align(Alignment.TopEnd),
                 )
             }
+        }
+    }
+}
+
+/** 隐身态细条（3dp×48dp 胶囊，35% 透明度）：运行/等待等状态染语义色，空闲用主题主色。 */
+@Composable
+internal fun BallSliver(
+    uiState: BallUiState,
+    side: BallSide,
+    modifier: Modifier = Modifier,
+) {
+    val motionOn = uiState.motionEnabled && LocalMotionEnabled.current
+    val spec = ballVisualSpec(uiState.mode, motionOn)
+    val color =
+        spec.ringTone?.let { LocalSemanticColors.current.tone(it).foreground }
+            ?: MaterialTheme.colorScheme.primary
+    Box(modifier = modifier.size(BALL_WINDOW_SIZE)) {
+        Box(modifier = Modifier.align(Alignment.Center).size(BALL_SIZE)) {
+            Box(
+                modifier =
+                    Modifier
+                        .align(if (side == BallSide.LEFT) Alignment.CenterEnd else Alignment.CenterStart)
+                        .size(width = SLIVER_WIDTH, height = SLIVER_HEIGHT)
+                        .background(color.copy(alpha = SLIVER_ALPHA), RoundedCornerShape(SLIVER_WIDTH / 2)),
+            )
         }
     }
 }

@@ -40,6 +40,7 @@
     <string name="ball_menu_abort">中止任务</string>
     <string name="ball_menu_tool_test">工具测试</string>
     <string name="ball_menu_record">录制流程</string>
+    <string name="ball_menu_hide">隐藏悬浮球</string>
 
     <!-- 流程录制面板（flows-recording-recovery.md V5） -->
     <string name="overlay_ball_recording_description">正在录制流程，单击展开录制面板</string>

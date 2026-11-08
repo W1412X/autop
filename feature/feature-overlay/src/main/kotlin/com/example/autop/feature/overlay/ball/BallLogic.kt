@@ -1,6 +1,10 @@
 /**
- * 悬浮球纯逻辑（docs/tech/08 §5.1）：状态推导、工具类别映射与贴边吸附计算。
+ * 悬浮球纯逻辑（docs/tech/08 §5.1）：状态推导、工具类别映射与停靠几何。
  * 独立于 Compose，供 [BallStateHolder] 与单测使用。
+ *
+ * 停靠几何（球左上角坐标系）：自由态停哪是哪；松手近左右边缘磁吸成半贴边态
+ * （约 [DOCK_VISIBLE_RATIO] 露在屏内）；静置自动收成隐身态细条（球几乎全出屏，
+ * 窗口内细条贴屏幕缘）。
  */
 package com.example.autop.feature.overlay.ball
 
@@ -58,57 +62,97 @@ public fun categoryOfTool(toolName: String): ToolCategory =
     }
 
 /**
- * 贴边吸附：松手后取最近的左右边，按 [edgeHideRatio] 把球收到屏幕外只露一小点（N217），
- * 点按露头唤出（[revealPosition]）。
- *
- * @param x 拖动结束时球的左上角 x（px）。
- * @param y 拖动结束时球的左上角 y（px）。
- * @param ballSizePx 球边长（px）。
- * @param screenWidthPx 屏幕宽（px）。
+ * 松手判定：球心距左右边缘 ≤ [magnetPx] → 磁吸成半贴边态（[BallDock.EDGE]）；
+ * 否则自由停留（[BallDock.NONE]，坐标钳回屏内）——位置由用户定，不强制吸边。
  */
-public fun snapTo(
-    x: Float,
+public fun releasePosition(
+    x: Int,
     y: Int,
     ballSizePx: Int,
     screenWidthPx: Int,
-    edgeHideRatio: Double,
+    magnetPx: Int,
 ): BallPosition {
-    val hide = hidePx(ballSizePx, edgeHideRatio)
     val centerX = x + ballSizePx / 2
-    return if (centerX < screenWidthPx / 2) {
-        BallPosition(x = -hide, y = y, side = BallSide.LEFT, hidden = true)
-    } else {
-        BallPosition(x = screenWidthPx - ballSizePx + hide, y = y, side = BallSide.RIGHT, hidden = true)
+    return when {
+        centerX <= magnetPx -> docked(BallSide.LEFT, y, ballSizePx, screenWidthPx)
+        centerX >= screenWidthPx - magnetPx -> docked(BallSide.RIGHT, y, ballSizePx, screenWidthPx)
+        else ->
+            BallPosition(
+                x = x.coerceIn(0, maxOf(0, screenWidthPx - ballSizePx)),
+                y = y,
+                side = BallSide.NONE,
+                dock = BallDock.NONE,
+            )
     }
 }
 
-/** 贴边隐藏态点按「全部唤出」（N217）：保持所在侧，球整体回到屏内并持久化。 */
+/** 半贴边态（约 [DOCK_VISIBLE_RATIO] 露在屏内）。 */
+public fun docked(
+    side: BallSide,
+    y: Int,
+    ballSizePx: Int,
+    screenWidthPx: Int,
+): BallPosition = BallPosition(dockX(side, ballSizePx, screenWidthPx), y, side, BallDock.EDGE)
+
+/** 半贴边态的球 x：露出 [DOCK_VISIBLE_RATIO]。 */
+public fun dockX(
+    side: BallSide,
+    ballSizePx: Int,
+    screenWidthPx: Int,
+): Int {
+    val visible = (ballSizePx * DOCK_VISIBLE_RATIO).roundToInt().coerceIn(1, ballSizePx)
+    return when (side) {
+        BallSide.LEFT -> visible - ballSizePx
+        BallSide.RIGHT -> screenWidthPx - visible
+        BallSide.NONE -> 0
+    }
+}
+
+/** 隐身态（细条）的球 x：球几乎全出屏，细条贴屏幕缘（[sliverPx] 为细条可见宽）。 */
+public fun sliverX(
+    side: BallSide,
+    ballSizePx: Int,
+    screenWidthPx: Int,
+    sliverPx: Int,
+): Int =
+    when (side) {
+        BallSide.LEFT -> sliverPx - ballSizePx
+        BallSide.RIGHT -> screenWidthPx - sliverPx
+        BallSide.NONE -> 0
+    }
+
+/** 半贴边态 → 隐身态细条（保持侧与高度）。 */
+public fun collapseToSliver(
+    position: BallPosition,
+    ballSizePx: Int,
+    screenWidthPx: Int,
+    sliverPx: Int,
+): BallPosition {
+    if (position.dock != BallDock.EDGE || position.side == BallSide.NONE) return position
+    return position.copy(x = sliverX(position.side, ballSizePx, screenWidthPx, sliverPx), dock = BallDock.SLIVER)
+}
+
+/**
+ * 唤出（细条/半贴边 → 自由态）：球整体回到屏内（保持所在侧锚定，
+ * 旋转后仍贴原来那侧），停哪由用户再拖。
+ */
 public fun revealPosition(
     position: BallPosition,
     screenWidthPx: Int,
     ballSizePx: Int,
 ): BallPosition =
     when (position.side) {
-        BallSide.LEFT -> position.copy(x = 0, hidden = false)
-        BallSide.RIGHT -> position.copy(x = (screenWidthPx - ballSizePx).coerceAtLeast(0), hidden = false)
+        BallSide.LEFT -> position.copy(x = 0, dock = BallDock.NONE)
+        BallSide.RIGHT -> position.copy(x = (screenWidthPx - ballSizePx).coerceAtLeast(0), dock = BallDock.NONE)
         BallSide.NONE ->
             position.copy(
                 x = position.x.coerceIn(0, (screenWidthPx - ballSizePx).coerceAtLeast(0)),
-                hidden = false,
+                dock = BallDock.NONE,
             )
     }
 
-/** 贴边隐藏量（px）：球宽 × 隐藏比例（钳制在 [MIN_HIDE_RATIO]..[MAX_HIDE_RATIO]）。 */
-public fun hidePx(
-    ballSizePx: Int,
-    edgeHideRatio: Double,
-): Int = (ballSizePx * edgeHideRatio.coerceIn(MIN_HIDE_RATIO, MAX_HIDE_RATIO)).roundToInt()
-
-/** 贴边隐藏比例下限。 */
-public const val MIN_HIDE_RATIO: Double = 0.0
-
-/** 贴边隐藏比例上限（N217：露头只剩一小点，再少就点不到了）。 */
-public const val MAX_HIDE_RATIO: Double = 0.85
+/** 半贴边态露出比例（球宽的 35% 在屏内，好抓取）。 */
+public const val DOCK_VISIBLE_RATIO: Double = 0.35
 
 private val TEXT_TOOLS = setOf("tool.input_text", "tool.clipboard_get", "tool.clipboard_set")
 private val VISION_TOOLS = setOf("tool.screenshot", "tool.observe")

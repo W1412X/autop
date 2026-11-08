@@ -55,6 +55,7 @@ import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Swipe
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.Visibility
+import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Warning
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
@@ -119,6 +120,7 @@ public object AutopIcons {
     public val Link: ImageVector = Icons.Outlined.Link
     public val PhotoCamera: ImageVector = Icons.Outlined.PhotoCamera
     public val Visibility: ImageVector = Icons.Outlined.Visibility
+    public val VisibilityOff: ImageVector = Icons.Outlined.VisibilityOff
     public val ListAlt: ImageVector = Icons.AutoMirrored.Outlined.ListAlt
     public val PhoneAndroid: ImageVector = Icons.Outlined.PhoneAndroid
     public val ContentPaste: ImageVector = Icons.Outlined.ContentPaste

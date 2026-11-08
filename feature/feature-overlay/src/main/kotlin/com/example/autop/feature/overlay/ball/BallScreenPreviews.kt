@@ -20,16 +20,23 @@ private val previewCallbacks =
         override fun onDragEnd(
             ballSizePx: Int,
             screenWidthPx: Int,
-            edgeHideRatio: Double,
+            sliverPx: Int,
+            magnetPx: Int,
         ) = Unit
 
         override fun onFirstLayout(
             screenWidthPx: Int,
             screenHeightPx: Int,
             ballSizePx: Int,
+            sliverPx: Int,
         ) = Unit
 
         override fun onTap(screenWidthPx: Int) = Unit
+
+        override fun onReveal(
+            screenWidthPx: Int,
+            ballSizePx: Int,
+        ) = Unit
 
         override fun onDoubleTap() = Unit
 

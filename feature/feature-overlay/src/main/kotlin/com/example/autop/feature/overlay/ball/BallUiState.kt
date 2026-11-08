@@ -63,8 +63,6 @@ public data class BallUiState(
     val motionEnabled: Boolean = true,
     /** 双击停止开关（`ui.overlay.doubleTapStops`）。 */
     val doubleTapStops: Boolean = true,
-    /** 贴边隐藏比例（`ui.overlay.edgeHideRatio`，N217 默认收边只露一小点）。 */
-    val edgeHideRatio: Double = 0.8,
     /** 输入面板"针对当前屏幕"默认值（`ui.overlay.attachScreenDefault`）。 */
     val attachScreenDefault: Boolean = true,
 )

@@ -22,6 +22,8 @@ import com.example.autop.task.impl.di.AppScope
 import com.example.autop.task.impl.store.AuditCleaner
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -89,8 +91,13 @@ class AutopApplication : Application() {
         // ADR-0014：执行期指示在盾之上（不可触摸，不挡注入）。
         overlayWindows.register(OverlayWindowIds.INDICATOR, indicatorController.indicatorFactory())
         indicatorController.start()
-        if (configProvider.current()[UiConfig.OVERLAY].enabled) {
-            ballController.start()
+        // 悬浮球显隐随 ui.overlay.enabled 实时生效（菜单"隐藏悬浮球"/设置页开关立即收放）。
+        appScope.launch {
+            configProvider
+                .observe()
+                .map { it[UiConfig.OVERLAY].enabled }
+                .distinctUntilChanged()
+                .collect { enabled -> if (enabled) ballController.start() else ballController.hide() }
         }
         auditCleaner.ensureScheduled()
         appScope.launch { runRecovery.markInterrupted() }

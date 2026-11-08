@@ -115,28 +115,46 @@ class BallLogicTest {
     }
 
     @Test
-    fun `snap goes to nearest edge hiding all but a sliver`() {
-        // 屏宽 1000、球 100、隐藏比例 0.4 → 左贴边 x=-40，右贴边 x=940；吸附即贴边隐藏态。
-        val left = snapTo(x = 100f, y = 300, ballSizePx = 100, screenWidthPx = 1000, edgeHideRatio = 0.4)
-        assertThat(left).isEqualTo(BallPosition(x = -40, y = 300, side = BallSide.LEFT, hidden = true))
-        val right = snapTo(x = 800f, y = 300, ballSizePx = 100, screenWidthPx = 1000, edgeHideRatio = 0.4)
-        assertThat(right).isEqualTo(BallPosition(x = 940, y = 300, side = BallSide.RIGHT, hidden = true))
+    fun `release near edge docks to nearest side showing a third`() {
+        // 磁吸 40：球心 30（x=-20）≤ 40 → 左半贴边（露出 35 = 0.35×100，x = -65）；
+        // 球心 980（x=930）≥ 960 → 右半贴边（x = 965）。
+        val left = releasePosition(x = -20, y = 300, ballSizePx = 100, screenWidthPx = 1000, magnetPx = 40)
+        assertThat(left).isEqualTo(BallPosition(x = -65, y = 300, side = BallSide.LEFT, dock = BallDock.EDGE))
+        val right = releasePosition(x = 930, y = 300, ballSizePx = 100, screenWidthPx = 1000, magnetPx = 40)
+        assertThat(right).isEqualTo(BallPosition(x = 965, y = 300, side = BallSide.RIGHT, dock = BallDock.EDGE))
     }
 
     @Test
-    fun `snap clamps hide ratio`() {
-        assertThat(hidePx(ballSizePx = 100, edgeHideRatio = 0.95)).isEqualTo(85)
-        val snapped = snapTo(x = 50f, y = 0, ballSizePx = 100, screenWidthPx = 1000, edgeHideRatio = 0.95)
-        assertThat(snapped.x).isEqualTo(-85)
+    fun `release in middle stays free where dropped`() {
+        val free = releasePosition(x = 400, y = 300, ballSizePx = 100, screenWidthPx = 1000, magnetPx = 40)
+        assertThat(free).isEqualTo(BallPosition(x = 400, y = 300, side = BallSide.NONE, dock = BallDock.NONE))
     }
 
     @Test
-    fun `reveal brings hidden ball back inside keeping its side`() {
-        val left = BallPosition(x = -80, y = 300, side = BallSide.LEFT, hidden = true)
+    fun `sliver positions keep a tiny pill at the edge`() {
+        assertThat(sliverX(BallSide.LEFT, ballSizePx = 100, screenWidthPx = 1000, sliverPx = 4))
+            .isEqualTo(-96)
+        assertThat(sliverX(BallSide.RIGHT, ballSizePx = 100, screenWidthPx = 1000, sliverPx = 4))
+            .isEqualTo(996)
+    }
+
+    @Test
+    fun `collapse to sliver keeps side and height`() {
+        val docked = BallPosition(x = -65, y = 300, side = BallSide.LEFT, dock = BallDock.EDGE)
+        val collapsed = collapseToSliver(docked, ballSizePx = 100, screenWidthPx = 1000, sliverPx = 4)
+        assertThat(collapsed).isEqualTo(BallPosition(x = -96, y = 300, side = BallSide.LEFT, dock = BallDock.SLIVER))
+        // 非半贴边不收。
+        val free = BallPosition(x = 10, y = 10, side = BallSide.NONE, dock = BallDock.NONE)
+        assertThat(collapseToSliver(free, 100, 1000, 4)).isEqualTo(free)
+    }
+
+    @Test
+    fun `reveal brings docked ball back inside keeping its side`() {
+        val left = BallPosition(x = -96, y = 300, side = BallSide.LEFT, dock = BallDock.SLIVER)
         assertThat(revealPosition(left, screenWidthPx = 1000, ballSizePx = 100))
-            .isEqualTo(BallPosition(x = 0, y = 300, side = BallSide.LEFT, hidden = false))
-        val right = BallPosition(x = 980, y = 300, side = BallSide.RIGHT, hidden = true)
+            .isEqualTo(BallPosition(x = 0, y = 300, side = BallSide.LEFT, dock = BallDock.NONE))
+        val right = BallPosition(x = 965, y = 300, side = BallSide.RIGHT, dock = BallDock.EDGE)
         assertThat(revealPosition(right, screenWidthPx = 1000, ballSizePx = 100))
-            .isEqualTo(BallPosition(x = 900, y = 300, side = BallSide.RIGHT, hidden = false))
+            .isEqualTo(BallPosition(x = 900, y = 300, side = BallSide.RIGHT, dock = BallDock.NONE))
     }
 }

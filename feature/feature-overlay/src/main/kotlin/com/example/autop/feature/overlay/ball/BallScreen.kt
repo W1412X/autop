@@ -1,6 +1,8 @@
 /**
- * 悬浮球交互层（docs/tech/08 §5.1）：拖动跟手、松手吸附、单击/双击分发。
+ * 悬浮球交互层（docs/tech/08 §5.1）：拖动跟手、松手磁吸/就地、单击/双击分发。
  * 球窗口位置由 WindowManager 移动（回调 [BallCallbacks.onMove]），本层只渲染与手势。
+ *
+ * 停靠形态（[BallDock]）：自由态整球；半贴边态弱化缩小；隐身态细条贴屏幕缘。
  */
 package com.example.autop.feature.overlay.ball
 
@@ -13,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
@@ -23,12 +26,21 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
+/** 松手磁吸判定距离（球心距边缘，dp）。 */
+private val MAGNET_SIZE = 28.dp
+
+/** 半贴边态的弱化透明度与缩小比例（视觉随形态递减）。 */
+private const val DOCK_ALPHA = 0.6f
+private const val DOCK_SCALE = 0.85f
+
 /** 球窗口视口（位置与尺寸，手势层用）。 */
 private data class BallViewport(
     val position: BallPosition,
     val screenWidthPx: Int,
     val screenHeightPx: Int,
     val ballSizePx: Int,
+    val sliverPx: Int,
+    val magnetPx: Int,
 )
 
 /** 悬浮球：视觉 + 手势。 */
@@ -47,18 +59,31 @@ internal fun BallScreen(
     val screenWidthPx = with(density) { config.screenWidthDp.dp.toPx() }.roundToInt()
     val screenHeightPx = with(density) { config.screenHeightDp.dp.toPx() }.roundToInt()
     val ballSizePx = with(density) { BALL_SIZE.toPx() }.roundToInt()
+    val sliverPx = with(density) { SLIVER_WIDTH.toPx() }.roundToInt()
+    val magnetPx = with(density) { MAGNET_SIZE.toPx() }.roundToInt()
     val viewport =
         BallViewport(
             position = position,
             screenWidthPx = screenWidthPx,
             screenHeightPx = screenHeightPx,
             ballSizePx = ballSizePx,
+            sliverPx = sliverPx,
+            magnetPx = magnetPx,
         )
     // N192：尺寸变化（旋转/折叠）时重新钳制摆放，避免球留在旧屏幕坐标外。
     LaunchedEffect(screenWidthPx, screenHeightPx) {
-        callbacks.onFirstLayout(viewport.screenWidthPx, viewport.screenHeightPx, ballSizePx)
+        callbacks.onFirstLayout(viewport.screenWidthPx, viewport.screenHeightPx, ballSizePx, sliverPx)
     }
-    // 无障碍（N185）：状态变化时描述同步变化（不只靠颜色区分），双击/点按动作暴露给读屏。
+    // 单击语义（N185）：细条/半贴边唤出、自由态开菜单、无障碍断开跳设置（读屏与手势同径）。
+    val state by rememberUpdatedState(uiState)
+    val current by rememberUpdatedState(viewport)
+    val tap: () -> Unit = {
+        when {
+            state.mode is BallMode.AccessibilityLost -> callbacks.onAccessibilityTap()
+            current.position.dock != BallDock.NONE -> callbacks.onReveal(current.screenWidthPx, current.ballSizePx)
+            else -> callbacks.onTap(current.screenWidthPx)
+        }
+    }
     val description = stringResource(ballDescriptionOf(uiState.mode))
     Box(
         modifier =
@@ -66,45 +91,49 @@ internal fun BallScreen(
                 .semantics {
                     contentDescription = description
                     onClick {
-                        callbacks.onTap(viewport.screenWidthPx)
+                        tap()
                         true
                     }
-                }.ballGestures(uiState, callbacks, viewport),
+                }.ballGestures(tap, callbacks, current),
     ) {
-        BallVisual(uiState)
+        when (position.dock) {
+            BallDock.SLIVER -> BallSliver(uiState, position.side)
+            BallDock.EDGE ->
+                BallVisual(
+                    uiState,
+                    Modifier.graphicsLayer {
+                        alpha = DOCK_ALPHA
+                        scaleX = DOCK_SCALE
+                        scaleY = DOCK_SCALE
+                    },
+                )
+            BallDock.NONE -> BallVisual(uiState)
+        }
     }
 }
 
 /**
- * 球手势（N185 抽出）：点按（圆弧菜单 / 无障碍设置）与双击（停止）分发，
- * 拖动跟手移动、松手吸附到最近左右边（[BallCallbacks.onDragEnd]）。
+ * 球手势：点按（唤出 / 圆弧菜单 / 无障碍设置）与双击（停止）分发，
+ * 拖动跟手移动、松手磁吸或就地停留（[BallCallbacks.onDragEnd]）。
  *
  * N217：手势闭包里引用的状态必须经 [rememberUpdatedState] 取当帧值——
- * `pointerInput(Unit)` 的 lambda 不随重组重启，直接捕获首帧 [BallViewport] 会让
+ * `pointerInput(Unit)` 的 lambda 不随重组重启，直接捕获首帧状态会让
  * 拖动起点永远停在初始位置（按下瞬间球闪现到别处，之后才跟手）。
  */
 @Composable
 private fun Modifier.ballGestures(
-    uiState: BallUiState,
+    tap: () -> Unit,
     callbacks: BallCallbacks,
     viewport: BallViewport,
 ): Modifier {
-    val state by rememberUpdatedState(uiState)
-    val current by rememberUpdatedState(viewport)
+    val state by rememberUpdatedState(viewport)
+    val onTap by rememberUpdatedState(tap)
     return this
         .pointerInput(Unit) {
             detectTapGestures(
-                onTap = {
-                    if (state.mode is BallMode.AccessibilityLost) {
-                        callbacks.onAccessibilityTap()
-                    } else {
-                        callbacks.onTap(current.screenWidthPx)
-                    }
-                },
+                onTap = { onTap() },
                 onDoubleTap = {
-                    if (state.doubleTapStops && state.mode is BallMode.Running) {
-                        callbacks.onDoubleTap()
-                    }
+                    if (state.position.dock == BallDock.NONE) callbacks.onDoubleTap()
                 },
             )
         }.pointerInput(Unit) {
@@ -112,27 +141,30 @@ private fun Modifier.ballGestures(
             var dragTotal = Offset.Zero
             detectDragGestures(
                 onDragStart = {
-                    dragOrigin = Offset(current.position.x.toFloat(), current.position.y.toFloat())
+                    dragOrigin = Offset(state.position.x.toFloat(), state.position.y.toFloat())
                     dragTotal = Offset.Zero
                 },
                 onDrag = { change, amount ->
                     change.consume()
                     dragTotal += amount
-                    val hide =
-                        (current.ballSizePx * state.edgeHideRatio.coerceIn(MIN_HIDE_RATIO, MAX_HIDE_RATIO))
-                            .roundToInt()
+                    val visible = (state.ballSizePx * DOCK_VISIBLE_RATIO).roundToInt()
                     val x =
                         (dragOrigin.x + dragTotal.x)
                             .roundToInt()
-                            .coerceIn(-hide, current.screenWidthPx - current.ballSizePx + hide)
+                            .coerceIn(visible - state.ballSizePx, state.screenWidthPx - visible)
                     val y =
                         (dragOrigin.y + dragTotal.y)
                             .roundToInt()
-                            .coerceIn(0, current.screenHeightPx - current.ballSizePx)
+                            .coerceIn(0, state.screenHeightPx - state.ballSizePx)
                     callbacks.onMove(x, y)
                 },
                 onDragEnd = {
-                    callbacks.onDragEnd(current.ballSizePx, current.screenWidthPx, state.edgeHideRatio)
+                    callbacks.onDragEnd(
+                        state.ballSizePx,
+                        state.screenWidthPx,
+                        state.sliverPx,
+                        state.magnetPx,
+                    )
                 },
             )
         }

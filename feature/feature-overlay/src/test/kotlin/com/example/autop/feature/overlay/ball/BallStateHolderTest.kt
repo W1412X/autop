@@ -12,16 +12,16 @@ class BallStateHolderTest {
     @Test
     fun `placeDefault puts ball on right edge upper third`() {
         val holder = newHolder()
-        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100)
+        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100, sliverPx = 4)
         assertThat(holder.position.value)
-            .isEqualTo(BallPosition(900, 2000 / 3, side = BallSide.RIGHT, hidden = false))
+            .isEqualTo(BallPosition(900, 2000 / 3, side = BallSide.RIGHT, dock = BallDock.NONE))
     }
 
     @Test
     fun `placeDefault keeps persisted position`() {
         store.saved = BallPosition(10, 20)
         val holder = newHolder()
-        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100)
+        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100, sliverPx = 4)
         assertThat(holder.position.value).isEqualTo(BallPosition(10, 20))
     }
 
@@ -30,52 +30,63 @@ class BallStateHolderTest {
         // N192：旋转后旧坐标越界（950 > 1000-100、2500 > 2000-100）必须钳回屏内。
         store.saved = BallPosition(950, 2500)
         val holder = newHolder()
-        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100)
+        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100, sliverPx = 4)
         assertThat(holder.position.value).isEqualTo(BallPosition(900, 1900))
     }
 
     @Test
-    fun `placeDefault re-anchors hidden ball to same side after rotation`() {
-        // N217：x 绑死保存时的屏宽，旋转（1080→2400）后按贴边锚在新屏宽重摆，
-        // 直接钳回会把球放回屏幕中央。
-        store.saved = BallPosition(1052, 300, side = BallSide.RIGHT, hidden = true)
+    fun `placeDefault re-anchors docked ball to same side after rotation`() {
+        // 旋转（1080→2400）后按停靠锚在新屏宽重摆：细条 x=2400-4、半贴边 x=2400-35（露出 0.35×100）。
+        store.saved = BallPosition(1052, 300, side = BallSide.RIGHT, dock = BallDock.SLIVER)
         val holder = newHolder()
-        holder.placeDefault(screenWidthPx = 2400, screenHeightPx = 1080, ballSizePx = 100)
-        // 默认 edgeHideRatio=0.8 → hide=80 → x = 2400-100+80。
+        holder.placeDefault(screenWidthPx = 2400, screenHeightPx = 1080, ballSizePx = 100, sliverPx = 4)
         assertThat(holder.position.value)
-            .isEqualTo(BallPosition(2380, 300, side = BallSide.RIGHT, hidden = true))
+            .isEqualTo(BallPosition(2396, 300, side = BallSide.RIGHT, dock = BallDock.SLIVER))
 
-        store.saved = BallPosition(-80, 300, side = BallSide.LEFT, hidden = true)
+        store.saved = BallPosition(-65, 300, side = BallSide.LEFT, dock = BallDock.EDGE)
         val leftHolder = newHolder()
-        leftHolder.placeDefault(screenWidthPx = 2400, screenHeightPx = 1080, ballSizePx = 100)
+        leftHolder.placeDefault(screenWidthPx = 2400, screenHeightPx = 1080, ballSizePx = 100, sliverPx = 4)
         assertThat(leftHolder.position.value)
-            .isEqualTo(BallPosition(-80, 300, side = BallSide.LEFT, hidden = true))
+            .isEqualTo(BallPosition(-65, 300, side = BallSide.LEFT, dock = BallDock.EDGE))
     }
 
     @Test
-    fun `onSnap persists snapped position`() {
+    fun `onDragEnd near edge docks and persists`() {
         val holder = newHolder()
-        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100)
-        holder.onMoved(x = 800, y = 300)
-        holder.onSnap(ballSizePx = 100, screenWidthPx = 1000, edgeHideRatio = 0.4)
-        assertThat(holder.position.value).isEqualTo(BallPosition(940, 300, side = BallSide.RIGHT, hidden = true))
-        assertThat(store.saved).isEqualTo(BallPosition(940, 300, side = BallSide.RIGHT, hidden = true))
+        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100, sliverPx = 4)
+        holder.onMoved(x = 920, y = 300)
+        holder.onDragEnd(ballSizePx = 100, screenWidthPx = 1000, sliverPx = 4, magnetPx = 40)
+        val docked = BallPosition(965, 300, side = BallSide.RIGHT, dock = BallDock.EDGE)
+        assertThat(holder.position.value).isEqualTo(docked)
+        assertThat(store.saved).isEqualTo(docked)
     }
 
     @Test
-    fun `onReveal brings hidden ball on screen and persists`() {
-        store.saved = BallPosition(980, 300, side = BallSide.RIGHT, hidden = true)
+    fun `onDragEnd in middle stays free and persists`() {
         val holder = newHolder()
-        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100)
+        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100, sliverPx = 4)
+        holder.onMoved(x = 400, y = 300)
+        holder.onDragEnd(ballSizePx = 100, screenWidthPx = 1000, sliverPx = 4, magnetPx = 40)
+        val free = BallPosition(400, 300, side = BallSide.NONE, dock = BallDock.NONE)
+        assertThat(holder.position.value).isEqualTo(free)
+        assertThat(store.saved).isEqualTo(free)
+    }
+
+    @Test
+    fun `onReveal brings docked ball on screen and persists`() {
+        store.saved = BallPosition(996, 300, side = BallSide.RIGHT, dock = BallDock.SLIVER)
+        val holder = newHolder()
+        holder.placeDefault(screenWidthPx = 1000, screenHeightPx = 2000, ballSizePx = 100, sliverPx = 4)
         holder.onReveal(screenWidthPx = 1000, ballSizePx = 100)
-        assertThat(holder.position.value).isEqualTo(BallPosition(900, 300, side = BallSide.RIGHT, hidden = false))
-        assertThat(store.saved).isEqualTo(BallPosition(900, 300, side = BallSide.RIGHT, hidden = false))
+        val revealed = BallPosition(900, 300, side = BallSide.RIGHT, dock = BallDock.NONE)
+        assertThat(holder.position.value).isEqualTo(revealed)
+        assertThat(store.saved).isEqualTo(revealed)
     }
 
     @Test
-    fun `onSnap before placement is ignored`() {
+    fun `onDragEnd before placement is ignored`() {
         val holder = newHolder()
-        holder.onSnap(ballSizePx = 100, screenWidthPx = 1000, edgeHideRatio = 0.4)
+        holder.onDragEnd(ballSizePx = 100, screenWidthPx = 1000, sliverPx = 4, magnetPx = 40)
         assertThat(holder.position.value).isEqualTo(BallPosition(BallStateHolder.UNSET, BallStateHolder.UNSET))
         assertThat(store.saved).isNull()
     }
