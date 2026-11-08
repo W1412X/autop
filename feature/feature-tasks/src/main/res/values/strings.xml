@@ -46,7 +46,7 @@
     <string name="task_edit_title">编辑任务</string>
     <string name="task_edit_save">保存</string>
     <string name="task_edit_section_desc">一句话描述</string>
-    <string name="task_edit_desc_hint">比如：每天早上 8 点看看微信有没有新消息，有就提醒我</string>
+    <string name="task_edit_desc_hint">输入一句话，AI 生成草稿</string>
     <string name="task_edit_generate">生成草稿</string>
     <string name="task_edit_generating">生成中…</string>
     <string name="task_edit_section_basic">基本</string>

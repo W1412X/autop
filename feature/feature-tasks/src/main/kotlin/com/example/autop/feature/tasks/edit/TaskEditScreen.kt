@@ -7,9 +7,13 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +22,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopButton
+import com.example.autop.core.ui.component.AutopIconButton
+import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.InputBarSpec
@@ -43,7 +49,9 @@ public fun TaskEditScreen(
         modifier =
             Modifier
                 .fillMaxSize()
-                .statusBarsPadding(),
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding(),
     ) {
         SubPageTopBar(
             title = stringResource(if (state.isNew) R.string.task_edit_new_title else R.string.task_edit_title),
@@ -65,8 +73,17 @@ public fun TaskEditScreen(
                         .padding(LocalSpacing.current.screenEdge),
             )
         }
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            item { DraftSection(state = state, onAction = onAction) }
+        LazyColumn(modifier = Modifier.weight(1f).fillMaxWidth()) {
+            if (state.generating) {
+                item {
+                    Text(
+                        text = stringResource(R.string.task_edit_generating),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = LocalSpacing.current.screenEdge),
+                    )
+                }
+            }
             item { BasicSection(state = state, onAction = onAction) }
             item { ExecutorSection(state = state, onAction = onAction) }
             item { TriggerForm(state = state, onAction = onAction) }
@@ -76,34 +93,29 @@ public fun TaskEditScreen(
                 item { SimulateSection(state = state, onAction = onAction) }
             }
         }
+        // 生成草稿输入（流程创作同款交互，docs/tech/08 §4.3）：底部停靠输入条＋发送钮。
+        DraftInputBar(state = state, onAction = onAction)
     }
 }
 
+/** 生成草稿输入条：底部停靠，发送钮触发 AI 生成（流程创作同款交互）。 */
 @Composable
-private fun DraftSection(
+private fun DraftInputBar(
     state: TaskEditUiState,
     onAction: (TaskEditAction) -> Unit,
 ) {
-    SectionTitle(text = stringResource(R.string.task_edit_section_desc))
     AutopInputBar(
         value = state.description,
         onValueChange = { onAction(TaskEditAction.SetDescription(it)) },
-        spec = InputBarSpec(placeholder = stringResource(R.string.task_edit_desc_hint), maxLines = 2),
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(LocalSpacing.current.screenEdge),
-    )
-    AutopButton(
-        text =
-            stringResource(
-                if (state.generating) R.string.task_edit_generating else R.string.task_edit_generate,
-            ),
-        onClick = { onAction(TaskEditAction.GenerateDraft) },
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(LocalSpacing.current.screenEdge),
+        spec = InputBarSpec(placeholder = stringResource(R.string.task_edit_desc_hint), maxLines = 4),
+        modifier = Modifier.fillMaxWidth().padding(LocalSpacing.current.screenEdge),
+        trailing = {
+            AutopIconButton(
+                AutopIcons.Send,
+                stringResource(R.string.task_edit_generate),
+                { onAction(TaskEditAction.GenerateDraft) },
+            )
+        },
     )
 }
 
