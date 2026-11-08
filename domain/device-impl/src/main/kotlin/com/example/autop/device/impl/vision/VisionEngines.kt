@@ -28,6 +28,12 @@ internal interface VisualOcrEngine {
 
     /** 识别文本行；未就绪/推理失败返回空列表。 */
     fun recognize(image: VisionImage): List<VisualOcrLine>
+
+    /** 带 rec 级联的识别（ocr-accuracy-uplift 阶段 B；默认忽略级联参数）。 */
+    fun recognize(
+        image: VisionImage,
+        cascade: RecCascadeOptions,
+    ): List<VisualOcrLine> = recognize(image)
 }
 
 /** 文本检测器（PP-OCR det，vp9 §4.4 拆分）：任意画布（全图/补扫块）上找文本行框。 */
@@ -45,6 +51,38 @@ internal interface TextDetector {
     ): List<OcrBox>
 }
 
+/** rec 级联档位（`device.vision.rec.mode`，ocr-accuracy-uplift 阶段 B）。 */
+internal enum class RecCascadeMode {
+    /** 只用 mobile 快档。 */
+    MOBILE,
+
+    /** mobile 跑全图＋低置信行升级 server（默认）。 */
+    CASCADE,
+
+    /** 全量 server（真机实测整帧 P95 达标后可切）。 */
+    SERVER,
+    ;
+
+    internal companion object {
+        /** 配置字符串 → 档位（未知值按默认 cascade）。 */
+        fun parse(value: String): RecCascadeMode =
+            when (value) {
+                "mobile" -> MOBILE
+                "server" -> SERVER
+                else -> CASCADE
+            }
+    }
+}
+
+/** rec 双档级联选项（`device.vision.rec` 映射）。 */
+internal data class RecCascadeOptions(
+    val mode: RecCascadeMode = RecCascadeMode.CASCADE,
+    /** 行置信度（CTC 行分）低于此值升级精档重识。 */
+    val upgradeConf: Double = 0.9,
+    /** 每帧升级名额（精档重识次数上限，控 P95）。 */
+    val maxUpgrades: Int = 6,
+)
+
 /** 文本识别器（PP-OCR rec，vp9 §4.4 拆分）：单框裁剪识别一行文字。 */
 internal interface TextRecognizer {
     /** 模型与字符集是否可用（类数校验失败为 false）。 */
@@ -55,6 +93,13 @@ internal interface TextRecognizer {
         image: VisionImage,
         box: OcrBox,
     ): VisualOcrLine?
+
+    /** 批量识别（级联入口，[TieredTextRecognizer] 覆写实现升级）；默认逐框 [recognize]。 */
+    fun recognizeAll(
+        image: VisionImage,
+        boxes: List<OcrBox>,
+        cascade: RecCascadeOptions = RecCascadeOptions(),
+    ): List<VisualOcrLine?> = boxes.map { recognize(image, it) }
 }
 
 /** 开关状态分类器（vp8 §6.3，state_cls）：勾选类框 → checked 三态。 */

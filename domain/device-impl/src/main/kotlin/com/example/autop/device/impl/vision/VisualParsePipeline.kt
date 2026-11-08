@@ -44,6 +44,8 @@ internal data class ParseOptions(
     val mosaicGap: Int = 24,
     val hintContrast: Int = 60,
     val debug: Boolean = false,
+    /** rec 双档级联选项（ocr-accuracy-uplift 阶段 B）。 */
+    val recCascade: RecCascadeOptions = RecCascadeOptions(),
     /** 不变量违规回调（vp9 §3.4：debug 抛出、release 记 warn）。 */
     val warn: (String) -> Unit = {},
 )
@@ -79,7 +81,7 @@ internal object VisualParsePipeline {
         if (!detector.ready || !ocr.ready) return null
         val floor = detector.deployConf ?: options.minConfidence
         val kept = detector.detect(image).filter { it.confidence >= floor && inArea(it.bounds, options.area) }
-        val lines = ocr.recognize(image).filter { inArea(it.bounds, options.area) }
+        val lines = ocr.recognize(image, options.recCascade).filter { inArea(it.bounds, options.area) }
         val refined = categorize(detector, kept, lines, image)
         val finalDets = states.classify(image, refined)
         val analysis = VisualTreeBuilder.analyze(finalDets, lines, options.spanOverlap)
@@ -335,35 +337,45 @@ internal object VisualParsePipeline {
         if (options.mosaic) {
             val canvas = mosaicImage(image, slots)
             mosaic = canvas
-            collectLines(engines, image, canvas, slots, out)
+            mergeInto(out, collectLines(engines, image, canvas, slots, options.recCascade))
         } else {
             for (slot in slots) {
                 val block = blockImage(image, slot)
-                collectLines(engines, image, block, listOf(slot), out)
+                mergeInto(out, collectLines(engines, image, block, listOf(slot), options.recCascade))
             }
         }
         return out.mapValues { it.value.toList() } to mosaic
     }
 
-    /** det 画布跑一遍，行按中心落块归位，rec 从原图识别（§4.4）。 */
+    /** 补扫行归并（按框索引追加）。 */
+    private fun mergeInto(
+        out: MutableMap<Int, MutableList<VisualOcrLine>>,
+        lines: Map<Int, List<VisualOcrLine>>,
+    ) {
+        for ((boxIdx, newLines) in lines) out.getOrPut(boxIdx) { mutableListOf() } += newLines
+    }
+
+    /** det 画布跑一遍，行按中心落块归位，rec 从原图批量识别（整画布走 rec 级联，§4.4）。 */
     private fun collectLines(
         engines: RescanEngines,
         original: VisionImage,
         canvas: VisionImage,
         slots: List<MosaicSlot>,
-        out: MutableMap<Int, MutableList<VisualOcrLine>>,
-    ) {
-        for (detBox in engines.detector.detect(canvas)) {
-            val slot = slots.firstOrNull { detBox.bounds.centerIn(it.canvas) }
-            val screen = slot?.let { CropMosaic.mapBack(detBox.bounds, it) }
-            val line =
-                if (screen != null) {
-                    engines.recognizer.recognize(original, OcrBox(screen, detBox.score))
-                } else {
-                    null
-                }
-            if (slot != null && line != null) out.getOrPut(slot.boxIndex) { mutableListOf() } += line
+        cascade: RecCascadeOptions,
+    ): Map<Int, List<VisualOcrLine>> {
+        val placed =
+            engines.detector.detect(canvas).mapNotNull { detBox ->
+                val slot = slots.firstOrNull { detBox.bounds.centerIn(it.canvas) }
+                val screen = slot?.let { CropMosaic.mapBack(detBox.bounds, it) }
+                if (slot != null && screen != null) Triple(slot, detBox, screen) else null
+            }
+        val boxes = placed.map { OcrBox(it.third, it.second.score) }
+        val lines = engines.recognizer.recognizeAll(original, boxes, cascade)
+        val out = HashMap<Int, MutableList<VisualOcrLine>>()
+        for ((i, line) in lines.withIndex()) {
+            if (line != null) out.getOrPut(placed[i].first.boxIndex) { mutableListOf() } += line
         }
+        return out.mapValues { it.value.toList() }
     }
 
     /** 拼图画布（§4.4）：灰底＋各块按 slot 贴入。 */

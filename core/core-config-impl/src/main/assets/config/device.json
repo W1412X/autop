@@ -81,6 +81,11 @@
         "mosaicGap": 24,
         "hintContrast": 60,
         "cacheSize": 64
+      },
+      "rec": {
+        "mode": "cascade",
+        "upgradeConf": 0.9,
+        "maxUpgrades": 6
       }
     },
     "overlay": {

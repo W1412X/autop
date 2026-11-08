@@ -81,15 +81,15 @@ internal class PpOcrCodecTest {
     }
 
     @Test
-    fun `rec input normalizes channels and pads with zero pixels`() {
+    fun `rec input scales channels to unit range and pads with zeros`() {
         val white = VisionImage(200, 100, IntArray(200 * 100) { 0xFFFFFFFF.toInt() })
         val input = PpOcrCodec.recInput(white, Rect(0, 0, 200, 100))
         val plane = PpOcrCodec.REC_HEIGHT * PpOcrCodec.REC_WIDTH
-        // 内容区：纯白 → BGR 三通道均 (1−0.5)/0.5＝1；右下补零区按 0 像素归一化为 −1。
+        // 内容区：纯白 → x/255＝1（导出模型内置归一化，输入 0..1）；右下补零区即模型输入 0。
         assertThat(input[0]).isWithin(1e-4f).of(1.0f)
         assertThat(input[plane]).isWithin(1e-4f).of(1.0f)
         assertThat(input[2 * plane]).isWithin(1e-4f).of(1.0f)
-        assertThat(input[plane - 1]).isWithin(1e-4f).of(-1.0f)
+        assertThat(input[plane - 1]).isWithin(1e-4f).of(0.0f)
     }
 
     @Test

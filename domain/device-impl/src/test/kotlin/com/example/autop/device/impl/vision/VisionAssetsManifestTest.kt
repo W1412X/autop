@@ -34,7 +34,7 @@ internal class VisionAssetsManifestTest {
 
     @Test
     fun `text assets use LF so every checkout has identical bytes`() {
-        for (name in listOf("ppocr_keys.txt", "manifest.json")) {
+        for (name in listOf("ppocr_keys.txt", "ocr_lexicon.txt", "manifest.json")) {
             assertThat(dir.resolve(name).readBytes().contains('\r'.code.toByte())).isFalse()
         }
     }
@@ -51,7 +51,9 @@ internal class VisionAssetsManifestTest {
                 "icon_cls.onnx",
                 "ocr_det.onnx",
                 "ocr_rec.onnx",
+                "ocr_rec_server.onnx",
                 "ppocr_keys.txt",
+                "ocr_lexicon.txt",
             )
     }
 }

@@ -43,9 +43,10 @@ internal object PpOcrCodec {
     private val DET_MEAN = floatArrayOf(0.485f, 0.456f, 0.406f)
     private val DET_STD = floatArrayOf(0.229f, 0.224f, 0.225f)
 
-    /** rec 归一化（v5：(x/255 − 0.5)/0.5）。 */
-    private const val REC_MEAN: Float = 0.5f
-    private const val REC_STD: Float = 0.5f
+    /** rec 归一化：模型导出时已内置归一化（inference.yml 无 NormalizeImage op），输入为 x/255（0..1）。
+     * 曾按训练侧文档口径用 (x/255−0.5)/0.5，实测同一裁剪两种口径在 mobile/server rec 上
+     * 乱码 vs 全对（微信日志 `[微l`、`cYWacYatw` 类乱码即此根因），以模型实际输入分布为准。 */
+    private const val REC_SCALE: Float = 255.0f
 
     /** 双线性采样的半像素中心偏移（N211）。 */
     private const val HALF_PIXEL: Double = 0.5
@@ -119,7 +120,7 @@ internal object PpOcrCodec {
 
     /**
      * rec 输入（官方口径几何）：框外扩保笔画（det 框切掉点/横是形近字误识主因）→
-     * 高恒 [REC_HEIGHT]、宽按比例 ≤ [REC_WIDTH]（与训练预处理一致）→ 双线性采样 → 右侧补零。
+     * 高恒 [REC_HEIGHT]、宽按比例 ≤ [REC_WIDTH]（与训练预处理一致）→ 双线性采样 → 右侧补零（0 像素即模型输入 0）。
      */
     fun recInput(
         image: VisionImage,
@@ -131,14 +132,14 @@ internal object PpOcrCodec {
         val dstH = REC_HEIGHT
         val dstW = minOf(REC_WIDTH, maxOf(1, dstH * srcW / srcH))
         val plane = REC_HEIGHT * REC_WIDTH
-        val chw = FloatArray(COLOR_CHANNELS * plane) { (0f - REC_MEAN) / REC_STD }
+        val chw = FloatArray(COLOR_CHANNELS * plane)
         for (y in 0 until dstH) {
             for (x in 0 until dstW) {
                 val sample = sampleRec(image, box, x, y, dstW, dstH)
                 val dst = y * REC_WIDTH + x
-                chw[dst] = normalizeRec(sample[2] / BYTE_MAX)
-                chw[plane + dst] = normalizeRec(sample[1] / BYTE_MAX)
-                chw[2 * plane + dst] = normalizeRec(sample[0] / BYTE_MAX)
+                chw[dst] = sample[2] / REC_SCALE
+                chw[plane + dst] = sample[1] / REC_SCALE
+                chw[2 * plane + dst] = sample[0] / REC_SCALE
             }
         }
         return chw
@@ -315,7 +316,4 @@ internal object PpOcrCodec {
         value: Float,
         channel: Int,
     ): Float = (value - DET_MEAN[channel]) / DET_STD[channel]
-
-    /** rec 通道归一化：(x − 0.5) / 0.5。 */
-    private fun normalizeRec(value: Float): Float = (value - REC_MEAN) / REC_STD
 }

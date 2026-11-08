@@ -240,6 +240,37 @@ public data class DeviceVisionRescanSection(
     }
 }
 
+/** `device.vision.rec`：OCR 识别双档级联（docs/design/ocr-accuracy-uplift 阶段 B）。 */
+@Serializable
+public data class DeviceVisionRecSection(
+    /** 档位：mobile=只用快档；cascade=快档＋低置信行升级精档；server=全量精档。 */
+    @SerialName("mode") val mode: String = "cascade",
+    /** 行置信度（CTC 行分）低于此值升级精档重识。 */
+    @SerialName("upgradeConf") val upgradeConf: Double = 0.9,
+    /** 每帧升级名额（精档重识次数上限，控 P95）。 */
+    @SerialName("maxUpgrades") val maxUpgrades: Int = 6,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (mode !in MODES) add("mode must be one of $MODES, was '$mode'")
+            if (upgradeConf !in UPGRADE_CONF_MIN..UPGRADE_CONF_MAX) {
+                add("upgradeConf must be within $UPGRADE_CONF_MIN..$UPGRADE_CONF_MAX, was $upgradeConf")
+            }
+            if (maxUpgrades !in UPGRADES_MIN..UPGRADES_MAX) {
+                add("maxUpgrades must be within $UPGRADES_MIN..$UPGRADES_MAX, was $maxUpgrades")
+            }
+        }
+
+    public companion object {
+        /** 支持的级联档位。 */
+        public val MODES: Set<String> = setOf("mobile", "cascade", "server")
+        private const val UPGRADE_CONF_MIN: Double = 0.0
+        private const val UPGRADE_CONF_MAX: Double = 1.0
+        private const val UPGRADES_MIN: Int = 0
+        private const val UPGRADES_MAX: Int = 20
+    }
+}
+
 /** `device.vision.icon`：视觉图标分类（vp9 §5/§7，icon_cls）。 */
 @Serializable
 public data class DeviceVisionIconSection(
@@ -421,6 +452,8 @@ public object DeviceConfig {
         ConfigKey("device.vision.icon", DeviceVisionIconSection.serializer()) { DeviceVisionIconSection() }
     public val VISION_RESCAN: ConfigKey<DeviceVisionRescanSection> =
         ConfigKey("device.vision.rescan", DeviceVisionRescanSection.serializer()) { DeviceVisionRescanSection() }
+    public val VISION_REC: ConfigKey<DeviceVisionRecSection> =
+        ConfigKey("device.vision.rec", DeviceVisionRecSection.serializer()) { DeviceVisionRecSection() }
     public val OVERLAY: ConfigKey<DeviceOverlaySection> =
         ConfigKey("device.overlay", DeviceOverlaySection.serializer()) { DeviceOverlaySection() }
     public val TOUCH: ConfigKey<DeviceTouchSection> =
@@ -449,6 +482,7 @@ public object DeviceConfig {
             VISION,
             VISION_ICON,
             VISION_RESCAN,
+            VISION_REC,
             OVERLAY,
             TOUCH,
             TAP,
