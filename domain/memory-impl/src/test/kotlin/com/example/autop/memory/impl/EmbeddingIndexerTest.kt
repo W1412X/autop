@@ -152,11 +152,14 @@ public class EmbeddingIndexerTest {
         waitUntil { cache.pathCount >= expected }
     }
 
-    /** 等待后台索引队列静默（连续两次采样 embed 次数不变），消除与全量入队的竞态。 */
+    /** 等待后台索引队列静默（连续三次采样 embed 次数不变），消除与全量入队的竞态。 */
     private suspend fun settle() {
         var last = -1
-        while (last != provider.calls.sumOf { it.size }) {
-            last = provider.calls.sumOf { it.size }
+        var stable = 0
+        while (stable < STABLE_SAMPLES) {
+            val now = provider.calls.sumOf { it.size }
+            stable = if (now == last) stable + 1 else 0
+            last = now
             delay(SETTLE_MS)
         }
     }
@@ -182,8 +185,12 @@ public class EmbeddingIndexerTest {
         }
 
     private companion object {
-        const val TIMEOUT_MS: Long = 5_000
+        /** CI 慢跑机上 Robolectric＋Room 冷启可能远超 5s（release 门禁曾抖动），放宽到 20s。 */
+        const val TIMEOUT_MS: Long = 20_000
         const val POLL_MS: Long = 20
         const val SETTLE_MS: Long = 100
+
+        /** settle 静默判定的连续稳定采样次数（× [SETTLE_MS]＝静默窗口）。 */
+        const val STABLE_SAMPLES: Int = 3
     }
 }
