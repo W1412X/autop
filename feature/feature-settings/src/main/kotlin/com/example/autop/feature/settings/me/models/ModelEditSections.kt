@@ -1,5 +1,5 @@
 /**
- * 模型编辑页的下半部分（docs/tech/08 §4.5）：保存后自动测试结果对话框、角色分配、删除入口。
+ * 模型编辑页的下半部分（docs/tech/08 §4.5）：保存后自动测试结果对话框、删除入口。
  * 与 [ModelEditScreen] 同页，拆文件控制单文件行数。
  */
 package com.example.autop.feature.settings.me.models
@@ -8,7 +8,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -30,29 +29,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.common.AppError
 import com.example.autop.core.ui.component.ActionRow
-import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.InfoDialog
 import com.example.autop.core.ui.component.ListRow
-import com.example.autop.core.ui.component.OptionRow
-import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusChip
 import com.example.autop.core.ui.component.subtitleParts
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.settings.R
-import com.example.autop.llm.ModelRole
-import com.example.autop.llm.ModelRoles
 import com.example.autop.llm.ProbeResult
-
-/** 该角色当前分配的 profile id（null=未分配）。 */
-internal fun ModelRoles.assignedTo(role: ModelRole): String? =
-    when (role) {
-        ModelRole.MAIN -> main
-        ModelRole.VISION -> vision
-        ModelRole.LIGHT -> light
-    }
 
 /** 保存后自动测试的结果对话框：配置已保存的提示 + 逐项结果 + 能力回填提示。 */
 @Composable
@@ -214,78 +200,6 @@ private fun ProbeRow(
 }
 
 private const val MS_PER_SECOND: Float = 1000f
-
-/**
- * 远端模型列表区（N164）："获取模型列表"拉取服务端可用模型 id，
- * 拉取成功后"从列表选择"弹层选择填入模型名字段（避免手填别名导致 unsupported model name）。
- */
-@Composable
-internal fun ModelFetchSection(
-    state: ModelsUiState,
-    onAction: (ModelsAction) -> Unit,
-    onOpenSheet: (EditSheet) -> Unit,
-) {
-    val spacing = LocalSpacing.current
-    val models = state.remoteModels.models
-    Column(modifier = Modifier.padding(bottom = spacing.md)) {
-        AutopTonalButton(
-            text = stringResource(R.string.model_fetch_models),
-            onClick = { onAction(ModelsAction.FetchRemoteModels) },
-            enabled = !state.remoteModels.running,
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = spacing.lg),
-        )
-        if (models != null && models.isNotEmpty()) {
-            OptionRow(
-                title = stringResource(R.string.model_pick_remote),
-                subtitle = stringResource(R.string.model_pick_remote_count, models.size),
-                value = state.draft?.model.orEmpty(),
-                onClick = { onOpenSheet(EditSheet.RemoteModels) },
-            )
-        }
-    }
-}
-
-/** 角色分配区（docs/tech/08 §4.5"角色分配 OptionRow"）。 */
-@Composable
-internal fun RolesSection(
-    state: ModelsUiState,
-    onOpenSheet: (EditSheet) -> Unit,
-) {
-    Column {
-        SectionTitle(text = stringResource(R.string.model_section_roles))
-        for (role in ModelRole.entries) {
-            OptionRow(
-                title = stringResource(roleLabelRes(role)),
-                subtitle = roleDescription(role),
-                value = roleValue(state, role),
-                onClick = { onOpenSheet(EditSheet.Role(role)) },
-            )
-        }
-        Text(
-            text = stringResource(R.string.model_vision_coord_hint),
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-    }
-}
-
-@Composable
-private fun roleDescription(role: ModelRole): String? =
-    if (role == ModelRole.VISION) stringResource(R.string.model_role_vision_desc) else null
-
-@Composable
-private fun roleValue(
-    state: ModelsUiState,
-    role: ModelRole,
-): String {
-    val id = state.roles.assignedTo(role)
-    if (id == null) return stringResource(R.string.model_role_unassigned)
-    return state.profiles.firstOrNull { it.id == id }?.displayName ?: id
-}
 
 /** 删除入口与确认框（删除同时清除已保存密钥）。 */
 @Composable

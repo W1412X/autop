@@ -288,6 +288,30 @@ class ModelsViewModelTest {
             assertThat(state.remoteModels.models).isEmpty()
         }
 
+    @Test
+    fun `fetch remote models dedups when list already loaded`() =
+        runTest(dispatcher) {
+            val viewModel = createViewModel()
+            viewModel.onAction(ModelsAction.New)
+            viewModel.onAction(ModelsAction.SetField(DraftField.BASE_URL, "https://api.example.com/v1"))
+            viewModel.onAction(ModelsAction.FetchRemoteModels)
+            viewModel.onAction(ModelsAction.FetchRemoteModels)
+            assertThat(directory.received).hasSize(1)
+        }
+
+    @Test
+    fun `base url edit resets fetched models for refetch`() =
+        runTest(dispatcher) {
+            val viewModel = createViewModel()
+            viewModel.onAction(ModelsAction.New)
+            viewModel.onAction(ModelsAction.SetField(DraftField.BASE_URL, "https://api.example.com/v1"))
+            viewModel.onAction(ModelsAction.FetchRemoteModels)
+            viewModel.onAction(ModelsAction.SetField(DraftField.BASE_URL, "https://api2.example.com/v1"))
+            assertThat(viewModel.uiState.value.remoteModels.models).isNull()
+            viewModel.onAction(ModelsAction.FetchRemoteModels)
+            assertThat(directory.received).hasSize(2)
+        }
+
     private fun fillValidDraft(viewModel: ModelsViewModel) {
         viewModel.onAction(ModelsAction.SetField(DraftField.NAME, "测试模型"))
         viewModel.onAction(ModelsAction.SetField(DraftField.BASE_URL, "https://api.example.com/v1"))

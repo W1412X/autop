@@ -1,17 +1,20 @@
 /**
  * 模型新建/编辑页（docs/tech/08 §4.5）：协议 OptionRow、名称、baseUrl、API Key（密码输入，
- * 已保存时只显示末 4 位）、模型名、上下文窗口、最大输出、quirks（高级，可折叠）；
- * 保存后自动测试连接并弹窗展示结果与能力；角色分配 OptionRow；删除入口。
+ * 已保存时只显示末 4 位）、模型名（聚焦即自动拉取服务端模型列表，下方列表点选填入，
+ * 也可自行输入）、上下文窗口、最大输出、quirks（高级，可折叠）；保存后自动测试连接并
+ * 弹窗展示结果与能力；删除入口。角色分配在列表页，不在本页。
  */
 package com.example.autop.feature.settings.me.models
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -20,13 +23,17 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.ActionRow
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.InlineBanner
 import com.example.autop.core.ui.component.InputBarSpec
+import com.example.autop.core.ui.component.LoadingState
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionRow
+import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -35,7 +42,7 @@ import com.example.autop.feature.settings.R
 /**
  * 模型新建/编辑页（无状态）。
  *
- * @param state 页面状态（错误/提示横幅、删除确认）。
+ * @param state 页面状态（错误/提示横幅、远端模型列表、删除确认）。
  * @param draft 当前草稿。
  * @param onBack 返回列表。
  * @param onAction 用户操作回调。
@@ -47,7 +54,7 @@ public fun ModelEditScreen(
     onBack: () -> Unit,
     onAction: (ModelsAction) -> Unit,
 ) {
-    var sheet by remember { mutableStateOf<EditSheet?>(null) }
+    var protocolSheet by remember { mutableStateOf(false) }
     Column(
         modifier =
             Modifier
@@ -65,32 +72,69 @@ public fun ModelEditScreen(
             },
         )
         Banners(state = state, onAction = onAction)
-        LazyColumn(modifier = Modifier.fillMaxSize()) {
-            item { DraftFields(draft = draft, onAction = onAction, onOpenSheet = { sheet = it }) }
-            item { ModelFetchSection(state = state, onAction = onAction, onOpenSheet = { sheet = it }) }
-            item { QuirksSection(draft = draft, onAction = onAction) }
-            item { RolesSection(state = state, onOpenSheet = { sheet = it }) }
-            item { DeleteSection(state = state, onAction = onAction) }
-        }
+        ModelForm(state = state, draft = draft, onAction = onAction, onOpenProtocol = { protocolSheet = true })
     }
-    val currentSheet = sheet
-    if (currentSheet != null) {
-        EditSheetContent(
-            sheet = currentSheet,
-            state = state,
-            draft = draft,
+    if (protocolSheet) {
+        OptionSheet(
+            title = stringResource(R.string.model_field_protocol),
+            options =
+                listOf(
+                    OptionItem(id = PROTOCOL_OPENAI, label = stringResource(R.string.protocol_openai)),
+                    OptionItem(id = PROTOCOL_ANTHROPIC, label = stringResource(R.string.protocol_anthropic)),
+                ),
+            selectedId = draft.protocol,
             onSelect = { id ->
-                when (currentSheet) {
-                    EditSheet.Protocol -> onAction(ModelsAction.SetField(DraftField.PROTOCOL, id))
-                    EditSheet.RemoteModels -> onAction(ModelsAction.SetField(DraftField.MODEL, id))
-                    is EditSheet.Role -> onAction(ModelsAction.AssignRole(currentSheet.role, id.ifEmpty { null }))
-                }
-                sheet = null
+                onAction(ModelsAction.SetField(DraftField.PROTOCOL, id))
+                protocolSheet = false
             },
-            onDismiss = { sheet = null },
+            onDismiss = { protocolSheet = false },
         )
     }
     ProbeResultDialog(state = state, onAction = onAction)
+}
+
+/** 表单主体（LazyColumn：字段区、模型名与建议列表、数值限制、quirks、删除）。 */
+@Composable
+private fun ModelForm(
+    state: ModelsUiState,
+    draft: ModelDraft,
+    onAction: (ModelsAction) -> Unit,
+    onOpenProtocol: () -> Unit,
+) {
+    LazyColumn(modifier = Modifier.fillMaxSize()) {
+        item {
+            DraftFields(
+                draft = draft,
+                onAction = onAction,
+                onOpenProtocol = onOpenProtocol,
+            )
+        }
+        item {
+            ModelField(
+                draft = draft,
+                onFocus = { onAction(ModelsAction.FetchRemoteModels) },
+                onAction = onAction,
+            )
+        }
+        if (state.remoteModels.running) {
+            item {
+                LoadingState(
+                    text = stringResource(R.string.model_fetch_running),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        }
+        items(state.remoteModels.models.orEmpty()) { model ->
+            ModelSuggestionRow(
+                model = model,
+                selected = model == draft.model,
+                onPick = { onAction(ModelsAction.SetField(DraftField.MODEL, model)) },
+            )
+        }
+        item { LimitsFields(draft = draft, onAction = onAction) }
+        item { QuirksSection(draft = draft, onAction = onAction) }
+        item { DeleteSection(state = state, onAction = onAction) }
+    }
 }
 
 @Composable
@@ -114,12 +158,12 @@ private fun Banners(
     }
 }
 
-/** 表单字段区（docs/tech/08 §4.5 顺序：协议、名称、baseUrl、API Key、模型名、上下文窗口、最大输出）。 */
+/** 表单字段区（docs/tech/08 §4.5 顺序：协议、名称、baseUrl、API Key）。 */
 @Composable
 private fun DraftFields(
     draft: ModelDraft,
     onAction: (ModelsAction) -> Unit,
-    onOpenSheet: (EditSheet) -> Unit,
+    onOpenProtocol: () -> Unit,
 ) {
     Column {
         SectionTitle(text = stringResource(R.string.model_section_basic))
@@ -127,7 +171,7 @@ private fun DraftFields(
             title = stringResource(R.string.model_field_protocol),
             subtitle = null,
             value = protocolLabel(draft.protocol),
-            onClick = { onOpenSheet(EditSheet.Protocol) },
+            onClick = onOpenProtocol,
         )
         DraftTextField(R.string.model_field_name, draft.displayName) {
             onAction(ModelsAction.SetField(DraftField.NAME, it))
@@ -143,9 +187,53 @@ private fun DraftFields(
         ) {
             onAction(ModelsAction.SetField(DraftField.API_KEY, it))
         }
-        DraftTextField(R.string.model_field_model, draft.model) {
-            onAction(ModelsAction.SetField(DraftField.MODEL, it))
-        }
+    }
+}
+
+/** 模型名输入：聚焦即自动拉取服务端模型列表（下方展示，点选填入，也可自行输入）。 */
+@Composable
+private fun ModelField(
+    draft: ModelDraft,
+    onFocus: () -> Unit,
+    onAction: (ModelsAction) -> Unit,
+) {
+    DraftTextField(
+        labelRes = R.string.model_field_model,
+        value = draft.model,
+        // 自动触发场景静默跳过：接口地址没填时不弹错误横幅（显式校验仍在 VM）。
+        onFocus = { if (draft.baseUrl.isNotBlank()) onFocus() },
+    ) {
+        onAction(ModelsAction.SetField(DraftField.MODEL, it))
+    }
+}
+
+/** 模型建议行（点选填入模型名输入框）。 */
+@Composable
+private fun ModelSuggestionRow(
+    model: String,
+    selected: Boolean,
+    onPick: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Text(
+        text = model,
+        style = MaterialTheme.typography.bodyMedium,
+        color = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface,
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .clickable(onClick = onPick)
+                .padding(horizontal = spacing.lg, vertical = spacing.sm),
+    )
+}
+
+/** 数值限制字段（docs/tech/08 §4.5：上下文窗口、最大输出）。 */
+@Composable
+private fun LimitsFields(
+    draft: ModelDraft,
+    onAction: (ModelsAction) -> Unit,
+) {
+    Column {
         DraftTextField(R.string.model_field_context_window, draft.contextWindow) {
             onAction(ModelsAction.SetField(DraftField.CONTEXT_WINDOW, it))
         }
@@ -156,11 +244,12 @@ private fun DraftFields(
 }
 
 @Composable
-private fun DraftTextField(
+internal fun DraftTextField(
     @StringRes labelRes: Int,
     value: String,
     placeholder: String = "",
     password: Boolean = false,
+    onFocus: (() -> Unit)? = null,
     onValueChange: (String) -> Unit,
 ) {
     val spacing = LocalSpacing.current
@@ -179,7 +268,10 @@ private fun DraftTextField(
             value = value,
             onValueChange = onValueChange,
             spec = InputBarSpec(placeholder = placeholder, password = password),
-            modifier = Modifier.fillMaxWidth(),
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .onFocusChanged { if (it.isFocused) onFocus?.invoke() },
         )
     }
 }

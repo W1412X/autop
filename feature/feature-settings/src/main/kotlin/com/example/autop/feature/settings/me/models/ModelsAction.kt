@@ -27,7 +27,7 @@ public sealed interface ModelsAction {
     /** 重新测试当前已保存的配置。 */
     public data object RetestProbe : ModelsAction
 
-    /** 获取服务端模型列表（N164：拉取可用模型 id 供选择）。 */
+    /** 模型名输入聚焦时自动拉取服务端模型列表（N164：拉取可用模型 id 供点选填入）。 */
     public data object FetchRemoteModels : ModelsAction
 
     /** 请求删除当前编辑的配置（弹确认框）。 */

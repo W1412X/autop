@@ -82,7 +82,7 @@ public class ModelsViewModel
 
         public fun onAction(action: ModelsAction) {
             when (action) {
-                is ModelsAction.SetField -> mutate { it.withField(action.field, action.value) }
+                is ModelsAction.SetField -> setField(action.field, action.value)
                 is ModelsAction.SetQuirk -> mutate { it.withQuirk(action.key, action.value) }
                 is ModelsAction.AssignRole -> assignRole(action.role, action.profileId)
                 is ModelsAction.Dismiss -> dismiss(action.kind)
@@ -131,6 +131,15 @@ public class ModelsViewModel
             val draft = draftState.value ?: return
             errorState.value = null
             draftState.value = transform(draft)
+        }
+
+        /** 字段编辑；接口地址 / 密钥 / 协议变更使已拉取的模型列表失效。 */
+        private fun setField(
+            field: DraftField,
+            value: String,
+        ) {
+            mutate { it.withField(field, value) }
+            if (field in FETCH_RESET_FIELDS) remoteModelsState.value = RemoteModelsUiState()
         }
 
         private fun save() {
@@ -225,6 +234,7 @@ public class ModelsViewModel
             }
         }
 
+        /** 模型名输入聚焦触发：已拉取/拉取中不重复请求，失败后再次聚焦自动重试（N164）。 */
         private fun fetchRemoteModels() {
             val draft = draftState.value ?: return
             val problem = draft.fetchModelsError()
@@ -232,6 +242,8 @@ public class ModelsViewModel
                 errorState.value = problem
                 return
             }
+            val current = remoteModelsState.value
+            if (current.running || !current.models.isNullOrEmpty()) return
             viewModelScope.launch(dispatchers.io) {
                 remoteModelsState.value = RemoteModelsUiState(running = true)
                 // 先落密钥再拉取（适配器经 `apiKeyRef` 解析密钥，同测试连接）。
@@ -297,5 +309,8 @@ public class ModelsViewModel
 
             /** 默认协议（OpenAI 兼容，docs/tech/03 §5.1）。 */
             const val DEFAULT_PROTOCOL = "openai"
+
+            /** 这些字段变更会使已拉取的模型列表失效（换了接口/密钥/协议）。 */
+            val FETCH_RESET_FIELDS = setOf(DraftField.BASE_URL, DraftField.API_KEY, DraftField.PROTOCOL)
         }
     }

@@ -1,7 +1,8 @@
 /**
- * 模型配置页（docs/tech/08 §4.5 `me/models`）：PagedList 列表（名称、协议 · 模型名、
- * 角色 StatusChip）与新建/编辑页（[ModelEditScreen]）共用同一目的地址，
- * 编辑态由 [ModelsUiState.draft] 驱动。
+ * 模型配置页（docs/tech/08 §4.5 `me/models`）：上半部分角色配置（主 / 视觉 / 轻量，
+ * 从已有模型配置中选择），下半部分 PagedList 模型配置列表（名称、协议 · 模型名、
+ * 角色 StatusChip）；新建/编辑页（[ModelEditScreen]）共用同一目的地址，编辑态由
+ * [ModelsUiState.draft] 驱动。
  */
 package com.example.autop.feature.settings.me.models
 
@@ -12,14 +13,22 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ListRow
+import com.example.autop.core.ui.component.OptionItem
+import com.example.autop.core.ui.component.OptionRow
+import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.PagedList
 import com.example.autop.core.ui.component.PagedListState
+import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusChip
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.subtitleParts
@@ -64,6 +73,7 @@ private fun ModelsList(
     onBack: () -> Unit,
     onAction: (ModelsAction) -> Unit,
 ) {
+    var roleSheet by remember { mutableStateOf<ModelRole?>(null) }
     Column(
         modifier =
             Modifier
@@ -81,6 +91,7 @@ private fun ModelsList(
                 )
             },
         )
+        RolesSection(state = state, onOpenRole = { roleSheet = it })
         if (state.profiles.isEmpty()) {
             EmptyState(text = stringResource(R.string.models_empty))
         } else {
@@ -99,7 +110,88 @@ private fun ModelsList(
             }
         }
     }
+    val currentRole = roleSheet
+    if (currentRole != null) {
+        RoleSheet(
+            role = currentRole,
+            state = state,
+            onSelect = { id ->
+                onAction(ModelsAction.AssignRole(currentRole, id.ifEmpty { null }))
+                roleSheet = null
+            },
+            onDismiss = { roleSheet = null },
+        )
+    }
 }
+
+/**
+ * 角色配置区（主 / 视觉 / 轻量）：只从已添加的模型配置中选择，
+ * 与 API 配置编辑分开（docs/tech/08 §4.5）。
+ */
+@Composable
+private fun RolesSection(
+    state: ModelsUiState,
+    onOpenRole: (ModelRole) -> Unit,
+) {
+    Column {
+        SectionTitle(text = stringResource(R.string.model_section_roles))
+        for (role in ModelRole.entries) {
+            OptionRow(
+                title = stringResource(roleLabelRes(role)),
+                subtitle = roleDescription(role),
+                value = roleValue(state, role),
+                onClick = { onOpenRole(role) },
+            )
+        }
+    }
+}
+
+/** 角色选择弹层：全部已有配置 + "未分配"；视觉角色只列支持图片的配置。 */
+@Composable
+private fun RoleSheet(
+    role: ModelRole,
+    state: ModelsUiState,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val candidates =
+        if (role == ModelRole.VISION) {
+            state.profiles.filter { it.capabilities.vision }
+        } else {
+            state.profiles
+        }
+    OptionSheet(
+        title = stringResource(roleLabelRes(role)),
+        options =
+            candidates.map { OptionItem(id = it.id, label = it.displayName) } +
+                OptionItem(id = "", label = stringResource(R.string.model_role_unassigned)),
+        selectedId = state.roles.assignedTo(role).orEmpty(),
+        onSelect = onSelect,
+        onDismiss = onDismiss,
+    )
+}
+
+@Composable
+private fun roleDescription(role: ModelRole): String? =
+    if (role == ModelRole.VISION) stringResource(R.string.model_role_vision_desc) else null
+
+@Composable
+private fun roleValue(
+    state: ModelsUiState,
+    role: ModelRole,
+): String {
+    val id = state.roles.assignedTo(role)
+    if (id == null) return stringResource(R.string.model_role_unassigned)
+    return state.profiles.firstOrNull { it.id == id }?.displayName ?: id
+}
+
+/** 该角色当前分配的 profile id（null=未分配）。 */
+internal fun ModelRoles.assignedTo(role: ModelRole): String? =
+    when (role) {
+        ModelRole.MAIN -> main
+        ModelRole.VISION -> vision
+        ModelRole.LIGHT -> light
+    }
 
 /** 角色徽标（docs/tech/08 §4.5：主 / 视觉 / 轻量，StatusChip 自带图标与文字）。 */
 @Composable
