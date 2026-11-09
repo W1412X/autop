@@ -58,4 +58,7 @@ public enum class RunStatus {
 
     /** 熔断 Stop 收口（连续无变化/同错误重复）；终态，与预算耗尽区分。 */
     BREAKER_STOPPED,
+
+    /** 触发被拦截（闸门/判定/限额/到点停用）：只留记录不执行，排查"为什么没触发"用。 */
+    BLOCKED,
 }

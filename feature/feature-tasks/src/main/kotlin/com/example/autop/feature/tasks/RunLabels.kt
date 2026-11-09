@@ -19,22 +19,24 @@ internal fun formatTime(millis: Long): String = SimpleDateFormat(TIME_PATTERN, L
 
 /** Run 状态名（[com.example.autop.task.RunStatus]）→ 文案资源。 */
 @StringRes
-internal fun runStatusTextRes(statusName: String): Int =
-    when (statusName) {
-        "QUEUED" -> R.string.run_status_QUEUED
-        "WAITING_SCREEN" -> R.string.run_status_WAITING_SCREEN
-        "WAITING_USER" -> R.string.run_status_WAITING_USER
-        "RUNNING" -> R.string.run_status_RUNNING
-        "PAUSED" -> R.string.run_status_PAUSED
-        "SUCCEEDED" -> R.string.run_status_SUCCEEDED
-        "FAILED" -> R.string.run_status_FAILED
-        "CANCELLED" -> R.string.run_status_CANCELLED
-        "EXPIRED" -> R.string.run_status_EXPIRED
-        "INTERRUPTED" -> R.string.run_status_INTERRUPTED
-        "BUDGET_EXHAUSTED" -> R.string.run_status_BUDGET_EXHAUSTED
-        "BREAKER_STOPPED" -> R.string.run_status_BREAKER_STOPPED
-        else -> R.string.run_status_CANCELLED
-    }
+internal fun runStatusTextRes(statusName: String): Int = RUN_STATUS_TEXT[statusName] ?: R.string.run_status_CANCELLED
+
+private val RUN_STATUS_TEXT: Map<String, Int> =
+    mapOf(
+        "QUEUED" to R.string.run_status_QUEUED,
+        "WAITING_SCREEN" to R.string.run_status_WAITING_SCREEN,
+        "WAITING_USER" to R.string.run_status_WAITING_USER,
+        "RUNNING" to R.string.run_status_RUNNING,
+        "PAUSED" to R.string.run_status_PAUSED,
+        "SUCCEEDED" to R.string.run_status_SUCCEEDED,
+        "FAILED" to R.string.run_status_FAILED,
+        "CANCELLED" to R.string.run_status_CANCELLED,
+        "EXPIRED" to R.string.run_status_EXPIRED,
+        "INTERRUPTED" to R.string.run_status_INTERRUPTED,
+        "BUDGET_EXHAUSTED" to R.string.run_status_BUDGET_EXHAUSTED,
+        "BREAKER_STOPPED" to R.string.run_status_BREAKER_STOPPED,
+        "BLOCKED" to R.string.run_status_BLOCKED,
+    )
 
 /** Run 状态名 → 语义色。 */
 internal fun runStatusTone(statusName: String): StatusTone =
@@ -44,5 +46,6 @@ internal fun runStatusTone(statusName: String): StatusTone =
         "PAUSED" -> StatusTone.PAUSED
         "SUCCEEDED" -> StatusTone.SUCCEEDED
         "FAILED", "BUDGET_EXHAUSTED", "BREAKER_STOPPED" -> StatusTone.BLOCKED
+        "BLOCKED" -> StatusTone.BLOCKED
         else -> StatusTone.NEUTRAL
     }

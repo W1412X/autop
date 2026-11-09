@@ -183,6 +183,7 @@
     <string name="run_status_INTERRUPTED">已中断</string>
     <string name="run_status_BUDGET_EXHAUSTED">预算用尽</string>
     <string name="run_status_BREAKER_STOPPED">熔断停止</string>
+    <string name="run_status_BLOCKED">被拦截</string>
 
     <!-- 新建入口 -->
     <string name="task_create_ai">AI 创建</string>

@@ -28,6 +28,7 @@ import com.example.autop.task.impl.draft.LlmTaskDraftGenerator
 import com.example.autop.task.impl.schedule.TriggerHub
 import com.example.autop.task.impl.schedule.TriggerRunner
 import com.example.autop.task.impl.schedule.TriggerSimulatorImpl
+import com.example.autop.task.impl.store.RunStore
 import com.example.autop.task.impl.store.TaskStore
 import com.example.autop.task.impl.store.TriggerStateStore
 import dagger.Module
@@ -121,22 +122,26 @@ public object TaskDraftModule {
     public fun provideTriggerHub(
         taskStore: TaskStore,
         stateStore: TriggerStateStore,
+        runStore: RunStore,
         sources: Set<@JvmSuppressWildcards TriggerSource>,
         evaluators: Set<@JvmSuppressWildcards ConditionEvaluator>,
         runner: TriggerRunner,
         configProvider: ConfigProvider,
         clock: Clock,
+        ids: IdGenerator,
         @AppScope scope: CoroutineScope,
         logger: Logger,
     ): TriggerHub =
         TriggerHub(
             taskStore = taskStore,
             stateStore = stateStore,
+            runStore = runStore,
             sources = sources.toList(),
             evaluators = evaluators.toList(),
             runner = runner,
             configProvider = configProvider,
             clock = clock,
+            ids = ids,
             scope = scope,
             logger = logger,
         )

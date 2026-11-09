@@ -365,7 +365,13 @@ internal class TaskAuthorSessionImpl(
             if (draft.goal.isBlank()) add("goal 为空")
             when (draft.triggerType.trim()) {
                 "manual" -> Unit
-                "once" -> if (parseAt(draft.at) == null) add("at 不可解析（yyyy-MM-dd HH:mm 或 ISO-8601）")
+                "once" -> {
+                    val at = parseAt(draft.at)
+                    when {
+                        at == null -> add("at 不可解析（yyyy-MM-dd HH:mm 或 ISO-8601）")
+                        at <= d.clock.nowMillis() -> add("at 早于当前时间，到点执行需要将来的时刻")
+                    }
+                }
                 "cron" -> {
                     val expr = draft.cron?.trim().orEmpty()
                     if (!cronValid(expr)) add("cron 不合法（5 段表达式：分 时 日 月 周）")
@@ -421,7 +427,10 @@ internal class TaskAuthorSessionImpl(
     private fun buildTrigger(draft: TaskDraft): Trigger? =
         when (draft.triggerType.trim()) {
             "manual" -> Trigger.Manual
-            "once" -> parseAt(draft.at)?.let { Trigger.Schedule(ScheduleSpec.Once(it)) }
+            "once" ->
+                parseAt(draft.at)
+                    ?.takeIf { it > d.clock.nowMillis() }
+                    ?.let { Trigger.Schedule(ScheduleSpec.Once(it)) }
             "cron" -> {
                 val expr = draft.cron?.trim().orEmpty()
                 if (!cronValid(expr)) {

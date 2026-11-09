@@ -8,6 +8,7 @@ import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.autop.core.common.AppError
+import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.testing.FakeClock
@@ -18,6 +19,8 @@ import com.example.autop.task.FilterGroup
 import com.example.autop.task.FilterOp
 import com.example.autop.task.GroupMode
 import com.example.autop.task.RunOrigin
+import com.example.autop.task.RunStatus
+import com.example.autop.task.ScheduleSpec
 import com.example.autop.task.Task
 import com.example.autop.task.Trigger
 import com.example.autop.task.TriggerEvent
@@ -31,6 +34,7 @@ import com.example.autop.task.impl.testing.FakeLogger
 import com.example.autop.task.impl.testing.FakeTriggerSource
 import com.example.autop.task.impl.testing.RecordingTriggerRunner
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -165,6 +169,75 @@ public class TriggerHubTest {
             fixture.hub.onEvent(eventOf("k1"))
             assertEquals(1, fixture.runner.calls.size)
         }
+
+    /** 定时任务到点必须入队（曾被条件评估链的 filter_not_match 静默拦掉）。 */
+    @Test
+    public fun `schedule task enqueues on schedule fired`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            val task = scheduleTask("t1")
+            fixture.saveTask(task)
+            fixture.hub.onScheduleFired(task.id, atMillis = 1_000L)
+            val call = fixture.runner.calls.single()
+            assertEquals(task.id, call.task.id)
+            assertEquals(RunOrigin.SCHEDULE, call.origin)
+        }
+
+    /** 定时任务没有冷却/每日上限等条件约束：连续到点都放行。 */
+    @Test
+    public fun `schedule task is not gated by condition limits`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            val task = scheduleTask("t1")
+            fixture.saveTask(task)
+            fixture.hub.onScheduleFired(task.id, atMillis = 1_000L)
+            fixture.hub.onScheduleFired(task.id, atMillis = 2_000L)
+            assertEquals(2, fixture.runner.calls.size)
+        }
+
+    /** 闸门拦截也留 BLOCKED 记录（同因 30 分钟内去重，连续拦截只留一条）。 */
+    @Test
+    public fun `gate blocked attempts leave a deduped blocked record`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            val task = conditionTask("t1")
+            fixture.saveTask(task)
+            fixture.hub.onEvent(eventOf("k1"))
+            fixture.hub.onEvent(eventOf("k2"))
+            fixture.hub.onEvent(eventOf("k3"))
+            val runs = fixture.runStore.observeRuns(task.id, 10).first()
+            assertEquals(1, runs.size)
+            assertEquals(RunStatus.BLOCKED, runs.single().status)
+            assertEquals("gate_cooldown", runs.single().errorCode)
+        }
+
+    /** LLM 判否也留 BLOCKED 记录（条件过了本地过滤但判定未通过）。 */
+    @Test
+    public fun `llm not match leaves a blocked record`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.evaluator.result = Outcome.Ok(ConditionResult(match = false, reason = "no"))
+            fixture.saveTask(conditionTask("t1", llmCondition = "重要消息"))
+            fixture.hub.onEvent(eventOf("k1"))
+            val runs = fixture.runStore.observeRuns(TaskId("t1"), 10).first()
+            assertEquals(1, runs.size)
+            assertEquals(RunStatus.BLOCKED, runs.single().status)
+            assertEquals("llm_not_match", runs.single().errorCode)
+        }
+
+    /** 到点但任务已停用：留"到点未执行"记录，不再无声消失。 */
+    @Test
+    public fun `disabled schedule task leaves a blocked record`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            fixture.saveTask(scheduleTask("t1"))
+            fixture.taskStore.setEnabled(TaskId("t1"), false)
+            fixture.hub.onScheduleFired(TaskId("t1"), atMillis = 1_000L)
+            val runs = fixture.runStore.observeRuns(TaskId("t1"), 10).first()
+            assertEquals(1, runs.size)
+            assertEquals(RunStatus.BLOCKED, runs.single().status)
+            assertEquals("task_disabled", runs.single().errorCode)
+        }
 }
 
 /** 测试装配：真实 TaskStore/TriggerStateStore + fake 判定器与入队记录器。 */
@@ -184,14 +257,23 @@ private class Fixture(
         TriggerHub(
             taskStore = taskStore,
             stateStore = TriggerStateStore(db),
+            runStore = runStore,
             sources = listOf(FakeTriggerSource(SOURCE_ID)),
             evaluators = listOf(evaluator),
             runner = runner,
             configProvider = config,
             clock = clock,
+            ids = SequentialIds(),
             scope = scope,
             logger = FakeLogger,
         )
+}
+
+/** 顺序 id 生成器（BLOCKED 记录用）。 */
+private class SequentialIds : IdGenerator {
+    private var n = 0
+
+    override fun newId(): String = "id-" + ++n
 }
 
 /** 条件任务构造（`pkg EQUALS com.a` 的本地过滤）。 */
@@ -217,6 +299,18 @@ private fun conditionTask(
                 cooldownMs = cooldownMs,
                 dailyLimit = dailyLimit,
             ),
+        priority = 0,
+        createdAt = 0L,
+        updatedAt = 0L,
+    )
+
+/** 定时任务构造（一次性到点）。 */
+private fun scheduleTask(id: String): Task =
+    Task(
+        id = TaskId(id),
+        name = "task-$id",
+        goal = "goal",
+        trigger = Trigger.Schedule(ScheduleSpec.Once(atMillis = 1_000L)),
         priority = 0,
         createdAt = 0L,
         updatedAt = 0L,
