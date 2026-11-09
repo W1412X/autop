@@ -2,11 +2,12 @@
  * 注入通道子页（N200，docs/tech/08 §4.5 `me/shell`）：无线调试配对与 shell 注入通道状态。
  * 无状态（docs/standards/coding-standards §8），状态与副作用在 [ShellChannelViewModel]；
  * 配对入口放设置而非工具测试面板（N200：配对是一次性配置，测试面板只做诊断）。
+ * 视觉与首次启动的权限检查页一致：状态卡片 + 图标 + 动作按钮。
  */
 package com.example.autop.feature.settings.me.shell
 
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,13 +19,14 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import com.example.autop.core.ui.component.AutopButton
+import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.SectionTitle
+import com.example.autop.core.ui.component.StatusCard
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.device.ShellState
@@ -57,62 +59,66 @@ public fun ShellChannelScreen(
                     .verticalScroll(rememberScrollState()),
         ) {
             SectionTitle(text = stringResource(R.string.me_shell_section_status))
-            StatusRow(state = state, onAction = onAction)
+            ShellStatusCard(state = state, onAction = onAction)
             PairingGuideSection()
             SectionTitle(text = stringResource(R.string.me_shell_section_pair))
-            Text(
-                text = stringResource(R.string.me_shell_steps),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier =
-                    Modifier.padding(
-                        horizontal = LocalSpacing.current.screenEdge,
-                        vertical = LocalSpacing.current.xs,
-                    ),
-            )
-            PairForm(state = state, onAction = onAction)
+            PairingCard(state = state, onAction = onAction)
         }
     }
 }
 
-/** 通道状态行：状态文案 + 手动连接。 */
+/** 通道状态卡：状态图标 + 状态文案 + 手动连接。 */
 @Composable
-private fun StatusRow(
+private fun ShellStatusCard(
     state: ShellChannelUiState,
     onAction: (ShellChannelAction) -> Unit,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = LocalSpacing.current.screenEdge),
-    ) {
-        Text(
-            text = stringResource(statusResOf(state.shellState)),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
-        AutopTextButton(
-            text = stringResource(R.string.me_shell_connect),
-            onClick = { onAction(ShellChannelAction.Connect) },
-            modifier = Modifier.padding(start = LocalSpacing.current.xs),
-        )
-    }
+    val connected = state.shellState == ShellState.Connected
+    StatusCard(
+        icon =
+            when (state.shellState) {
+                ShellState.Disconnected -> AutopIcons.Error
+                ShellState.Connecting -> AutopIcons.Refresh
+                ShellState.Connected -> AutopIcons.CheckCircle
+            },
+        tint =
+            when (state.shellState) {
+                ShellState.Disconnected -> MaterialTheme.colorScheme.error
+                ShellState.Connecting -> MaterialTheme.colorScheme.onSurfaceVariant
+                ShellState.Connected -> MaterialTheme.colorScheme.primary
+            },
+        title = stringResource(R.string.me_shell_status_title),
+        subtitle = stringResource(statusResOf(state.shellState)),
+        trailing =
+            if (connected) {
+                null
+            } else {
+                {
+                    AutopTextButton(
+                        text = stringResource(R.string.me_shell_connect),
+                        onClick = { onAction(ShellChannelAction.Connect) },
+                    )
+                }
+            },
+    )
 }
 
-/** 配对表单：配对端口 + 6 位配对码 + 配对按钮 + 引导/提示。 */
+/** 配对卡：三步引导 + 自动发现提示 + 端口/配对码表单。 */
 @Composable
-private fun PairForm(
+private fun PairingCard(
     state: ShellChannelUiState,
     onAction: (ShellChannelAction) -> Unit,
 ) {
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = LocalSpacing.current.screenEdge),
+    val spacing = LocalSpacing.current
+    StatusCard(
+        icon = AutopIcons.PhoneAndroid,
+        tint = MaterialTheme.colorScheme.primary,
+        title = stringResource(R.string.me_shell_pair_title),
+        subtitle = null,
     ) {
+        StepText(textRes = R.string.me_shell_step_1)
+        StepText(textRes = R.string.me_shell_step_2)
+        StepText(textRes = R.string.me_shell_step_3)
         Text(
             text =
                 stringResource(
@@ -120,7 +126,7 @@ private fun PairForm(
                 ),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(bottom = LocalSpacing.current.xs),
+            modifier = Modifier.padding(top = spacing.sm),
         )
         OutlinedTextField(
             value = state.portText,
@@ -129,7 +135,7 @@ private fun PairForm(
             singleLine = true,
             enabled = !state.busy,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = spacing.sm),
         )
         OutlinedTextField(
             value = state.codeText,
@@ -138,12 +144,12 @@ private fun PairForm(
             singleLine = true,
             enabled = !state.busy,
             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(top = spacing.xs),
         )
         AutopButton(
             text = stringResource(R.string.me_shell_pair),
             onClick = { onAction(ShellChannelAction.Pair) },
-            modifier = Modifier.padding(top = LocalSpacing.current.xs),
+            modifier = Modifier.fillMaxWidth().padding(top = spacing.sm),
         )
         val notice = state.notice
         if (notice != null) {
@@ -151,14 +157,22 @@ private fun PairForm(
                 text = noticeTextOf(notice),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(top = spacing.xs),
             )
         }
-        Text(
-            text = stringResource(R.string.me_shell_guide),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
+}
+
+/** 配对步骤文字。 */
+@Composable
+private fun StepText(
+    @StringRes textRes: Int,
+) {
+    Text(
+        text = stringResource(textRes),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+    )
 }
 
 /** 通道状态文案（N200）。 */

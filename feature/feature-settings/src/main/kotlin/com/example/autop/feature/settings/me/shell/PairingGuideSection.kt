@@ -2,6 +2,7 @@
  * 配对引导区（P1x）：Wi-Fi 状态检查＋相关权限征求（通知 / 附近设备 / 定位，全部可选、可跳过）。
  * 无线调试依赖 Wi-Fi；mDNS 发现在个别 ROM 需要附近设备/定位权限。系统状态随重组与
  * ON_RESUME 刷新（授完权限回来即更新）；本组件自带请求回调，不进 ViewModel。
+ * 视觉与首次启动的权限检查页一致：状态卡片 + 图标 + 动作按钮。
  */
 package com.example.autop.feature.settings.me.shell
 
@@ -13,9 +14,8 @@ import android.net.wifi.WifiManager
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -26,7 +26,6 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
@@ -34,8 +33,10 @@ import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.SectionTitle
+import com.example.autop.core.ui.component.StatusCard
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.settings.R
 
@@ -45,25 +46,28 @@ internal fun PairingGuideSection() {
     val context = LocalContext.current
     var tick by remember { mutableIntStateOf(0) }
     ResumeRefresh { tick += 1 }
+    val wifiOn = remember(tick) { wifiEnabled(context) }
+    val spacing = LocalSpacing.current
     Column {
         SectionTitle(text = stringResource(R.string.me_shell_section_prepare))
-        WifiRow(wifiOn = remember(tick) { wifiEnabled(context) })
-        Text(
-            text = stringResource(R.string.me_shell_perm_title),
-            style = MaterialTheme.typography.titleSmall,
-            color = MaterialTheme.colorScheme.onSurface,
-            modifier = Modifier.padding(horizontal = LocalSpacing.current.screenEdge),
+        WifiCard(
+            wifiOn = wifiOn,
+            onOpenWifi = { runCatching { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) } },
         )
-        PermissionRow(
-            title = stringResource(R.string.me_shell_perm_notice),
+        SectionTitle(text = stringResource(R.string.me_shell_perm_title))
+        PermissionCard(
+            titleRes = R.string.me_shell_perm_notice_title,
+            descriptionRes = R.string.me_shell_perm_notice_desc,
             permission = Manifest.permission.POST_NOTIFICATIONS,
         )
-        PermissionRow(
-            title = stringResource(R.string.me_shell_perm_nearby),
+        PermissionCard(
+            titleRes = R.string.me_shell_perm_nearby_title,
+            descriptionRes = R.string.me_shell_perm_nearby_desc,
             permission = NEARBY_WIFI_DEVICES,
         )
-        PermissionRow(
-            title = stringResource(R.string.me_shell_perm_location),
+        PermissionCard(
+            titleRes = R.string.me_shell_perm_location_title,
+            descriptionRes = R.string.me_shell_perm_location_desc,
             permission = Manifest.permission.ACCESS_FINE_LOCATION,
         )
         Text(
@@ -72,11 +76,36 @@ internal fun PairingGuideSection() {
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             modifier =
                 Modifier.padding(
-                    horizontal = LocalSpacing.current.screenEdge,
-                    vertical = LocalSpacing.current.xs,
+                    horizontal = spacing.screenEdge,
+                    vertical = spacing.xs,
                 ),
         )
     }
+}
+
+/** Wi-Fi 状态卡：关闭时提供跳转系统设置的入口。 */
+@Composable
+private fun WifiCard(
+    wifiOn: Boolean,
+    onOpenWifi: () -> Unit,
+) {
+    StatusCard(
+        icon = if (wifiOn) AutopIcons.CheckCircle else AutopIcons.Error,
+        tint = if (wifiOn) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.error,
+        title = stringResource(R.string.me_shell_wifi_title),
+        subtitle = stringResource(if (wifiOn) R.string.me_shell_wifi_on else R.string.me_shell_wifi_off),
+        trailing =
+            if (wifiOn) {
+                null
+            } else {
+                {
+                    AutopTextButton(
+                        text = stringResource(R.string.me_shell_wifi_open),
+                        onClick = onOpenWifi,
+                    )
+                }
+            },
+    )
 }
 
 /** ON_RESUME 重新检测（权限弹窗/系统设置返回后刷新）。 */
@@ -94,41 +123,11 @@ private fun ResumeRefresh(onResume: () -> Unit) {
     }
 }
 
-/** Wi-Fi 状态行：无线调试依赖 Wi-Fi。 */
+/** 权限卡：标题 + 说明 + 授权状态（可选，不阻塞）。 */
 @Composable
-private fun WifiRow(wifiOn: Boolean) {
-    val context = LocalContext.current
-    val spacing = LocalSpacing.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = spacing.screenEdge),
-    ) {
-        Text(
-            text =
-                stringResource(
-                    if (wifiOn) R.string.me_shell_wifi_on else R.string.me_shell_wifi_off,
-                ),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
-        if (!wifiOn) {
-            AutopTextButton(
-                text = stringResource(R.string.me_shell_wifi_open),
-                onClick = {
-                    runCatching { context.startActivity(Intent(Settings.ACTION_WIFI_SETTINGS)) }
-                },
-            )
-        }
-    }
-}
-
-/** 权限行：标题 + 状态 + 请求（可选，不阻塞）。 */
-@Composable
-private fun PermissionRow(
-    title: String,
+private fun PermissionCard(
+    @StringRes titleRes: Int,
+    @StringRes descriptionRes: Int,
     permission: String,
 ) {
     val context = LocalContext.current
@@ -136,28 +135,30 @@ private fun PermissionRow(
     val launcher =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { tick += 1 }
     val granted = remember(tick) { granted(context, permission) }
-    val spacing = LocalSpacing.current
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = spacing.screenEdge),
-    ) {
-        Text(
-            text =
-                "$title · " +
-                    stringResource(if (granted) R.string.me_shell_perm_granted else R.string.me_shell_perm_missing),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
-        if (!granted) {
-            AutopTextButton(
-                text = stringResource(R.string.me_shell_perm_request),
-                onClick = { launcher.launch(permission) },
-            )
-        }
-    }
+    StatusCard(
+        icon = if (granted) AutopIcons.CheckCircle else AutopIcons.RadioButtonUnchecked,
+        tint =
+            if (granted) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.outline
+            },
+        title = stringResource(titleRes),
+        subtitle =
+            stringResource(descriptionRes) + " · " +
+                stringResource(if (granted) R.string.me_shell_perm_granted else R.string.me_shell_perm_missing),
+        trailing =
+            if (granted) {
+                null
+            } else {
+                {
+                    AutopTextButton(
+                        text = stringResource(R.string.me_shell_perm_request),
+                        onClick = { launcher.launch(permission) },
+                    )
+                }
+            },
+    )
 }
 
 private fun wifiEnabled(context: Context): Boolean =
