@@ -113,6 +113,7 @@
     <string name="progress_plan_title">计划</string>
     <string name="progress_steer_tag">补充指令</string>
     <string name="progress_tool_duration">%1$d ms</string>
+    <string name="progress_tool_running">执行中</string>
     <string name="progress_outcome_succeeded">已完成</string>
     <string name="progress_outcome_failed">失败</string>
     <string name="progress_outcome_cancelled">已取消</string>

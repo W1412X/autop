@@ -11,6 +11,7 @@ import com.example.autop.agent.RunFinished
 import com.example.autop.agent.RunNoteAdded
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.RunPaused
+import com.example.autop.agent.RunStarted
 import com.example.autop.agent.RunState
 import com.example.autop.agent.ThreadCreated
 import com.example.autop.agent.ThreadEvent
@@ -18,6 +19,7 @@ import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
 import com.example.autop.agent.protocol.TOOL_MARK_NOTE
+import com.example.autop.agent.timeline.StepState
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.ui.theme.StatusTone
@@ -30,6 +32,7 @@ import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus
 import com.google.common.truth.Truth.assertThat
+import kotlinx.serialization.json.buildJsonObject
 import org.junit.Test
 
 class ProgressLogicTest {
@@ -78,9 +81,9 @@ class ProgressLogicTest {
             )
         assertThat(rows)
             .containsExactly(
-                ProgressRow.Tool("tool.tap", ok = true, durationMs = 80, errorText = null),
-                ProgressRow.Tool("tool.scroll", ok = false, durationMs = 80, errorText = "节点不可点击"),
-                ProgressRow.Tool("tool.observe", ok = false, durationMs = 80, errorText = "E_TIMEOUT"),
+                ProgressRow.Tool("tool.tap", state = StepState.DONE, durationMs = 80, errorText = null),
+                ProgressRow.Tool("tool.scroll", state = StepState.FAILED, durationMs = 80, errorText = "节点不可点击"),
+                ProgressRow.Tool("tool.observe", state = StepState.FAILED, durationMs = 80, errorText = "E_TIMEOUT"),
             ).inOrder()
     }
 
@@ -201,7 +204,7 @@ class ProgressLogicTest {
             )
         assertThat(rows)
             .containsExactly(
-                ProgressRow.Tool("tool.scroll", ok = false, durationMs = 80, errorText = "节点不可点击"),
+                ProgressRow.Tool("tool.scroll", state = StepState.FAILED, durationMs = 80, errorText = "节点不可点击"),
             )
     }
 
@@ -319,6 +322,52 @@ class ProgressLogicTest {
             ).inOrder()
     }
 
+    @Test
+    fun `finished meta stays on own run tail and stats do not accumulate across runs`() {
+        val rows =
+            progressRowsOf(
+                eventsOf(
+                    UserMessage(blocks = listOf(Block.Text("第一问")), kind = UserMessageKind.INPUT),
+                    runStarted(),
+                    toolResult(toolId = "tool.tap", ok = true, blocks = emptyList()),
+                    assistant(blocks = listOf(Block.Text("第一轮")), outputTokens = 5),
+                    RunFinished(status = RunOutcome.SUCCEEDED, summary = null),
+                    UserMessage(blocks = listOf(Block.Text("第二问")), kind = UserMessageKind.INPUT),
+                    runStarted(),
+                    assistant(blocks = listOf(Block.Text("第二轮")), outputTokens = 7),
+                ),
+            )
+
+        val firstText = rows[2] as ProgressRow.Assistant
+        val meta = requireNotNull(firstText.meta)
+        assertThat(meta.status).isEqualTo(RunOutcome.SUCCEEDED)
+        assertThat(meta.stepCount).isEqualTo(1)
+        assertThat(meta.outputTokens).isEqualTo(5)
+        // 结束元信息留在第一轮消息上，不挂到新一轮的尾巴。
+        val lastText = rows.last() as ProgressRow.Assistant
+        assertThat(lastText.text).isEqualTo("第二轮")
+        assertThat(lastText.meta).isNull()
+    }
+
+    @Test
+    fun `empty-output run meta becomes standalone row and keeps previous meta intact`() {
+        val rows =
+            progressRowsOf(
+                eventsOf(
+                    runStarted(),
+                    assistant(blocks = listOf(Block.Text("第一轮"))),
+                    RunFinished(status = RunOutcome.SUCCEEDED, summary = null),
+                    runStarted(),
+                    RunFinished(status = RunOutcome.CANCELLED, summary = null),
+                ),
+            )
+
+        val firstText = rows[0] as ProgressRow.Assistant
+        assertThat(firstText.meta?.status).isEqualTo(RunOutcome.SUCCEEDED)
+        val standalone = rows.last() as ProgressRow.Finished
+        assertThat(standalone.status).isEqualTo(RunOutcome.CANCELLED)
+    }
+
     private fun activeRun(
         status: RunStatus = RunStatus.RUNNING,
         pauseReason: PauseReason? = null,
@@ -354,6 +403,15 @@ class ProgressLogicTest {
             )
         }
 
+    private fun runStarted(): RunStarted =
+        RunStarted(
+            runId = RunId("run-1"),
+            configDiff = buildJsonObject { },
+            promptVersions = emptyMap(),
+            modelProfileId = "m",
+            toolIds = emptyList(),
+        )
+
     private fun assistant(
         blocks: List<Block>,
         outputTokens: Int = 0,
@@ -372,7 +430,7 @@ class ProgressLogicTest {
         errorCode: String? = null,
     ): ToolResultEvent =
         ToolResultEvent(
-            callId = "call-1",
+            callId = "call-$toolId",
             toolId = toolId,
             ok = ok,
             blocks = blocks,

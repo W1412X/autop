@@ -7,52 +7,14 @@ package com.example.autop.feature.chat.thread
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.RunOutcome
 
-/** 步骤（工具调用）状态。 */
-public enum class StepState {
-    /** 调用中（流式未落盘或已发未回）。 */
-    RUNNING,
+/** 步骤状态（归并内核定义，对话页沿用同名）。 */
+public typealias StepState = com.example.autop.agent.timeline.StepState
 
-    /** 成功。 */
-    DONE,
+/** 状态横幅种类（归并内核定义，对话页沿用同名）。 */
+public typealias BannerKind = com.example.autop.agent.timeline.BannerKind
 
-    /** 失败。 */
-    FAILED,
-}
-
-/** 时间线状态横幅种类（等待回答由 AskCard 承载，docs/tech/08 §4.2）。 */
-public enum class BannerKind {
-    /** 已暂停（含手动 / 触摸 / 租约丢失）。 */
-    PAUSED,
-
-    /** 被策略拦截。 */
-    BLOCKED,
-
-    /** 已中断（进程被杀等，恢复后提示）。 */
-    INTERRUPTED,
-}
-
-/**
- * 步骤结果里的快捷跳转入口（工具结果 `data.links`）：由 app 按 [kind] 映射到任务/流程路由。
- *
- * [kind] 取值：task_detail / task_edit / task_ai / flow_detail / flow_edit / flow_ai。
- */
-public data class StepLink(
-    val kind: String,
-    /** 展示文案（缺省按 kind 给默认标签）。 */
-    val label: String? = null,
-    val taskId: String? = null,
-    val flowId: String? = null,
-    val draftId: String? = null,
-) {
-    public companion object {
-        public const val TASK_DETAIL: String = "task_detail"
-        public const val TASK_EDIT: String = "task_edit"
-        public const val TASK_AI: String = "task_ai"
-        public const val FLOW_DETAIL: String = "flow_detail"
-        public const val FLOW_EDIT: String = "flow_edit"
-        public const val FLOW_AI: String = "flow_ai"
-    }
-}
+/** 步骤快捷跳转入口（归并内核定义，对话页沿用同名）。 */
+public typealias StepLink = com.example.autop.agent.timeline.StepLink
 
 /** 时间线条目。 */
 public sealed interface TimelineItem {

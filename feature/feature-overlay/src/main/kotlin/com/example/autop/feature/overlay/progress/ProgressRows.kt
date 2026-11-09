@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CornerBasedShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,6 +32,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
@@ -41,6 +43,7 @@ import androidx.compose.ui.unit.dp
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.PlanStatus
 import com.example.autop.agent.RunOutcome
+import com.example.autop.agent.timeline.StepState
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.MarkdownText
 import com.example.autop.core.ui.theme.AutopAlpha
@@ -191,13 +194,18 @@ private fun ThinkingRow(
     }
 }
 
-/** 工具步骤行：类别图标（tone 底）+ 工具 id + 耗时 + 成败小标（同对话页 StepRow 折叠态）。 */
+/** 工具步骤行：类别图标（tone 底）+ 工具 id + 执行中进度/耗时 + 状态标（同对话页 StepRow）。 */
 @Composable
 private fun ToolRow(
     row: ProgressRow.Tool,
     modifier: Modifier = Modifier,
 ) {
-    val stepTone = if (row.ok) StatusTone.SUCCEEDED else StatusTone.BLOCKED
+    val stepTone =
+        when (row.state) {
+            StepState.RUNNING -> StatusTone.RUNNING
+            StepState.DONE -> StatusTone.SUCCEEDED
+            StepState.FAILED -> StatusTone.BLOCKED
+        }
     val tone = LocalSemanticColors.current.tone(stepTone)
     Row(
         modifier =
@@ -229,22 +237,9 @@ private fun ToolRow(
                     .weight(1f)
                     .padding(start = LocalSpacing.current.sm),
         )
-        Text(
-            text = stringResource(R.string.progress_tool_duration, row.durationMs),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Icon(
-            imageVector = if (row.ok) AutopIcons.Check else AutopIcons.Error,
-            contentDescription = null,
-            modifier =
-                Modifier
-                    .size(IconSize.Xs.scaled())
-                    .padding(start = LocalSpacing.current.xs),
-            tint = tone.foreground,
-        )
+        ToolTrailing(row = row, tint = tone.foreground)
     }
-    if (!row.ok && row.errorText != null) {
+    if (row.state == StepState.FAILED && row.errorText != null) {
         val indent = LocalSpacing.current.sm + IconSize.Sm.scaled() + LocalSpacing.current.xs * ERROR_TEXT_INDENT
         Text(
             text = row.errorText,
@@ -252,6 +247,80 @@ private fun ToolRow(
             color = MaterialTheme.colorScheme.error,
             modifier = Modifier.padding(start = indent, bottom = LocalSpacing.current.xs),
         )
+    }
+}
+
+/** 工具行尾部：执行中给进度提示，完成/失败给耗时与状态标。 */
+@Composable
+private fun ToolTrailing(
+    row: ProgressRow.Tool,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    if (row.state == StepState.RUNNING) {
+        RunningHint(progressText = row.progressText, tint = tint, modifier = modifier)
+    } else {
+        Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+            row.durationMs?.let { duration ->
+                Text(
+                    text = stringResource(R.string.progress_tool_duration, duration),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Icon(
+                imageVector = if (row.state == StepState.DONE) AutopIcons.Check else AutopIcons.Error,
+                contentDescription = null,
+                modifier =
+                    Modifier
+                        .size(IconSize.Xs.scaled())
+                        .padding(start = LocalSpacing.current.xs),
+                tint = tint,
+            )
+        }
+    }
+}
+
+/**
+ * 执行中提示：进度文本（无则「执行中」）+ 小转圈（[LocalMotionEnabled] 关闭时静态图标），
+ * 颜色随工具行状态语义。
+ */
+@Composable
+private fun RunningHint(
+    progressText: String?,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = progressText ?: stringResource(R.string.progress_tool_running),
+            style = MaterialTheme.typography.labelSmall,
+            color = tint,
+            maxLines = 1,
+            modifier = Modifier.widthIn(max = RUNNING_HINT_MAX_WIDTH),
+        )
+        Box(
+            modifier =
+                Modifier
+                    .padding(start = LocalSpacing.current.xs)
+                    .size(IconSize.Xs.scaled()),
+            contentAlignment = Alignment.Center,
+        ) {
+            if (LocalMotionEnabled.current) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(IconSize.Xs.scaled()),
+                    strokeWidth = RUNNING_SPINNER_STROKE,
+                    color = tint,
+                )
+            } else {
+                Icon(
+                    imageVector = AutopIcons.Schedule,
+                    contentDescription = null,
+                    modifier = Modifier.size(IconSize.Xs.scaled()),
+                    tint = tint,
+                )
+            }
+        }
     }
 }
 
@@ -341,6 +410,12 @@ private fun cursorAlpha(): Float {
 }
 
 private const val USER_BUBBLE_WIDTH_FRACTION: Float = 0.8f
+
+/** 执行中进度文本最大宽度（超长截断，避免挤压工具名）。 */
+private val RUNNING_HINT_MAX_WIDTH = 120.dp
+
+/** 执行中转圈描边宽度。 */
+private val RUNNING_SPINNER_STROKE = 2.dp
 
 /** 失败错误文本左缩进（图标宽 + 间隙的倍数）。 */
 private const val ERROR_TEXT_INDENT: Int = 2

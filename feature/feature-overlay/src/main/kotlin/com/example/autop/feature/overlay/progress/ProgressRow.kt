@@ -6,6 +6,7 @@ package com.example.autop.feature.overlay.progress
 
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.RunOutcome
+import com.example.autop.agent.timeline.StepState
 
 /** 进度悬浮窗消息行（N182）。 */
 public sealed interface ProgressRow {
@@ -32,12 +33,14 @@ public sealed interface ProgressRow {
         val streaming: Boolean = false,
     ) : ProgressRow
 
-    /** 工具步骤行（工具类别图标 + 工具 id + 耗时 + 成败状态）。 */
+    /** 工具步骤行（发出即出行 [StepState.RUNNING]，结果到达转 DONE/FAILED）。 */
     public data class Tool(
         val toolId: String,
-        val ok: Boolean,
-        val durationMs: Long,
+        val state: StepState,
+        val durationMs: Long?,
         val errorText: String?,
+        /** 流式进度文本（ToolProgress，执行中展示）。 */
+        val progressText: String? = null,
     ) : ProgressRow
 
     /** 计划卡（覆盖式，同对话页 PlanCard）。 */

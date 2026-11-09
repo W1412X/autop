@@ -1,10 +1,8 @@
 /**
- * 时间线折叠与判定辅助（docs/tech/08 §4.2 StepGroup 折叠规则）：[mergeTimeline]
- * 的收尾阶段与状态横幅判定，同包 internal 纯函数。
+ * 时间线折叠（docs/tech/08 §4.2 StepGroup 折叠规则）：[mergeTimeline]
+ * 的收尾阶段，同包 internal 纯函数。
  */
 package com.example.autop.feature.chat.thread
-
-import com.example.autop.agent.PauseReason
 
 /**
  * 链路编号：按时间线顺序给步骤行编号（折叠组携带已编号步骤，docs/tech/08 §4.2，N172），
@@ -62,19 +60,3 @@ private fun isReadStep(entry: TimelineEntry): Boolean {
     val step = entry.item as? TimelineItem.StepRow ?: return false
     return step.state == StepState.DONE && step.toolId in READ_TOOLS
 }
-
-internal fun isUnresolvedBanner(item: TimelineItem): Boolean {
-    val banner = item as? TimelineItem.Banner ?: return false
-    return banner.kind == BannerKind.PAUSED || banner.kind == BannerKind.BLOCKED
-}
-
-/** 暂停原因 → 时间线横幅种类（ASK_USER 由 AskCard 承载，返回 null）。 */
-internal fun bannerKindOf(reason: PauseReason): BannerKind? =
-    when (reason) {
-        PauseReason.POLICY_BLOCKED -> BannerKind.BLOCKED
-        PauseReason.USER_TOUCH,
-        PauseReason.LEASE_LOST,
-        PauseReason.MANUAL,
-        -> BannerKind.PAUSED
-        PauseReason.ASK_USER -> null
-    }

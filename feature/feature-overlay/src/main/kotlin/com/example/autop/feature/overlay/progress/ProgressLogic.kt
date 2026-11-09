@@ -1,183 +1,71 @@
 /**
  * 进度悬浮窗数据映射（docs/tech/08 §5.3，N182）：线程事件 → 消息行（模型见 `ProgressRow`）。
+ * 公共归并内核 `mergeCore` 的悬浮层映射（与对话页 `TimelineMerger` 共用归并口径：
+ * 按轮窗口统计、结束元信息结算、callId 配对转态、流式合并），此处只做 UI 模型转换。
  * 独立于 Compose，供单测使用。
  */
 package com.example.autop.feature.overlay.progress
 
 import androidx.compose.runtime.Immutable
 import com.example.autop.agent.AgentEvent
-import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.PauseReason
-import com.example.autop.agent.PlanUpdated
-import com.example.autop.agent.RunFinished
 import com.example.autop.agent.RunOutcome
-import com.example.autop.agent.RunStarted
 import com.example.autop.agent.ThreadEvent
-import com.example.autop.agent.ToolResultEvent
-import com.example.autop.agent.UserMessage
-import com.example.autop.agent.UserMessageKind
-import com.example.autop.agent.protocol.displayTextOf
+import com.example.autop.agent.timeline.CoreRow
+import com.example.autop.agent.timeline.StepState
+import com.example.autop.agent.timeline.mergeCore
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.overlay.R
-import com.example.autop.llm.Block
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunStatus
 
 /**
- * 线程事件 → 消息行（N182）：[PlanUpdated] 覆盖式（移除旧计划行再追加）；
- * 工具行取 `ToolResultEvent`（完成即定格成败），当前执行中的工具由窗口头部 currentStep 兜底；
- * Run 结束 → [ProgressRow.Finished] 元信息行附着末条助手文（N183）。
- *
- * N186 与对话页 `TimelineMerger` 逐项对齐（此前平行实现遗漏的修复回归）：
- * `INJECTED` 注入上下文不进消息流（不伪装用户气泡）、块按原序逐条出行、
- * 失败错误文本只取首个文本块、[live] 流式增量同款“持久化到达即作废”合并。
+ * 线程事件 → 消息行（N182）：[CoreRow.Plan] 覆盖式（内核保证移除旧计划行再追加）；
+ * 工具行发出即出行（RUNNING，N192 对齐对话页），结果到达转 DONE/FAILED；
+ * Run 结束 → [ProgressRow.Finished] 元信息行附着**本轮**末条助手文（N183）。
  */
 public fun progressRowsOf(
     events: List<ThreadEvent>,
     live: List<AgentEvent> = emptyList(),
-): List<ProgressRow> {
-    val rows = mutableListOf<ProgressRow>()
-    var startedAt: Long? = null
-    var outputTokens = 0
-    var finished: ThreadEvent? = null
-    events.forEach { event ->
-        when (val payload = event.payload) {
-            is AssistantMessage -> outputTokens += payload.usage?.outputTokens ?: 0
-            is RunStarted -> startedAt = event.createdAt
-            is RunFinished -> finished = event
-            else -> Unit
-        }
-        appendPayload(rows, event)
-    }
-    live.forEach { appendLive(rows, it) }
-    // 结束元信息在 live 流式行之后处理（同对话页 appendResult 顺序，N186）。
-    appendFinished(rows, finished, startedAt, outputTokens)
-    return rows
-}
+): List<ProgressRow> = mergeCore(events, live).mapNotNull { it.row.toProgressRow() }
 
-/** 单个持久化事件 → 消息行（同对话页 appendPayload 的显示映射，N186）。 */
-private fun appendPayload(
-    rows: MutableList<ProgressRow>,
-    event: ThreadEvent,
-) {
-    when (val payload = event.payload) {
-        // INJECTED 为系统注入上下文（电量等），只进模型不进消息流（N174 对话页同款口径）。
-        is UserMessage ->
-            if (payload.kind != UserMessageKind.INJECTED) {
-                rows +=
-                    ProgressRow.User(
-                        text = payload.blocks.filterIsInstance<Block.Text>().joinToString("\n") { it.text },
-                        isSteer = payload.kind == UserMessageKind.STEER,
-                    )
-            }
-        is AssistantMessage -> appendAssistant(rows, payload)
-        is ToolResultEvent ->
-            rows +=
-                ProgressRow.Tool(
-                    toolId = payload.toolId,
-                    ok = payload.ok,
-                    durationMs = payload.durationMs,
-                    errorText =
-                        if (payload.ok) {
-                            null
-                        } else {
-                            // 错误文本只取首个文本块（同对话页 resultText 口径），无则回退 errorCode。
-                            payload.blocks
-                                .filterIsInstance<Block.Text>()
-                                .firstOrNull()
-                                ?.text
-                                ?.takeIf { it.isNotBlank() } ?: payload.errorCode
-                        },
-                )
-        is PlanUpdated -> {
-            rows.removeAll { it is ProgressRow.Plan }
-            rows += ProgressRow.Plan(payload.items, payload.explanation)
-        }
-        else -> Unit
+/** 中立条目 → 消息行（对话页专属的横幅/分叉标记不出现在悬浮层消息流）。 */
+private fun CoreRow.toProgressRow(): ProgressRow? =
+    when (this) {
+        is CoreRow.User -> ProgressRow.User(text, isSteer)
+        is CoreRow.Assistant -> ProgressRow.Assistant(text, streaming, meta?.toFinished())
+        is CoreRow.Thinking -> ProgressRow.Thinking(text, streaming)
+        is CoreRow.Step -> toToolRow()
+        is CoreRow.Plan -> ProgressRow.Plan(items, explanation)
+        is CoreRow.RunMeta -> toFinished()
+        is CoreRow.Banner,
+        is CoreRow.ForkMarker,
+        -> null
     }
-}
 
-/** 助手消息块按原序逐条出行（同对话页 appendMessage）：思考与文本交错时不再重排/合并。 */
-private fun appendAssistant(
-    rows: MutableList<ProgressRow>,
-    payload: AssistantMessage,
-) {
-    payload.blocks.forEach { block ->
-        when (block) {
-            is Block.Thinking -> rows += ProgressRow.Thinking(block.text)
-            // 回退协议/工具标记文本不冒充正文（displayTextOf 过滤）。
-            is Block.Text ->
-                displayTextOf(block.text).takeIf { it.isNotBlank() }?.let { shown ->
-                    rows += ProgressRow.Assistant(shown)
-                }
-            // 工具调用行取 ToolResultEvent；Image/ToolResult 不进消息行（同对话页）。
-            else -> Unit
-        }
-    }
-}
+private fun CoreRow.RunMeta.toFinished(): ProgressRow.Finished =
+    ProgressRow.Finished(
+        status = outcome,
+        summary = summary,
+        stepCount = stepCount,
+        durationMs = durationMs,
+        outputTokens = outputTokens,
+    )
 
-/** 实时增量 → 追加或合并到流式行（同对话页 appendLive；工具行取 ToolResultEvent，不出行）。 */
-private fun appendLive(
-    rows: MutableList<ProgressRow>,
-    event: AgentEvent,
-) {
-    when (event) {
-        is AgentEvent.TextDelta -> appendStream(rows, event.text, thinking = false)
-        is AgentEvent.ThinkingDelta -> appendStream(rows, event.text, thinking = true)
-        else -> Unit
-    }
-}
-
-/** 流式文本合并：追加到同类型流式行，否则新建（同对话页 appendStream）。 */
-private fun appendStream(
-    rows: MutableList<ProgressRow>,
-    text: String,
-    thinking: Boolean,
-) {
-    val last = rows.lastOrNull()
-    if (thinking && last is ProgressRow.Thinking && last.streaming) {
-        rows[rows.lastIndex] = last.copy(text = last.text + text)
-    } else if (!thinking && last is ProgressRow.Assistant && last.streaming) {
-        rows[rows.lastIndex] = last.copy(text = last.text + text)
-    } else {
-        rows +=
-            if (thinking) {
-                ProgressRow.Thinking(text, streaming = true)
+private fun CoreRow.Step.toToolRow(): ProgressRow.Tool =
+    ProgressRow.Tool(
+        toolId = toolId,
+        state = state,
+        durationMs = durationMs,
+        // 错误文本只取首个文本块（同对话页 resultText 口径），无则回退 errorCode。
+        errorText =
+            if (state == StepState.FAILED) {
+                resultText?.takeIf { it.isNotBlank() } ?: errorCode
             } else {
-                ProgressRow.Assistant(text, streaming = true)
-            }
-    }
-}
-
-/**
- * Run 结束 → [ProgressRow.Finished]（summary 与末条助手文重复时丢弃，同对话页）；
- * 末条为助手文时附着其末尾，否则独立成行（N183）。
- */
-private fun appendFinished(
-    rows: MutableList<ProgressRow>,
-    event: ThreadEvent?,
-    startedAt: Long?,
-    outputTokens: Int,
-) {
-    val payload = event?.payload as? RunFinished ?: return
-    val trimmed = payload.summary?.trim()
-    val duplicated = rows.any { (it as? ProgressRow.Assistant)?.text?.trim() == trimmed }
-    val meta =
-        ProgressRow.Finished(
-            status = payload.status,
-            summary = if (trimmed.isNullOrEmpty() || duplicated) null else payload.summary,
-            stepCount = rows.count { it is ProgressRow.Tool },
-            durationMs = event.createdAt - (startedAt ?: event.createdAt),
-            outputTokens = outputTokens,
-        )
-    val lastIndex = rows.lastIndex
-    val lastText = rows.getOrNull(lastIndex) as? ProgressRow.Assistant
-    if (lastText != null) {
-        rows[lastIndex] = lastText.copy(meta = meta)
-    } else {
-        rows += meta
-    }
-}
+                null
+            },
+        progressText = progressText,
+    )
 
 /** RunOutcome → 结束状态徽标文案（strings `progress_outcome_*`）。 */
 public fun outcomeTextOf(outcome: RunOutcome): Int =

@@ -334,6 +334,25 @@ class TimelineMergerTest {
         assertThat((entries.single().item as TimelineItem.StepRow).state).isEqualTo(StepState.RUNNING)
     }
 
+    @Test
+    fun `empty-output run adds standalone meta and keeps previous run meta intact`() {
+        val history =
+            listOf(
+                event(1, runStarted()),
+                event(2, assistant(Block.Text("第一轮"))),
+                event(3, RunFinished(status = RunOutcome.SUCCEEDED, summary = null)),
+                event(4, runStarted()),
+                event(5, RunFinished(status = RunOutcome.CANCELLED, summary = null)),
+            )
+
+        val entries = mergeTimeline(history, emptyList(), GROUP_THRESHOLD)
+
+        val firstText = entries[0].item as TimelineItem.AssistantText
+        assertThat(firstText.meta?.outcome).isEqualTo(RunOutcome.SUCCEEDED)
+        val standalone = entries.last().item as TimelineItem.RunMeta
+        assertThat(standalone.outcome).isEqualTo(RunOutcome.CANCELLED)
+    }
+
     private companion object {
         const val GROUP_THRESHOLD = 3
     }

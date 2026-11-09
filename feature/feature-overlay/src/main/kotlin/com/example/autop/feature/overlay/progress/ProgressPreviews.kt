@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.RunState
+import com.example.autop.agent.timeline.StepState
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.ui.preview.PreviewTheme
@@ -66,8 +67,15 @@ private val PreviewRows: List<ProgressRow> =
     listOf(
         ProgressRow.User("帮我看下当前屏幕", isSteer = false),
         ProgressRow.Thinking("当前屏幕上有设置与相机，需要确认用户意图。"),
-        ProgressRow.Tool("tool.observe", ok = true, durationMs = 320, errorText = null),
-        ProgressRow.Tool("tool.tap", ok = false, durationMs = 80, errorText = "点击手势被取消"),
+        ProgressRow.Tool("tool.observe", state = StepState.DONE, durationMs = 320, errorText = null),
+        ProgressRow.Tool(
+            toolId = "tool.scroll",
+            state = StepState.RUNNING,
+            durationMs = null,
+            errorText = null,
+            progressText = "正在滚动 3/10",
+        ),
+        ProgressRow.Tool("tool.tap", state = StepState.FAILED, durationMs = 80, errorText = "点击手势被取消"),
         ProgressRow.Assistant(
             text = "已为你打开设置。",
             meta =
