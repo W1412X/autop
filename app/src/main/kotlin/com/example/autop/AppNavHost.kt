@@ -46,6 +46,7 @@ import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.feature.chat.ChatNavigator
 import com.example.autop.feature.chat.chatGraph
+import com.example.autop.feature.chat.thread.StepLink
 import com.example.autop.feature.flows.FlowsNavigator
 import com.example.autop.feature.flows.FlowsRoutes
 import com.example.autop.feature.flows.flowsGraph
@@ -401,6 +402,20 @@ private fun createChatNavigator(
             }
         }
 
+        override fun openStepLink(link: StepLink) {
+            when (link.kind) {
+                StepLink.TASK_DETAIL -> link.taskId?.let { navController.navigate(AutopRoutes.taskDetail(it)) }
+                StepLink.TASK_EDIT -> link.taskId?.let { navController.navigate(AutopRoutes.taskEdit(it)) }
+                StepLink.TASK_AI -> link.taskId?.let { navController.navigate(AutopRoutes.taskAuthor(it)) }
+                StepLink.FLOW_DETAIL -> link.flowId?.let { navController.navigate(AutopRoutes.flowDetail(it)) }
+                StepLink.FLOW_EDIT -> link.flowId?.let { navController.navigate(AutopRoutes.flowEditor(it)) }
+                StepLink.FLOW_AI ->
+                    link.draftId?.let {
+                        navController.navigate(AutopRoutes.flowAuthor(draftId = it, editFlowId = link.flowId))
+                    }
+            }
+        }
+
         override fun navigateBack() {
             navController.popBackStack()
         }
@@ -413,8 +428,8 @@ private fun createTasksNavigator(navController: NavHostController): TasksNavigat
             navController.navigate(AutopRoutes.taskEdit(taskId ?: NEW_TASK_ID))
         }
 
-        override fun openTaskAuthor() {
-            navController.navigate(AutopRoutes.TASK_AUTHOR)
+        override fun openTaskAuthor(taskId: String?) {
+            navController.navigate(AutopRoutes.taskAuthor(taskId))
         }
 
         override fun openDetail(taskId: String) {

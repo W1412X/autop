@@ -31,6 +31,29 @@ public enum class BannerKind {
     INTERRUPTED,
 }
 
+/**
+ * 步骤结果里的快捷跳转入口（工具结果 `data.links`）：由 app 按 [kind] 映射到任务/流程路由。
+ *
+ * [kind] 取值：task_detail / task_edit / task_ai / flow_detail / flow_edit / flow_ai。
+ */
+public data class StepLink(
+    val kind: String,
+    /** 展示文案（缺省按 kind 给默认标签）。 */
+    val label: String? = null,
+    val taskId: String? = null,
+    val flowId: String? = null,
+    val draftId: String? = null,
+) {
+    public companion object {
+        public const val TASK_DETAIL: String = "task_detail"
+        public const val TASK_EDIT: String = "task_edit"
+        public const val TASK_AI: String = "task_ai"
+        public const val FLOW_DETAIL: String = "flow_detail"
+        public const val FLOW_EDIT: String = "flow_edit"
+        public const val FLOW_AI: String = "flow_ai"
+    }
+}
+
 /** 时间线条目。 */
 public sealed interface TimelineItem {
     /** 用户消息气泡（[isSteer] 为运行中补充指令）。 */
@@ -82,6 +105,8 @@ public sealed interface TimelineItem {
         val progressText: String?,
         /** 链路编号（时间线内步骤序号，从 1 起；0 = 未编号，docs/tech/08 §4.2，N172）。 */
         val stepNo: Int = 0,
+        /** 结果上的快捷跳转入口（任务/流程工具）。 */
+        val links: List<StepLink> = emptyList(),
     ) : TimelineItem
 
     /** 连续读类步骤折叠行（"查看屏幕 ×n"，可展开查看组内链路步骤，N172）。 */

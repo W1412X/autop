@@ -9,8 +9,11 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -25,8 +28,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import com.example.autop.core.ui.component.AutopChip
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.IconSize
@@ -42,6 +47,7 @@ import com.example.autop.feature.chat.R
  *
  * @param step 步骤内容。
  * @param onLongClick 长按菜单（null 表示不开放，docs/tech/08 §4.2 长按 StepRow）。
+ * @param onLinkClick 结果快捷入口点击（null 表示不渲染快捷入口）。
  */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
@@ -49,6 +55,7 @@ internal fun StepRowView(
     step: TimelineItem.StepRow,
     onLongClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    onLinkClick: ((StepLink) -> Unit)? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Column(
@@ -83,6 +90,9 @@ internal fun StepRowView(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(start = LocalSpacing.current.sm),
             )
+        }
+        if (onLinkClick != null) {
+            StepLinks(links = step.links, onLinkClick = onLinkClick)
         }
         if (LocalMotionEnabled.current) {
             AnimatedVisibility(visible = expanded) {
@@ -154,6 +164,61 @@ private fun StepSummary(step: TimelineItem.StepRow) {
     }
 }
 
+/** 结果上的快捷入口（任务/流程详情、编辑、AI 编辑）；未知 kind 不渲染。 */
+@OptIn(ExperimentalLayoutApi::class) // FlowRow 在当前 Compose 版本仍为实验 API
+@Composable
+private fun StepLinks(
+    links: List<StepLink>,
+    onLinkClick: (StepLink) -> Unit,
+) {
+    val known = links.filter { stepLinkLabelRes(it.kind) != 0 }
+    if (known.isEmpty()) return
+    val spacing = LocalSpacing.current
+    FlowRow(
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+        verticalArrangement = Arrangement.spacedBy(spacing.xs),
+        modifier =
+            Modifier.padding(
+                start = spacing.sm + IconSize.Sm.scaled() + spacing.xs * 2,
+                top = spacing.xs,
+            ),
+    ) {
+        known.forEach { link ->
+            AutopChip(
+                text = link.label ?: stringResource(stepLinkLabelRes(link.kind)),
+                selected = false,
+                onClick = { onLinkClick(link) },
+                icon = stepLinkIconOf(link.kind),
+            )
+        }
+    }
+}
+
+private fun stepLinkLabelRes(kind: String): Int =
+    when (kind) {
+        StepLink.TASK_DETAIL,
+        StepLink.FLOW_DETAIL,
+        -> R.string.thread_link_detail
+        StepLink.TASK_EDIT,
+        StepLink.FLOW_EDIT,
+        -> R.string.thread_link_edit
+        StepLink.TASK_AI,
+        StepLink.FLOW_AI,
+        -> R.string.thread_link_ai
+        else -> 0
+    }
+
+private fun stepLinkIconOf(kind: String): ImageVector =
+    when (kind) {
+        StepLink.TASK_EDIT,
+        StepLink.FLOW_EDIT,
+        -> AutopIcons.Edit
+        StepLink.TASK_AI,
+        StepLink.FLOW_AI,
+        -> AutopIcons.Psychology
+        else -> AutopIcons.Description
+    }
+
 /**
  * 连续读类步骤折叠行（docs/tech/08 §4.2 StepGroup："查看屏幕 ×n"）：
  * 点击展开组内步骤，链路完整可见（N172）。
@@ -162,6 +227,7 @@ private fun StepSummary(step: TimelineItem.StepRow) {
 internal fun StepGroupRow(
     group: TimelineItem.StepGroup,
     modifier: Modifier = Modifier,
+    onLinkClick: ((StepLink) -> Unit)? = null,
 ) {
     var expanded by rememberSaveable { mutableStateOf(false) }
     Column(
@@ -194,20 +260,23 @@ internal fun StepGroupRow(
         }
         if (LocalMotionEnabled.current) {
             AnimatedVisibility(visible = expanded) {
-                GroupSteps(group = group)
+                GroupSteps(group = group, onLinkClick = onLinkClick)
             }
         } else if (expanded) {
-            GroupSteps(group = group)
+            GroupSteps(group = group, onLinkClick = onLinkClick)
         }
     }
 }
 
 /** 展开的组内步骤（各自可再展开详情）。 */
 @Composable
-private fun GroupSteps(group: TimelineItem.StepGroup) {
+private fun GroupSteps(
+    group: TimelineItem.StepGroup,
+    onLinkClick: ((StepLink) -> Unit)?,
+) {
     Column(modifier = Modifier.padding(start = LocalSpacing.current.md)) {
         group.steps.forEach { step ->
-            StepRowView(step = step, onLongClick = null)
+            StepRowView(step = step, onLongClick = null, onLinkClick = onLinkClick)
         }
     }
 }

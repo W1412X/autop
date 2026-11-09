@@ -28,6 +28,9 @@ public enum class StepLabel(
     DEVICE_STATE(R.string.step_device_state),
     CLIPBOARD_GET(R.string.step_clipboard_get),
     CLIPBOARD_SET(R.string.step_clipboard_set),
+    LIST_TASKS(R.string.step_list_tasks),
+    CREATE_TASK(R.string.step_create_task),
+    UPDATE_TASK(R.string.step_update_task),
 
     /** 未知工具（模板取 `step_other`，参数为工具 id）。 */
     OTHER(R.string.step_other),

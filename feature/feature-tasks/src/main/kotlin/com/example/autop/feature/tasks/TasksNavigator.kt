@@ -8,8 +8,8 @@ public interface TasksNavigator {
     /** 打开任务编辑页（[taskId] 为 null = 新建）。 */
     public fun openEdit(taskId: String?)
 
-    /** 打开 AI 创建任务页。 */
-    public fun openTaskAuthor()
+    /** 打开 AI 创建任务页；[taskId] 非空时修改该任务。 */
+    public fun openTaskAuthor(taskId: String? = null)
 
     /** 打开任务详情页。 */
     public fun openDetail(taskId: String)

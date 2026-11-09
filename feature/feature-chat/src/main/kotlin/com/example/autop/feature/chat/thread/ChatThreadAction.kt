@@ -87,6 +87,11 @@ public sealed interface ChatThreadAction {
     public data class OpenSourceThread(
         val threadId: String,
     ) : ChatThreadAction
+
+    /** 点击步骤行的快捷入口（任务/流程详情、编辑、AI 编辑）。 */
+    public data class OpenLink(
+        val link: StepLink,
+    ) : ChatThreadAction
 }
 
 /** ViewModel → 导航的一次性事件（[com.example.autop.feature.chat.ChatNavigator] 执行）。 */
@@ -105,5 +110,10 @@ public sealed interface ChatNavEvent {
     /** "导出日志"：导出文本已组装好，由 app 写缓存文件并拉起系统分享（N175）。 */
     public data class ExportLog(
         val text: String,
+    ) : ChatNavEvent
+
+    /** 步骤行的快捷入口：由 app 按 [StepLink.kind] 跳任务/流程页面。 */
+    public data class OpenLink(
+        val link: StepLink,
     ) : ChatNavEvent
 }

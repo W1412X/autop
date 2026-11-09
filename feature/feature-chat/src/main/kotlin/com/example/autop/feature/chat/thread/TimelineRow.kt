@@ -74,8 +74,19 @@ internal fun TimelineRow(
             AssistantTextRow(item = item, onLongClick = longPress, seq = seq, onAction = onAction, modifier = modifier)
         is TimelineItem.ThinkingBlock -> ThinkingRow(item = item, modifier = modifier)
         is TimelineItem.PlanCard -> PlanRow(item = item, modifier = modifier)
-        is TimelineItem.StepRow -> StepRowView(step = item, onLongClick = longPress, modifier = modifier)
-        is TimelineItem.StepGroup -> StepGroupRow(group = item, modifier = modifier)
+        is TimelineItem.StepRow ->
+            StepRowView(
+                step = item,
+                onLongClick = longPress,
+                modifier = modifier,
+                onLinkClick = { link -> onAction(ChatThreadAction.OpenLink(link)) },
+            )
+        is TimelineItem.StepGroup ->
+            StepGroupRow(
+                group = item,
+                modifier = modifier,
+                onLinkClick = { link -> onAction(ChatThreadAction.OpenLink(link)) },
+            )
         is TimelineItem.Banner -> BannerRow(banner = item, onAction = onAction, modifier = modifier)
         is TimelineItem.RunMeta ->
             RunMetaRow(result = item, copyText = item.summary, seq = seq, onAction = onAction, modifier = modifier)

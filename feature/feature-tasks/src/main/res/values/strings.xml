@@ -191,6 +191,8 @@
 
     <!-- AI 创建任务 -->
     <string name="task_author_title">AI 创建任务</string>
+    <string name="task_author_title_edit">AI 修改任务</string>
+    <string name="task_author_save_edit">保存</string>
     <string name="task_author_intro">说说你想让手机自动做什么、什么时候做，我来生成任务草稿</string>
     <string name="task_author_examples_title">可以试试这些：</string>
     <string name="task_author_example_remind">每天早上 8 点提醒我看日程</string>

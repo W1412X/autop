@@ -21,6 +21,10 @@ import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
 import com.example.autop.agent.protocol.displayTextOf
 import com.example.autop.llm.Block
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /** 读类工具：连续成功时折叠为 [TimelineItem.StepGroup]（docs/tech/08 §4.2）。 */
 internal val READ_TOOLS: Set<String> = setOf("observe", "screenshot")
@@ -226,6 +230,7 @@ private fun applyToolResult(
                     .firstOrNull()
                     ?.fileRef,
             progressText = null,
+            links = linksOf(payload.data),
         )
     val entry = TimelineEntry(step, event.seq, forkable = unpaired <= 1)
     if (index >= 0) {
@@ -325,6 +330,30 @@ private fun appendStream(
         entries.add(TimelineEntry(new, seq = null, forkable = false))
     }
 }
+
+/** 工具结果 `data.links` → 快捷入口（宽松解析：结构不对的条目跳过，不影响时间线）。 */
+private fun linksOf(data: JsonElement?): List<StepLink> {
+    val array = (data as? JsonObject)?.get("links") as? JsonArray ?: return emptyList()
+    return array
+        .mapNotNull { (it as? JsonObject)?.toStepLink() }
+        .distinctBy { listOf(it.kind, it.taskId, it.flowId, it.draftId) }
+        .take(MAX_LINK_COUNT)
+}
+
+private fun JsonObject.toStepLink(): StepLink? {
+    val kind = text("kind") ?: return null
+    return StepLink(
+        kind = kind,
+        label = text("label"),
+        taskId = text("taskId"),
+        flowId = text("flowId"),
+        draftId = text("draftId"),
+    )
+}
+
+private fun JsonObject.text(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
+
+private const val MAX_LINK_COUNT: Int = 4
 
 private fun applyToolProgress(
     entries: MutableList<TimelineEntry>,

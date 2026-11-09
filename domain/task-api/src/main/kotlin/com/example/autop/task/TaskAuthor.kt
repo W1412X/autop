@@ -6,6 +6,7 @@
 package com.example.autop.task
 
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.TaskId
 import com.example.autop.flow.AuthorLive
 import com.example.autop.flow.AuthorMessage
 import kotlinx.coroutines.flow.StateFlow
@@ -46,6 +47,8 @@ public data class TaskAuthorState(
     /** 等待用户回答的问题。 */
     val pendingQuestion: AuthorMessage.Question? = null,
     val errorCode: String? = null,
+    /** 正在修改已有任务（保存时更新该任务而不是新建）。 */
+    val editing: Boolean = false,
 )
 
 /** 一个任务创作会话。 */
@@ -61,12 +64,12 @@ public interface TaskAuthorSession {
     /** 取消本轮（挂起的提问/工具调用立即收尾）。 */
     public fun cancel()
 
-    /** 确认草稿并创建任务。 */
+    /** 确认草稿：新建任务，或更新 [TaskAuthorState.editing] 对应的既有任务。 */
     public suspend fun save(): Outcome<Task>
 }
 
 /** 任务创作入口。 */
 public interface TaskAuthor {
-    /** 打开一个新会话。 */
-    public fun open(): TaskAuthorSession
+    /** 打开一个新会话；[taskId] 非空时基于该任务修改。 */
+    public suspend fun open(taskId: TaskId? = null): TaskAuthorSession
 }

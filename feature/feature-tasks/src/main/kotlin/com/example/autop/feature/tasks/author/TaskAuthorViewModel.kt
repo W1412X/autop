@@ -3,9 +3,13 @@
  */
 package com.example.autop.feature.tasks.author
 
+import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.TaskId
+import com.example.autop.feature.tasks.NEW_TASK_ID
+import com.example.autop.feature.tasks.TASK_ID_ARG
 import com.example.autop.feature.tasks.TasksNavigator
 import com.example.autop.task.TaskAuthor
 import com.example.autop.task.TaskAuthorSession
@@ -49,8 +53,10 @@ public sealed interface TaskAuthorAction {
 public class TaskAuthorViewModel
     @Inject
     constructor(
+        savedStateHandle: SavedStateHandle,
         private val author: TaskAuthor,
     ) : ViewModel() {
+        private val taskId: String? = savedStateHandle.get<String>(TASK_ID_ARG)?.takeIf { it != NEW_TASK_ID }
         private val _uiState = MutableStateFlow(TaskAuthorUiState())
         public val uiState: StateFlow<TaskAuthorUiState> = _uiState
         private var session: TaskAuthorSession? = null
@@ -58,7 +64,7 @@ public class TaskAuthorViewModel
 
         init {
             viewModelScope.launch {
-                val s = author.open()
+                val s = author.open(taskId?.let(::TaskId))
                 session = s
                 s.state.collect { st -> _uiState.update { it.copy(author = st) } }
             }

@@ -94,16 +94,86 @@ internal class TaskAuthorDeps(
 internal class TaskAuthorImpl(
     private val d: TaskAuthorDeps,
 ) : TaskAuthor {
-    override fun open(): TaskAuthorSession = TaskAuthorSessionImpl(d)
+    override suspend fun open(taskId: TaskId?): TaskAuthorSession {
+        val base = taskId?.let { d.tasks.get(it) }
+        return TaskAuthorSessionImpl(
+            d = d,
+            base = base,
+            initialDraft = base?.let { toDraft(it) },
+            missing = taskId != null && base == null,
+        )
+    }
+
+    /** 既有任务 → 可编辑草稿（流程名回填，触发器还原为创作字段口径）。 */
+    private suspend fun toDraft(task: Task): TaskDraft {
+        var triggerType = "manual"
+        var at: String? = null
+        var cron: String? = null
+        var timezone: String? = null
+        var source: String? = null
+        var condition: String? = null
+        when (val trigger = task.trigger) {
+            Trigger.Manual -> Unit
+            is Trigger.Schedule ->
+                when (val spec = trigger.spec) {
+                    is ScheduleSpec.Once -> {
+                        triggerType = "once"
+                        at = Instant.ofEpochMilli(spec.atMillis).atZone(ZoneId.systemDefault()).format(TIME_FORMAT)
+                    }
+                    is ScheduleSpec.Cron -> {
+                        triggerType = "cron"
+                        cron = spec.expr
+                        timezone = spec.zoneId
+                    }
+                }
+            is Trigger.Condition -> {
+                triggerType = "condition"
+                source = trigger.sourceId
+                condition = trigger.llmCondition
+            }
+        }
+        return TaskDraft(
+            name = task.name,
+            goal = task.goal,
+            triggerType = triggerType,
+            at = at,
+            cron = cron,
+            timezone = timezone,
+            source = source,
+            condition = condition,
+            executorFlow =
+                task.flow?.let {
+                    d.flows
+                        .get(it.flowId)
+                        ?.definition
+                        ?.name
+                },
+            needsScreen = task.needsScreen,
+        )
+    }
+
+    private companion object {
+        val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
+    }
 }
 
-/** 一个任务创作会话。 */
+/** 一个任务创作会话（[base] 非空时保存为更新）。 */
 internal class TaskAuthorSessionImpl(
     private val d: TaskAuthorDeps,
+    private val base: Task? = null,
+    initialDraft: TaskDraft? = null,
+    missing: Boolean = false,
 ) : TaskAuthorSession {
     private val json = AutopJson.default
     private val conversation = mutableListOf<Msg>()
-    private val _state = MutableStateFlow(TaskAuthorState())
+    private val _state =
+        MutableStateFlow(
+            TaskAuthorState(
+                draft = initialDraft,
+                editing = base != null,
+                errorCode = if (missing) TaskErrorCodes.NOT_FOUND else null,
+            ),
+        )
     override val state: StateFlow<TaskAuthorState> = _state.asStateFlow()
     private val mutex = Mutex()
     private var answerGate: CompletableDeferred<String>? = null
@@ -150,7 +220,7 @@ internal class TaskAuthorSessionImpl(
             state.value.draft
                 ?: return Outcome.Err(AppError(code = TaskErrorCodes.INVALID, message = "no draft to save"))
         val task =
-            when (val built = assemble(draft)) {
+            when (val built = assemble(draft, base)) {
                 is Outcome.Ok -> built.value
                 is Outcome.Err -> return built
             }
@@ -205,6 +275,10 @@ internal class TaskAuthorSessionImpl(
                 add(SystemPart(render(SYSTEM, emptyMap())))
                 add(SystemPart(render(OUTPUT, mapOf("lang" to languageLabel()))))
                 add(SystemPart(render(SPEC, emptyMap())))
+                base?.let { task ->
+                    val taskJson = json.encodeToString(Task.serializer(), task)
+                    add(SystemPart(render(EDIT_CONTEXT, mapOf("task" to taskJson))))
+                }
                 resolver.staticToolList(schemas)?.let { add(SystemPart(it)) }
             }
         return TaskPipeline(provider, nativeTools, resolver, builder, system, schemas)
@@ -389,9 +463,12 @@ internal class TaskAuthorSessionImpl(
             }
         }
 
-    /** 草稿 → 待保存 [Task]（触发器解析 + 流程绑定）。 */
-    private suspend fun assemble(draft: TaskDraft): Outcome<Task> {
-        val trigger = buildTrigger(draft)
+    /** 草稿 → 待保存 [Task]（触发器解析 + 流程绑定）；[base] 非空时只覆盖可编辑字段。 */
+    private suspend fun assemble(
+        draft: TaskDraft,
+        base: Task?,
+    ): Outcome<Task> {
+        val trigger = buildTrigger(draft, base?.trigger)
         if (trigger == null) {
             return Outcome.Err(
                 AppError(code = TaskErrorCodes.INVALID, message = "trigger 无法装配（at/cron/source 不合法）"),
@@ -403,8 +480,18 @@ internal class TaskAuthorSessionImpl(
             return Outcome.Err(AppError(code = TaskErrorCodes.INVALID, message = "找不到流程：$flowName"))
         }
         val now = d.clock.nowMillis()
+        val edited =
+            base?.copy(
+                name = draft.name.trim(),
+                goal = goalOf(draft),
+                trigger = trigger,
+                needsScreen = draft.needsScreen,
+                executor = if (flow != null) TaskExecutor.FLOW else TaskExecutor.AGENT,
+                flow = flow?.let { FlowBinding(FlowId(it.definition.id)) },
+                updatedAt = now,
+            )
         return Outcome.Ok(
-            Task(
+            edited ?: Task(
                 id = TaskId(d.ids.newId()),
                 name = draft.name.trim(),
                 goal = goalOf(draft),
@@ -424,7 +511,10 @@ internal class TaskAuthorSessionImpl(
         return if (hint.isEmpty()) draft.goal.trim() else draft.goal.trim() + "\n" + hint
     }
 
-    private fun buildTrigger(draft: TaskDraft): Trigger? =
+    private fun buildTrigger(
+        draft: TaskDraft,
+        base: Trigger?,
+    ): Trigger? =
         when (draft.triggerType.trim()) {
             "manual" -> Trigger.Manual
             "once" ->
@@ -441,20 +531,25 @@ internal class TaskAuthorSessionImpl(
                     Trigger.Schedule(ScheduleSpec.Cron(expr, zone))
                 }
             }
-            "condition" -> conditionTrigger(draft)
+            "condition" -> conditionTrigger(draft, base)
             else -> null
         }
 
-    private fun conditionTrigger(draft: TaskDraft): Trigger? {
+    /** 条件触发：同一事件源沿用原冷却与每日上限，避免编辑时被默认值覆盖。 */
+    private fun conditionTrigger(
+        draft: TaskDraft,
+        base: Trigger?,
+    ): Trigger? {
         val source = draft.source?.trim().orEmpty()
         val condition = draft.condition?.trim().orEmpty()
         if (source.isEmpty() || condition.isEmpty() || source !in sourceIds) return null
+        val previous = base as? Trigger.Condition
         return Trigger.Condition(
             sourceId = source,
-            filter = FilterGroup(GroupMode.ALL, emptyList()),
+            filter = previous?.takeIf { it.sourceId == source }?.filter ?: FilterGroup(GroupMode.ALL, emptyList()),
             llmCondition = condition,
-            cooldownMs = DEFAULT_COOLDOWN_MS,
-            dailyLimit = DEFAULT_DAILY_LIMIT,
+            cooldownMs = previous?.takeIf { it.sourceId == source }?.cooldownMs ?: DEFAULT_COOLDOWN_MS,
+            dailyLimit = previous?.takeIf { it.sourceId == source }?.dailyLimit ?: DEFAULT_DAILY_LIMIT,
         )
     }
 
@@ -495,6 +590,7 @@ internal class TaskAuthorSessionImpl(
         val SELF_REPORTING = setOf("ask_user", "inspect_screen")
         const val SYSTEM = "task.author.system"
         const val SPEC = "task.author.spec"
+        const val EDIT_CONTEXT = "task.author.edit_context"
         const val OUTPUT = "agent.system.output"
         const val MAX_OUTPUT = 8192
         const val ERROR_TOO_LONG = "task.author_too_long"

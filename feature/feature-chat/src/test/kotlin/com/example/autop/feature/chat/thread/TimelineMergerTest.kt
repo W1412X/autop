@@ -21,6 +21,9 @@ import com.example.autop.llm.Block
 import com.example.autop.llm.StopReason
 import com.example.autop.llm.Usage
 import com.google.common.truth.Truth.assertThat
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import org.junit.Test
 
@@ -224,6 +227,64 @@ class TimelineMergerTest {
             .isEqualTo("$TOOL_MARK_NOTE\n\n$xmlMark")
     }
 
+    @Test
+    fun `tool result links become step jump chips`() {
+        val data =
+            buildJsonObject {
+                put(
+                    "links",
+                    buildJsonArray {
+                        add(
+                            buildJsonObject {
+                                put("kind", JsonPrimitive("task_detail"))
+                                put("taskId", JsonPrimitive("t1"))
+                                put("label", JsonPrimitive("早报任务"))
+                            },
+                        )
+                        add(
+                            buildJsonObject {
+                                put("kind", JsonPrimitive("task_edit"))
+                                put("taskId", JsonPrimitive("t1"))
+                            },
+                        )
+                        add(
+                            buildJsonObject {
+                                put("kind", JsonPrimitive("task_detail"))
+                                put("taskId", JsonPrimitive("t1"))
+                            },
+                        )
+                    },
+                )
+            }
+        val history =
+            listOf(
+                event(1, assistant(toolCall("c1", "list_tasks"))),
+                event(2, toolResult("c1", "list_tasks", data = data)),
+            )
+
+        val row = mergeTimeline(history, emptyList(), GROUP_THRESHOLD).single().item as TimelineItem.StepRow
+
+        assertThat(row.links.map { it.kind }).containsExactly("task_detail", "task_edit").inOrder()
+        assertThat(row.links.first().label).isEqualTo("早报任务")
+        assertThat(row.links.first().taskId).isEqualTo("t1")
+    }
+
+    @Test
+    fun `malformed tool data yields no links`() {
+        val history =
+            listOf(
+                event(1, assistant(toolCall("c1", "list_tasks"))),
+                event(
+                    2,
+                    toolResult("c1", "list_tasks", data = buildJsonObject { put("links", JsonPrimitive("oops")) }),
+                ),
+            )
+
+        val row = mergeTimeline(history, emptyList(), GROUP_THRESHOLD).single().item as TimelineItem.StepRow
+
+        assertThat(row.links).isEmpty()
+    }
+
     private companion object {
         const val GROUP_THRESHOLD = 3
     }
@@ -261,12 +322,14 @@ private fun toolResult(
     callId: String,
     tool: String,
     ok: Boolean = true,
+    data: JsonElement? = null,
 ): EventPayload =
     ToolResultEvent(
         callId = callId,
         toolId = tool,
         ok = ok,
         blocks = listOf(Block.Text("ok")),
+        data = data,
         durationMs = 100,
     )
 

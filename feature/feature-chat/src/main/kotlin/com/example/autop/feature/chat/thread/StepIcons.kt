@@ -28,6 +28,9 @@ private val TOOL_ICONS: Map<StepLabel, ImageVector> =
         StepLabel.DEVICE_STATE to AutopIcons.PhoneAndroid,
         StepLabel.CLIPBOARD_GET to AutopIcons.ContentPaste,
         StepLabel.CLIPBOARD_SET to AutopIcons.ContentPaste,
+        StepLabel.LIST_TASKS to AutopIcons.ListAlt,
+        StepLabel.CREATE_TASK to AutopIcons.Add,
+        StepLabel.UPDATE_TASK to AutopIcons.Edit,
     )
 
 /** 状态图标（行尾小标：运行中 / 成功 / 失败）。 */

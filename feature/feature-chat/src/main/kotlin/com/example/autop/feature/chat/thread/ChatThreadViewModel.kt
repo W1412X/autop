@@ -171,6 +171,8 @@ public class ChatThreadViewModel
                 ChatThreadAction.ConfirmDelete -> deleteThread()
                 is ChatThreadAction.OpenSourceThread ->
                     viewModelScope.launch { navChannel.send(ChatNavEvent.ReplaceThread(action.threadId)) }
+                is ChatThreadAction.OpenLink ->
+                    viewModelScope.launch { navChannel.send(ChatNavEvent.OpenLink(action.link)) }
                 else -> handleSheet(action)
             }
         }

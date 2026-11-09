@@ -5,6 +5,8 @@
  */
 package com.example.autop.feature.chat
 
+import com.example.autop.feature.chat.thread.StepLink
+
 /** 对话模块导航回调接口。 */
 public interface ChatNavigator {
     /** 打开对话页 [threadId]（`chat/thread/{threadId}`，由 app 实现）。 */
@@ -21,6 +23,9 @@ public interface ChatNavigator {
 
     /** "导出日志"（N175）：把导出文本写入缓存文件并拉起系统分享（由 app 实现，FileProvider）。 */
     public fun shareExport(text: String)
+
+    /** 步骤行快捷入口：按 [StepLink.kind] 跳任务/流程详情、编辑或 AI 编辑（由 app 映射路由）。 */
+    public fun openStepLink(link: StepLink)
 
     /** 返回上一级（`popBackStack`，由 app 实现）。 */
     public fun navigateBack()

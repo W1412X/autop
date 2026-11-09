@@ -99,7 +99,7 @@ public fun TaskAuthorScreen(
     LaunchedEffect(author.draft) {
         if (author.draft != null) {
             follow = false
-            val intro = if (author.messages.isEmpty() && author.live == null) 1 else 0
+            val intro = if (!author.editing && author.messages.isEmpty() && author.live == null) 1 else 0
             listState.animateScrollToItem(intro + author.messages.size)
         }
     }
@@ -112,11 +112,14 @@ public fun TaskAuthorScreen(
                 .imePadding(),
     ) {
         SubPageTopBar(
-            title = stringResource(R.string.task_author_title),
+            title = stringResource(if (author.editing) R.string.task_author_title_edit else R.string.task_author_title),
             onBack = { onAction(TaskAuthorAction.Back) },
             actions = {
                 AutopTonalButton(
-                    text = stringResource(R.string.task_author_save),
+                    text =
+                        stringResource(
+                            if (author.editing) R.string.task_author_save_edit else R.string.task_author_save,
+                        ),
                     onClick = { onAction(TaskAuthorAction.Save) },
                     enabled = author.draft != null && !author.busy,
                 )
@@ -128,7 +131,7 @@ public fun TaskAuthorScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.md),
             contentPadding = PaddingValues(vertical = spacing.md),
         ) {
-            if (author.messages.isEmpty() && author.live == null) item { Intro(onAction) }
+            if (author.messages.isEmpty() && author.live == null && !author.editing) item { Intro(onAction) }
             items(author.messages) { message ->
                 MessageItem(message = message, pending = author.pendingQuestion, onAction = onAction)
             }

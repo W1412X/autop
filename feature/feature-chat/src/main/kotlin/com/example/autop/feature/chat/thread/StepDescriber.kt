@@ -61,6 +61,9 @@ private val LABEL_BY_TOOL: Map<String, StepLabel> =
         "get_device_state" to StepLabel.DEVICE_STATE,
         "clipboard_get" to StepLabel.CLIPBOARD_GET,
         "clipboard_set" to StepLabel.CLIPBOARD_SET,
+        "list_tasks" to StepLabel.LIST_TASKS,
+        "create_task" to StepLabel.CREATE_TASK,
+        "update_task" to StepLabel.UPDATE_TASK,
     )
 
 /** 描述参数取值键（按优先级；值全部缺失时返回 null）。 */
@@ -75,6 +78,8 @@ private val ARG_KEYS_BY_TOOL: Map<String, List<String>> =
         "open_uri" to listOf("uri"),
         "list_apps" to listOf("query"),
         "clipboard_set" to listOf("text"),
+        "create_task" to listOf("name", "goal"),
+        "update_task" to listOf("task", "name", "goal"),
     )
 
 /** 多键逗号拼接的工具（坐标类）。 */
