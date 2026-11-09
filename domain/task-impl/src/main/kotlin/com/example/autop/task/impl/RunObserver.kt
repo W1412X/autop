@@ -123,11 +123,11 @@ public class RunObserver(
         }
     }
 
-    /** 释放句柄与事件流，清空活跃信息。 */
+    /** 释放句柄与事件流，清空活跃信息（只清自己那轮，防重叠 Run 被误清）。 */
     fun clear(runId: RunId) {
         handles.remove(runId)
         eventFlows.remove(runId)
-        _active.value = null
+        _active.update { info -> if (info?.run?.id == runId) null else info }
     }
 
     private suspend fun onEvent(

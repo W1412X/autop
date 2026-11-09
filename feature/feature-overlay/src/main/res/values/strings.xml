@@ -33,6 +33,7 @@
     <string name="panel_status_breaker">熔断停止</string>
     <string name="panel_status_stopped">已停止</string>
     <string name="panel_status_blocked">被拦截</string>
+    <string name="panel_status_cancelled">已取消</string>
 
     <!-- 圆弧菜单（docs/tech/08 §5.1，N182） -->
     <string name="ball_menu_create">即时创建</string>
@@ -111,7 +112,7 @@
     <string name="progress_tool_duration">%1$d ms</string>
     <string name="progress_outcome_succeeded">已完成</string>
     <string name="progress_outcome_failed">失败</string>
-    <string name="progress_outcome_cancelled">已中止</string>
+    <string name="progress_outcome_cancelled">已取消</string>
     <string name="progress_outcome_budget">步数用尽</string>
     <string name="progress_outcome_breaker">熔断停止</string>
     <string name="progress_outcome_interrupted">已中断</string>

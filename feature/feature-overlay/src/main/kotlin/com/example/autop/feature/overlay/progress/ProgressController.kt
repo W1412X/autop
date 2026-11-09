@@ -15,6 +15,7 @@ import androidx.compose.runtime.remember
 import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.PauseReason
+import com.example.autop.agent.RunFinished
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolResultEvent
@@ -133,6 +134,13 @@ public class ProgressController
                             launch { collectLive(runId) }
                             collectHistory(threadId)
                         }
+                    } else {
+                        // 收口后重载收尾行：确保 RunFinished 落进行列，头部回退到结束状态
+                        // 而不是「排队中」；同时作废残留的流式增量（取消后光标/半截文本）。
+                        val threadId = lastThreadState.value
+                        if (threadId != null) {
+                            rowsInput.value = RowsInput(history = threadStore.events(threadId).takeLast(MAX_EVENTS))
+                        }
                     }
                 }
         }
@@ -146,12 +154,16 @@ public class ProgressController
             }
         }
 
-        /** 落盘事件追加；助手消息/工具结果落盘即作废流式缓存（同对话页，N186）。 */
+        /** 落盘事件追加；助手消息/工具结果/Run 收口落盘即作废流式缓存（同对话页，N186）。 */
         private suspend fun collectHistory(threadId: ThreadId) {
             threadStore.observe(threadId).collect { event ->
                 rowsInput.update { input ->
                     val live =
-                        if (event.payload is AssistantMessage || event.payload is ToolResultEvent) {
+                        if (
+                            event.payload is AssistantMessage ||
+                            event.payload is ToolResultEvent ||
+                            event.payload is RunFinished
+                        ) {
                             emptyList()
                         } else {
                             input.live

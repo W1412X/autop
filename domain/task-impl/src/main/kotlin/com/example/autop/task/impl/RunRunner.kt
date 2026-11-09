@@ -101,6 +101,12 @@ public class RunRunner(
                     runBlock(record, request, flowLaunch, task, entry)
                 }
             } catch (e: CancellationException) {
+                // 取消也要收口：不 finish/clear 会让进度页永远停在「运行中」。
+                observer.finish(
+                    record.id,
+                    RunFinished(status = RunOutcome.CANCELLED, summary = null, errorCode = null),
+                )
+                observer.clear(record.id)
                 throw e
             } catch (e: Exception) {
                 logger.e(TAG, "run_crashed", "runId" to record.id.value, error = e)

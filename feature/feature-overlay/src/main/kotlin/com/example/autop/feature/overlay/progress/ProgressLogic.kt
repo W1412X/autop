@@ -257,9 +257,8 @@ internal fun statusToneOf(status: RunStatus?): StatusTone =
         RunStatus.RUNNING -> StatusTone.RUNNING
         RunStatus.PAUSED -> StatusTone.PAUSED
         RunStatus.SUCCEEDED -> StatusTone.SUCCEEDED
-        RunStatus.FAILED, RunStatus.BUDGET_EXHAUSTED, RunStatus.BREAKER_STOPPED -> StatusTone.BLOCKED
+        RunStatus.FAILED, RunStatus.BUDGET_EXHAUSTED, RunStatus.BREAKER_STOPPED, RunStatus.BLOCKED -> StatusTone.BLOCKED
         RunStatus.CANCELLED, RunStatus.EXPIRED, RunStatus.INTERRUPTED -> StatusTone.NEUTRAL
-        RunStatus.BLOCKED -> StatusTone.NEUTRAL
     }
 
 /** RunStatus → 状态徽标文案（strings 资源，自运行面板迁入，N182；N185 迁至数据映射层）。 */
@@ -273,6 +272,7 @@ internal fun statusTextOf(status: RunStatus?): Int =
         RunStatus.FAILED -> R.string.panel_status_failed
         RunStatus.BUDGET_EXHAUSTED -> R.string.panel_status_budget
         RunStatus.BREAKER_STOPPED -> R.string.panel_status_breaker
-        RunStatus.CANCELLED, RunStatus.EXPIRED, RunStatus.INTERRUPTED -> R.string.panel_status_stopped
-        RunStatus.BLOCKED -> R.string.panel_status_stopped
+        RunStatus.CANCELLED -> R.string.panel_status_cancelled
+        RunStatus.EXPIRED, RunStatus.INTERRUPTED -> R.string.panel_status_stopped
+        RunStatus.BLOCKED -> R.string.panel_status_blocked
     }
