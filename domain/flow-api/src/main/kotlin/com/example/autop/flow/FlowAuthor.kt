@@ -5,6 +5,7 @@ package com.example.autop.flow
 
 import com.example.autop.core.common.Outcome
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.serialization.json.JsonElement
 
 /** 创作对话里的一条展示消息。 */
 public sealed interface AuthorMessage {
@@ -63,6 +64,18 @@ public data class DraftInfo(
     val updatedAt: Long,
 )
 
+/** 非交互分析的输入（docs/design/flows-contracts-evidence §4.1）。 */
+public data class FlowAnalysisRequest(
+    /** 起点骨架（动作与目标），由轨迹转换生成。 */
+    val skeleton: FlowDefinition,
+    /** 证据包 JSON（逐步差异、命中元素与契约候选）。 */
+    val evidence: JsonElement,
+    /** 修订既有流程时的原流程 id。 */
+    val baseFlowId: String? = null,
+    /** 修订原因。 */
+    val reason: String? = null,
+)
+
 /** 一个创作会话。 */
 public interface FlowAuthorSession {
     public val draftId: String
@@ -99,4 +112,10 @@ public interface FlowAuthor {
     public suspend fun drafts(): List<DraftInfo>
 
     public suspend fun deleteDraft(draftId: String)
+
+    /**
+     * 非交互分析（§4.1）：用证据与骨架驱动创作循环产出待确认草稿，返回 draftId。
+     * 不向用户提问；无法决定的点由模型写进草稿说明。
+     */
+    public suspend fun analyze(request: FlowAnalysisRequest): Outcome<String>
 }

@@ -59,11 +59,14 @@ internal class ExternalNodes(
                 return Attempt.Failed(r.errorCode ?: FlowErrorCodes.ARGS_INVALID, detail, args)
             }
             if (expect != null && !env.verifier.await(expect, frame, before)) {
-                return Attempt.Failed(
-                    FlowErrorCodes.ACTION_NO_EFFECT,
-                    "动作已执行，但未出现预期效果：${expect.kind.name}",
-                    args,
-                )
+                // 结果契约（cond）不成立与"动作没效果"分开记错误码（§8）。
+                val code = if (expect.cond != null) FlowErrorCodes.CONTRACT_UNMET else FlowErrorCodes.ACTION_NO_EFFECT
+                val message = if (expect.cond != null) "结果契约不成立" else "动作已执行，但未出现预期效果：${expect.kind.name}"
+                return Attempt.Failed(code, message, args)
+            }
+            // 结果契约缺失的写屏幕节点只能算"未验证"（§7.2），执行记录里留痕。
+            if (expect == null && access == ToolAccess.WRITE_SCREEN) {
+                env.ports.trace.log("info", "node=${node.id} contract=none verified=false")
             }
             val out =
                 JsonObject(

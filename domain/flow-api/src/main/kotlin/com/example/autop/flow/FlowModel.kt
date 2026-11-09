@@ -151,6 +151,11 @@ public data class Expect(
     @SerialName("app") val app: String? = null,
     /** null = 使用 `flow.recovery.verifyTimeoutMs`。 */
     @SerialName("timeoutMs") val timeoutMs: Long? = null,
+    /**
+     * 任意条件契约（结果契约，docs/design/flows-contracts-evidence §7.1）：
+     * 非空时优先于 [kind]；[kind] 保留兼容旧流程（可转换为等价条件）。
+     */
+    @SerialName("cond") val cond: Condition? = null,
 )
 
 /** 节点的锚点：恢复后用于判断是否回到了原来的页面。 */
@@ -187,6 +192,11 @@ public data class Precondition(
     @SerialName("timeoutMs") val timeoutMs: Long? = null,
     /** 失败说明；支持模板。 */
     @SerialName("message") val message: String? = null,
+    /**
+     * 是否允许继承上一步的结果契约作前置（docs/design/flows-contracts-evidence §7.2）：
+     * 为真且本节点没写 `pre` 时，生效前置默认取同列表上一个工具节点的结果契约。
+     */
+    @SerialName("inherit") val inherit: Boolean = true,
 )
 
 /** 重试策略：PLAIN 为原地重复执行；ESCALATE 按恢复阶梯逐级升级。 */

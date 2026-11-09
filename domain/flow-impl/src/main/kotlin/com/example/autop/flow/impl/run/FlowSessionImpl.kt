@@ -180,6 +180,7 @@ internal class FlowSessionImpl(
             flowCfg[FlowConfig.AGENT],
             flowCfg[FlowConfig.RECOVERY],
             flowCfg[FlowConfig.PRECONDITION],
+            flowCfg[FlowConfig.CONTRACT],
         )
     }
 

@@ -11,12 +11,17 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.ToolSpec
+import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.FlowConfig
+import com.example.autop.flow.FlowAnalysisRequest
+import com.example.autop.flow.FlowAuthor
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.core.author.TrajectoryConverter
+import com.example.autop.flow.core.evidence.EvidenceExtractor
+import com.example.autop.flow.core.evidence.EvidencePack
 import com.example.autop.flow.impl.author.FlowDraftWriter
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
@@ -31,6 +36,7 @@ public class SaveAsFlowTool
     internal constructor(
         private val threads: ThreadStore,
         private val writer: FlowDraftWriter,
+        private val author: FlowAuthor,
         private val ids: IdGenerator,
         private val configProvider: ConfigProvider,
     ) : Tool {
@@ -47,9 +53,9 @@ public class SaveAsFlowTool
             val name = (args["name"] as? JsonPrimitive)?.content?.trim().orEmpty()
             if (name.isEmpty()) return failure(FlowErrorCodes.ARGS_INVALID, "需要 name 参数", "给流程起一个简短的名称")
             val description = (args["description"] as? JsonPrimitive)?.content.orEmpty()
+            val events = threads.events(ctx.threadId, 0, Long.MAX_VALUE)
             val steps =
-                threads
-                    .events(ctx.threadId, 0, Long.MAX_VALUE)
+                events
                     .filter { it.runId == ctx.runId }
                     .mapNotNull { (it.payload as? ToolResultEvent)?.takeIf { r -> r.ok }?.replay }
             val save = configProvider.current()[FlowConfig.SAVE]
@@ -65,19 +71,27 @@ public class SaveAsFlowTool
             if (definition.steps.isEmpty()) {
                 return failure(FlowErrorCodes.INVALID, "本次运行没有可以保存为流程的操作", "只有成功执行的界面操作会被保存")
             }
-            return when (val saved = writer.save(definition)) {
-                is Outcome.Err -> failure(saved.error.code, saved.error.message, saved.error.hint)
-                is Outcome.Ok ->
-                    ToolOutput(
-                        ok = true,
-                        content =
-                            listOf(
-                                Block.Text(
-                                    "已生成待确认的流程草稿「$name」(draftId=${saved.value})。用户在“流程”页确认后即可使用。",
-                                ),
-                            ),
-                        data = draftData(saved.value),
-                    )
-            }
+            val pack = EvidenceExtractor().extract(listOf(evidenceStepsOf(events, ctx.runId)))
+            // 统一创作入口（§4.1）：证据 + 骨架驱动创作循环产出草稿；失败保底直接存骨架。
+            val packJson = AutopJson.default.encodeToJsonElement(EvidencePack.serializer(), pack)
+            val draftId =
+                when (val analyzed = author.analyze(FlowAnalysisRequest(skeleton = definition, evidence = packJson))) {
+                    is Outcome.Ok -> analyzed.value
+                    is Outcome.Err ->
+                        when (val saved = writer.save(definition)) {
+                            is Outcome.Ok -> saved.value
+                            is Outcome.Err -> return failure(saved.error.code, saved.error.message, saved.error.hint)
+                        }
+                }
+            return ToolOutput(
+                ok = true,
+                content =
+                    listOf(
+                        Block.Text(
+                            "已生成待确认的流程草稿「$name」(draftId=$draftId)。用户在“流程”页确认后即可使用。",
+                        ),
+                    ),
+                data = withEvidence(draftData(draftId), pack),
+            )
         }
     }

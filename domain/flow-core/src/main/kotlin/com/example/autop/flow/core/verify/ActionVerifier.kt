@@ -1,18 +1,20 @@
 /**
- * 动作效果校验（docs/design/flows-recording-recovery.md R3）。
+ * 动作效果校验（docs/design/flows-recording-recovery.md R3、flows-contracts-evidence §7.1）。
  *
- * 动作执行后轮询屏幕，直到期望出现或超时。期望来自节点 `expect`；未写时按
- * `settings.verify` 与 `flow.recovery.verifyTools` 决定是否做“屏幕是否变化”的弱校验。
+ * 动作执行后轮询屏幕，直到期望出现或超时。期望来自节点 `expect`（`cond` 优先于 `kind`）；
+ * 未写时按 `settings.verify` 与 `flow.recovery.verifyTools` 决定是否做“屏幕是否变化”的弱校验。
  */
 package com.example.autop.flow.core.verify
 
 import com.example.autop.agent.ToolAccess
+import com.example.autop.core.config.FlowContractSection
 import com.example.autop.core.config.FlowRecoverySection
 import com.example.autop.device.ScreenModel
 import com.example.autop.flow.Expect
 import com.example.autop.flow.ExpectKind
 import com.example.autop.flow.ToolNode
 import com.example.autop.flow.VerifyMode
+import com.example.autop.flow.core.ConditionEvaluator
 import com.example.autop.flow.core.FlowPorts
 import com.example.autop.flow.core.Frame
 import com.example.autop.flow.core.ScreenService
@@ -24,6 +26,8 @@ internal class ActionVerifier(
     private val ports: FlowPorts,
     private val screens: ScreenService,
     private val cfg: FlowRecoverySection,
+    private val conditions: ConditionEvaluator,
+    private val contractCfg: FlowContractSection,
 ) {
     /** 动作前的屏幕指纹（强制重新观测）。 */
     suspend fun fingerprint(frame: Frame): Int {
@@ -38,7 +42,11 @@ internal class ActionVerifier(
         access: ToolAccess?,
     ): Expect? {
         val explicit = node.expect
-        if (explicit != null) return if (explicit.kind == ExpectKind.NONE) null else explicit
+        if (explicit != null) {
+            // cond 是状态契约（§7.1）：受 flow.contract.enabled 总开关控制。
+            if (explicit.cond != null) return if (contractCfg.enabled) explicit else null
+            return if (explicit.kind == ExpectKind.NONE) null else explicit
+        }
         return autoExpect(node, frame, access)
     }
 
@@ -76,6 +84,8 @@ internal class ActionVerifier(
         frame: Frame,
         before: Int?,
     ): Boolean {
+        // 状态契约（cond）优先于 kind：条件成立即到达目标状态（§7.1）。
+        expect.cond?.let { return conditions.detail(it, frame).ok }
         val mode = frame.flow.settings.observeMode
         val screen = screens.screen(null, mode, force = true).screen
         return when (expect.kind) {

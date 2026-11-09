@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "flow": {
     "run": {
       "pollMs": 500,
@@ -30,7 +30,15 @@
       "maxDetailRowsPerRun": 0
     },
     "author": {
-      "maxTurns": 30
+      "maxTurns": 30,
+      "analysis": {
+        "maxTurns": 8,
+        "role": "main"
+      }
+    },
+    "contract": {
+      "enabled": true,
+      "inherit": true
     },
     "recovery": {
       "enabled": true,

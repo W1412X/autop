@@ -9,6 +9,7 @@ import com.example.autop.agent.PauseReason
 import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolControl
 import com.example.autop.core.config.FlowAgentSection
+import com.example.autop.core.config.FlowContractSection
 import com.example.autop.core.config.FlowLlmSection
 import com.example.autop.core.config.FlowPreconditionSection
 import com.example.autop.core.config.FlowRecoverySection
@@ -22,6 +23,7 @@ import com.example.autop.device.ScreenNode
 import com.example.autop.device.ScreenQuality
 import com.example.autop.device.ScreenWindow
 import com.example.autop.flow.Condition
+import com.example.autop.flow.Expect
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowSettings
 import com.example.autop.flow.Node
@@ -93,6 +95,9 @@ internal class FlowTestHarness {
 
     /** 工具调用时的钩子（模拟运行中应用修订）。 */
     var onToolCall: (suspend (String) -> Unit)? = null
+
+    /** 节点开始前的钩子（模拟节点之间的屏幕变化）。 */
+    var onBeforeNode: ((String) -> Unit)? = null
 
     /** 最近一次运行的解释器（用于运行中调用 applyPatch）。 */
     var lastInterpreter: FlowInterpreter? = null
@@ -221,7 +226,9 @@ internal class FlowTestHarness {
                     override suspend fun beforeNode(
                         nodeId: String,
                         nodeName: String?,
-                    ) = Unit
+                    ) {
+                        onBeforeNode?.invoke(nodeId)
+                    }
 
                     override suspend fun pauseOnFailure(
                         reason: PauseReason,
@@ -264,17 +271,20 @@ internal class FlowTestHarness {
         settings: FlowSettings = FlowSettings(),
         precondition: FlowPreconditionSection = FlowPreconditionSection(pollMs = 50),
         recovery: FlowRecoverySection = FlowRecoverySection(),
+        contract: FlowContractSection = FlowContractSection(),
     ): FlowRunResult {
         val flow = FlowDefinition(id = "f1", name = "t", steps = steps, settings = settings)
         return runBlocking {
             val interpreter =
                 FlowInterpreter(
                     ports,
-                    FlowRunSection(),
+                    // 关掉观测缓存：测试会在节点之间改 screenText，缓存会把变化吞掉。
+                    FlowRunSection(observeCacheMs = 0),
                     FlowLlmSection(),
                     FlowAgentSection(),
                     recovery,
                     precondition,
+                    contract,
                 )
             lastInterpreter = interpreter
             interpreter.run(FlowRunInput("r1", flow, JsonObject(emptyMap()), JsonObject(emptyMap()), null, "manual"))
@@ -287,12 +297,14 @@ internal class FlowTestHarness {
         text: String = "x",
         pre: Precondition? = null,
         onFail: OnFail? = null,
+        expect: Expect? = null,
     ) = ToolNode(
         id = id,
         tool = "say",
         args = JsonObject(mapOf("text" to JsonPrimitive(text))),
         pre = pre,
         onFail = onFail,
+        expect = expect,
     )
 
     /** 单独求值一个条件，取明细。 */

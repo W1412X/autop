@@ -1,8 +1,10 @@
-@file:Suppress("CyclomaticComplexMethod") // 节点类型分发表：一个类型一个分支
+@file:Suppress("LongParameterList", "CyclomaticComplexMethod")
+// 参数面按解释器装配；分发表一个节点类型一个分支
 
 package com.example.autop.flow.core
 
 import com.example.autop.core.config.FlowAgentSection
+import com.example.autop.core.config.FlowContractSection
 import com.example.autop.core.config.FlowLlmSection
 import com.example.autop.core.config.FlowRecoverySection
 import com.example.autop.core.config.FlowRunSection
@@ -15,6 +17,7 @@ import com.example.autop.flow.ConfirmTimeout
 import com.example.autop.flow.ContinueNode
 import com.example.autop.flow.DelayRange
 import com.example.autop.flow.EndNode
+import com.example.autop.flow.Expect
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.IfNode
@@ -67,9 +70,10 @@ internal class NodeEnv(
     val input: FlowRunInput,
     val host: NodeHost,
     val recoveryCfg: FlowRecoverySection,
+    val contractCfg: FlowContractSection,
 ) {
     val hints = RecoveryHints()
-    val verifier = ActionVerifier(ports, screens, recoveryCfg)
+    val verifier = ActionVerifier(ports, screens, recoveryCfg, conditions, contractCfg)
     val recovery = RecoveryRunner(RecoveryCatalog.builtin(), ports, screens, recoveryCfg, hints)
 
     /** 渲染 JSON 对象里的全部模板。 */
@@ -104,8 +108,10 @@ internal class NodeRunner(
     input: FlowRunInput,
     host: NodeHost,
     recoveryCfg: FlowRecoverySection,
+    contractCfg: FlowContractSection,
 ) {
-    private val env = NodeEnv(ports, runCfg, llmCfg, agentCfg, screens, conditions, tokens, input, host, recoveryCfg)
+    private val env =
+        NodeEnv(ports, runCfg, llmCfg, agentCfg, screens, conditions, tokens, input, host, recoveryCfg, contractCfg)
     private val control = ControlNodes(env)
     private val screenNodes = ScreenNodes(env)
     private val external = ExternalNodes(env)
@@ -155,6 +161,22 @@ internal class NodeRunner(
         val ms = env.rangeMs(range)
         if (ms > 0) delay(ms)
     }
+
+    /** 节点的生效期望（显式 expect 或弱校验派生）；null = 不校验。 */
+    fun expectOf(
+        node: ToolNode,
+        frame: Frame,
+    ): Expect? = env.verifier.expectFor(node, frame, env.ports.tools.accessOf(node.tool))
+
+    /** 交回后复核期望是否成立（与执行期同一套轮询判定）。 */
+    suspend fun verifyExpect(
+        expect: Expect,
+        frame: Frame,
+        before: Int?,
+    ): Boolean = env.verifier.await(expect, frame, before)
+
+    /** 复核前采一个屏幕指纹（SCREEN_CHANGED 期望的比较基准）。 */
+    suspend fun fingerprint(frame: Frame): Int = env.verifier.fingerprint(frame)
 
     /** 执行一次尝试；受控错误转为 [Attempt.Failed]。 */
     suspend fun perform(

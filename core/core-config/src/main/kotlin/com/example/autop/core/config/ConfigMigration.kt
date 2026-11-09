@@ -22,11 +22,12 @@ public data class ConfigMigration(
 )
 
 /** 配置（用户覆盖）文件的当前 schemaVersion。 */
-public const val CURRENT_SCHEMA_VERSION: Int = 2
+public const val CURRENT_SCHEMA_VERSION: Int = 3
 
 /**
  * 内置迁移链：v2 删除屏幕观测 v4 不再使用的配置键（docs/design/
- * observation-modes-coordinate-actions §7）。
+ * observation-modes-coordinate-actions §7）；v2→v3 只新增配置段
+ * （flow.contract 等，docs/design/flows-contracts-evidence §8），覆盖文件无需改写。
  */
 public fun builtinConfigMigrations(): List<ConfigMigration> =
     listOf(
@@ -34,6 +35,7 @@ public fun builtinConfigMigrations(): List<ConfigMigration> =
             val cleaned = DELETE_PATHS_V2.fold(doc) { acc, path -> removePath(acc, path) }
             filterAgentTools(cleaned)
         },
+        ConfigMigration(from = 2, to = 3) { doc -> doc },
     )
 
 /** v2 删除的配置路径。 */

@@ -5,7 +5,7 @@ plugins {
 
 dependencies {
     api(project(":domain:flow-api"))
-    // 屏幕树类型（ScreenModel/ScreenNode）：解析 observe 工具输出、匹配目标。
+    // 屏幕树类型（ScreenModel/ScreenNode）与节点差异集合（nodeDiffSets）：证据层与目标匹配。
     api(project(":domain:device-api"))
     implementation(project(":core:core-common"))
     implementation(project(":core:core-config"))

@@ -56,4 +56,38 @@ class HandoffGoalVarsTest {
         assertThat(vars["flowName"]).isEmpty()
         assertThat(vars["screen"]).isEmpty()
     }
+
+    @Test
+    fun `vars cover every variable of the reach state template`() {
+        val ctx =
+            context.copy(
+                targetState = "页面文字 contains 「已发送」",
+                instruction = "不要执行该步骤本身的操作",
+            )
+        val vars = reachStateVars("n3", ctx)
+        assertThat(vars.keys)
+            .containsExactly(
+                "nodeId",
+                "nodeName",
+                "flowName",
+                "targetState",
+                "instruction",
+                "failure",
+                "precondition",
+                "executed",
+                "tried",
+                "screen",
+            )
+        assertThat(vars["targetState"]).contains("已发送")
+        assertThat(vars["instruction"]).contains("不要执行")
+        assertThat(vars["tried"]).contains("recovery.wait_stable")
+    }
+
+    @Test
+    fun `reach state vars fill empty strings without context`() {
+        val vars = reachStateVars("n3", null)
+        assertThat(vars.keys).hasSize(10)
+        assertThat(vars["targetState"]).isEmpty()
+        assertThat(vars["instruction"]).isEmpty()
+    }
 }

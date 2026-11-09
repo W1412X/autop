@@ -1,26 +1,35 @@
 package com.example.autop.flow.impl.author
 
-import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.RunRequest
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolInvoker
-import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserInteraction
-import com.example.autop.agent.protocol.JsonParsed
-import com.example.autop.agent.protocol.JsonToolProtocol
 import com.example.autop.agent.toolSpec
 import com.example.autop.core.common.AppError
+import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
+import com.example.autop.flow.Condition
+import com.example.autop.flow.FlowDefinition
+import com.example.autop.flow.core.contract.ContractChecker
+import com.example.autop.flow.core.contract.ContractIssue
+import com.example.autop.flow.core.evidence.ContractCandidate
+import com.example.autop.flow.core.evidence.EvidenceExtractor
+import com.example.autop.flow.core.evidence.EvidencePack
+import com.example.autop.flow.core.evidence.EvidenceScreen
+import com.example.autop.flow.core.evidence.EvidenceStep
+import com.example.autop.flow.core.evidence.conditionHolds
+import com.example.autop.flow.core.evidence.describeCondition
+import com.example.autop.flow.core.evidence.screenTextOf
 import com.example.autop.flow.impl.ports.FlowToolContext
+import com.example.autop.flow.impl.tools.evidenceStepsOf
 import com.example.autop.llm.Block
 import com.example.autop.llm.ToolSchema
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus
 import kotlinx.coroutines.flow.first
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -34,6 +43,11 @@ import kotlinx.serialization.json.put
 internal class AuthorTools(
     private val d: AuthorDeps,
 ) {
+    /** 最近一次 demonstrate 的证据（read_evidence / check_contract 用）。 */
+    private var evidenceRuns: List<List<EvidenceStep>> = emptyList()
+
+    private val extractor = EvidenceExtractor()
+
     private val invoker: ToolInvoker by lazy { d.invokerFactory().create(syntheticRequest(), TOOL_FILTER) }
     private val context: ToolContext by lazy {
         FlowToolContext(
@@ -87,7 +101,15 @@ internal class AuthorTools(
                 toolSpec("read_flow", "flow.author.tools") { string("flow", required = true) },
                 toolSpec("list_endpoints", "flow.author.tools") {},
                 toolSpec("memory_search", "flow.author.tools") { string("query", required = true) },
-                toolSpec("propose_flow", "flow.author.tools") { anyObject("flow", required = true) },
+                toolSpec("read_evidence", "flow.author.tools") { integer("step") },
+                toolSpec("check_contract", "flow.author.tools") {
+                    anyObject("cond", required = true)
+                    array("steps", itemType = "integer")
+                },
+                toolSpec("propose_flow", "flow.author.tools") {
+                    anyObject("flow", required = true)
+                    anyObject("trace")
+                },
             )
         return specs.map { ToolSchema(it.name, descriptions[it.name].orEmpty(), it.parameters) }
     }
@@ -113,6 +135,8 @@ internal class AuthorTools(
             "read_flow" -> readFlow(args.str("flow").orEmpty())
             "list_endpoints" -> listEndpoints()
             "memory_search" -> call("memory_search", buildJsonObject { put("query", args.str("query").orEmpty()) })
+            "read_evidence" -> readEvidence(args.str("step")?.toIntOrNull())
+            "check_contract" -> checkContract(args)
             else -> """{"error":"unknown tool $name"}"""
         }
 
@@ -193,7 +217,7 @@ internal class AuthorTools(
             }
         }.toString()
 
-    /** 示范：智能体按目标真实操作一遍，返回动作序列（工具、参数、结果摘要）。 */
+    /** 示范：智能体按目标真实操作一遍，返回证据包（逐步差异与契约候选，§3.1）。 */
     suspend fun demonstrate(
         goal: String,
         activity: (String) -> Unit,
@@ -207,42 +231,107 @@ internal class AuthorTools(
             }
         val finished = service.observeRun(record.id).first { it.status in TERMINAL }
         val events = d.threads.events(record.threadId)
-        val calls = HashMap<String, Pair<String, String>>()
-        val steps = mutableListOf<JsonElement>()
-        var turn = 0
-        for (event in events) {
-            when (val p = event.payload) {
-                is AssistantMessage -> {
-                    // 解析计数与执行侧一致：每次采样（含解析失败重试）各占一轮，回退 id 为 fb_<turn>_<i>。
-                    turn++
-                    p.blocks.filterIsInstance<Block.ToolCall>().forEach { calls[it.id] = it.name to it.argsJson }
-                    // 回退模式无 ToolCall 块：从协议 JSON 正文恢复调用参数，避免示范步骤退化成 "{}"。
-                    fallbackCallsOf(p.blocks, turn).forEach { calls[it.id] = it.name to it.argsJson }
-                }
-                is ToolResultEvent -> {
-                    val (tool, args) = calls[p.callId] ?: (p.toolId to "{}")
-                    val text =
-                        p.blocks
-                            .filterIsInstance<Block.Text>()
-                            .joinToString("\n") { it.text }
-                            .take(RESULT_CHARS)
-                    steps +=
-                        buildJsonObject {
-                            put("tool", tool)
-                            put("args", args)
-                            put("ok", p.ok)
-                            put("result", text)
-                        }
-                }
-                else -> Unit
-            }
-        }
+        evidenceRuns = listOf(evidenceStepsOf(events, record.id))
+        val pack = extractor.extract(evidenceRuns)
         return buildJsonObject {
             put("status", finished.status.name.lowercase())
             finished.summary?.let { put("summary", it) }
-            put("steps", JsonArray(steps))
+            put("evidence", AutopJson.default.encodeToJsonElement(EvidencePack.serializer(), pack))
         }.toString()
     }
+
+    /**
+     * 契约核验（propose_flow 用）：[trace] 为节点 id → 证据步序号（创作元数据 authorTrace）；
+     * 没有证据或没有对应关系时不做核验。
+     */
+    fun contractIssues(
+        flow: FlowDefinition,
+        trace: Map<String, Int>,
+    ): List<ContractIssue> {
+        if (evidenceRuns.isEmpty() || trace.isEmpty()) return emptyList()
+        return ContractChecker().check(flow, evidenceRuns) { node -> trace[node.id] }
+    }
+
+    /** 读取证据包里某一步的完整证据（省略 step 返回全部摘要）。 */
+    private fun readEvidence(step: Int?): String {
+        val runs = evidenceRuns
+        if (runs.isEmpty()) return """{"error":"no evidence yet; call demonstrate first"}"""
+        val primary = runs.first()
+        val pack = extractor.extract(runs)
+        val picked = pack.steps.filter { step == null || it.index == step }
+        return buildJsonObject {
+            put(
+                "steps",
+                JsonArray(
+                    picked.map { se ->
+                        buildJsonObject {
+                            put("index", se.index)
+                            put("tool", se.tool)
+                            put("ok", se.ok)
+                            put("weak", se.weak)
+                            put("appChange", se.appChange)
+                            put("appeared", JsonArray(se.appeared.map(::JsonPrimitive)))
+                            put("disappeared", JsonArray(se.disappeared.map(::JsonPrimitive)))
+                            put("changed", JsonArray(se.changed.map(::JsonPrimitive)))
+                            put("persistent", JsonArray(se.persistent.map(::JsonPrimitive)))
+                            se.hit?.let { put("hit", it) }
+                            put(
+                                "candidates",
+                                JsonArray(
+                                    se.candidates.map {
+                                        AutopJson.default.encodeToJsonElement(ContractCandidate.serializer(), it)
+                                    },
+                                ),
+                            )
+                            primary.getOrNull(se.index)?.pre?.let { put("pre", screenBrief(it)) }
+                            primary.getOrNull(se.index)?.post?.let { put("post", screenBrief(it)) }
+                        }
+                    },
+                ),
+            )
+        }.toString()
+    }
+
+    /** 在证据上判定一个条件（供创作模型试写结果契约）。 */
+    private fun checkContract(args: JsonObject): String {
+        val runs = evidenceRuns
+        if (runs.isEmpty()) return """{"error":"no evidence yet; call demonstrate first"}"""
+        val cond =
+            args["cond"]
+                ?.let {
+                    runCatching { AutopJson.default.decodeFromJsonElement(Condition.serializer(), it) }.getOrNull()
+                }
+                ?: return """{"error":"cond must be a flow condition object"}"""
+        val indices = (args["steps"] as? JsonArray)?.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull() }
+        val primary = runs.first()
+        val picked = indices?.mapNotNull { primary.getOrNull(it) } ?: primary
+        return buildJsonObject {
+            put("cond", describeCondition(cond))
+            put(
+                "steps",
+                buildJsonArray {
+                    picked.forEachIndexed { i, step ->
+                        add(
+                            buildJsonObject {
+                                put("index", indices?.get(i) ?: i)
+                                put("tool", step.tool)
+                                put("pre", step.pre?.let { conditionHolds(cond, it) } ?: false)
+                                put("post", step.post?.let { conditionHolds(cond, it) } ?: false)
+                            },
+                        )
+                    }
+                },
+            )
+        }.toString()
+    }
+
+    private fun screenBrief(screen: EvidenceScreen): JsonObject =
+        buildJsonObject {
+            screen.app?.let { put("app", it) }
+            screen.page?.let { put("page", it) }
+            put("weak", screen.weak)
+            put("text", screenTextOf(screen).take(SCREEN_TEXT_CHARS))
+        }
 
     private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.content
 
@@ -260,7 +349,7 @@ internal class AuthorTools(
         const val TOOLS_TEMPLATE = "flow.author.tools"
         const val ACTIVITY_INSPECT = "inspect_screen"
         const val ACTIVITY_DEMONSTRATE = "demonstrate"
-        const val RESULT_CHARS = 600
+        const val SCREEN_TEXT_CHARS = 600
         val TERMINAL =
             setOf(
                 RunStatus.SUCCEEDED,
@@ -273,20 +362,4 @@ internal class AuthorTools(
             )
         val TOOL_FILTER: Set<String> = setOf("tool.observe", "tool.memory_search")
     }
-}
-
-/** 回退模式助手正文（`{"tool_calls":[…]}`）里的工具调用；原生 ToolCall 块或普通文本返回空。 */
-internal fun fallbackCallsOf(
-    blocks: List<Block>,
-    turn: Int,
-): List<Block.ToolCall> {
-    val text =
-        blocks
-            .filterIsInstance<Block.Text>()
-            .lastOrNull()
-            ?.text
-            .orEmpty()
-    return (JsonToolProtocol.parse(text, turn) as? JsonParsed.Calls)
-        ?.calls
-        .orEmpty()
 }

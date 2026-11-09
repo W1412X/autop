@@ -55,9 +55,9 @@ class HandoffGoalTemplateTest {
     }
 
     @Test
-    fun `the template tells the agent how to submit a node revision`() {
+    fun `the template no longer asks the agent to revise the node`() {
         val body = templates.getValue("flow.recovery.handoff_goal").body
-        assertThat(body).contains("tool.patch_flow_node")
+        assertThat(body).doesNotContain("tool.patch_flow_node")
     }
 
     @Test

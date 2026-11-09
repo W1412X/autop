@@ -72,6 +72,7 @@ class TemplateCatalogTest {
         /** 新方案模板 id（docs/design/observation-modes-coordinate-actions §4.4、§6；docs/tech/09 待更新）。 */
         val EXPECTED_IDS =
             setOf(
+                "flow.author.analysis_system",
                 "flow.author.demo_declined",
                 "flow.author.draft_context",
                 "flow.author.spec",
@@ -87,6 +88,7 @@ class TemplateCatalogTest {
                 "flow.author.tool_cancelled",
                 "flow.record.polish",
                 "flow.recovery.handoff_goal",
+                "flow.recovery.reach_state",
                 "flow.summary.cancelled",
                 "flow.summary.failed",
                 "flow.summary.succeeded",

@@ -179,8 +179,8 @@ internal class AgentPortImpl(
         role: String?,
         context: AgentContext?,
     ): AgentResult {
-        // 空目标表示“隐式交回”：使用模板 flow.recovery.handoff_goal 生成目标（flows-recording-recovery.md R4）。
-        val text = goal.ifBlank { renderHandoffGoal(nodeId, context) }
+        // 空目标表示“隐式交回”：按目标状态生成交回目标（reach_state）；无状态描述时回落旧模板。
+        val text = goal.ifBlank { renderRecoveryGoal(nodeId, context) }
         val childRun = RunId(ids.newId())
         val thread = store.createThread(title = text.take(TITLE_CHARS), parent = null)
         lineage.register(childRun, parentRunId)
@@ -219,17 +219,20 @@ internal class AgentPortImpl(
         return configProvider.layered(overlay)
     }
 
-    /** 渲染隐式交回的目标：上下文缺项时给空串（模板缺变量会渲染失败）。 */
-    private fun renderHandoffGoal(
+    /** 渲染隐式交回的目标：有目标状态用 reach_state，否则回落旧模板；上下文缺项时给空串。 */
+    private fun renderRecoveryGoal(
         nodeId: String,
         context: AgentContext?,
     ): String {
-        val vars = handoffGoalVars(nodeId, context)
-        return (prompts.render(HANDOFF_GOAL_PROMPT, vars) as? Outcome.Ok)?.value?.text.orEmpty()
+        val reach = context?.targetState != null
+        val template = if (reach) REACH_STATE_PROMPT else HANDOFF_GOAL_PROMPT
+        val vars = if (reach) reachStateVars(nodeId, context) else handoffGoalVars(nodeId, context)
+        return (prompts.render(template, vars) as? Outcome.Ok)?.value?.text.orEmpty()
     }
 
     private companion object {
         const val HANDOFF_GOAL_PROMPT = "flow.recovery.handoff_goal"
+        const val REACH_STATE_PROMPT = "flow.recovery.reach_state"
         const val RUN_MODE_KEY = "runMode"
         const val RUN_MODE_BACKGROUND = "background"
         const val TITLE_CHARS = 20
@@ -255,6 +258,28 @@ internal fun handoffGoalVars(
         "anchor" to context?.anchorHint.orEmpty(),
         "precondition" to context?.preconditionDetail.orEmpty(),
         "executed" to (context?.executedSteps.orEmpty().joinToString("\n")),
+        "screen" to context?.screenSummary.orEmpty(),
+    )
+
+/**
+ * 交回目标（到达状态）的模板变量：目标状态与操作指引来自解释器（G5/G6）。
+ *
+ * 模板缺变量会渲染失败，因此这里必须给全每个变量；可空字段给空串，不漏传。
+ */
+internal fun reachStateVars(
+    nodeId: String,
+    context: AgentContext?,
+): Map<String, String> =
+    mapOf(
+        "nodeId" to nodeId,
+        "flowName" to context?.flowName.orEmpty(),
+        "nodeName" to (context?.nodeName ?: nodeId),
+        "targetState" to context?.targetState.orEmpty(),
+        "instruction" to context?.instruction.orEmpty(),
+        "failure" to (context?.failureMessage ?: context?.failureCode.orEmpty()),
+        "precondition" to context?.preconditionDetail.orEmpty(),
+        "executed" to (context?.executedSteps.orEmpty().joinToString("\n")),
+        "tried" to (context?.triedRecoveries.orEmpty().joinToString("、")),
         "screen" to context?.screenSummary.orEmpty(),
     )
 

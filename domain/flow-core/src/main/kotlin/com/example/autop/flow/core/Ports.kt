@@ -154,6 +154,10 @@ public data class AgentContext(
     val screenSummary: String?,
     /** 已尝试过的恢复动作 id。 */
     val triedRecoveries: List<String>,
+    /** 目标状态的文字描述（交回目标是"到达状态"时给出）。 */
+    val targetState: String? = null,
+    /** 到达目标状态的操作指引（是否允许执行失败步骤本身）。 */
+    val instruction: String? = null,
 )
 
 /** 智能体端口。 */

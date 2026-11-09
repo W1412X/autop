@@ -112,6 +112,31 @@ public data class FlowAuthorSection(
         }
 }
 
+/** `flow.contract`：状态契约（docs/design/flows-contracts-evidence §7.2）。 */
+@Serializable
+public data class FlowContractSection(
+    /** 总开关：关闭后不做契约继承与每步必检。 */
+    @SerialName("enabled") val enabled: Boolean = true,
+    /** 是否继承上一步的结果契约作前置。 */
+    @SerialName("inherit") val inherit: Boolean = true,
+) : ConfigSection {
+    override fun validate(): List<String> = emptyList()
+}
+
+/** `flow.author.analysis`：事后证据分析的创作循环预算（flows-contracts-evidence §4.1）。 */
+@Serializable
+public data class FlowAuthorAnalysisSection(
+    /** 分析循环的最大轮数。 */
+    @SerialName("maxTurns") val maxTurns: Int = 8,
+    /** 使用的模型角色（main / vision / light）。 */
+    @SerialName("role") val role: String = "main",
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (maxTurns <= 0) add("maxTurns must be > 0, was $maxTurns")
+        }
+}
+
 /** `flow.recovery`：操作效果校验与恢复阶梯（flows-recording-recovery.md R2）。 */
 @Serializable
 @Suppress("MagicNumber") // 配置段的默认值与取值范围本身就是数字，与 assets/flow.json 一一对应
@@ -284,6 +309,28 @@ public object FlowConfig {
     public val AUTHOR: ConfigKey<FlowAuthorSection> =
         ConfigKey("flow.author", FlowAuthorSection.serializer()) { FlowAuthorSection() }
 
+    public val CONTRACT: ConfigKey<FlowContractSection> =
+        ConfigKey("flow.contract", FlowContractSection.serializer()) { FlowContractSection() }
+
+    public val ANALYSIS: ConfigKey<FlowAuthorAnalysisSection> =
+        ConfigKey("flow.author.analysis", FlowAuthorAnalysisSection.serializer()) {
+            FlowAuthorAnalysisSection()
+        }
+
     public val ALL: List<ConfigKey<*>> =
-        listOf(RUN, LLM, AGENT, API, TRACE, AUTHOR, RECOVERY, PRECONDITION, DIRECTORY, SAVE, RECORDER)
+        listOf(
+            RUN,
+            LLM,
+            AGENT,
+            API,
+            TRACE,
+            AUTHOR,
+            ANALYSIS,
+            CONTRACT,
+            RECOVERY,
+            PRECONDITION,
+            DIRECTORY,
+            SAVE,
+            RECORDER,
+        )
 }

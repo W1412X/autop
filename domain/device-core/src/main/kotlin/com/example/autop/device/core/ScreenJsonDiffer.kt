@@ -1,13 +1,14 @@
 /**
  * 差量观测（docs/design/observation-modes-coordinate-actions §3.4）：
  * 只有 a11y/visual 有差量；按稳定键配对，换页或变化比例超阈值时回退完整观测。
+ * 配对与集合计算复用 [nodeDiffSets]（流程证据层同源）。
  */
 package com.example.autop.device.core
 
 import com.example.autop.device.Observation
 import com.example.autop.device.ObservationMode
 import com.example.autop.device.ObserveMode
-import com.example.autop.device.ScreenNode
+import com.example.autop.device.nodeDiffSets
 
 /** 统一 JSON 差量生成。 */
 public object ScreenJsonDiffer {
@@ -23,20 +24,12 @@ public object ScreenJsonDiffer {
         // 只比较应用窗口：系统窗口（状态栏时钟/网速等）一直变，掺进来会让差量永远“有变化”。
         val prevNodes = base.model.appFlatten()
         val curNodes = cur.model.appFlatten()
-        val prevByKey = prevNodes.filter { it.key.isNotEmpty() }.associateBy { it.key }
-        val curByKey = curNodes.filter { it.key.isNotEmpty() }.associateBy { it.key }
-        val added = curNodes.filter { it.key.isEmpty() || it.key !in prevByKey }
-        val removed = prevNodes.filter { it.key.isEmpty() || it.key !in curByKey }
-        val changed =
-            curNodes.filter { node ->
-                val before = prevByKey[node.key] ?: return@filter false
-                !sameNode(before, node)
-            }
-        val ratio = (added.size + removed.size + changed.size).toDouble() / maxOf(1, curNodes.size)
+        val sets = nodeDiffSets(prevNodes, curNodes)
+        val ratio = (sets.added.size + sets.removed.size + sets.changed.size).toDouble() / maxOf(1, curNodes.size)
         if (ratio > config.diffMaxRatio) return full
         return full.copy(
             mode = ObservationMode.DIFF,
-            text = ScreenJsonRenderer.renderDiff(cur.model.mode, added, changed, removed),
+            text = ScreenJsonRenderer.renderDiff(cur.model.mode, sets.added, sets.changed, sets.removed),
         )
     }
 
@@ -49,10 +42,4 @@ public object ScreenJsonDiffer {
             base.model.mode == cur.model.mode &&
             base.observation.packageName == cur.observation.packageName &&
             base.observation.activity == cur.observation.activity
-
-    /** 节点内容是否相同（忽略 kids 与内部 key）。 */
-    private fun sameNode(
-        a: ScreenNode,
-        b: ScreenNode,
-    ): Boolean = a.copy(kids = emptyList(), key = "") == b.copy(kids = emptyList(), key = "")
 }

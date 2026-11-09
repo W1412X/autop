@@ -39,4 +39,10 @@ public object FlowErrorCodes {
 
     /** 条件求值本身出错（非法正则、模板缺变量等），不属于条件不成立。 */
     public const val PRECONDITION_ERROR: String = "flow.precondition_error"
+
+    /** 交回智能体后复核目标状态失败（子 Run 报成功但契约不成立）。 */
+    public const val STATE_NOT_REACHED: String = "flow.state_not_reached"
+
+    /** 结果契约（状态契约）不成立。 */
+    public const val CONTRACT_UNMET: String = "flow.contract_unmet"
 }
