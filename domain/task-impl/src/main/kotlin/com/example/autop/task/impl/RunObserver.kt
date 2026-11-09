@@ -146,7 +146,7 @@ public class RunObserver(
                                 info?.copy(
                                     stepCount = info.stepCount + calls.size,
                                     currentStep = stepTextOf(call.name, call.argsJson),
-                                    toolId = call.name,
+                                    toolId = canonToolId(call.name),
                                     toolTarget = targetOf(call.name, call.argsJson),
                                 )
                             }

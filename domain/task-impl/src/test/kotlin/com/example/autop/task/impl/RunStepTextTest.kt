@@ -64,4 +64,13 @@ class RunStepTextTest {
         assertThat(targetOf("tool.input_text", """{"text":"一二三四五六七八九十一二三四五"}"""))
             .isEqualTo("一二三四五六七八九十一二…")
     }
+
+    @Test
+    fun `模型可见裸名与工具 id 同等命中`() {
+        // ToolCall.name 是模型可见裸名（无 tool. 前缀），两形态都要查中表
+        assertThat(stepTextOf("tap", """{"x":1,"y":2}""")).isEqualTo("点击")
+        assertThat(stepTextOf("global_action", """{"action":"back"}""")).isEqualTo("返回")
+        assertThat(stepTextOf("input_text", """{"text":"你好"}""")).isEqualTo("输入「你好」")
+        assertThat(targetOf("open_app", """{"name":"微信"}""")).isEqualTo("微信")
+    }
 }

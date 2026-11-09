@@ -109,15 +109,19 @@ internal fun hintTitleOf(
     return pickVariant(pool, previous, roll) ?: active.currentStep ?: "运行中"
 }
 
+/** 工具 id 规范化：模型可见名（tap）与工具 id（tool.tap）都归一到工具 id。 */
+private fun canonToolId(toolId: String): String = if (toolId.startsWith("tool.")) toolId else "tool.$toolId"
+
 /** 工具变体池：有目标用带目标模板（填目标），没目标用无目标说法；未知工具回落“正在执行 xxx…”，无工具回落空池。 */
 private fun toolPoolOf(
     toolId: String?,
     target: String?,
 ): List<String> {
-    val variants = toolId?.let { TOOLS[it] }
-    val name = toolId?.removePrefix("tool.").orEmpty()
+    val id = toolId?.let { canonToolId(it) }
+    val variants = id?.let { TOOLS[it] }
+    val name = id?.removePrefix("tool.").orEmpty()
     return when {
-        toolId == null -> emptyList()
+        id == null -> emptyList()
         variants == null -> listOf("正在执行 $name…", "$name 进行中…")
         target.isNullOrBlank() || variants.withTarget.isEmpty() -> variants.noTarget
         else -> variants.withTarget.map { it.replace(TARGET_SLOT, target) }

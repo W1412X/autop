@@ -88,15 +88,7 @@ internal fun RunBarScreen(
     onToggleExpand: () -> Unit,
     onAction: (RunBarAction) -> Unit,
 ) {
-    // 变体文案：按状态/步数/工具变化重抽（同段展示稳定），上一次说法降权（hintTitleOf）。
-    val lastHint = remember { mutableStateOf<String?>(null) }
-    val random = remember { Random.Default }
-    val spec =
-        remember(active.run.status, active.state, active.stepCount, active.toolId, active.toolTarget, active.flow) {
-            runBarSpecOf(active, previousHint = lastHint.value, roll = random.nextFloat()).also { next ->
-                lastHint.value = (next.hint as? RunBarHint.Running)?.title
-            }
-        }
+    val spec = rememberRunBarSpec(active)
     val motionOn = LocalMotionEnabled.current
     val breath = rememberBreath(halfPeriodMs = BREATH_HALF_MS, enabled = motionOn && spec.hint is RunBarHint.Running)
     val appear = remember { Animatable(0f) }
@@ -136,6 +128,31 @@ internal fun RunBarScreen(
                     modifier = Modifier.padding(start = BUTTON_GAP),
                 )
             }
+        }
+    }
+}
+
+/**
+ * 标题变体的记忆抽取：按状态/步数/工具/暂停原因/等待问题变化重抽（同段展示稳定），
+ * 上一次说法降权（[hintTitleOf]）；键须含暂停原因/等待问题——拦截与暂停同为 PAUSED，
+ * 遗漏会漏刷按钮与文案。
+ */
+@Composable
+private fun rememberRunBarSpec(active: ActiveRunInfo): RunBarSpec {
+    val lastHint = remember { mutableStateOf<String?>(null) }
+    val random = remember { Random.Default }
+    return remember(
+        active.run.status,
+        active.run.pauseReason,
+        active.run.waitingQuestion,
+        active.state,
+        active.stepCount,
+        active.toolId,
+        active.toolTarget,
+        active.flow,
+    ) {
+        runBarSpecOf(active, previousHint = lastHint.value, roll = random.nextFloat()).also { next ->
+            lastHint.value = (next.hint as? RunBarHint.Running)?.title
         }
     }
 }

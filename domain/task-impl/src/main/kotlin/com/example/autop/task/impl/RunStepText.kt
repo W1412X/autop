@@ -68,7 +68,7 @@ internal fun targetOf(
 ): String? {
     val args = argsOf(argsJson)
     val raw =
-        when (toolId) {
+        when (canonToolId(toolId)) {
             "tool.input_text" -> args?.str("text")
             "tool.open_app" -> args?.str("name") ?: args?.str("package")
             "tool.list_apps" -> args?.str("query")
@@ -78,20 +78,24 @@ internal fun targetOf(
     return raw?.trim()?.takeIf { it.isNotBlank() }?.abbreviate()
 }
 
+/** 工具 id 规范化：模型可见名（tap）与工具 id（tool.tap）都归一到工具 id。 */
+internal fun canonToolId(toolId: String): String = if (toolId.startsWith("tool.")) toolId else "tool.$toolId"
+
 /** 当前操作描述：动词 + 可选目标（「目标」过长截断）；未知工具回落去前缀的 id。 */
 internal fun stepTextOf(
     toolId: String,
     argsJson: String,
 ): String {
+    val id = canonToolId(toolId)
     val args = argsOf(argsJson)
     val verb =
-        when (toolId) {
+        when (id) {
             "tool.tap" -> if (args?.bool("long") == true) "长按" else "点击"
             "tool.global_action" -> args?.str("action")?.let { GLOBAL_ACTIONS[it] } ?: "执行系统动作"
-            else -> VERBS[toolId]
-        } ?: toolId.removePrefix("tool.")
+            else -> VERBS[id]
+        } ?: id.removePrefix("tool.")
     val target =
-        when (toolId) {
+        when (id) {
             "tool.input_text" -> args?.str("text")
             "tool.open_app" -> args?.str("name") ?: args?.str("package")
             "tool.list_apps" -> args?.str("query")

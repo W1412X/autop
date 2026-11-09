@@ -55,6 +55,15 @@ class RunHintVariantsTest {
     }
 
     @Test
+    fun `模型可见裸名与工具 id 同等命中`() {
+        // ToolCall.name 是模型可见裸名（无 tool. 前缀），变体表须两形态都查中
+        val bare = active().copy(toolId = "tap", toolTarget = "存储")
+        assertThat(hintTitleOf(bare, null, 0f)).isEqualTo("正在点击「存储」")
+        assertThat(hintTitleOf(active().copy(toolId = "global_action", toolTarget = "返回"), null, 0f))
+            .isEqualTo("返回中…")
+    }
+
+    @Test
     fun `无工具回落基础文案`() {
         assertThat(hintTitleOf(active().copy(currentStep = "点击「存储」"), null, 0f)).isEqualTo("点击「存储」")
         assertThat(hintTitleOf(active(), null, 0f)).isEqualTo("运行中")
