@@ -6,7 +6,6 @@
 package com.example.autop.feature.overlay.indicator
 
 import com.example.autop.agent.PauseReason
-import com.example.autop.feature.overlay.progress.flowHintOf
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunStatus
 
@@ -24,9 +23,9 @@ internal enum class RunBarAction {
 
 /** 控制条状态提示。 */
 internal sealed interface RunBarHint {
-    /** 运行中：标题（流程提示优先，回落当前操作）+ 步数。 */
+    /** 运行中：标题（[hintTitleOf] 变体文案）+ 步数。 */
     data class Running(
-        val title: String?,
+        val title: String,
         val stepCount: Int,
     ) : RunBarHint
 
@@ -49,8 +48,15 @@ internal data class RunBarSpec(
     val buttons: List<RunBarAction>,
 )
 
-/** 由活跃 Run 推导控制条状态。 */
-internal fun runBarSpecOf(active: ActiveRunInfo): RunBarSpec {
+/**
+ * 由活跃 Run 推导控制条状态；[previousHint] / [roll] 供标题变体的加权反重复抽取
+ * （[hintTitleOf]，同一展示段内稳定）。
+ */
+internal fun runBarSpecOf(
+    active: ActiveRunInfo,
+    previousHint: String? = null,
+    roll: Float = 0f,
+): RunBarSpec {
     val run = active.run
     val hint =
         when {
@@ -58,7 +64,11 @@ internal fun runBarSpecOf(active: ActiveRunInfo): RunBarSpec {
             run.waitingQuestion != null -> RunBarHint.Waiting
             run.status == RunStatus.PAUSED -> RunBarHint.Paused
             run.status == RunStatus.QUEUED -> RunBarHint.Queued
-            else -> RunBarHint.Running(title = flowHintOf(active) ?: active.currentStep, stepCount = active.stepCount)
+            else ->
+                RunBarHint.Running(
+                    title = hintTitleOf(active, previousHint, roll),
+                    stepCount = active.stepCount,
+                )
         }
     val buttons =
         when (hint) {

@@ -105,6 +105,9 @@ public data class ActiveRunInfo(
     val currentStep: String?,
     val stepCount: Int,
     val plan: List<PlanItem>,
+    /** 当前工具 id 与目标文本（控制条变体文案用；基础展示文案仍走 [currentStep]）。 */
+    val toolId: String? = null,
+    val toolTarget: String? = null,
     /** 根 Run 名下进行中的流程进度（run_flow/任务流程；无流程为 null，P1-2 进度互通）。 */
     val flow: FlowRunProgress? = null,
 )

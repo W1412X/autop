@@ -34,6 +34,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -50,6 +51,7 @@ import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.overlay.R
 import com.example.autop.feature.overlay.rememberBreath
 import com.example.autop.task.ActiveRunInfo
+import kotlin.random.Random
 
 /** 图标按钮与状态点尺寸（dp）。 */
 private val BUTTON_SIZE = 36.dp
@@ -86,7 +88,15 @@ internal fun RunBarScreen(
     onToggleExpand: () -> Unit,
     onAction: (RunBarAction) -> Unit,
 ) {
-    val spec = runBarSpecOf(active)
+    // 变体文案：按状态/步数/工具变化重抽（同段展示稳定），上一次说法降权（hintTitleOf）。
+    val lastHint = remember { mutableStateOf<String?>(null) }
+    val random = remember { Random.Default }
+    val spec =
+        remember(active.run.status, active.state, active.stepCount, active.toolId, active.toolTarget, active.flow) {
+            runBarSpecOf(active, previousHint = lastHint.value, roll = random.nextFloat()).also { next ->
+                lastHint.value = (next.hint as? RunBarHint.Running)?.title
+            }
+        }
     val motionOn = LocalMotionEnabled.current
     val breath = rememberBreath(halfPeriodMs = BREATH_HALF_MS, enabled = motionOn && spec.hint is RunBarHint.Running)
     val appear = remember { Animatable(0f) }
@@ -274,15 +284,13 @@ private fun iconOf(action: RunBarAction): ImageVector =
         RunBarAction.STOP -> AutopIcons.Stop
     }
 
-/** 状态文案（运行中为「操作 · 第 N 步」，标题缺省退化为纯步数/状态词）。 */
+/** 状态文案（运行中为变体标题 + 「第 N 步」，见 [hintTitleOf]）。 */
 @Composable
 private fun hintTextOf(hint: RunBarHint): String =
     when {
-        hint is RunBarHint.Running && hint.title != null && hint.stepCount > 0 ->
+        hint is RunBarHint.Running && hint.stepCount > 0 ->
             stringResource(R.string.run_bar_running, hint.title, hint.stepCount)
-        hint is RunBarHint.Running && hint.title != null -> hint.title
-        hint is RunBarHint.Running && hint.stepCount > 0 -> stringResource(R.string.run_bar_step, hint.stepCount)
-        hint is RunBarHint.Running -> stringResource(R.string.panel_status_running)
+        hint is RunBarHint.Running -> hint.title
         hint == RunBarHint.Paused -> stringResource(R.string.panel_status_paused)
         hint == RunBarHint.Blocked -> stringResource(R.string.panel_status_blocked)
         hint == RunBarHint.Waiting -> stringResource(R.string.panel_status_waiting)

@@ -61,6 +61,23 @@ private val GLOBAL_ACTIONS: Map<String, String> =
         "lock" to "锁屏",
     )
 
+/** 目标文本（展示就绪：已截断）；无目标返回 null。 */
+internal fun targetOf(
+    toolId: String,
+    argsJson: String,
+): String? {
+    val args = argsOf(argsJson)
+    val raw =
+        when (toolId) {
+            "tool.input_text" -> args?.str("text")
+            "tool.open_app" -> args?.str("name") ?: args?.str("package")
+            "tool.list_apps" -> args?.str("query")
+            "tool.global_action" -> args?.str("action")?.let { GLOBAL_ACTIONS[it] }
+            else -> null
+        }
+    return raw?.trim()?.takeIf { it.isNotBlank() }?.abbreviate()
+}
+
 /** 当前操作描述：动词 + 可选目标（「目标」过长截断）；未知工具回落去前缀的 id。 */
 internal fun stepTextOf(
     toolId: String,

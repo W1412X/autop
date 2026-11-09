@@ -104,7 +104,6 @@
 
     <!-- 顶部运行控制条（执行期胶囊升级） -->
     <string name="run_bar_running">%1$s · 第 %2$d 步</string>
-    <string name="run_bar_step">第 %1$d 步</string>
     <string name="run_bar_stop">中止</string>
 
     <!-- 任务进度悬浮窗（docs/tech/08 §5.3，N182） -->

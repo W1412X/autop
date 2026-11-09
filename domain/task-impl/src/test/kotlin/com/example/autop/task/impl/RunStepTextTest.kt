@@ -49,4 +49,19 @@ class RunStepTextTest {
         assertThat(stepTextOf("tool.input_text", """{"text":null}""")).isEqualTo("输入")
         assertThat(stepTextOf("tool.input_text", """{"text":""}""")).isEqualTo("输入")
     }
+
+    @Test
+    fun `targetOf 取展示就绪目标`() {
+        assertThat(targetOf("tool.input_text", """{"text":"你好"}""")).isEqualTo("你好")
+        assertThat(targetOf("tool.open_app", """{"name":"微信"}""")).isEqualTo("微信")
+        assertThat(targetOf("tool.global_action", """{"action":"back"}""")).isEqualTo("返回")
+        assertThat(targetOf("tool.tap", """{"x":1,"y":2}""")).isNull()
+        assertThat(targetOf("tool.input_text", """{"text":null}""")).isNull()
+    }
+
+    @Test
+    fun `targetOf 过长截断加省略号`() {
+        assertThat(targetOf("tool.input_text", """{"text":"一二三四五六七八九十一二三四五"}"""))
+            .isEqualTo("一二三四五六七八九十一二…")
+    }
 }
