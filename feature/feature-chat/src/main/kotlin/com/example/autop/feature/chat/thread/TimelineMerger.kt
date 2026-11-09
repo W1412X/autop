@@ -47,20 +47,24 @@ public fun mergeTimeline(
 ): List<TimelineEntry> {
     val entries = mutableListOf<TimelineEntry>()
     var unpaired = 0
-    var outputTokens = 0
-    var startedAt: Long? = null
-    var finished: ThreadEvent? = null
+    // 按轮窗口：RunStarted 重置，步数/用时/Token 只统计本轮，页脚不串轮。
+    var windowStart: Long? = null
+    var windowTokens = 0
+    var windowStartIndex = 0
     history.forEach { event ->
         when (val payload = event.payload) {
-            is AssistantMessage -> outputTokens += payload.usage?.outputTokens ?: 0
-            is RunStarted -> startedAt = event.createdAt
-            is RunFinished -> finished = event
+            is RunStarted -> {
+                windowStart = event.createdAt
+                windowTokens = 0
+                windowStartIndex = entries.size
+            }
+            is AssistantMessage -> windowTokens += payload.usage?.outputTokens ?: 0
+            is RunFinished -> appendResult(entries, event, windowStart, windowTokens, windowStartIndex)
             else -> Unit
         }
         unpaired = appendPayload(entries, event, unpaired)
     }
     live.forEach { appendLive(entries, it) }
-    appendResult(entries, finished, startedAt, outputTokens)
     return foldGroups(numberSteps(entries), stepGroupThreshold)
 }
 
@@ -242,28 +246,30 @@ private fun applyToolResult(
 }
 
 /**
- * Run 结束 → [TimelineItem.RunMeta] 元信息行；末条为助手文时附着其末尾（N183），
+ * Run 结束 → [TimelineItem.RunMeta] 元信息行（本轮窗口统计：步数/用时/Token 只算到
+ * 本轮为止，且附着在本轮末条上，不挂到新一轮消息的尾巴）；末条为助手文时附着其末尾，
  * 否则作为独立条目。
  */
 private fun appendResult(
     entries: MutableList<TimelineEntry>,
-    finished: ThreadEvent?,
+    finished: ThreadEvent,
     startedAt: Long?,
     outputTokens: Int,
+    windowStartIndex: Int,
 ) {
-    val event = finished ?: return
-    val payload = event.payload as? RunFinished ?: return
+    val payload = finished.payload as? RunFinished ?: return
+    val window = entries.subList(windowStartIndex, entries.size)
     val trimmed = payload.summary?.trim()
     val duplicated =
-        entries.any { entry ->
+        window.any { entry ->
             (entry.item as? TimelineItem.AssistantText)?.text?.trim() == trimmed
         }
     val meta =
         TimelineItem.RunMeta(
             outcome = payload.status,
             summary = if (trimmed.isNullOrEmpty() || duplicated) null else payload.summary,
-            stepCount = entries.count { it.item is TimelineItem.StepRow },
-            durationMs = event.createdAt - (startedAt ?: event.createdAt),
+            stepCount = window.count { it.item is TimelineItem.StepRow },
+            durationMs = finished.createdAt - (startedAt ?: finished.createdAt),
             outputTokens = outputTokens,
         )
     val lastIndex = entries.lastIndex
@@ -271,7 +277,7 @@ private fun appendResult(
     if (lastText != null) {
         entries[lastIndex] = entries[lastIndex].copy(item = lastText.copy(meta = meta))
     } else {
-        entries.add(TimelineEntry(meta, event.seq, forkable = false))
+        entries.add(TimelineEntry(meta, finished.seq, forkable = false))
     }
 }
 
@@ -283,24 +289,31 @@ private fun appendLive(
     when (event) {
         is AgentEvent.TextDelta -> appendStream(entries, event.text, thinking = false)
         is AgentEvent.ThinkingDelta -> appendStream(entries, event.text, thinking = true)
-        is AgentEvent.ToolCallStreaming ->
-            entries.add(
-                TimelineEntry(
-                    TimelineItem.StepRow(
-                        callId = "live-${event.index}",
-                        toolId = event.name,
-                        argsJson = "",
-                        state = StepState.RUNNING,
-                        durationMs = null,
-                        resultText = null,
-                        observationLine = null,
-                        imageRef = null,
-                        progressText = null,
+        is AgentEvent.ToolCallStreaming -> {
+            // 携带真实 callId 时按 id 就地配对：历史里已有同 id 的 RUNNING 行则不重复出行，
+            // 结果到达时 [applyToolResult] 按 callId 把它转成 DONE/FAILED（状态机闭环）。
+            val callId = event.callId.ifEmpty { "live-${event.index}" }
+            val exists = entries.any { (it.item as? TimelineItem.StepRow)?.callId == callId }
+            if (!exists) {
+                entries.add(
+                    TimelineEntry(
+                        TimelineItem.StepRow(
+                            callId = callId,
+                            toolId = event.name,
+                            argsJson = "",
+                            state = StepState.RUNNING,
+                            durationMs = null,
+                            resultText = null,
+                            observationLine = null,
+                            imageRef = null,
+                            progressText = null,
+                        ),
+                        seq = null,
+                        forkable = false,
                     ),
-                    seq = null,
-                    forkable = false,
-                ),
-            )
+                )
+            }
+        }
         is AgentEvent.ToolProgress -> applyToolProgress(entries, event)
         is AgentEvent.StateChanged,
         is AgentEvent.Persisted,

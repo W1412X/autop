@@ -59,6 +59,8 @@ public sealed interface AgentEvent {
     public data class ToolCallStreaming(
         val index: Int,
         val name: String,
+        /** 真实 callId（原生流式阶段为 null/空，解析后带上，UI 据此与结果配对转态）。 */
+        val callId: String = "",
     ) : AgentEvent
 
     public data class ToolProgress(

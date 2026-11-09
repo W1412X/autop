@@ -285,6 +285,55 @@ class TimelineMergerTest {
         assertThat(row.links).isEmpty()
     }
 
+    @Test
+    fun `run meta counts only its own run and stays on its own tail`() {
+        val history =
+            listOf(
+                event(1, runStarted()),
+                event(2, assistant(toolCall("c1", "tap"))),
+                event(3, toolResult("c1", "tap")),
+                event(4, assistant(Block.Text("第一轮"), outputTokens = 5)),
+                event(5, RunFinished(status = RunOutcome.SUCCEEDED, summary = null)),
+                event(6, user("再来一次", UserMessageKind.INPUT)),
+                event(7, runStarted()),
+                event(8, assistant(Block.Text("第二轮"), outputTokens = 7)),
+            )
+
+        val entries = mergeTimeline(history, emptyList(), GROUP_THRESHOLD)
+
+        val firstText = entries[1].item as TimelineItem.AssistantText
+        val meta = requireNotNull(firstText.meta)
+        assertThat(meta.outcome).isEqualTo(RunOutcome.SUCCEEDED)
+        assertThat(meta.stepCount).isEqualTo(1)
+        assertThat(meta.outputTokens).isEqualTo(5)
+        assertThat(meta.durationMs).isEqualTo(4000)
+        // 页脚留在第一轮消息上，不挂到新一轮的尾巴。
+        val lastText = entries.last().item as TimelineItem.AssistantText
+        assertThat(lastText.text).isEqualTo("第二轮")
+        assertThat(lastText.meta).isNull()
+    }
+
+    @Test
+    fun `live tool call streams a running row keyed by real call id`() {
+        val live = listOf(AgentEvent.ToolCallStreaming(index = 0, name = "tap", callId = "c9"))
+
+        val row = mergeTimeline(emptyList(), live, GROUP_THRESHOLD).single().item as TimelineItem.StepRow
+
+        assertThat(row.callId).isEqualTo("c9")
+        assertThat(row.state).isEqualTo(StepState.RUNNING)
+    }
+
+    @Test
+    fun `live tool call does not duplicate the persisted running row`() {
+        val history = listOf(event(1, assistant(toolCall("c9", "tap"))))
+        val live = listOf(AgentEvent.ToolCallStreaming(index = 0, name = "tap", callId = "c9"))
+
+        val entries = mergeTimeline(history, live, GROUP_THRESHOLD)
+
+        assertThat(entries).hasSize(1)
+        assertThat((entries.single().item as TimelineItem.StepRow).state).isEqualTo(StepState.RUNNING)
+    }
+
     private companion object {
         const val GROUP_THRESHOLD = 3
     }

@@ -6,6 +6,7 @@
 package com.example.autop.agent.runtime
 
 import com.example.autop.agent.AgentErrorCodes
+import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.ContextRequest
 import com.example.autop.agent.RenderItem
@@ -249,6 +250,10 @@ internal class TurnLoop(
         val calls = (resolved as? ResolvedCalls.ToolCalls)?.calls.orEmpty()
         val finalText = (resolved as? ResolvedCalls.Done)?.text
         if (calls.isNotEmpty()) {
+            // 调用发出即播报（回退协议解析出的调用不落 ToolCall 块，UI 靠这条实时出行）。
+            calls.forEachIndexed { index, call ->
+                controller.emit(AgentEvent.ToolCallStreaming(index, call.name, callId = call.id))
+            }
             val outputs = phase.execute(calls)
             val control = handleControl(outputs)
             if (control != null) return control

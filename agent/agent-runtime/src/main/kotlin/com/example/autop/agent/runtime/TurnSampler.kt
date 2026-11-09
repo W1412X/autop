@@ -101,7 +101,7 @@ internal class TurnSampler(
                     is LlmStreamEvent.TextDelta -> controller.emit(AgentEvent.TextDelta(event.text))
                     is LlmStreamEvent.ThinkingDelta -> controller.emit(AgentEvent.ThinkingDelta(event.text))
                     is LlmStreamEvent.ToolCallStarted ->
-                        controller.emit(AgentEvent.ToolCallStreaming(event.index, event.name))
+                        controller.emit(AgentEvent.ToolCallStreaming(event.index, event.name, event.id))
                     is LlmStreamEvent.Completed -> last = event
                     else -> Unit
                 }

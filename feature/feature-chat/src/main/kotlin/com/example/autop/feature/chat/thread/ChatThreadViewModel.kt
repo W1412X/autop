@@ -15,6 +15,7 @@ import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.AgentSession
 import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.EventPayload
+import com.example.autop.agent.RunFinished
 import com.example.autop.agent.ThreadCreated
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
@@ -313,7 +314,11 @@ public class ChatThreadViewModel
                 threadStore.observe(id).collect { event ->
                     timeline.update { input ->
                         val live =
-                            if (event.payload is AssistantMessage || event.payload is ToolResultEvent) {
+                            if (
+                                event.payload is AssistantMessage ||
+                                event.payload is ToolResultEvent ||
+                                event.payload is RunFinished
+                            ) {
                                 emptyList()
                             } else {
                                 input.live
