@@ -123,6 +123,7 @@ private fun ThreadList(
         EmptyState(
             text = stringResource(R.string.chat_empty),
             icon = AutopIcons.ChatBubbleOutline,
+            modifier = Modifier.fillMaxSize(),
         )
         return
     }

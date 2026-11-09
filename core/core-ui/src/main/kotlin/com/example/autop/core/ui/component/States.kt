@@ -7,6 +7,7 @@ package com.example.autop.core.ui.component
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.CircularProgressIndicator
@@ -53,9 +54,12 @@ public fun LoadingState(
     text: String = stringResource(R.string.core_ui_loading),
 ) {
     Column(
-        modifier = modifier.padding(AutopDimens.statePadding),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(AutopDimens.statePadding),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(AutopDimens.stateGap),
+        verticalArrangement = Arrangement.spacedBy(AutopDimens.stateGap, Alignment.CenterVertically),
     ) {
         CircularProgressIndicator(modifier = Modifier.size(AutopDimens.loadingIndicatorSize))
         StateText(text = text)
@@ -70,9 +74,12 @@ private fun StateBlock(
     action: (@Composable () -> Unit)? = null,
 ) {
     Column(
-        modifier = modifier.padding(AutopDimens.statePadding),
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(AutopDimens.statePadding),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(AutopDimens.stateGap),
+        verticalArrangement = Arrangement.spacedBy(AutopDimens.stateGap, Alignment.CenterVertically),
     ) {
         Icon(
             imageVector = icon,

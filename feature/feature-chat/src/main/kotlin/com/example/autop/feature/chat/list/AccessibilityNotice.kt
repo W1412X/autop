@@ -2,9 +2,11 @@
  * 首页无障碍提示（docs/tech/08 §4.1 AccessibilityNotice）：已开启时一行状态文字，
  * 未开启 / 被系统关闭时 blocked 色系 [StatusBanner]；SDK ≥ 33（侧载应用需
  * "允许受限设置"）时"去开启"前先弹 [ConfirmDialog] 说明步骤。
+ * shell 注入提示只留一句可点问题，详细说明走弹窗。
  */
 package com.example.autop.feature.chat.list
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +27,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.ConfirmDialog
+import com.example.autop.core.ui.component.InfoDialog
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -86,13 +89,27 @@ private fun ConnectedRow(
             )
         }
         if (shellHint) {
-            Text(
-                text = stringResource(R.string.chat_a11y_shell_hint),
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(top = LocalSpacing.current.xs),
-            )
+            ShellHint(modifier = Modifier.padding(top = LocalSpacing.current.xs))
         }
+    }
+}
+
+/** shell 注入提示：一句话问题（点击弹出详细说明）。 */
+@Composable
+private fun ShellHint(modifier: Modifier = Modifier) {
+    var detail by rememberSaveable { mutableStateOf(false) }
+    Text(
+        text = stringResource(R.string.chat_a11y_shell_hint),
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.primary,
+        modifier = modifier.clickable { detail = true },
+    )
+    if (detail) {
+        InfoDialog(
+            title = stringResource(R.string.chat_a11y_shell_hint),
+            text = stringResource(R.string.chat_a11y_shell_hint_detail),
+            onDismiss = { detail = false },
+        )
     }
 }
 
