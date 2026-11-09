@@ -134,7 +134,6 @@ public data class DeviceVisionParseSection(
     @SerialName("enabled") val enabled: Boolean = true,
     /** 树退化判定的有效节点数下限（仅作为 quality 信号报告）。 */
     @SerialName("degenerateNodeThreshold") val degenerateNodeThreshold: Int = 5,
-    @SerialName("diffEnabled") val diffEnabled: Boolean = true,
     /** ROI 复检区域比例（相对屏幕尺寸）。 */
     @SerialName("roiRatio") val roiRatio: Double = 0.5,
     @SerialName("minConfidence") val minConfidence: Double = 0.35,

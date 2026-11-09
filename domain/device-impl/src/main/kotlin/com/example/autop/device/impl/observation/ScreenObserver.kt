@@ -177,7 +177,6 @@ public class ScreenObserver
                             ObserveMode.VISUAL,
                             ctx.config,
                             effective,
-                            cached = tree.cached,
                         ),
                     mode = ObserveMode.VISUAL,
                 ),

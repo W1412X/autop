@@ -57,7 +57,6 @@
     "vision": {
       "enabled": true,
       "degenerateNodeThreshold": 5,
-      "diffEnabled": true,
       "roiRatio": 0.5,
       "minConfidence": 0.35,
       "uncertainConf": 0.6,
