@@ -1,6 +1,7 @@
 /**
  * 运行控制条与详情面板的窗口 spec：控制条顶部窄条（宽随屏减边距、高 [RUN_BAR_HEIGHT]），
- * 详情面板在条下展开（宽同条、高约屏四成）。两者可触摸但窗口只包内容，条外触摸不被吞；
+ * 详情面板在条下展开（宽同条、高约屏四成）。条可触摸但不可聚焦；详情面板可触摸且可聚焦
+ * （执行中交互：提问回答/拦截决策/补充指令输入需要键盘），窗口都只包内容，条外触摸不被吞；
  * 尺寸固定为像素值（触摸探针按矩形排除自家窗口，<=0 视为不存在）。
  */
 package com.example.autop.feature.overlay.indicator
@@ -35,7 +36,7 @@ internal fun runBarSpec(context: Context): OverlaySpec {
     )
 }
 
-/** 详情面板窗口 spec：条下观测面板，可触摸（滚动消息流）、不可聚焦。 */
+/** 详情面板窗口 spec：条下消息＋交互面板，可触摸（滚动消息流/输入）、可聚焦（键盘输入）。 */
 internal fun runDetailSpec(context: Context): OverlaySpec {
     val metrics = context.resources.displayMetrics
     val margin = (BAR_MARGIN.value * metrics.density).roundToInt()
@@ -46,7 +47,7 @@ internal fun runDetailSpec(context: Context): OverlaySpec {
         width = metrics.widthPixels - margin * 2,
         height = (metrics.heightPixels * DETAIL_HEIGHT_FRACTION).roundToInt(),
         touchable = true,
-        focusable = false,
+        focusable = true,
         gravity = OverlayGravity.TOP_LEFT,
     )
 }

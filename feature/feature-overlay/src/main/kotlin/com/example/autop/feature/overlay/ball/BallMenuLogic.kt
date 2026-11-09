@@ -21,9 +21,11 @@ public enum class BallMenuAction {
     OPEN_APP,
 
     /** 查看任务进度（有任务运行时）：打开进度悬浮窗。 */
+    @Deprecated("执行中交互已迁至顶部控制条＋消息条，悬浮球不再提供运行交互（N218）")
     VIEW_PROGRESS,
 
     /** 中止当前任务（有任务运行时）。 */
+    @Deprecated("执行中交互已迁至顶部控制条＋消息条，悬浮球不再提供运行交互（N218）")
     ABORT_RUN,
 
     /** 工具测试面板（两种状态都有；N198）。 */
@@ -34,8 +36,9 @@ public enum class BallMenuAction {
 }
 
 /**
- * 菜单项条件（N182，N198 加工具测试）：有任务运行给「查看进度 / 中止 / 工具测试」，
- * 空闲给「即时创建 / 打开应用 / 工具测试」。顺序即圆弧上的摆位（开口朝屏幕内侧，从上到下）。
+ * 菜单项条件（N182，N198 加工具测试）：空闲给「即时创建 / 打开应用 / 录制 / 工具测试 / 隐藏」；
+ * 有任务运行时**不再提供悬浮球交互**（N218：执行中交互走顶部控制条＋消息条，运行期球本身
+ * 也由控制条接管隐藏），返回空菜单。顺序即圆弧上的摆位（开口朝屏幕内侧，从上到下）。
  */
 public fun deriveBallMenu(active: ActiveRunInfo?): List<BallMenuAction> =
     if (active == null) {
@@ -47,7 +50,7 @@ public fun deriveBallMenu(active: ActiveRunInfo?): List<BallMenuAction> =
             BallMenuAction.HIDE_BALL,
         )
     } else {
-        listOf(BallMenuAction.VIEW_PROGRESS, BallMenuAction.ABORT_RUN, BallMenuAction.TOOL_TEST)
+        emptyList()
     }
 
 /** 圆弧菜单按钮中心（px，屏幕绝对坐标）。 */

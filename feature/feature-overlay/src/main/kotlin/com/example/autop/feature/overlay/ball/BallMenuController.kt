@@ -118,7 +118,11 @@ public class BallMenuController
             )
         }
 
-        /** 动作分发（先收起菜单再执行，N182）。 */
+        /** 动作分发（先收起菜单再执行，N182）。
+         *
+         * VIEW_PROGRESS / ABORT_RUN 为弃用入口（N218，代码保留）：执行中交互走控制条＋消息条。
+         */
+        @Suppress("DEPRECATION")
         private fun onAction(action: BallMenuAction) {
             dismiss()
             when (action) {

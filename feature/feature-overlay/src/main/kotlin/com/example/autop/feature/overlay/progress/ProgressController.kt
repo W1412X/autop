@@ -1,8 +1,8 @@
 /**
- * 进度悬浮窗装配（docs/tech/08 §5.3，N182）：窗口注册 / 显示 / 收起、消息行供给，
- * 并在 ask_user（waitingQuestion 出现）与策略拦截（POLICY_BLOCKED）时**自动弹出**——
- * 不在对话页时 ask_user 没有任何 UI 的修复（N182）：提问卡随进度窗在任何页面可见。
- * 窗口 `register` 由 app 组装层调用（FEATURE 不依赖 IMPL，docs/tech/01 §4）。
+ * 进度悬浮窗装配（docs/tech/08 §5.3，N182）：窗口注册 / 显示 / 收起、消息行供给。
+ * **已弃用**（N218）：执行中交互（ask_user 回答、拦截决策、补充指令）已由顶部控制条＋
+ * 消息条体系接管（IndicatorController 的运行详情面板自动展开），本进度窗不再自动弹出；
+ * 窗口与内容代码保留（[rowsState] 仍供运行详情面板共用），入口仅剩兼容调用。
  */
 package com.example.autop.feature.overlay.progress
 
@@ -14,7 +14,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.AssistantMessage
-import com.example.autop.agent.PauseReason
 import com.example.autop.agent.RunFinished
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
@@ -95,25 +94,7 @@ public class ProgressController
         private val lastThreadState = MutableStateFlow<ThreadId?>(null)
 
         init {
-            scope.launch { autoShow() }
             scope.launch { collectRows() }
-        }
-
-        /**
-         * 自动弹出（N182）：ask_user 等待回答或策略拦截需要决策时弹出进度窗——
-         * 只在「需要用户输入/决策」的迁移沿弹出，暂停等用户主动行为不打扰。
-         */
-        private suspend fun autoShow() {
-            var lastQuestion: String? = null
-            var lastBlocked = false
-            runService.observeActive().collect { info ->
-                val question = info?.run?.waitingQuestion
-                val blocked = info?.run?.pauseReason == PauseReason.POLICY_BLOCKED
-                if (question != null && lastQuestion == null) show()
-                if (blocked && !lastBlocked) show()
-                lastQuestion = question
-                lastBlocked = blocked
-            }
         }
 
         /**
@@ -185,7 +166,11 @@ public class ProgressController
                 }
             }
 
-        /** 展开进度悬浮窗（已显示时不重复 show）。 */
+        /** 展开进度悬浮窗（已显示时不重复 show）。
+         *
+         * 已弃用（N218）：执行中交互走控制条＋消息条，入口仅剩兼容调用。
+         */
+        @Deprecated("执行中交互已由顶部控制条＋消息条接管（IndicatorController），本进度窗弃用")
         public fun show() {
             if (visibleState.value) return
             visibleState.value = true

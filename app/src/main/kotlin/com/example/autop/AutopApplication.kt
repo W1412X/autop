@@ -41,7 +41,8 @@ import javax.inject.Inject
  * 触摸检测（[UserActivityMonitor] 注入即启动探针与 a11y 两路，docs/tech/05 §8）。
  * WP10 接线：中断恢复标记（docs/tech/04 §3.11）与审计日志定期清理（docs/tech/07 §8）。
  * N182 接线：圆弧菜单（MENU）与任务进度悬浮窗（PROGRESS）工厂注册；
- * 进度窗的自动弹出与消息行随 [ProgressController] 注入即自启动。
+ * 消息行随 [ProgressController] 注入即自启动（进度窗自动弹出已弃用 N218：
+ * 执行中交互由顶部控制条＋消息条接管，见 IndicatorController）。
  * N186 接线：触摸盾（[TouchShieldController]）最先注册与常驻显示，
  * 窗口按添加顺序垫底（同 type 后加者在上），球/菜单/面板/进度窗在盾之上照常交互。
  * 日志报错接线（questions.md N165）：CrashLogger 安装（未捕获异常落文件）与

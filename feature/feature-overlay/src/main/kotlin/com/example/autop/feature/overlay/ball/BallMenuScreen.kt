@@ -132,6 +132,7 @@ private fun MenuButton(
 }
 
 /** 动作 → 图标。 */
+@Suppress("DEPRECATION") // 弃用项 VIEW_PROGRESS/ABORT_RUN 保留在枚举（代码保留口径，N218）
 private fun menuIconOf(action: BallMenuAction): ImageVector =
     when (action) {
         BallMenuAction.CREATE_TASK -> AutopIcons.Add
@@ -145,6 +146,7 @@ private fun menuIconOf(action: BallMenuAction): ImageVector =
 
 /** 动作 → 无障碍描述文案（视觉无文字，读屏仍可辨）。 */
 @Composable
+@Suppress("DEPRECATION") // 弃用项 VIEW_PROGRESS/ABORT_RUN 保留在枚举（代码保留口径，N218）
 private fun menuLabelOf(action: BallMenuAction): String =
     stringResource(
         when (action) {

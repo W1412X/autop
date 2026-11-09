@@ -16,6 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import com.example.autop.agent.PauseReason
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.exceptionHandler
@@ -28,7 +29,9 @@ import com.example.autop.device.OverlaySpec
 import com.example.autop.feature.overlay.OverlayWindowIds
 import com.example.autop.feature.overlay.composeOverlayView
 import com.example.autop.feature.overlay.panel.PanelRunActions
+import com.example.autop.feature.overlay.progress.ProgressCallbacks
 import com.example.autop.feature.overlay.progress.ProgressController
+import com.example.autop.flow.FlowProgressFeed
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
@@ -58,6 +61,7 @@ public class IndicatorController
         private val configProvider: ConfigProvider,
         private val actions: PanelRunActions,
         private val progress: ProgressController,
+        private val flowFeed: FlowProgressFeed,
         dispatchers: DispatcherProvider,
         logger: Logger,
     ) {
@@ -93,6 +97,25 @@ public class IndicatorController
                 combine(runService.observeActive(), indicator) { active, ind ->
                     VisibilityInput(active = active, enabled = ind.enabled, barOn = ind.capsule, glowOn = ind.edgeGlow)
                 }.collect { input -> applyVisibility(input) }
+            }
+            scope.launch { autoExpandOnInteraction() }
+        }
+
+        /**
+         * 等待回答/被拦截的迁移沿自动展开详情面板（执行中交互走控制条＋消息条体系，
+         * 就地完成回答/决策，替代旧进度悬浮窗的自动弹出）。
+         */
+        private suspend fun autoExpandOnInteraction() {
+            var lastQuestion: String? = null
+            var lastBlocked = false
+            runService.observeActive().collect { info ->
+                val question = info?.run?.waitingQuestion
+                val blocked = info?.run?.pauseReason == PauseReason.POLICY_BLOCKED
+                if (questionAppeared(question, lastQuestion) || blockAppeared(blocked, lastBlocked)) {
+                    expandDetail()
+                }
+                lastQuestion = question
+                lastBlocked = blocked
             }
         }
 
@@ -161,9 +184,14 @@ public class IndicatorController
             if (detailExpanded.value) {
                 collapseDetail()
             } else {
-                detailExpanded.value = true
-                host.show(OverlayWindowIds.RUN_DETAIL, runDetailSpec(context))
+                expandDetail()
             }
+        }
+
+        private fun expandDetail() {
+            if (detailExpanded.value) return
+            detailExpanded.value = true
+            host.show(OverlayWindowIds.RUN_DETAIL, runDetailSpec(context))
         }
 
         private fun collapseDetail() {
@@ -208,7 +236,26 @@ public class IndicatorController
         @Composable
         private fun RunDetailContent() {
             val rows by progress.rowsState.collectAsState()
-            RunDetailScreen(rows = rows)
+            val active by runService.observeActive().collectAsState()
+            val callbacks =
+                remember(this) {
+                    ProgressCallbacks(
+                        onAnswer = actions::answer,
+                        onPauseResume = actions::pauseResume,
+                        onStop = actions::stop,
+                        onStopFlow = {
+                            val activeNow = runService.observeActive().value
+                            val rootRunId = activeNow?.run?.id
+                            if (rootRunId != null) flowFeed.cancel(rootRunId)
+                        },
+                        onOpenThread = {},
+                        onSteer = actions::steer,
+                        onContinueBlocked = actions::continueBlocked,
+                        onFinishBlocked = actions::finishBlocked,
+                        onClose = ::collapseDetail,
+                    )
+                }
+            RunDetailScreen(active = active, rows = rows, callbacks = callbacks)
         }
     }
 
@@ -219,6 +266,18 @@ private data class VisibilityInput(
     val barOn: Boolean,
     val glowOn: Boolean,
 )
+
+/** 等待回答出现（迁移沿：null → 非 null）。 */
+private fun questionAppeared(
+    question: String?,
+    lastQuestion: String?,
+): Boolean = question != null && lastQuestion == null
+
+/** 被拦截出现（迁移沿：false → true）。 */
+private fun blockAppeared(
+    blocked: Boolean,
+    lastBlocked: Boolean,
+): Boolean = blocked && !lastBlocked
 
 /** 智能体是否正在操作手机：有活跃 Run，且未暂停、未等待用户回答（与触摸盾的屏蔽态一致）。 */
 internal fun isOperating(active: ActiveRunInfo?): Boolean {

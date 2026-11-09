@@ -26,10 +26,9 @@ class BallMenuLogicTest {
     }
 
     @Test
-    fun `active run shows progress and abort in order`() {
-        assertThat(deriveBallMenu(activeRun()))
-            .containsExactly(BallMenuAction.VIEW_PROGRESS, BallMenuAction.ABORT_RUN, BallMenuAction.TOOL_TEST)
-            .inOrder()
+    fun `active run offers no ball interaction`() {
+        // 执行中交互走顶部控制条＋消息条（N218），悬浮球运行态菜单弃用。
+        assertThat(deriveBallMenu(activeRun())).isEmpty()
     }
 
     @Test
