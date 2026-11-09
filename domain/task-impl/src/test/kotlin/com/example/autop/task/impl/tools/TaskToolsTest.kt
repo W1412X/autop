@@ -42,7 +42,12 @@ class TaskToolsTest {
         runTest {
             val repo = FakeTaskRepository()
             val tool = createTool(repo)
-            val out = tool.invoke(buildJsonObject { put("name", " 早报 "); put("goal", "播报天气") }, ctx())
+            val args =
+                buildJsonObject {
+                    put("name", " 早报 ")
+                    put("goal", "播报天气")
+                }
+            val out = tool.invoke(args, ctx())
 
             assertThat(out.ok).isTrue()
             val saved = repo.saved.single()
@@ -115,7 +120,12 @@ class TaskToolsTest {
                     .jsonObject
                     .getValue("tasks")
                     .jsonArray
-                    .map { it.jsonObject.getValue("id").jsonPrimitive.content }
+                    .map {
+                        it.jsonObject
+                            .getValue("id")
+                            .jsonPrimitive
+                            .content
+                    }
             assertThat(ids).containsExactly("t6", "t5", "t4", "t3", "t2", "t1").inOrder()
             assertThat(out.links()).hasSize(5)
         }
@@ -158,9 +168,8 @@ class TaskToolsTest {
         flows: FlowStore = MapFlowStore(emptyList()),
     ): CreateTaskTool = CreateTaskTool(repo, flows, emptySet(), FakeClock(start = 1_000L), SeqIds())
 
-    private fun updateTool(
-        repo: FakeTaskRepository,
-    ): UpdateTaskTool = UpdateTaskTool(repo, MapFlowStore(emptyList()), emptySet(), FakeClock(start = 1_000L))
+    private fun updateTool(repo: FakeTaskRepository): UpdateTaskTool =
+        UpdateTaskTool(repo, MapFlowStore(emptyList()), emptySet(), FakeClock(start = 1_000L))
 
     private fun ctx(): ToolContext =
         object : ToolContext {
