@@ -67,7 +67,7 @@ public sealed interface ChatThreadAction {
 
     public data object DismissMoreMenu : ChatThreadAction
 
-    /** "保存为任务"（未落地，见 [ThreadNotice.SAVE_AS_TASK]）。 */
+    /** "保存为任务"（带会话摘录跳 AI 创建任务页）。 */
     public data object SaveAsTask : ChatThreadAction
 
     /** "导出日志"（事件 JSON lines + 应用日志，经系统分享发出，N175）。 */
@@ -115,5 +115,10 @@ public sealed interface ChatNavEvent {
     /** 步骤行的快捷入口：由 app 按 [StepLink.kind] 跳任务/流程页面。 */
     public data class OpenLink(
         val link: StepLink,
+    ) : ChatNavEvent
+
+    /** "保存为任务"：跳 AI 创建任务页，[hint] 为带入的会话摘录。 */
+    public data class OpenTaskCreate(
+        val hint: String,
     ) : ChatNavEvent
 }

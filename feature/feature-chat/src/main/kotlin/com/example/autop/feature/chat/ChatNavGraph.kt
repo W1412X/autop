@@ -85,6 +85,7 @@ private fun ChatThreadRoute(
                 ChatNavEvent.Background -> navigator.backgroundApp()
                 is ChatNavEvent.ExportLog -> navigator.shareExport(event.text)
                 is ChatNavEvent.OpenLink -> navigator.openStepLink(event.link)
+                is ChatNavEvent.OpenTaskCreate -> navigator.openTaskCreate(event.hint)
             }
         }
     }

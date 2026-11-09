@@ -30,6 +30,9 @@ public const val RUN_ID_ARG: String = "runId"
 /** 新建任务时的路由参数占位值。 */
 public const val NEW_TASK_ID: String = "new"
 
+/** AI 创建任务路由的会话摘录参数名（对话页「保存为任务」带入）。 */
+public const val TASK_HINT_ARG: String = "hint"
+
 /**
  * 挂载任务域四路由（docs/tech/08 §4.3）。
  *

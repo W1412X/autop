@@ -9,6 +9,7 @@ import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.TaskId
 import com.example.autop.feature.tasks.NEW_TASK_ID
+import com.example.autop.feature.tasks.TASK_HINT_ARG
 import com.example.autop.feature.tasks.TASK_ID_ARG
 import com.example.autop.feature.tasks.TasksNavigator
 import com.example.autop.task.TaskAuthor
@@ -63,10 +64,14 @@ public class TaskAuthorViewModel
         private var sendJob: Job? = null
 
         init {
+            // 「保存为任务」带入的会话摘录：消费一次即清，进程重建不重复自动发送。
+            val hint = savedStateHandle.get<String>(TASK_HINT_ARG)?.takeIf { it.isNotBlank() }
+            savedStateHandle[TASK_HINT_ARG] = null
             viewModelScope.launch {
                 val s = author.open(taskId?.let(::TaskId))
                 session = s
-                s.state.collect { st -> _uiState.update { it.copy(author = st) } }
+                launch { s.state.collect { st -> _uiState.update { it.copy(author = st) } } }
+                hint?.let { text -> sendJob = launch { s.send(text) } }
             }
         }
 

@@ -203,7 +203,6 @@ private suspend fun scrollToEnd(
 private fun noticeText(notice: ThreadNotice): String =
     stringResource(
         when (notice) {
-            ThreadNotice.SAVE_AS_TASK -> R.string.thread_notice_save_task
             ThreadNotice.EXPORT_LOG -> R.string.thread_notice_export
             ThreadNotice.COPIED -> R.string.thread_notice_copied
             ThreadNotice.IMAGE_FAILED -> R.string.thread_notice_image_failed

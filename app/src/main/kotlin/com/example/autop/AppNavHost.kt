@@ -416,6 +416,10 @@ private fun createChatNavigator(
             }
         }
 
+        override fun openTaskCreate(hint: String) {
+            navController.navigate(AutopRoutes.taskAuthor(hint = hint))
+        }
+
         override fun navigateBack() {
             navController.popBackStack()
         }

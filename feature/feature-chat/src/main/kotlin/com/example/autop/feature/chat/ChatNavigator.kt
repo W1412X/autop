@@ -27,6 +27,9 @@ public interface ChatNavigator {
     /** 步骤行快捷入口：按 [StepLink.kind] 跳任务/流程详情、编辑或 AI 编辑（由 app 映射路由）。 */
     public fun openStepLink(link: StepLink)
 
+    /** "保存为任务"：跳 AI 创建任务页，[hint] 为带入的会话摘录（由 app 映射路由）。 */
+    public fun openTaskCreate(hint: String)
+
     /** 返回上一级（`popBackStack`，由 app 实现）。 */
     public fun navigateBack()
 }

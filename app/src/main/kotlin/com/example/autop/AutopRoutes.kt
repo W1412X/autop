@@ -18,6 +18,7 @@ import com.example.autop.feature.onboarding.ONBOARDING_MODE_HEALTH
 import com.example.autop.feature.settings.ME_SECTION_ARG
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.RUN_ID_ARG
+import com.example.autop.feature.tasks.TASK_HINT_ARG
 import com.example.autop.feature.tasks.TASK_ID_ARG
 
 /** 全部应用路由。 */
@@ -125,12 +126,17 @@ object AutopRoutes {
     /** 任务编辑路由：[taskId] 取 feature-tasks 的 [NEW_TASK_ID]（新建）或真实任务 id。 */
     fun taskEdit(taskId: String = NEW_TASK_ID): String = "tasks/edit/$taskId"
 
-    /** AI 创建/修改任务路由模板（[taskId] 为 [NEW_TASK_ID] 时新建）。 */
-    val TASK_AUTHOR: String = "tasks/author?${TASK_ID_ARG}={${TASK_ID_ARG}}"
+    /** AI 创建/修改任务路由模板（[taskId] 为 [NEW_TASK_ID] 时新建；[TASK_HINT_ARG] 为带入的会话摘录）。 */
+    val TASK_AUTHOR: String =
+        "tasks/author?${TASK_ID_ARG}={${TASK_ID_ARG}}&${TASK_HINT_ARG}={${TASK_HINT_ARG}}"
 
-    /** AI 创建/修改任务路由：[taskId] 取 [NEW_TASK_ID]（新建）或真实任务 id。 */
-    fun taskAuthor(taskId: String? = NEW_TASK_ID): String =
-        "tasks/author?${TASK_ID_ARG}=${Uri.encode(taskId ?: NEW_TASK_ID)}"
+    /** AI 创建/修改任务路由：[taskId] 取 [NEW_TASK_ID]（新建）或真实任务 id；[hint] 为带入的会话摘录。 */
+    fun taskAuthor(
+        taskId: String? = NEW_TASK_ID,
+        hint: String? = null,
+    ): String =
+        "tasks/author?${TASK_ID_ARG}=${Uri.encode(taskId ?: NEW_TASK_ID)}" +
+            "&${TASK_HINT_ARG}=${Uri.encode(hint.orEmpty())}"
 
     /** 任务详情路由。 */
     fun taskDetail(taskId: String): String = "tasks/detail/$taskId"

@@ -203,8 +203,11 @@ public class ChatThreadViewModel
                     meta.update { it.copy(sheet = it.sheet.copy(moreMenu = true)) }
                 ChatThreadAction.DismissMoreMenu ->
                     meta.update { it.copy(sheet = it.sheet.copy(moreMenu = false)) }
-                ChatThreadAction.SaveAsTask ->
-                    meta.update { it.copy(notice = ThreadNotice.SAVE_AS_TASK, sheet = it.sheet.copy(moreMenu = false)) }
+                ChatThreadAction.SaveAsTask -> {
+                    meta.update { it.copy(sheet = it.sheet.copy(moreMenu = false)) }
+                    val hint = taskHintOf(uiState.value.entries)
+                    viewModelScope.launch { navChannel.send(ChatNavEvent.OpenTaskCreate(hint)) }
+                }
                 ChatThreadAction.ExportLog -> exportLog()
                 ChatThreadAction.DeleteThread ->
                     meta.update { it.copy(sheet = it.sheet.copy(deleteConfirm = true, moreMenu = false)) }
@@ -372,3 +375,12 @@ public class ChatThreadViewModel
 
 /** 标题刷新去抖（事件连发时合并成一次库查询，同对话列表 N184 口径）。 */
 private const val TITLE_REFRESH_DEBOUNCE_MS: Long = 300
+
+/** 「保存为任务」带给任务创作页的输入：用户消息摘录。 */
+private fun taskHintOf(entries: List<TimelineEntry>): String =
+    entries
+        .mapNotNull { (it.item as? TimelineItem.UserBubble)?.text }
+        .joinToString("\n")
+        .take(TASK_HINT_MAX_CHARS)
+
+private const val TASK_HINT_MAX_CHARS: Int = 200

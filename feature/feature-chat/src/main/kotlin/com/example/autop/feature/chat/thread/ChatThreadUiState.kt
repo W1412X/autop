@@ -15,9 +15,6 @@ public data class WaitingQuestion(
 
 /** 一次性提示种类（文案在 strings，ViewModel 不接触资源）。 */
 public enum class ThreadNotice {
-    /** "保存为任务"未落地（feature-tasks 在后续 WP）。 */
-    SAVE_AS_TASK,
-
     /** "导出日志"未落地。 */
     EXPORT_LOG,
 
