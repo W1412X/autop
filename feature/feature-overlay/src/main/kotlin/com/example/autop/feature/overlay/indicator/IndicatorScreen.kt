@@ -1,7 +1,7 @@
 /**
- * 执行期指示的界面（ADR-0014）：沿屏幕四周的柔光带，颜色取主题色（主色、第三色、次色循环）并缓慢流动，
- * 光带随呼吸起伏并轻微涨落；顶部胶囊显示步数。颜色全部取自 [MaterialTheme.colorScheme]，
- * 随主题色与深浅色动态变化。
+ * 执行期指示的边缘光（ADR-0014）：沿屏幕四周的柔光带，颜色取主题色（主色、第三色、次色循环）并缓慢流动，
+ * 光带随呼吸起伏并轻微涨落。颜色全部取自 [MaterialTheme.colorScheme]，
+ * 随主题色与深浅色动态变化。（原顶部胶囊升级为独立的运行控制条，见 RunBarScreen。）
  *
  * 光带形状来自一次性生成的高斯模糊遮罩（[buildGlowMask]），渐变连续、没有分层；
  * 每帧只用旋转的扫描渐变上色（`SrcIn`）。随帧变化的值都只在绘制阶段读取，整屏界面不随动画重组。
@@ -10,27 +10,18 @@
 package com.example.autop.feature.overlay.indicator
 
 import android.graphics.Matrix
-import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.tween
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.remember
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -43,11 +34,9 @@ import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.SweepGradientShader
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.IntSize
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
-import com.example.autop.feature.overlay.R
 import com.example.autop.feature.overlay.rememberBreath
 import com.example.autop.feature.overlay.rememberRotation
 import kotlin.math.roundToInt
@@ -77,22 +66,10 @@ private const val GLOW_SCALE_MAX: Float = 1.05f
 /** 流光绕屏一周的时长（毫秒）。 */
 private const val GLOW_ROTATE_MS: Long = 9000L
 
-/** 胶囊状态点随呼吸缩放的下限。 */
-private const val DOT_SCALE_MIN: Float = 0.7f
-
-/** 胶囊状态点的直径倍数（相对 spacing.sm）与顶部留白倍数（相对 spacing.xl）。 */
-private const val DOT_SIZE_FACTOR: Int = 2
-private const val CAPSULE_TOP_FACTOR: Int = 2
-
-/** 胶囊淡入时从上方滑入的距离，取 spacing.md 的倍数。 */
-private const val CAPSULE_SLIDE_FACTOR: Int = 2
-
-/** 执行期指示内容。[visible] 为 false 时淡出（窗口由控制器在淡出后移除）。 */
+/** 边缘光内容。[visible] 为 false 时淡出（窗口由控制器在淡出后移除）。 */
 @Composable
 internal fun IndicatorScreen(
-    stepCount: Int,
     edgeGlow: Boolean,
-    capsule: Boolean,
     pulseMs: Long,
     visible: Boolean = true,
 ) {
@@ -111,7 +88,6 @@ internal fun IndicatorScreen(
     }
     Box(modifier = Modifier.fillMaxSize()) {
         if (edgeGlow) EdgeGlow(breath = breath, rotation = rotation, appear = appear)
-        if (capsule) Capsule(stepCount = stepCount, appear = appear, breath = breath, motionOn = motionOn)
     }
 }
 
@@ -176,57 +152,5 @@ private class RotatingSweepBrush(
         val shader = SweepGradientShader(center, colors)
         shader.setLocalMatrix(Matrix().apply { setRotate(degrees, center.x, center.y) })
         return shader
-    }
-}
-
-/** 顶部胶囊：状态点随呼吸起伏，步数变化交叉淡入，随整体淡入从上方滑入。 */
-@Composable
-private fun Capsule(
-    stepCount: Int,
-    appear: Animatable<Float, AnimationVector1D>,
-    breath: State<Float>,
-    motionOn: Boolean,
-) {
-    val colors = MaterialTheme.colorScheme
-    val spacing = LocalSpacing.current
-    val slide = spacing.md * CAPSULE_SLIDE_FACTOR
-    Box(modifier = Modifier.fillMaxSize()) {
-        Row(
-            modifier =
-                Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = spacing.xl * CAPSULE_TOP_FACTOR)
-                    .graphicsLayer {
-                        alpha = appear.value
-                        translationY = -(1f - appear.value) * slide.toPx()
-                    }.clip(CircleShape)
-                    .background(colors.primaryContainer)
-                    .padding(horizontal = spacing.md, vertical = spacing.sm),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(
-                modifier =
-                    Modifier
-                        .size(spacing.sm * DOT_SIZE_FACTOR)
-                        .graphicsLayer {
-                            val scale = DOT_SCALE_MIN + (1f - DOT_SCALE_MIN) * breath.value
-                            scaleX = scale
-                            scaleY = scale
-                        }.clip(CircleShape)
-                        .background(colors.primary),
-            )
-            Crossfade(
-                targetState = stepCount,
-                animationSpec = tween(durationMillis = if (motionOn) FADE_IN_MS / 2 else 0),
-                label = "indicator_step",
-            ) { step ->
-                Text(
-                    text = stringResource(R.string.indicator_operating, step),
-                    style = MaterialTheme.typography.labelLarge,
-                    color = colors.onPrimaryContainer,
-                    modifier = Modifier.padding(start = spacing.sm),
-                )
-            }
-        }
     }
 }

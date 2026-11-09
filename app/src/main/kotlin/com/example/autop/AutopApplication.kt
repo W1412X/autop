@@ -29,6 +29,7 @@ import com.example.autop.task.impl.schedule.TriggerHub
 import com.example.autop.task.impl.store.AuditCleaner
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -108,16 +109,20 @@ class AutopApplication : Application() {
         overlayWindows.register(OverlayWindowIds.RECORD, recordController.recordFactory())
         overlayWindows.register(OverlayWindowIds.PICKER, recordController.pickerFactory())
         overlayWindows.register(OverlayWindowIds.PAIRING, pairingCardController.cardFactory())
-        // ADR-0014：执行期指示在盾之上（不可触摸，不挡注入）。
+        // ADR-0014：执行期指示在盾之上（边缘光不可触摸不挡注入；控制条可触摸、只包内容）。
         overlayWindows.register(OverlayWindowIds.INDICATOR, indicatorController.indicatorFactory())
+        overlayWindows.register(OverlayWindowIds.RUN_BAR, indicatorController.runBarFactory())
+        overlayWindows.register(OverlayWindowIds.RUN_DETAIL, indicatorController.runDetailFactory())
         indicatorController.start()
-        // 悬浮球显隐随 ui.overlay.enabled 实时生效（菜单"隐藏悬浮球"/设置页开关立即收放）。
+        // 悬浮球显隐随 ui.overlay.enabled 实时生效（菜单"隐藏悬浮球"/设置页开关立即收放）；
+        // 运行期顶部控制条承担提示与停止入口时隐藏悬浮球（功能保留，Run 收口自动回显）。
         appScope.launch {
-            configProvider
-                .observe()
-                .map { it[UiConfig.OVERLAY].enabled }
+            combine(
+                configProvider.observe().map { it[UiConfig.OVERLAY].enabled },
+                indicatorController.barVisible,
+            ) { enabled, barVisible -> enabled && !barVisible }
                 .distinctUntilChanged()
-                .collect { enabled -> if (enabled) ballController.start() else ballController.hide() }
+                .collect { show -> if (show) ballController.start() else ballController.hide() }
         }
         // 无线调试配对自动发现（未配对时后台监听可配对服务，发现即通知；配对成功自动停用）。
         pairingDiscovery.start(appScope)

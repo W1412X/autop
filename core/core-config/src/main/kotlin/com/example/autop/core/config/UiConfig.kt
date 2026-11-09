@@ -110,14 +110,14 @@ public data class UiOverlaySection(
 private const val OPACITY_MIN: Double = 0.5
 private const val OPACITY_MAX: Double = 1.0
 
-/** `ui.indicator`：执行期状态指示（屏幕边缘光 + 顶部胶囊；ADR-0014）。颜色取自主题，不在配置里。 */
+/** `ui.indicator`：执行期状态指示（屏幕边缘光 + 顶部运行控制条；ADR-0014）。颜色取自主题，不在配置里。 */
 @Serializable
 public data class UiIndicatorSection(
     /** 总开关：关闭后执行期不显示任何指示。 */
     @SerialName("enabled") val enabled: Boolean = true,
     /** 屏幕边缘光。 */
     @SerialName("edgeGlow") val edgeGlow: Boolean = true,
-    /** 顶部胶囊（步数与阶段）。 */
+    /** 顶部运行控制条（状态 + 操作；运行期隐藏悬浮球时的唯一常驻入口）。 */
     @SerialName("capsule") val capsule: Boolean = true,
     /** 呼吸周期（毫秒）；动效关闭时不呼吸。 */
     @SerialName("pulseMs") val pulseMs: Long = 1800,

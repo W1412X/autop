@@ -23,8 +23,14 @@ public object OverlayWindowIds {
     /** 流程录制的整屏拾取层（点击元素，V5 拾取模式）。 */
     public const val PICKER: String = "overlay.picker"
 
-    /** 执行期状态指示：屏幕边缘光 + 顶部胶囊（ADR-0014）；全屏、不可触摸、不可聚焦。 */
+    /** 执行期状态指示：屏幕边缘光（ADR-0014）；全屏、不可触摸、不可聚焦。 */
     public const val INDICATOR: String = "overlay.indicator"
+
+    /** 运行控制条（原顶部胶囊升级）：顶部窄条，可触摸（操作信息 + 暂停/继续/中止按钮）。 */
+    public const val RUN_BAR: String = "overlay.run_bar"
+
+    /** 运行详情面板（点控制条操作信息展开）：条下消息流观测视图，可触摸（滚动）。 */
+    public const val RUN_DETAIL: String = "overlay.run_detail"
 
     /** 配对卡（无线调试配对码输入小窗，发现可配对设备即弹；可聚焦供输入法）。 */
     public const val PAIRING: String = "overlay.pairing"

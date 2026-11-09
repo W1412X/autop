@@ -58,7 +58,6 @@
 
     <!-- 流程录制面板（flows-recording-recovery.md V5） -->
     <string name="overlay_ball_recording_description">正在录制流程，单击展开录制面板</string>
-    <string name="indicator_operating">AutoP 正在操作手机 · 第 %1$d 步</string>
     <string name="record_title">录制流程</string>
     <string name="record_hint">切到要录制的应用，正常操作即可。结束后保存为待确认的流程。</string>
     <string name="record_status">已记录 %1$d 个操作</string>
@@ -102,6 +101,11 @@
     <string name="record_saved">已保存为待确认流程，请在“流程”页确认</string>
     <string name="record_failed">保存失败，请重试</string>
     <string name="record_default_name">录制的流程</string>
+
+    <!-- 顶部运行控制条（执行期胶囊升级） -->
+    <string name="run_bar_running">%1$s · 第 %2$d 步</string>
+    <string name="run_bar_step">第 %1$d 步</string>
+    <string name="run_bar_stop">中止</string>
 
     <!-- 任务进度悬浮窗（docs/tech/08 §5.3，N182） -->
     <string name="progress_title">任务进度</string>

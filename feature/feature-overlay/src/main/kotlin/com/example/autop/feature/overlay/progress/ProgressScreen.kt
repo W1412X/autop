@@ -16,15 +16,12 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Send
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -110,7 +107,7 @@ internal fun ProgressScreen(
             currentStep = flowHintOf(active) ?: active?.currentStep,
             onClose = callbacks.onClose,
         )
-        MessageList(rows = rows, modifier = Modifier.weight(1f))
+        ProgressMessageList(rows = rows, modifier = Modifier.weight(1f))
         AlertCards(active = active, callbacks = callbacks)
         ControlRow(active = active, expanded = header.runControls, callbacks = callbacks)
         if (header.runControls) {
@@ -214,27 +211,6 @@ private fun HeaderHint(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 1,
                 )
-        }
-    }
-}
-
-/** 消息流（chat 页消息同款，N182）：新行自动滚到底。 */
-@Composable
-private fun MessageList(
-    rows: List<ProgressRow>,
-    modifier: Modifier = Modifier,
-) {
-    val listState = rememberLazyListState()
-    LaunchedEffect(rows.size) {
-        if (rows.isNotEmpty()) listState.animateScrollToItem(rows.size - 1)
-    }
-    LazyColumn(
-        state = listState,
-        modifier = modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
-    ) {
-        items(rows.size) { index ->
-            ProgressRowView(row = rows[index])
         }
     }
 }
@@ -398,19 +374,6 @@ private fun ControlRow(
             onClick = callbacks.onOpenThread,
         )
     }
-}
-
-/** 流程执行中的提示行（P1-2）：流程名 · 当前节点 · 已完成步数。 */
-private fun flowHintOf(active: ActiveRunInfo?): String? {
-    val flow = active?.flow ?: return null
-    val node = flow.progress.currentNodeName ?: flow.progress.currentNodeId ?: return flow.flowName
-    val done =
-        if (flow.progress.completedNodes > 0) {
-            "已完成 ${flow.progress.completedNodes} 步"
-        } else {
-            null
-        }
-    return listOfNotNull("流程：${flow.flowName}", node, done).joinToString(" · ")
 }
 
 /** steer 补充指令输入行（同运行面板 SteerRow）。 */

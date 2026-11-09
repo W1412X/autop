@@ -1,6 +1,11 @@
 /**
- * 执行期状态指示的显示控制（ADR-0014）：智能体正在操作手机（Run 活跃、未暂停、未等待回答）时显示
- * 屏幕边缘光与顶部胶囊；暂停、等待用户回答或指示关闭时隐藏。窗口本身不可触摸、不可聚焦，不会挡住注入动作。
+ * 执行期状态指示的显示控制（ADR-0014 + 运行控制条）：
+ * - 边缘光（[OverlayWindowIds.INDICATOR]，整屏不可触摸）：Run 活跃、未暂停、未等待回答时显示。
+ * - 运行控制条（[OverlayWindowIds.RUN_BAR]，顶部窄条可触摸）：有活跃 Run 即显示（暂停/
+ *   等待也有操作出口），点操作信息展开详情、按钮执行暂停/继续/中止。
+ * - 运行详情（[OverlayWindowIds.RUN_DETAIL]）：条下的消息流观测面板，展开时显示、再点收起。
+ * 悬浮球在控制条可见时由组装层隐藏（[barVisible] 同源），Run 收口自动回显；控制条窗口
+ * 不可聚焦、只包内容，不挡注入（注入期封锁由 `blockInput` 按相交区域覆盖）。
  */
 package com.example.autop.feature.overlay.indicator
 
@@ -22,56 +27,107 @@ import com.example.autop.device.OverlayHost
 import com.example.autop.device.OverlaySpec
 import com.example.autop.feature.overlay.OverlayWindowIds
 import com.example.autop.feature.overlay.composeOverlayView
+import com.example.autop.feature.overlay.panel.PanelRunActions
+import com.example.autop.feature.overlay.progress.ProgressController
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
 /** 指示窗口的显示与隐藏（进程级）。 */
 @Singleton
+@Suppress("LongParameterList", "TooManyFunctions") // 装配类：端口 + 动作 + 消息源 + 三窗口显隐面，职责单一
 public class IndicatorController
     @Inject
     constructor(
+        @ApplicationContext private val context: Context,
         private val host: OverlayHost,
         private val runService: RunService,
         private val configProvider: ConfigProvider,
+        private val actions: PanelRunActions,
+        private val progress: ProgressController,
         dispatchers: DispatcherProvider,
         logger: Logger,
     ) {
         private val scope =
             CoroutineScope(SupervisorJob() + dispatchers.main + logger.exceptionHandler("IndicatorController"))
-        private var shown = false
+        private var glowShown = false
+        private var barShown = false
         private var hideJob: Job? = null
 
-        /** 内容是否处于“显示”态；变为 false 时内容淡出，淡出结束后才移除窗口。 */
+        /** 边缘光内容是否处于“显示”态；变为 false 时内容淡出，淡出结束后才移除窗口。 */
         private val contentVisible = MutableStateFlow(false)
 
-        /** 订阅 Run 与配置，按规则显示或隐藏指示窗口（幂等）。 */
+        /** 详情面板展开（点操作信息切换；控制条隐藏时收起）。 */
+        private val detailExpanded = MutableStateFlow(false)
+
+        /** 控制条可见中（悬浮球显隐同源用：条可见则藏球）。 */
+        private val barVisibleState = MutableStateFlow(false)
+
+        /** 控制条是否可见。 */
+        public val barVisible: StateFlow<Boolean> = barVisibleState.asStateFlow()
+
+        /** 订阅 Run 与配置，按规则显示或隐藏各窗口（幂等）。 */
         public fun start() {
             scope.launch {
-                combine(runService.observeActive(), configProvider.observe()) { active, cfg ->
-                    active to cfg[UiConfig.INDICATOR].enabled
-                }.collect { (active, enabled) -> apply(enabled && isOperating(active)) }
+                val indicator = configProvider.observe().map { it[UiConfig.INDICATOR] }
+                combine(runService.observeActive(), indicator) { active, ind ->
+                    VisibilityInput(active = active, enabled = ind.enabled, barOn = ind.capsule, glowOn = ind.edgeGlow)
+                }.collect { input -> applyVisibility(input) }
             }
         }
 
-        /** 指示窗口工厂（app 组装层注册到 `OverlayWindowManager`）。 */
+        /** 边缘光窗口工厂（app 组装层注册到 `OverlayWindowManager`）。 */
         public fun indicatorFactory(): (Context, OverlayLifecycleOwner) -> View =
             { windowContext, owner ->
                 composeOverlayView(windowContext, owner) { IndicatorContent() }
             }
 
-        private fun apply(visible: Boolean) {
-            if (visible == shown) return
-            shown = visible
+        /** 运行控制条窗口工厂。 */
+        public fun runBarFactory(): (Context, OverlayLifecycleOwner) -> View =
+            { windowContext, owner ->
+                composeOverlayView(windowContext, owner) { RunBarContent() }
+            }
+
+        /** 运行详情窗口工厂。 */
+        public fun runDetailFactory(): (Context, OverlayLifecycleOwner) -> View =
+            { windowContext, owner ->
+                composeOverlayView(windowContext, owner) { RunDetailContent() }
+            }
+
+        /** 控制条与边缘光的显隐；控制条隐藏时一并收起详情面板。 */
+        private fun applyVisibility(input: VisibilityInput) {
+            applyBar(input.enabled && input.barOn && input.active != null)
+            applyGlow(input.enabled && input.glowOn && isOperating(input.active))
+        }
+
+        private fun applyBar(visible: Boolean) {
+            if (visible == barShown) return
+            barShown = visible
+            barVisibleState.value = visible
+            if (visible) {
+                host.show(OverlayWindowIds.RUN_BAR, runBarSpec(context))
+            } else {
+                collapseDetail()
+                host.hide(OverlayWindowIds.RUN_BAR)
+            }
+        }
+
+        private fun applyGlow(visible: Boolean) {
+            if (visible == glowShown) return
+            glowShown = visible
             hideJob?.cancel()
             if (visible) {
                 contentVisible.value = true
@@ -86,20 +142,67 @@ public class IndicatorController
             }
         }
 
+        /** 操作信息点按：展开/收起详情面板。 */
+        private fun toggleDetail() {
+            if (detailExpanded.value) {
+                collapseDetail()
+            } else {
+                detailExpanded.value = true
+                host.show(OverlayWindowIds.RUN_DETAIL, runDetailSpec(context))
+            }
+        }
+
+        private fun collapseDetail() {
+            if (!detailExpanded.value) return
+            detailExpanded.value = false
+            host.hide(OverlayWindowIds.RUN_DETAIL)
+        }
+
+        /** 控制条按钮：暂停/继续走同一切换入口；中止先收起详情再走安全停止（N191/N217）。 */
+        private fun onAction(action: RunBarAction) {
+            when (action) {
+                RunBarAction.PAUSE, RunBarAction.RESUME -> actions.pauseResume()
+                RunBarAction.STOP -> {
+                    collapseDetail()
+                    actions.stop()
+                }
+            }
+        }
+
         @Composable
         private fun IndicatorContent() {
-            val active by runService.observeActive().collectAsState()
             val visible by contentVisible.collectAsState()
             val cfg = remember(configProvider) { configProvider.current()[UiConfig.INDICATOR] }
-            IndicatorScreen(
-                stepCount = active?.stepCount ?: 0,
-                edgeGlow = cfg.edgeGlow,
-                capsule = cfg.capsule,
-                pulseMs = cfg.pulseMs,
-                visible = visible,
+            IndicatorScreen(edgeGlow = cfg.edgeGlow, pulseMs = cfg.pulseMs, visible = visible)
+        }
+
+        @Composable
+        private fun RunBarContent() {
+            val active by runService.observeActive().collectAsState()
+            val expanded by detailExpanded.collectAsState()
+            val current = active ?: return
+            RunBarScreen(
+                active = current,
+                expanded = expanded,
+                onToggleExpand = ::toggleDetail,
+                onAction = ::onAction,
             )
         }
+
+        @Composable
+        private fun RunDetailContent() {
+            val rows by progress.rowsState.collectAsState()
+            RunDetailScreen(rows = rows)
+        }
     }
+
+/** 可见性输入（Run 快照 + 指示配置）。 */
+private data class VisibilityInput(
+    val active: ActiveRunInfo?,
+    val enabled: Boolean,
+    val barOn: Boolean,
+    val glowOn: Boolean,
+)
 
 /** 智能体是否正在操作手机：有活跃 Run，且未暂停、未等待用户回答（与触摸盾的屏蔽态一致）。 */
 internal fun isOperating(active: ActiveRunInfo?): Boolean {

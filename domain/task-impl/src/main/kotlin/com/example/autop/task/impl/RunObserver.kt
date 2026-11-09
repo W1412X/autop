@@ -142,7 +142,11 @@ public class RunObserver(
                         val calls = payload.blocks.filterIsInstance<Block.ToolCall>()
                         if (calls.isNotEmpty()) {
                             _active.update { info ->
-                                info?.copy(stepCount = info.stepCount + calls.size, currentStep = calls.last().name)
+                                val call = calls.last()
+                                info?.copy(
+                                    stepCount = info.stepCount + calls.size,
+                                    currentStep = stepTextOf(call.name, call.argsJson),
+                                )
                             }
                         }
                     }

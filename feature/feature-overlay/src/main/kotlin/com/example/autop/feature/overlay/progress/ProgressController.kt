@@ -85,8 +85,8 @@ public class ProgressController
 
         private val rowsInput = MutableStateFlow(RowsInput())
 
-        /** 消息行（历史 + 流式增量重算，N186）。 */
-        private val rowsState: StateFlow<List<ProgressRow>> =
+        /** 消息行（历史 + 流式增量重算，N186；进度窗与顶部运行详情面板共用）。 */
+        internal val rowsState: StateFlow<List<ProgressRow>> =
             rowsInput
                 .map { progressRowsOf(it.history, it.live) }
                 .stateIn(scope, SharingStarted.Eagerly, emptyList())
