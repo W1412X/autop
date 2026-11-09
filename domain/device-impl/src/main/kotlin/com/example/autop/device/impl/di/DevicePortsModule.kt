@@ -3,8 +3,11 @@
  */
 package com.example.autop.device.impl.di
 
+import android.content.Context
 import com.example.autop.agent.ReplayStateProbe
 import com.example.autop.agent.ReplayTargetResolver
+import com.example.autop.core.common.DispatcherProvider
+import com.example.autop.core.common.Logger
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.ElementPicker
@@ -18,6 +21,7 @@ import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellKeepAlive
 import com.example.autop.device.TouchShield
 import com.example.autop.device.UiStabilizer
+import com.example.autop.device.UpdateChecker
 import com.example.autop.device.VisualScreenParser
 import com.example.autop.device.impl.AppLauncherImpl
 import com.example.autop.device.impl.DeviceStateProviderImpl
@@ -34,10 +38,12 @@ import com.example.autop.device.impl.shell.AdbShellInput
 import com.example.autop.device.impl.shell.PairingDiscoveryImpl
 import com.example.autop.device.impl.shell.ShellKeepAliveImpl
 import com.example.autop.device.impl.touch.TouchShieldController
+import com.example.autop.device.impl.update.GitHubUpdateChecker
 import com.example.autop.device.impl.vision.VisualScreenParserImpl
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
+import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
 import javax.inject.Singleton
 
@@ -113,4 +119,13 @@ public object DevicePortsModule {
     @Provides
     @Singleton
     public fun provideObserveModeAvailability(impl: ObserveModeResolver): ObserveModeAvailability = impl
+
+    /** 应用更新检测（GitHub Releases 静默检查 + 后台下载 + 系统安装器）。 */
+    @Provides
+    @Singleton
+    public fun provideUpdateChecker(
+        @ApplicationContext context: Context,
+        dispatchers: DispatcherProvider,
+        logger: Logger,
+    ): UpdateChecker = GitHubUpdateChecker(context, dispatchers, logger)
 }

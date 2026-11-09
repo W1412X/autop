@@ -6,6 +6,7 @@ package com.example.autop.feature.settings.me
 import com.example.autop.core.config.UiAppearanceSection
 import com.example.autop.core.config.UiBannerSection
 import com.example.autop.device.ShellState
+import com.example.autop.device.UpdateState
 
 /** 横幅提示类型（文案在 feature-settings 的 strings，ViewModel 不接触资源）。 */
 public enum class NoticeKind {
@@ -70,7 +71,26 @@ public data class MeUiState(
     val hostRunning: Boolean = false,
     /** 主模型已分配（状态卡）。 */
     val mainModelAssigned: Boolean = false,
+    /** 应用更新状态（关于分组"检查更新"与新版本横幅）。 */
+    val update: UpdateState = UpdateState.Idle,
+    /** 手动检测结果提示（已是最新/检测失败；null 表示无）。 */
+    val updateNotice: UpdateNotice? = null,
 )
+
+/** 手动检查更新的结果提示。 */
+public enum class UpdateNotice {
+    /** 已是最新版本。 */
+    UP_TO_DATE,
+
+    /** 检测失败（网络不可达等）。 */
+    CHECK_FAILED,
+
+    /** 下载失败。 */
+    DOWNLOAD_FAILED,
+
+    /** 需先授权"安装未知应用"（已跳系统授权页）。 */
+    INSTALL_PERMISSION,
+}
 
 /** 稍后可选档位（分钟，docs/tech/07 §4.4）。 */
 private const val SNOOZE_SHORT = 5

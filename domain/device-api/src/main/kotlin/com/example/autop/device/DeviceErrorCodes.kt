@@ -77,4 +77,16 @@ public object DeviceErrorCodes {
 
     /** 等待条件超时。 */
     public const val TIMEOUT: String = "device.timeout"
+
+    /** 更新检测失败（网络不可达、GitHub 限流或响应异常）。 */
+    public const val UPDATE_CHECK_FAILED: String = "device.update_check_failed"
+
+    /** 更新下载失败（网络中断、写入失败或资产缺失）。 */
+    public const val UPDATE_DOWNLOAD_FAILED: String = "device.update_download_failed"
+
+    /** 未授权"安装未知应用"（已跳授权页，授权后重试）。 */
+    public const val INSTALL_PERMISSION_REQUIRED: String = "device.install_permission_required"
+
+    /** 拉起系统安装器失败。 */
+    public const val INSTALL_FAILED: String = "device.install_failed"
 }

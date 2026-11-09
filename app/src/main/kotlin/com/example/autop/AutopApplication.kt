@@ -7,6 +7,7 @@ import com.example.autop.core.config.UiConfig
 import com.example.autop.core.platform.AndroidLogger
 import com.example.autop.core.platform.CrashLogger
 import com.example.autop.device.PairingDiscovery
+import com.example.autop.device.UpdateChecker
 import com.example.autop.device.UserActivityMonitor
 import com.example.autop.device.VisualScreenParser
 import com.example.autop.device.impl.overlay.OverlayWindowManager
@@ -73,6 +74,8 @@ class AutopApplication : Application() {
 
     @Inject lateinit var pairingDiscovery: PairingDiscovery
 
+    @Inject lateinit var updateChecker: UpdateChecker
+
     @Inject lateinit var pairingCardController: PairingCardController
 
     @Inject lateinit var alarmSync: AlarmSync
@@ -118,6 +121,8 @@ class AutopApplication : Application() {
         }
         // 无线调试配对自动发现（未配对时后台监听可配对服务，发现即通知；配对成功自动停用）。
         pairingDiscovery.start(appScope)
+        // 应用更新静默检测（24h 节流，IO 协程，不阻塞界面；发现新版本由设置页横幅提示）。
+        updateChecker.start(appScope)
         // 配对卡：发现即可配对设备即浮出输入小窗（零跳转，不依赖通知权限）。
         pairingCardController.start()
         // 定时任务闹钟同步（2026-11-09 修复"到点不执行"）：任务变更即重排闹钟，首值覆盖启动重排。

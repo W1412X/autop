@@ -21,20 +21,26 @@ import com.example.autop.core.common.PermissionChecks
 import com.example.autop.core.common.onErr
 import com.example.autop.core.config.ConfigEditor
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.LlmConfig
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NotificationFeed
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
+import com.example.autop.device.UpdateChecker
+import com.example.autop.device.UpdateState
 import com.example.autop.feature.settings.me.backup.BackupExporter
 import com.example.autop.feature.settings.me.backup.BackupFile
 import com.example.autop.feature.settings.me.backup.BackupImporter
 import com.example.autop.feature.settings.me.backup.readBackupText
 import com.example.autop.feature.settings.me.backup.writeBackupToDownloads
+import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.ModelProfileStore
+import com.example.autop.llm.ModelRoles
 import com.example.autop.memory.MemoryStore
 import com.example.autop.task.AgentHostStatus
 import com.example.autop.task.TaskRepository
@@ -63,6 +69,7 @@ public class AppearanceSettingsViewModel
         private val shellInput: ShellInput,
         private val permissionChecks: PermissionChecks,
         private val hostStatus: AgentHostStatus,
+        private val updateChecker: UpdateChecker,
         private val memoryStore: MemoryStore,
         private val taskRepository: TaskRepository,
         @ApplicationContext private val context: Context,
@@ -72,9 +79,13 @@ public class AppearanceSettingsViewModel
     ) : ViewModel() {
         private val notice = MutableStateFlow<NoticeKind?>(null)
 
+        private val updateNotice = MutableStateFlow<UpdateNotice?>(null)
+
         /** ON_RESUME 回到前台时 +1，触发权限类同步查询重新评估（N190）。 */
         private val refreshTick = MutableStateFlow(0)
 
+        // 超过 5 路的 combine 只能按 values 下标取值，下标即上方各流的声明顺序。
+        @Suppress("MagicNumber")
         public val uiState: StateFlow<MeUiState> =
             combine(
                 configProvider.observe(),
@@ -91,7 +102,18 @@ public class AppearanceSettingsViewModel
                     // 通知使用权查系统授权名单（连接态只作重评触发器，N190）。
                     HealthSignals(accessibility, permissionChecks.canReadNotifications(), host, shell)
                 },
-            ) { snapshot, profiles, roles, pending, health ->
+                updateChecker.state,
+                updateNotice,
+            ) { values ->
+                val snapshot = values[0] as ConfigSnapshot
+
+                @Suppress("UNCHECKED_CAST")
+                val profiles = values[1] as List<ModelProfile>
+                val roles = values[2] as ModelRoles
+                val pending = values[3] as NoticeKind?
+                val health = values[4] as HealthSignals
+                val update = values[5] as UpdateState
+                val pendingUpdateNotice = values[6] as UpdateNotice?
                 val reminder = snapshot[TaskConfig.REMINDER]
                 MeUiState(
                     appearance = snapshot[UiConfig.APPEARANCE],
@@ -116,6 +138,8 @@ public class AppearanceSettingsViewModel
                     notificationListenerGranted = health.notifications,
                     hostRunning = health.host,
                     mainModelAssigned = roles.main != null,
+                    update = update,
+                    updateNotice = pendingUpdateNotice,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -163,7 +187,41 @@ public class AppearanceSettingsViewModel
                 is MeAction.OpenSection -> if (!action.section.hasPage) notice.value = NoticeKind.PLACEHOLDER
                 // 路由层转 SettingsNavigator.openReminderSound
                 MeAction.OpenReminderSound -> Unit
-                MeAction.DismissNotice -> notice.value = null
+                MeAction.DismissNotice -> {
+                    notice.value = null
+                    updateNotice.value = null
+                }
+                MeAction.CheckUpdate -> checkUpdate()
+                MeAction.DownloadUpdate -> downloadUpdate()
+                MeAction.InstallUpdate -> installUpdate()
+            }
+        }
+
+        /** 手动检查更新：发现新版本由状态流驱动横幅；无更新/失败给一次性提示。 */
+        private fun checkUpdate() {
+            viewModelScope.launch {
+                updateNotice.value = null
+                when (val result = updateChecker.checkNow()) {
+                    is Outcome.Ok -> if (result.value == null) updateNotice.value = UpdateNotice.UP_TO_DATE
+                    is Outcome.Err -> updateNotice.value = UpdateNotice.CHECK_FAILED
+                }
+            }
+        }
+
+        /** 后台下载新版本 APK（进度经状态流上报）。 */
+        private fun downloadUpdate() {
+            viewModelScope.launch {
+                updateNotice.value = null
+                updateChecker.download().onErr { updateNotice.value = UpdateNotice.DOWNLOAD_FAILED }
+            }
+        }
+
+        /** 拉起系统安装器；未授权时已跳授权页并提示。 */
+        private fun installUpdate() {
+            updateChecker.install().onErr { error ->
+                if (error.code == DeviceErrorCodes.INSTALL_PERMISSION_REQUIRED) {
+                    updateNotice.value = UpdateNotice.INSTALL_PERMISSION
+                }
             }
         }
 

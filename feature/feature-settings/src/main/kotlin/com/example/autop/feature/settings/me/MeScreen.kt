@@ -109,7 +109,7 @@ public fun MeScreen(
             }
             item {
                 HorizontalDivider()
-                AboutSection()
+                AboutSection(state = state, onAction = onAction)
             }
         }
     }
@@ -172,13 +172,32 @@ private fun NoticeBanner(
     state: MeUiState,
     onAction: (MeAction) -> Unit,
 ) {
-    val kind = state.notice ?: return
-    InlineBanner(
-        message = stringResource(noticeMessageRes(kind)),
-        onDismiss = { onAction(MeAction.DismissNotice) },
-        durationMs = state.bannerDurationMs,
-    )
+    val kind = state.notice
+    val updateKind = state.updateNotice
+    if (kind != null) {
+        InlineBanner(
+            message = stringResource(noticeMessageRes(kind)),
+            onDismiss = { onAction(MeAction.DismissNotice) },
+            durationMs = state.bannerDurationMs,
+        )
+    }
+    if (updateKind != null) {
+        InlineBanner(
+            message = stringResource(updateNoticeMessageRes(updateKind)),
+            onDismiss = { onAction(MeAction.DismissNotice) },
+            durationMs = state.bannerDurationMs,
+        )
+    }
 }
+
+@StringRes
+private fun updateNoticeMessageRes(kind: UpdateNotice): Int =
+    when (kind) {
+        UpdateNotice.UP_TO_DATE -> R.string.me_update_up_to_date
+        UpdateNotice.CHECK_FAILED -> R.string.me_update_check_failed
+        UpdateNotice.DOWNLOAD_FAILED -> R.string.me_update_download_failed
+        UpdateNotice.INSTALL_PERMISSION -> R.string.me_update_install_permission
+    }
 
 @StringRes
 private fun noticeMessageRes(kind: NoticeKind): Int =

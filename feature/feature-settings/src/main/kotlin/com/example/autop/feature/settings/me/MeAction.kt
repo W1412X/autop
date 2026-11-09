@@ -110,4 +110,13 @@ public sealed interface MeAction {
 
     /** 关闭横幅提示。 */
     public data object DismissNotice : MeAction
+
+    /** 手动检查更新（忽略 24h 节流）。 */
+    public data object CheckUpdate : MeAction
+
+    /** 下载新版本 APK（后台进行，进度见关于分组）。 */
+    public data object DownloadUpdate : MeAction
+
+    /** 安装已下载的新版本（拉起系统安装器）。 */
+    public data object InstallUpdate : MeAction
 }

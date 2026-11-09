@@ -1,7 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- "导出日志"分享（questions.md N175）：仅暴露 cache/export/ 下的导出文件。 -->
+<!-- "导出日志"分享（questions.md N175）：仅暴露 cache/export/ 下的导出文件；
+     应用内更新安装：仅暴露 cache/update/ 下的已下载 APK。 -->
 <paths>
     <cache-path
         name="export"
         path="export/" />
+    <cache-path
+        name="update"
+        path="update/" />
 </paths>

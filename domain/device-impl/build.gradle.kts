@@ -21,8 +21,11 @@ dependencies {
     implementation(libs.bcpkix.jdk18on)
     implementation(libs.conscrypt.android)
     implementation(libs.ndk.boringssl)
+    // 应用更新：GitHub Releases 检测与 APK 下载。
+    implementation(libs.okhttp)
 
     testImplementation(project(":core:core-testing"))
+    testImplementation(libs.okhttp.mockwebserver3.junit4)
 }
 
 // ADB 注入通道的 SPAKE2 配对 native（libadb.so，搬运自 Shizuku jni/）：prefab 链 BoringSSL。

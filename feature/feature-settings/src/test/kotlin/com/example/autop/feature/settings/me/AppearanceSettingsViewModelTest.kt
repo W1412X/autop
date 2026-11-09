@@ -19,6 +19,9 @@ import com.example.autop.device.NotificationFeed
 import com.example.autop.device.NotificationInfo
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
+import com.example.autop.device.UpdateChecker
+import com.example.autop.device.UpdateInfo
+import com.example.autop.device.UpdateState
 import com.example.autop.feature.settings.SettingsSection
 import com.example.autop.llm.ModelRoles
 import com.example.autop.memory.MemoryNode
@@ -33,6 +36,7 @@ import com.example.autop.task.RunRecord
 import com.example.autop.task.Task
 import com.example.autop.task.TaskRepository
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -194,6 +198,7 @@ class AppearanceSettingsViewModelTest {
             shellInput = FakeShellInput(),
             permissionChecks = checks,
             hostStatus = FakeHostStatus(),
+            updateChecker = FakeUpdateChecker(),
             memoryStore = UnusedMemoryStore(),
             taskRepository = UnusedTaskRepository(),
             context = ContextWrapper(null),
@@ -342,4 +347,17 @@ private class UnusedTaskRepository : TaskRepository {
         taskId: TaskId?,
         limit: Int,
     ): Flow<List<RunRecord>> = flowOf(emptyList())
+}
+
+/** 本用例不触碰更新检测（仅构造注入），保持空闲实现。 */
+private class FakeUpdateChecker : UpdateChecker {
+    override val state: StateFlow<UpdateState> = MutableStateFlow(UpdateState.Idle)
+
+    override fun start(scope: CoroutineScope) = Unit
+
+    override suspend fun checkNow(): Outcome<UpdateInfo?> = Outcome.Ok(null)
+
+    override suspend fun download(): Outcome<java.io.File> = error("unused")
+
+    override fun install(): Outcome<Unit> = error("unused")
 }
