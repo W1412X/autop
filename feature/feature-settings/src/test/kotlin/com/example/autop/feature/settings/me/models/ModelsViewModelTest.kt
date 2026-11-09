@@ -113,19 +113,30 @@ class ModelsViewModelTest {
         }
 
     @Test
-    fun `save persists profile and api key and returns to list`() =
+    fun `save persists profile and api key then auto probes`() =
         runTest(dispatcher) {
+            probe.report = okProbeReport()
             val viewModel = createViewModel()
             viewModel.onAction(ModelsAction.New)
             fillValidDraft(viewModel)
             viewModel.onAction(ModelsAction.SetField(DraftField.API_KEY, "sk-new"))
             viewModel.onAction(ModelsAction.Save)
-            assertThat(viewModel.uiState.value.draft).isNull()
+            val state = viewModel.uiState.value
+            assertThat(state.draft).isNotNull()
+            assertThat(state.probe.visible).isTrue()
+            assertThat(state.probe.running).isFalse()
+            assertThat(state.probe.report).isEqualTo(okProbeReport())
             val saved = store.profiles.first().single()
             assertThat(saved.id).isEqualTo("id-1")
             assertThat(saved.displayName).isEqualTo("测试模型")
+            assertThat(saved.model).isEqualTo("gpt-4o-mini")
             assertThat(saved.apiKeyRef).isEqualTo("secret:model:id-1")
             assertThat(secrets.get("secret:model:id-1")).isEqualTo("sk-new")
+            assertThat(saved.capabilities.tools).isTrue()
+            assertThat(saved.capabilities.vision).isTrue()
+            viewModel.onAction(ModelsAction.CloseProbe)
+            assertThat(viewModel.uiState.value.draft).isNull()
+            assertThat(viewModel.uiState.value.probe.visible).isFalse()
         }
 
     @Test
@@ -147,35 +158,58 @@ class ModelsViewModelTest {
         }
 
     @Test
-    fun `test connection saves key fills capabilities and shows hint`() =
+    fun `save probes saved profile and fills draft capabilities`() =
         runTest(dispatcher) {
             probe.report = okProbeReport()
             val viewModel = createViewModel()
             viewModel.onAction(ModelsAction.New)
             fillValidDraft(viewModel)
-            viewModel.onAction(ModelsAction.SetField(DraftField.API_KEY, "sk-probe"))
-            viewModel.onAction(ModelsAction.TestConnection)
-            val state = viewModel.uiState.value
-            val draft = checkNotNull(state.draft)
-            assertThat(state.probe.report).isEqualTo(okProbeReport())
-            assertThat(state.notice).isEqualTo(ModelsNoticeKind.CAPABILITIES_UPDATED)
+            viewModel.onAction(ModelsAction.Save)
+            val draft = checkNotNull(viewModel.uiState.value.draft)
             assertThat(draft.capabilities.tools).isTrue()
             assertThat(draft.capabilities.vision).isTrue()
-            assertThat(secrets.get("secret:model:id-1")).isEqualTo("sk-probe")
             assertThat(probe.received.single().apiKeyRef).isEqualTo("secret:model:id-1")
         }
 
     @Test
-    fun `test connection persists capabilities for existing profile`() =
+    fun `save auto probe persists capabilities for existing profile`() =
         runTest(dispatcher) {
             store.upsert(testProfile("p1"))
             probe.report = okProbeReport()
             val viewModel = createViewModel()
             viewModel.onAction(ModelsAction.Edit("p1"))
-            viewModel.onAction(ModelsAction.TestConnection)
+            viewModel.onAction(ModelsAction.Save)
             val saved = store.profiles.first().single()
             assertThat(saved.capabilities.tools).isTrue()
             assertThat(saved.capabilities.vision).isTrue()
+        }
+
+    @Test
+    fun `probe request failure keeps saved config and shows dialog error`() =
+        runTest(dispatcher) {
+            probe.error = IllegalStateException("连接超时")
+            val viewModel = createViewModel()
+            viewModel.onAction(ModelsAction.New)
+            fillValidDraft(viewModel)
+            viewModel.onAction(ModelsAction.Save)
+            val state = viewModel.uiState.value
+            assertThat(state.probe.visible).isTrue()
+            assertThat(state.probe.error?.message).isEqualTo("连接超时")
+            assertThat(store.profiles.first()).hasSize(1)
+        }
+
+    @Test
+    fun `retest reruns probe for saved profile`() =
+        runTest(dispatcher) {
+            probe.report = okProbeReport()
+            val viewModel = createViewModel()
+            viewModel.onAction(ModelsAction.New)
+            fillValidDraft(viewModel)
+            viewModel.onAction(ModelsAction.Save)
+            viewModel.onAction(ModelsAction.RetestProbe)
+            assertThat(probe.received).hasSize(2)
+            assertThat(viewModel.uiState.value.probe.visible).isTrue()
+            assertThat(viewModel.uiState.value.probe.report).isEqualTo(okProbeReport())
         }
 
     @Test

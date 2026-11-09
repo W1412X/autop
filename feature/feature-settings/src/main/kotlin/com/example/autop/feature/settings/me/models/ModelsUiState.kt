@@ -4,6 +4,7 @@
  */
 package com.example.autop.feature.settings.me.models
 
+import com.example.autop.core.common.AppError
 import com.example.autop.core.config.UiBannerSection
 import com.example.autop.llm.ModelCapabilities
 import com.example.autop.llm.ModelProfile
@@ -27,9 +28,6 @@ public enum class ModelsErrorKind {
 
 /** 页面提示类型（文案在 strings）。 */
 public enum class ModelsNoticeKind {
-    /** 测试连接后能力回填（"已根据测试结果更新能力"）。 */
-    CAPABILITIES_UPDATED,
-
     /** 服务端未返回可用模型（N164）。 */
     MODELS_EMPTY,
 }
@@ -68,10 +66,15 @@ public data class ModelDraft(
     val capabilities: ModelCapabilities = ModelCapabilities(),
 )
 
-/** 测试连接状态（docs/tech/08 §4.5：结果三行文本 / 工具 / 图片）。 */
+/**
+ * 保存后自动测试状态（docs/tech/08 §4.5：结果三行文本 / 工具 / 图片）。
+ * [visible] 驱动结果对话框；[error] 为拿不到逐项报告时的请求级失败（配置仍已保存）。
+ */
 public data class ProbeUiState(
+    val visible: Boolean = false,
     val running: Boolean = false,
     val report: ProbeReport? = null,
+    val error: AppError? = null,
 )
 
 /** 远端模型列表状态（N164）：`models=null` 表示未拉取/拉取失败。 */

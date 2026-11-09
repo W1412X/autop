@@ -20,7 +20,9 @@ import com.example.autop.core.config.UiConfig
 import com.example.autop.llm.ModelDirectory
 import com.example.autop.llm.ModelProbe
 import com.example.autop.llm.ModelRole
+import com.example.autop.llm.ProbeReport
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -44,6 +46,7 @@ public class ModelsViewModel
     ) : ViewModel() {
         private val draftState = MutableStateFlow<ModelDraft?>(null)
         private val probeState = MutableStateFlow(ProbeUiState())
+        private var probeJob: Job? = null
         private val remoteModelsState = MutableStateFlow(RemoteModelsUiState())
         private val errorState = MutableStateFlow<ModelsErrorKind?>(null)
         private val noticeState = MutableStateFlow<ModelsNoticeKind?>(null)
@@ -86,9 +89,9 @@ public class ModelsViewModel
                 ModelsAction.ToggleQuirks -> mutate { it.copy(quirksExpanded = !it.quirksExpanded) }
                 ModelsAction.New -> newDraft()
                 is ModelsAction.Edit -> openDraft(action.id)
-                ModelsAction.Cancel -> draftState.value = null
+                ModelsAction.Cancel, ModelsAction.CloseProbe -> closeDraft()
                 ModelsAction.Save -> save()
-                ModelsAction.TestConnection -> testConnection()
+                ModelsAction.RetestProbe -> retest()
                 ModelsAction.FetchRemoteModels -> fetchRemoteModels()
                 ModelsAction.RequestDelete -> confirmDeleteState.value = true
                 ModelsAction.ConfirmDelete -> deleteProfile()
@@ -143,10 +146,66 @@ public class ModelsViewModel
                         editor.saveProfile(draft.toProfile(), draft.apiKeyInput)
                     }
                 when (outcome) {
-                    is Outcome.Ok -> draftState.value = null
+                    is Outcome.Ok -> startProbe(draft)
                     is Outcome.Err -> fail("model_save_failed", outcome.error)
                 }
             }
+        }
+
+        /** 关闭草稿（返回列表），同时取消进行中的自动测试。 */
+        private fun closeDraft() {
+            probeJob?.cancel()
+            probeState.value = ProbeUiState()
+            remoteModelsState.value = RemoteModelsUiState()
+            draftState.value = null
+        }
+
+        /** 保存/重测共用：落库后自动测试连接（docs/tech/08 §4.5），结果驱动弹窗。 */
+        private fun startProbe(draft: ModelDraft) {
+            probeJob?.cancel()
+            probeState.value = ProbeUiState(visible = true, running = true)
+            val profile = draft.toProfile()
+            probeJob =
+                viewModelScope.launch(dispatchers.io) {
+                    val report = runCatchingCancellable(CommonErrorCodes.IO) { probe.probe(profile) }
+                    when (report) {
+                        is Outcome.Ok -> onProbed(draft, report.value)
+                        is Outcome.Err -> {
+                            logger.e(
+                                tag = TAG,
+                                event = "model_probe_failed",
+                                "code" to report.error.code,
+                                error = report.error.cause,
+                            )
+                            probeState.value = ProbeUiState(visible = true, error = report.error)
+                        }
+                    }
+                }
+        }
+
+        /** 回填并持久化探测出的能力（tools / vision），弹窗展示逐项结果。 */
+        private suspend fun onProbed(
+            draft: ModelDraft,
+            report: ProbeReport,
+        ) {
+            val updated = draft.withProbed(report, editor.savedKeyTail(draft.id))
+            draftState.value = updated
+            probeState.value = ProbeUiState(visible = true, report = report)
+            val persisted =
+                runCatchingCancellable(CommonErrorCodes.IO) { editor.saveProfile(updated.toProfile(), null) }
+            if (persisted is Outcome.Err) {
+                logger.e(
+                    tag = TAG,
+                    event = "model_capabilities_save_failed",
+                    "code" to persisted.error.code,
+                    error = persisted.error.cause,
+                )
+            }
+        }
+
+        private fun retest() {
+            val draft = draftState.value ?: return
+            startProbe(draft)
         }
 
         private fun deleteProfile() {
@@ -156,44 +215,12 @@ public class ModelsViewModel
                 val outcome =
                     runCatchingCancellable(CommonErrorCodes.IO) { editor.deleteProfile(draft.id) }
                 when (outcome) {
-                    is Outcome.Ok -> draftState.value = null
-                    is Outcome.Err -> fail("model_delete_failed", outcome.error)
-                }
-            }
-        }
-
-        private fun testConnection() {
-            val draft = draftState.value ?: return
-            val problem = draft.validationError()
-            if (problem != null) {
-                errorState.value = problem
-                return
-            }
-            viewModelScope.launch(dispatchers.io) {
-                probeState.value = ProbeUiState(running = true)
-                // 先落密钥再探测（Provider 经 `apiKeyRef` 解析密钥，docs/tech/03 §3）。
-                val report =
-                    runCatchingCancellable(CommonErrorCodes.IO) {
-                        if (draft.apiKeyInput.isNotBlank()) {
-                            editor.saveKey(draft.id, draft.apiKeyInput)
-                        }
-                        probe.probe(draft.toProfile())
-                    }
-                when (report) {
                     is Outcome.Ok -> {
-                        val updated = draft.withProbed(report.value, editor.savedKeyTail(draft.id))
-                        draftState.value = updated
-                        if (!draft.isNew) {
-                            // 新建草稿的持久化延至保存；既有 profile 探测后立即持久化（N48）。
-                            editor.saveProfile(updated.toProfile(), null)
-                        }
-                        probeState.value = ProbeUiState(report = report.value)
-                        noticeState.value = ModelsNoticeKind.CAPABILITIES_UPDATED
-                    }
-                    is Outcome.Err -> {
+                        probeJob?.cancel()
                         probeState.value = ProbeUiState()
-                        fail("model_probe_failed", report.error)
+                        draftState.value = null
                     }
+                    is Outcome.Err -> fail("model_delete_failed", outcome.error)
                 }
             }
         }

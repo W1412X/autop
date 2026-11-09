@@ -1,7 +1,7 @@
 /**
  * 模型新建/编辑页（docs/tech/08 §4.5）：协议 OptionRow、名称、baseUrl、API Key（密码输入，
  * 已保存时只显示末 4 位）、模型名、上下文窗口、最大输出、quirks（高级，可折叠）；
- * 底部"测试连接"→ 结果三行并回填能力；角色分配 OptionRow；删除入口。
+ * 保存后自动测试连接并弹窗展示结果与能力；角色分配 OptionRow；删除入口。
  */
 package com.example.autop.feature.settings.me.models
 
@@ -69,7 +69,6 @@ public fun ModelEditScreen(
             item { DraftFields(draft = draft, onAction = onAction, onOpenSheet = { sheet = it }) }
             item { ModelFetchSection(state = state, onAction = onAction, onOpenSheet = { sheet = it }) }
             item { QuirksSection(draft = draft, onAction = onAction) }
-            item { ProbeSection(state = state, onAction = onAction) }
             item { RolesSection(state = state, onOpenSheet = { sheet = it }) }
             item { DeleteSection(state = state, onAction = onAction) }
         }
@@ -91,6 +90,7 @@ public fun ModelEditScreen(
             onDismiss = { sheet = null },
         )
     }
+    ProbeResultDialog(state = state, onAction = onAction)
 }
 
 @Composable

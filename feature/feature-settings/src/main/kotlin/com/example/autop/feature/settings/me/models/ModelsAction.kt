@@ -18,11 +18,14 @@ public sealed interface ModelsAction {
     /** 编辑页返回列表（放弃草稿）。 */
     public data object Cancel : ModelsAction
 
-    /** 保存草稿。 */
+    /** 保存草稿（保存成功后自动测试连接并弹窗展示结果）。 */
     public data object Save : ModelsAction
 
-    /** 测试连接（docs/tech/08 §4.5：3 个最小请求回填能力）。 */
-    public data object TestConnection : ModelsAction
+    /** 关闭测试结果对话框并返回列表。 */
+    public data object CloseProbe : ModelsAction
+
+    /** 重新测试当前已保存的配置。 */
+    public data object RetestProbe : ModelsAction
 
     /** 获取服务端模型列表（N164：拉取可用模型 id 供选择）。 */
     public data object FetchRemoteModels : ModelsAction

@@ -148,14 +148,18 @@
     <string name="model_quirk_tool_choice_none">toolChoice=none 发送方式（native / omit_tools）</string>
     <string name="model_quirk_context_patterns">上下文超长识别（默认见配置 llm.errors）</string>
     <string name="model_quirk_image_max_edge">图片长边上限（默认见配置 llm.image）</string>
-    <string name="model_section_probe">测试连接</string>
-    <string name="model_test_connection">测试连接</string>
+    <string name="model_probe_dialog_title">连接测试</string>
+    <string name="model_probe_saved">配置已保存</string>
+    <string name="model_probe_running">正在测试连接…</string>
+    <string name="model_probe_retest">重新测试</string>
+    <string name="model_probe_finish">完成</string>
     <string name="model_probe_text">文本</string>
     <string name="model_probe_tools">工具</string>
     <string name="model_probe_vision">图片</string>
     <string name="model_probe_elapsed">%1$.1fs</string>
     <string name="model_probe_status_ok">可用</string>
     <string name="model_probe_status_fail">不可用</string>
+    <string name="model_probe_request_failed">测试请求失败</string>
     <string name="model_probe_hint">已根据测试结果更新能力</string>
     <string name="model_probe_detail_tap">点击查看详情</string>
     <string name="model_probe_detail_title">错误详情</string>

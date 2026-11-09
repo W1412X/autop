@@ -74,7 +74,7 @@ internal class FakeIdGenerator : IdGenerator {
     override fun newId(): String = "id-${++next}"
 }
 
-/** 可编程结果的 [ModelProbe]（记录收到的 profile）。 */
+/** 可编程结果的 [ModelProbe]（记录收到的 profile；[error] 非空时抛出模拟请求级失败）。 */
 internal class RecordingModelProbe(
     var report: ProbeReport =
         ProbeReport(
@@ -82,11 +82,13 @@ internal class RecordingModelProbe(
             tools = ProbeResult(ok = true, elapsedMs = 800),
             vision = ProbeResult(ok = false, elapsedMs = 300),
         ),
+    var error: Exception? = null,
 ) : ModelProbe {
     val received = mutableListOf<ModelProfile>()
 
     override suspend fun probe(profile: ModelProfile): ProbeReport {
         received += profile
+        error?.let { throw it }
         return report
     }
 }
