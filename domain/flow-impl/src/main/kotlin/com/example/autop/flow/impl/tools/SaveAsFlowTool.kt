@@ -76,6 +76,7 @@ public class SaveAsFlowTool
                                     "已生成待确认的流程草稿「$name」(draftId=${saved.value})。用户在“流程”页确认后即可使用。",
                                 ),
                             ),
+                        data = draftData(saved.value),
                     )
             }
         }

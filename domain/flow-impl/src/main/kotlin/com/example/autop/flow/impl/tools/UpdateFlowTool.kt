@@ -79,6 +79,7 @@ public class UpdateFlowTool
                                         "用户确认后生效，原定义会保留为历史版本。",
                                 ),
                             ),
+                        data = draftData(saved.value, flowId = stored.id.value),
                     )
             }
         }

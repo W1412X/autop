@@ -105,6 +105,7 @@ public class PatchFlowNodeTool
                                         "用户确认后生效，原定义会保留为历史版本。",
                                 ),
                             ),
+                        data = draftData(saved.value, flowId = flowId),
                     )
             }
 
@@ -129,6 +130,7 @@ public class PatchFlowNodeTool
                                         "原定义已保留为历史版本，运行中的流程已用新定义继续。",
                                 ),
                             ),
+                        data = flowData(flowId),
                     )
             }
         }
