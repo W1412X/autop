@@ -1,7 +1,8 @@
 /**
  * 流程类工具结果的结构化跳转入口：对话页把 `data.links` 渲染成快捷入口。
  *
- * link.kind 取值：flow_ai（draftId，可带 flowId）/ flow_detail、flow_edit（flowId）。
+ * link.kind 取值：flow_ai（draftId，可带 flowId；也可只带 flowId 直接改既有流程）/
+ * flow_detail、flow_edit（flowId）。
  */
 package com.example.autop.flow.impl.tools
 
@@ -32,13 +33,14 @@ internal fun draftData(
         )
     }
 
-/** 修订已直接生效的结果：查看详情或手动编辑。 */
+/** 修订已直接生效的结果：AI 编辑、查看详情或手动编辑。 */
 internal fun flowData(flowId: String): JsonObject =
     buildJsonObject {
         put("flowId", flowId)
         put(
             "links",
             buildJsonArray {
+                add(flowAiLink(flowId = flowId))
                 add(flowLink(kind = "flow_detail", flowId = flowId))
                 add(flowLink(kind = "flow_edit", flowId = flowId))
             },
@@ -46,12 +48,12 @@ internal fun flowData(flowId: String): JsonObject =
     }
 
 private fun flowAiLink(
-    draftId: String,
+    draftId: String? = null,
     flowId: String? = null,
 ): JsonObject =
     buildJsonObject {
         put("kind", "flow_ai")
-        put("draftId", draftId)
+        draftId?.let { put("draftId", it) }
         flowId?.let { put("flowId", it) }
     }
 

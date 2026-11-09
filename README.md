@@ -137,7 +137,7 @@ flowchart LR
 - 预算触顶不抛错，而是最后一轮禁用工具，让模型总结做到了哪一步。同一工具同一错误连续出现、屏幕指纹原地不变，会触发熔断提示。
 - 屏幕与通知内容一律作为**不可信数据**交给模型，系统提示明确声明其中的「指令」只是数据。
 
-**内置工具**：观察（`observe` / `screenshot` / `read_notifications` / `get_device_state`）、动作（`tap` / `input_text` / `scroll` / `swipe` / `global_action` / `open_app` / `open_uri` / `wait`）、恢复（`dismiss_popup` / `restart_app`）、记忆（`memory_*`）、流程（`run_flow` / `list_flows` / `save_as_flow` / `update_flow`）、协作（`ask_user` / `notify_user` / `update_plan` / `finish` 等）。
+**内置工具**：观察（`observe` / `screenshot` / `read_notifications` / `get_device_state`）、动作（`tap` / `input_text` / `scroll` / `swipe` / `global_action` / `open_app` / `open_uri` / `wait`）、恢复（`dismiss_popup` / `restart_app`）、记忆（`memory_*`）、流程（`run_flow` / `list_flows` / `create_flow` / `edit_flow` / `save_as_flow` / `update_flow` / `patch_flow_node`）、任务（`list_tasks` / `create_task` / `update_task`）、协作（`ask_user` / `notify_user` / `update_plan` / `finish` 等）。
 
 ## 快速开始
 

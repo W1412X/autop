@@ -72,6 +72,11 @@ public data class AgentToolsSection(
                 "tool.save_as_flow",
                 "tool.update_flow",
                 "tool.patch_flow_node",
+                "tool.create_flow",
+                "tool.edit_flow",
+                "tool.list_tasks",
+                "tool.create_task",
+                "tool.update_task",
             )
 
         public val DEFAULT_TIMEOUT_MS: Map<String, Long> =

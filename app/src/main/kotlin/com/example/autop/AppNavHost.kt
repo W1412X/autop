@@ -410,8 +410,8 @@ private fun createChatNavigator(
                 StepLink.FLOW_DETAIL -> link.flowId?.let { navController.navigate(AutopRoutes.flowDetail(it)) }
                 StepLink.FLOW_EDIT -> link.flowId?.let { navController.navigate(AutopRoutes.flowEditor(it)) }
                 StepLink.FLOW_AI ->
-                    link.draftId?.let {
-                        navController.navigate(AutopRoutes.flowAuthor(draftId = it, editFlowId = link.flowId))
+                    if (link.draftId != null || link.flowId != null) {
+                        navController.navigate(AutopRoutes.flowAuthor(draftId = link.draftId, editFlowId = link.flowId))
                     }
             }
         }

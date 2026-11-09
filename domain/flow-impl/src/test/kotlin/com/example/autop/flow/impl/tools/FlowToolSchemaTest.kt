@@ -8,7 +8,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.jsonObject
 import org.junit.Test
 
-/** 5 个流程工具的 schema 都能由真实模板组装，参数都有说明，且有自测 fixture（N198）。 */
+/** 7 个流程工具的 schema 都能由真实模板组装，参数都有说明，且有自测 fixture（N198）。 */
 class FlowToolSchemaTest {
     private val prompts = FakePromptRepository()
     private val specs: List<ToolSpec> =
@@ -18,6 +18,8 @@ class FlowToolSchemaTest {
             FlowToolSpecs.saveAsFlow,
             FlowToolSpecs.updateFlow,
             FlowToolSpecs.patchFlowNode,
+            FlowToolSpecs.createFlow,
+            FlowToolSpecs.editFlow,
         )
 
     @Test

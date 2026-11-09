@@ -52,6 +52,10 @@ public object ToolProbeFixtures {
             "save_as_flow" to jsonObjectOf("name" to "工具自测流程", "description" to "工具自测草稿（N198）"),
             "update_flow" to jsonObjectOf("flow" to "自测流程", "reason" to "工具自测"),
             "patch_flow_node" to jsonObjectOf("flow" to "自测流程", "node_id" to "n1", "reason" to "工具自测"),
+            "create_flow" to
+                """{"name":"工具自测流程A","description":"工具自测（N198）","steps":[{"tool":"wait","args":{"ms":200}}]}"""
+                    .let(::jsonElementOf),
+            "edit_flow" to jsonObjectOf("flow" to "工具自测流程A", "description" to "工具自测修订（N198）"),
             "list_tasks" to jsonObjectOf(),
             "create_task" to
                 jsonObjectOf(

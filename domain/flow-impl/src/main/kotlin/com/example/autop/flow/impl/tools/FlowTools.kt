@@ -26,6 +26,8 @@ import com.example.autop.flow.FlowRunRequest
 import com.example.autop.flow.FlowRunStore
 import com.example.autop.flow.FlowSession
 import com.example.autop.flow.FlowStore
+import com.example.autop.flow.FlowTree
+import com.example.autop.flow.Node
 import com.example.autop.flow.core.ParamBinder
 import com.example.autop.flow.core.expr.FlowException
 import com.example.autop.llm.Block
@@ -35,6 +37,7 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -72,6 +75,39 @@ public object FlowToolSpecs {
             string("flow", required = true)
             string("node_id", required = true)
             string("reason", required = true)
+        }
+
+    /** tool.create_flow：按步骤定义直接创建流程（不需要先执行一遍）。 */
+    public val createFlow: ToolSpec =
+        toolSpec(name = "create_flow", descriptionPromptId = "tool.create_flow") {
+            string("name", required = true)
+            string("description")
+            array("steps", required = true, minItems = 1) {
+                string("tool", required = true)
+                anyObject("args")
+                anyObject("target")
+            }
+        }
+
+    /** tool.edit_flow：修改既有流程的名称、描述或步骤（不提供删除）。 */
+    public val editFlow: ToolSpec =
+        toolSpec(name = "edit_flow", descriptionPromptId = "tool.edit_flow") {
+            string("flow", required = true)
+            string("name")
+            string("description")
+            obj("set_step") {
+                string("node_id", required = true)
+                string("tool")
+                anyObject("args")
+                anyObject("target")
+            }
+            obj("add_step") {
+                string("tool", required = true)
+                anyObject("args")
+                anyObject("target")
+                string("after")
+            }
+            string("remove_step")
         }
 }
 
@@ -257,6 +293,13 @@ public class ListFlowsTool
                                     item.lastRunAt?.let { put("lastRunAt", it) }
                                     item.lastRunStatus?.let { put("lastRunStatus", it) }
                                 }
+                                // 节点概览（id/type/tool/args/target）：供 edit_flow 定位与改写步骤。
+                                put(
+                                    "steps",
+                                    buildJsonArray {
+                                        FlowTree.allNodes(flow).forEach { add(stepView(it)) }
+                                    },
+                                )
                             },
                         )
                     }
@@ -264,3 +307,13 @@ public class ListFlowsTool
             return ToolOutput(ok = true, content = listOf(Block.Text(list.toString())), data = list)
         }
     }
+
+/** 节点概览：只带定位与改写用得上的键，其余字段留在流程编辑页。 */
+private fun stepView(node: Node): JsonObject {
+    val encoded = AutopJson.default.encodeToJsonElement(Node.serializer(), node).jsonObject
+    return buildJsonObject {
+        for (key in listOf("id", "type", "tool", "args", "target")) {
+            encoded[key]?.let { put(key, it) }
+        }
+    }
+}
