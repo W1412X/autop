@@ -66,9 +66,16 @@ public class IndicatorController
         private var glowShown = false
         private var barShown = false
         private var hideJob: Job? = null
+        private var barHideJob: Job? = null
+
+        /** 最近一次活跃 Run（收口后淡出期间仍渲染最后状态，防内容瞬间清空）。 */
+        private var lastActive: ActiveRunInfo? = null
 
         /** 边缘光内容是否处于“显示”态；变为 false 时内容淡出，淡出结束后才移除窗口。 */
         private val contentVisible = MutableStateFlow(false)
+
+        /** 控制条内容是否处于“显示”态；淡出结束后才移除窗口。 */
+        private val barContentVisible = MutableStateFlow(false)
 
         /** 详情面板展开（点操作信息切换；控制条隐藏时收起）。 */
         private val detailExpanded = MutableStateFlow(false)
@@ -109,6 +116,7 @@ public class IndicatorController
 
         /** 控制条与边缘光的显隐；控制条隐藏时一并收起详情面板。 */
         private fun applyVisibility(input: VisibilityInput) {
+            if (input.active != null) lastActive = input.active
             applyBar(input.enabled && input.barOn && input.active != null)
             applyGlow(input.enabled && input.glowOn && isOperating(input.active))
         }
@@ -117,11 +125,17 @@ public class IndicatorController
             if (visible == barShown) return
             barShown = visible
             barVisibleState.value = visible
+            barHideJob?.cancel()
             if (visible) {
+                barContentVisible.value = true
                 host.show(OverlayWindowIds.RUN_BAR, runBarSpec(context))
             } else {
                 collapseDetail()
-                host.hide(OverlayWindowIds.RUN_BAR)
+                barHideJob =
+                    scope.launch {
+                        delay(BAR_FADE_OUT_MS)
+                        host.hide(OverlayWindowIds.RUN_BAR)
+                    }
             }
         }
 
@@ -179,11 +193,13 @@ public class IndicatorController
         @Composable
         private fun RunBarContent() {
             val active by runService.observeActive().collectAsState()
+            val visible by barContentVisible.collectAsState()
             val expanded by detailExpanded.collectAsState()
-            val current = active ?: return
+            val current = active ?: lastActive ?: return
             RunBarScreen(
                 active = current,
                 expanded = expanded,
+                visible = visible,
                 onToggleExpand = ::toggleDetail,
                 onAction = ::onAction,
             )

@@ -1,14 +1,23 @@
 /**
  * 顶部运行控制条（原执行期胶囊升级）：一行横排——呼吸状态点 + 操作信息（点按展开/收起
- * 下方运行详情面板）+ 状态按钮组。颜色取 [MaterialTheme.colorScheme]，动效遵守
- * [LocalMotionEnabled]；窗口只包住条本身（可触摸但不吞条外触摸）。
+ * 下方运行详情面板）+ 状态图标按钮组。颜色取 [MaterialTheme.colorScheme]，动效遵守
+ * [LocalMotionEnabled]：出入淡入淡出并从上滑入、图标交叉过渡、按压回弹、箭头旋转。
+ * 窗口只包住条本身（可触摸但不吞条外触摸）。
  */
 package com.example.autop.feature.overlay.indicator
 
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -21,27 +30,35 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopIcons
+import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalMotionEnabled
+import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.overlay.R
 import com.example.autop.feature.overlay.rememberBreath
 import com.example.autop.task.ActiveRunInfo
 
-/** 按钮与状态点尺寸（dp）；条高取 [RUN_BAR_HEIGHT]（与窗口 spec 同源）。 */
-private val BUTTON_HEIGHT = 30.dp
-private val BUTTON_PADDING_H = 12.dp
+/** 图标按钮与状态点尺寸（dp）。 */
+private val BUTTON_SIZE = 36.dp
 private val DOT_SIZE = 8.dp
 private val INFO_GAP = 8.dp
 private val BUTTON_GAP = 6.dp
+
+/** 入场从上方滑入的距离（dp）。 */
+private val SLIDE_DISTANCE = 12.dp
 
 /** 状态点呼吸缩放下限。 */
 private const val DOT_SCALE_MIN: Float = 0.7f
@@ -49,26 +66,48 @@ private const val DOT_SCALE_MIN: Float = 0.7f
 /** 状态点呼吸半周期（毫秒）。 */
 private const val BREATH_HALF_MS: Long = 700L
 
-/** 展开箭头过渡时长（毫秒）。 */
+/** 按压回弹的缩放下限。 */
+private const val PRESSED_SCALE: Float = 0.88f
+
+/** 入场 / 图标交叉过渡 / 箭头过渡时长（毫秒）。 */
+private const val BAR_APPEAR_MS: Int = 250
+private const val ICON_SWAP_MS: Int = 180
 private const val CHEVRON_MS: Int = 200
+
+/** 淡出时长（毫秒）；控制器在淡出结束后才移除窗口。 */
+internal const val BAR_FADE_OUT_MS: Long = 250L
 
 /** 运行控制条内容（窗口高度按 [RUN_BAR_HEIGHT] 定，内容须恰好铺满）。 */
 @Composable
 internal fun RunBarScreen(
     active: ActiveRunInfo,
     expanded: Boolean,
+    visible: Boolean,
     onToggleExpand: () -> Unit,
     onAction: (RunBarAction) -> Unit,
 ) {
     val spec = runBarSpecOf(active)
     val motionOn = LocalMotionEnabled.current
     val breath = rememberBreath(halfPeriodMs = BREATH_HALF_MS, enabled = motionOn && spec.hint is RunBarHint.Running)
+    val appear = remember { Animatable(0f) }
+    LaunchedEffect(visible, motionOn) {
+        val target = if (visible) 1f else 0f
+        if (motionOn) {
+            val duration = if (visible) BAR_APPEAR_MS else BAR_FADE_OUT_MS.toInt()
+            appear.animateTo(target, tween(durationMillis = duration))
+        } else {
+            appear.snapTo(target)
+        }
+    }
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
                 .height(RUN_BAR_HEIGHT)
-                .background(color = MaterialTheme.colorScheme.primaryContainer, shape = CircleShape)
+                .graphicsLayer {
+                    alpha = appear.value
+                    translationY = -(1f - appear.value) * SLIDE_DISTANCE.toPx()
+                }.background(color = MaterialTheme.colorScheme.primaryContainer, shape = CircleShape)
                 .padding(horizontal = INFO_GAP * 2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -80,11 +119,13 @@ internal fun RunBarScreen(
             modifier = Modifier.weight(1f),
         )
         spec.buttons.forEach { action ->
-            RunBarActionButton(
-                action = action,
-                onClick = { onAction(action) },
-                modifier = Modifier.padding(start = BUTTON_GAP),
-            )
+            key(buttonSlotOf(action)) {
+                RunBarActionButton(
+                    action = action,
+                    onClick = { onAction(action) },
+                    modifier = Modifier.padding(start = BUTTON_GAP),
+                )
+            }
         }
     }
 }
@@ -164,18 +205,29 @@ private fun ExpandChevron(
         tint = MaterialTheme.colorScheme.onPrimaryContainer,
         modifier =
             modifier
-                .size(INFO_GAP * 2)
+                .size(IconSize.Xs.scaled())
                 .graphicsLayer { rotationZ = rotation },
     )
 }
 
-/** 状态按钮：暂停/继续主色胶囊，中止错误色胶囊（破坏性动作醒目）。 */
+/**
+ * 状态按钮：圆形图标按钮（暂停/继续、中止），按压回弹 + 涟漪反馈；
+ * 暂停/继续同一槽位（[buttonSlotOf]）复用节点，图标交叉过渡。
+ */
 @Composable
 private fun RunBarActionButton(
     action: RunBarAction,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val motionOn = LocalMotionEnabled.current
+    val interaction = remember { MutableInteractionSource() }
+    val pressed by interaction.collectIsPressedAsState()
+    val scale by animateFloatAsState(
+        targetValue = if (pressed) PRESSED_SCALE else 1f,
+        animationSpec = if (motionOn) spring(dampingRatio = Spring.DampingRatioMediumBouncy) else snap(),
+        label = "run_bar_press",
+    )
     val colors = MaterialTheme.colorScheme
     val stop = action == RunBarAction.STOP
     val container = if (stop) colors.errorContainer else colors.primary
@@ -183,21 +235,44 @@ private fun RunBarActionButton(
     Box(
         modifier =
             modifier
-                .height(BUTTON_HEIGHT)
-                .clip(CircleShape)
+                .size(BUTTON_SIZE)
+                .graphicsLayer {
+                    scaleX = scale
+                    scaleY = scale
+                }.clip(CircleShape)
                 .background(container)
-                .clickable(onClick = onClick)
-                .padding(horizontal = BUTTON_PADDING_H),
+                .clickable(
+                    interactionSource = interaction,
+                    indication = LocalIndication.current,
+                    onClick = onClick,
+                ),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = buttonTextOf(action),
-            style = MaterialTheme.typography.labelMedium,
-            color = content,
-            maxLines = 1,
-        )
+        Crossfade(
+            targetState = action,
+            animationSpec = tween(durationMillis = if (motionOn) ICON_SWAP_MS else 0),
+            label = "run_bar_icon",
+        ) { shown ->
+            Icon(
+                imageVector = iconOf(shown),
+                contentDescription = buttonLabelOf(shown),
+                tint = content,
+                modifier = Modifier.size(IconSize.Sm.scaled()),
+            )
+        }
     }
 }
+
+/** 按钮槽位：暂停/继续共用 0（状态切换时原地交叉过渡），中止恒为 1。 */
+private fun buttonSlotOf(action: RunBarAction): Int = if (action == RunBarAction.STOP) 1 else 0
+
+/** 按钮图标。 */
+private fun iconOf(action: RunBarAction): ImageVector =
+    when (action) {
+        RunBarAction.PAUSE -> AutopIcons.Pause
+        RunBarAction.RESUME -> AutopIcons.Play
+        RunBarAction.STOP -> AutopIcons.Stop
+    }
 
 /** 状态文案（运行中为「操作 · 第 N 步」，标题缺省退化为纯步数/状态词）。 */
 @Composable
@@ -214,9 +289,9 @@ private fun hintTextOf(hint: RunBarHint): String =
         else -> stringResource(R.string.panel_status_queued)
     }
 
-/** 按钮文案。 */
+/** 按钮无障碍文案（视觉为图标，读屏读文字）。 */
 @Composable
-private fun buttonTextOf(action: RunBarAction): String =
+private fun buttonLabelOf(action: RunBarAction): String =
     when (action) {
         RunBarAction.PAUSE -> stringResource(R.string.panel_action_pause)
         RunBarAction.RESUME -> stringResource(R.string.panel_action_resume)
