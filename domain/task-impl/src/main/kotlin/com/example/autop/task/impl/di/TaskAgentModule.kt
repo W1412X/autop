@@ -1,6 +1,6 @@
 /**
  * 通知、提醒与审计装配（docs/tech/07 §7/§8）：UserNotifier、锁屏提醒、
- * notify_user 工具与审计清理。
+ * 任务工具（notify_user / list_tasks / create_task / update_task）与审计清理。
  */
 package com.example.autop.task.impl.di
 
@@ -13,7 +13,10 @@ import com.example.autop.task.impl.db.TasksDb
 import com.example.autop.task.impl.notify.UserNotifierImpl
 import com.example.autop.task.impl.reminder.LockReminder
 import com.example.autop.task.impl.store.AuditCleaner
+import com.example.autop.task.impl.tools.CreateTaskTool
+import com.example.autop.task.impl.tools.ListTasksTool
 import com.example.autop.task.impl.tools.NotifyUserTool
+import com.example.autop.task.impl.tools.UpdateTaskTool
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -57,4 +60,16 @@ public object TaskAgentModule {
     @Provides
     @IntoSet
     public fun provideNotifyUserTool(tool: NotifyUserTool): Tool = tool
+
+    @Provides
+    @IntoSet
+    public fun provideListTasksTool(tool: ListTasksTool): Tool = tool
+
+    @Provides
+    @IntoSet
+    public fun provideCreateTaskTool(tool: CreateTaskTool): Tool = tool
+
+    @Provides
+    @IntoSet
+    public fun provideUpdateTaskTool(tool: UpdateTaskTool): Tool = tool
 }

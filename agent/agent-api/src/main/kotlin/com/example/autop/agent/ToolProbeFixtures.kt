@@ -52,6 +52,14 @@ public object ToolProbeFixtures {
             "save_as_flow" to jsonObjectOf("name" to "工具自测流程", "description" to "工具自测草稿（N198）"),
             "update_flow" to jsonObjectOf("flow" to "自测流程", "reason" to "工具自测"),
             "patch_flow_node" to jsonObjectOf("flow" to "自测流程", "node_id" to "n1", "reason" to "工具自测"),
+            "list_tasks" to jsonObjectOf(),
+            "create_task" to
+                jsonObjectOf(
+                    "name" to "工具自测任务",
+                    "goal" to "打开设置查看系统版本号",
+                    "trigger_type" to "manual",
+                ),
+            "update_task" to jsonObjectOf("task" to "工具自测任务", "goal" to "打开设置查看系统版本号并告知用户"),
         )
 
     /** 有默认测试参数的工具名（测试守护：注册的工具须全部落在这里）。 */

@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(35)
+        assertThat(toolTemplates).hasSize(38)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -160,6 +160,7 @@ class TemplateCatalogTest {
                 "memory.experience.extract",
                 "memory.summary.generate",
                 "memory.write.supplement",
+                "task.author.edit_context",
                 "task.author.spec",
                 "task.author.system",
                 "task.author.tools",
@@ -169,6 +170,7 @@ class TemplateCatalogTest {
                 "tool.ask_user",
                 "tool.clipboard_get",
                 "tool.clipboard_set",
+                "tool.create_task",
                 "tool.dismiss_popup",
                 "tool.finish",
                 "tool.get_device_state",
@@ -176,6 +178,7 @@ class TemplateCatalogTest {
                 "tool.history_recall",
                 "tool.input_text",
                 "tool.list_apps",
+                "tool.list_tasks",
                 "tool.memory_list",
                 "tool.memory_read",
                 "tool.memory_search",
@@ -195,6 +198,7 @@ class TemplateCatalogTest {
                 "tool.swipe",
                 "tool.tap",
                 "tool.update_plan",
+                "tool.update_task",
                 "tool.wait",
             )
     }

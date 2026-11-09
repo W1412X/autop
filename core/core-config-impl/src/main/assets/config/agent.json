@@ -49,7 +49,10 @@
         "tool.list_flows",
         "tool.save_as_flow",
         "tool.update_flow",
-        "tool.patch_flow_node"
+        "tool.patch_flow_node",
+        "tool.list_tasks",
+        "tool.create_task",
+        "tool.update_task"
       ],
       "defaultTimeoutMs": 30000,
       "timeoutMs": {
