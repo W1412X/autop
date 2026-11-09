@@ -67,9 +67,6 @@ internal val SLIVER_WIDTH = 3.dp
 /** 隐身态细条高（居中，抓取/点按余量在窗口本身）。 */
 private val SLIVER_HEIGHT = 48.dp
 
-/** 隐身态细条透明度（弱化但状态色可辨）。 */
-private const val SLIVER_ALPHA = 0.35f
-
 /** 外圈进度环宽度（docs/tech/08 §5.1"外圈 3dp 进度环"）。 */
 private val RING_WIDTH = 3.dp
 
@@ -188,7 +185,7 @@ internal fun BallVisual(
     }
 }
 
-/** 隐身态细条（3dp×48dp 胶囊，35% 透明度）：运行/等待等状态染语义色，空闲用主题主色。 */
+/** 隐身态细条（3dp×48dp 胶囊）：运行/等待等状态染语义色，空闲用主题主色；透明度随球体设置。 */
 @Composable
 internal fun BallSliver(
     uiState: BallUiState,
@@ -207,7 +204,7 @@ internal fun BallSliver(
                     Modifier
                         .align(if (side == BallSide.LEFT) Alignment.CenterEnd else Alignment.CenterStart)
                         .size(width = SLIVER_WIDTH, height = SLIVER_HEIGHT)
-                        .background(color.copy(alpha = SLIVER_ALPHA), RoundedCornerShape(SLIVER_WIDTH / 2)),
+                        .background(color, RoundedCornerShape(SLIVER_WIDTH / 2)),
             )
         }
     }
@@ -271,13 +268,13 @@ private fun ballAnimOf(spec: BallVisualSpec): BallAnim {
     return BallAnim(ringColor, ringAlpha, sweep, iconAlpha)
 }
 
-/** 底圆：surfaceContainerHigh α0.9（docs/tech/08 §5.1）。 */
+/** 球底：surfaceContainerHigh 实底（不透明度由 `ui.overlay.opacity` 统一控制）。 */
 @Composable
 private fun BoxScope.BallBody() {
     Box(
         Modifier
             .matchParentSize()
-            .background(MaterialTheme.colorScheme.surfaceContainerHigh.copy(alpha = 0.9f), CircleShape),
+            .background(MaterialTheme.colorScheme.surfaceContainerHigh, CircleShape),
     )
 }
 

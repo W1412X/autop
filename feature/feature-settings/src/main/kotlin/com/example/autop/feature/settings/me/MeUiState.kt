@@ -42,6 +42,8 @@ public data class MeUiState(
     val overlayEnabled: Boolean = true,
     /** `ui.overlay.displayMode`（悬浮球显示方式：auto / always / edge）。 */
     val overlayDisplayMode: String = "auto",
+    /** `ui.overlay.opacity`（球体与贴边小条透明度，1.0=完全不透明）。 */
+    val overlayOpacity: Double = 1.0,
     /** `task.host.persistent`（常驻后台，docs/tech/07 §4.5）。 */
     val hostPersistent: Boolean = false,
     /** `task.returnToOriginApp`（任务结束后返回原应用，docs/tech/07 §4.5）。 */

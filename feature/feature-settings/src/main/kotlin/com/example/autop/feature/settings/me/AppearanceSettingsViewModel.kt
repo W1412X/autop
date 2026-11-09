@@ -102,6 +102,7 @@ public class AppearanceSettingsViewModel
                     overlayWindowType = snapshot[UiConfig.OVERLAY].windowType,
                     overlayEnabled = snapshot[UiConfig.OVERLAY].enabled,
                     overlayDisplayMode = snapshot[UiConfig.OVERLAY].displayMode,
+                    overlayOpacity = snapshot[UiConfig.OVERLAY].opacity,
                     hostPersistent = snapshot[TaskConfig.HOST].persistent,
                     returnToOriginApp = snapshot[TaskConfig.TASK].returnToOriginApp,
                     conditionsEnabled = snapshot[TaskConfig.CONDITIONS].enabled,
@@ -151,6 +152,7 @@ public class AppearanceSettingsViewModel
                 is MeAction.SetOverlayWindowType -> write(OVERLAY_WINDOW_TYPE_PATH, JsonPrimitive(action.value))
                 is MeAction.SetOverlayEnabled -> write(OVERLAY_ENABLED_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetOverlayDisplayMode -> write(OVERLAY_DISPLAY_MODE_PATH, JsonPrimitive(action.value))
+                is MeAction.SetOverlayOpacity -> write(OVERLAY_OPACITY_PATH, JsonPrimitive(action.value))
                 is MeAction.SetHostPersistent -> write(HOST_PERSISTENT_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetReturnToOriginApp -> write(RETURN_TO_ORIGIN_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetConditionsEnabled -> write(CONDITIONS_ENABLED_PATH, JsonPrimitive(action.enabled))
@@ -238,6 +240,9 @@ public class AppearanceSettingsViewModel
 
             /** 悬浮球显示方式写入路径（ui.overlay.displayMode）。 */
             const val OVERLAY_DISPLAY_MODE_PATH = "ui.overlay.displayMode"
+
+            /** 悬浮球透明度写入路径（ui.overlay.opacity）。 */
+            const val OVERLAY_OPACITY_PATH = "ui.overlay.opacity"
 
             /** 常驻后台写入路径（task.host.persistent，docs/tech/07 §4.5）。 */
             const val HOST_PERSISTENT_PATH = "task.host.persistent"

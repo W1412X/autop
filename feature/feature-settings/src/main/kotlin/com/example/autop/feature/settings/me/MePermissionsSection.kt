@@ -21,13 +21,14 @@ import com.example.autop.device.ShellState
 import com.example.autop.feature.settings.R
 import com.example.autop.feature.settings.SettingsSection
 
-/** 权限与运行分组：权限检查入口 + 悬浮窗通道/悬浮球显隐与显示方式 + 常驻后台/返回原应用开关 + 运行预算入口。 */
+/** 权限与运行分组：权限检查入口 + 悬浮窗通道/悬浮球显隐、显示方式与透明度 + 常驻后台/返回原应用开关 + 运行预算入口。 */
 @Composable
 internal fun PermissionsSection(
     state: MeUiState,
     onOpen: (SettingsSection) -> Unit,
     onOpenWindowTypeSheet: () -> Unit,
     onOpenDisplayModeSheet: () -> Unit,
+    onOpenOpacitySheet: () -> Unit,
     onAction: (MeAction) -> Unit,
 ) {
     Column {
@@ -60,30 +61,45 @@ internal fun PermissionsSection(
             value = DisplayModeLabel(state.overlayDisplayMode),
             onClick = onOpenDisplayModeSheet,
         )
+        OptionRow(
+            title = stringResource(R.string.me_overlay_opacity),
+            subtitle = null,
+            value = opacityLabel(state.overlayOpacity),
+            onClick = onOpenOpacitySheet,
+        )
         NavRow(
             title = stringResource(R.string.me_nav_shell),
             subtitle = stringResource(shellChannelStatusRes(state.shellChannel)),
             onClick = { onOpen(SettingsSection.SHELL) },
         )
-        SwitchRow(
-            title = stringResource(R.string.me_host_persistent),
-            subtitle = stringResource(R.string.me_host_persistent_desc),
-            checked = state.hostPersistent,
-            onCheckedChange = { onAction(MeAction.SetHostPersistent(it)) },
-        )
-        SwitchRow(
-            title = stringResource(R.string.me_return_to_origin),
-            subtitle = null,
-            checked = state.returnToOriginApp,
-            onCheckedChange = { onAction(MeAction.SetReturnToOriginApp(it)) },
-        )
-        SwitchRow(
-            title = stringResource(R.string.me_shield_enabled),
-            subtitle = stringResource(R.string.me_shield_enabled_desc),
-            checked = state.shieldEnabled,
-            onCheckedChange = { onAction(MeAction.SetShieldEnabled(it)) },
-        )
+        BehaviorRows(state = state, onAction = onAction)
     }
+}
+
+/** 运行行为开关：常驻后台 / 结束后返回原应用 / 执行期触摸盾。 */
+@Composable
+private fun BehaviorRows(
+    state: MeUiState,
+    onAction: (MeAction) -> Unit,
+) {
+    SwitchRow(
+        title = stringResource(R.string.me_host_persistent),
+        subtitle = stringResource(R.string.me_host_persistent_desc),
+        checked = state.hostPersistent,
+        onCheckedChange = { onAction(MeAction.SetHostPersistent(it)) },
+    )
+    SwitchRow(
+        title = stringResource(R.string.me_return_to_origin),
+        subtitle = null,
+        checked = state.returnToOriginApp,
+        onCheckedChange = { onAction(MeAction.SetReturnToOriginApp(it)) },
+    )
+    SwitchRow(
+        title = stringResource(R.string.me_shield_enabled),
+        subtitle = stringResource(R.string.me_shield_enabled_desc),
+        checked = state.shieldEnabled,
+        onCheckedChange = { onAction(MeAction.SetShieldEnabled(it)) },
+    )
 }
 
 /** 悬浮窗通道选择弹层。 */
@@ -101,6 +117,30 @@ internal fun WindowTypeSheet(
         onDismiss = onDismiss,
     )
 }
+
+/** 悬浮球透明度选择弹层（球体与贴边小条统一生效）。 */
+@Composable
+internal fun OpacitySheet(
+    selected: Double,
+    onSelect: (Double) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val options =
+        OPACITY_OPTIONS.map { value ->
+            OptionItem(id = value.toString(), label = opacityLabel(value))
+        }
+    OptionSheet(
+        title = stringResource(R.string.me_overlay_opacity),
+        options = options,
+        selectedId = OPACITY_OPTIONS.firstOrNull { it == selected }?.toString().orEmpty(),
+        onSelect = { id -> id.toDoubleOrNull()?.let(onSelect) },
+        onDismiss = onDismiss,
+    )
+}
+
+/** 透明度显示文案（百分比）。 */
+@Composable
+private fun opacityLabel(value: Double): String = stringResource(R.string.me_scale_percent, (value * PERCENT).toInt())
 
 /** 悬浮球显示方式选择弹层。 */
 @Composable
@@ -180,3 +220,9 @@ private const val DISPLAY_MODE_ALWAYS = "always"
 
 /** 松手即收边细条。 */
 private const val DISPLAY_MODE_EDGE = "edge"
+
+/** 透明度可选档位（1.0=完全不透明）。 */
+private val OPACITY_OPTIONS: List<Double> = listOf(1.0, 0.9, 0.8, 0.7, 0.6)
+
+/** 小数透明度 → 百分比。 */
+private const val PERCENT = 100

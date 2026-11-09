@@ -83,6 +83,8 @@ public data class UiOverlaySection(
     @SerialName("windowType") val windowType: String = "auto",
     /** 悬浮球显示方式：auto=静置自动收拢（贴边→细条）；always=保持展开；edge=松手即收边细条。 */
     @SerialName("displayMode") val displayMode: String = "auto",
+    /** 球体与贴边细条的透明度（1.0=完全不透明）。 */
+    @SerialName("opacity") val opacity: Double = 1.0,
     @SerialName("edgeHideRatio") val edgeHideRatio: Double = 0.8,
     @SerialName("breathMs") val breathMs: Long = 1600,
     @SerialName("doubleTapStops") val doubleTapStops: Boolean = true,
@@ -93,6 +95,9 @@ public data class UiOverlaySection(
             if (displayMode !in DISPLAY_MODES) {
                 add("displayMode must be one of $DISPLAY_MODES, was '$displayMode'")
             }
+            if (opacity !in OPACITY_MIN..OPACITY_MAX) {
+                add("opacity must be in $OPACITY_MIN..$OPACITY_MAX, was $opacity")
+            }
         }
 
     public companion object {
@@ -100,6 +105,10 @@ public data class UiOverlaySection(
         public val DISPLAY_MODES: Set<String> = setOf("auto", "always", "edge")
     }
 }
+
+/** 悬浮球透明度下限/上限。 */
+private const val OPACITY_MIN: Double = 0.5
+private const val OPACITY_MAX: Double = 1.0
 
 /** `ui.indicator`：执行期状态指示（屏幕边缘光 + 顶部胶囊；ADR-0014）。颜色取自主题，不在配置里。 */
 @Serializable

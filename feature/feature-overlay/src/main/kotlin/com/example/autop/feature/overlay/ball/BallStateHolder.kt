@@ -81,6 +81,7 @@ public class BallStateHolder
                     motionEnabled = bits.motionEnabled,
                     doubleTapStops = bits.doubleTapStops,
                     attachScreenDefault = bits.attachScreenDefault,
+                    opacity = bits.opacity,
                 )
             }.stateIn(scope, SharingStarted.Eagerly, BallUiState())
 
@@ -240,6 +241,7 @@ public class BallStateHolder
                 motionEnabled = snapshot[UiConfig.APPEARANCE].motionEnabled,
                 doubleTapStops = snapshot[UiConfig.OVERLAY].doubleTapStops,
                 attachScreenDefault = snapshot[UiConfig.OVERLAY].attachScreenDefault,
+                opacity = snapshot[UiConfig.OVERLAY].opacity.toFloat(),
             )
 
         /** 未摆放/未持久化的位置标记。 */
@@ -265,4 +267,5 @@ private data class ConfigBits(
     val motionEnabled: Boolean,
     val doubleTapStops: Boolean,
     val attachScreenDefault: Boolean,
+    val opacity: Float,
 )

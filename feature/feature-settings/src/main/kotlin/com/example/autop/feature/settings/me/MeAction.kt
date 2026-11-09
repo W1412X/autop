@@ -62,6 +62,11 @@ public sealed interface MeAction {
         val value: String,
     ) : MeAction
 
+    /** 悬浮球透明度（`ui.overlay.opacity`，1.0=完全不透明）。 */
+    public data class SetOverlayOpacity(
+        val value: Double,
+    ) : MeAction
+
     /** 常驻后台开关（`task.host.persistent`，docs/tech/07 §4.5）。 */
     public data class SetHostPersistent(
         val enabled: Boolean,

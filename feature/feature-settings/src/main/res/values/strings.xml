@@ -38,6 +38,7 @@
     <string name="me_overlay_display_mode_auto">自动收拢</string>
     <string name="me_overlay_display_mode_always">保持展开</string>
     <string name="me_overlay_display_mode_edge">收边小条</string>
+    <string name="me_overlay_opacity">悬浮球透明度</string>
     <string name="me_sub_overlay_channel">悬浮球所在窗口类型，显示异常时切换</string>
     <string name="me_sub_display_mode">静置自动收成贴边小条，可改为常开或即收</string>
     <string name="me_sub_conditions_enabled">满足条件（时间、电量等）自动跑流程</string>
