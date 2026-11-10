@@ -195,6 +195,7 @@ public class ProgressController
         @Composable
         private fun ProgressContent() {
             val active by runService.observeActive().collectAsState()
+            val pending by actions.controlIntent.collectAsState()
             val rows by rowsState.collectAsState()
             val callbacks =
                 remember(this) {
@@ -219,6 +220,7 @@ public class ProgressController
                 active = active,
                 rows = rows,
                 callbacks = callbacks,
+                intent = pending,
             )
         }
     }

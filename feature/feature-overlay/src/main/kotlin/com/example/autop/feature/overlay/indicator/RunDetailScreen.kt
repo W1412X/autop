@@ -17,6 +17,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.overlay.R
+import com.example.autop.feature.overlay.panel.ControlIntent
 import com.example.autop.feature.overlay.progress.AlertCards
 import com.example.autop.feature.overlay.progress.ProgressCallbacks
 import com.example.autop.feature.overlay.progress.ProgressMessageList
@@ -30,6 +31,7 @@ internal fun RunDetailScreen(
     active: ActiveRunInfo?,
     rows: List<ProgressRow>,
     callbacks: ProgressCallbacks,
+    intent: ControlIntent? = null,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
@@ -44,7 +46,7 @@ internal fun RunDetailScreen(
         verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         ProgressMessageList(rows = rows, modifier = Modifier.fillMaxWidth().weight(1f))
-        RunInteractArea(active = active, callbacks = callbacks)
+        RunInteractArea(active = active, callbacks = callbacks, intent = intent)
     }
 }
 
@@ -56,6 +58,7 @@ internal fun RunDetailScreen(
 internal fun RunInteractArea(
     active: ActiveRunInfo?,
     callbacks: ProgressCallbacks,
+    intent: ControlIntent? = null,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
@@ -63,7 +66,7 @@ internal fun RunInteractArea(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        AlertCards(active = active, callbacks = callbacks)
+        AlertCards(active = active, callbacks = callbacks, intent = intent)
         if (active != null && active.run.waitingQuestion == null) {
             SteerRow(callbacks = callbacks)
         }

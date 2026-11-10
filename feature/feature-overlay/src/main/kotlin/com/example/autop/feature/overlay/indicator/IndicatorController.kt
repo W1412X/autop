@@ -5,7 +5,7 @@
  *   等待也有操作出口），点操作信息展开详情、按钮执行暂停/继续/中止。
  * - 运行详情（[OverlayWindowIds.RUN_DETAIL]）：条下的消息流观测面板，展开时显示、再点收起。
  * 悬浮球在控制条可见时由组装层隐藏（[barVisible] 同源），Run 收口自动回显；控制条窗口
- * 不可聚焦、只包内容，不挡注入（注入期封锁由 `blockInput` 按相交区域覆盖）。
+ * 不可聚焦、只包内容，不挡注入（注入期封锁由 `blockInput` 统一覆盖全部自家窗口）。
  */
 package com.example.autop.feature.overlay.indicator
 
@@ -221,6 +221,7 @@ public class IndicatorController
         @Composable
         private fun RunBarContent() {
             val active by runService.observeActive().collectAsState()
+            val pending by actions.controlIntent.collectAsState()
             val visible by barContentVisible.collectAsState()
             val expanded by detailExpanded.collectAsState()
             val current = active ?: lastActive ?: return
@@ -228,6 +229,7 @@ public class IndicatorController
                 active = current,
                 expanded = expanded,
                 visible = visible,
+                pending = pending,
                 onToggleExpand = ::toggleDetail,
                 onAction = ::onAction,
             )
@@ -237,6 +239,7 @@ public class IndicatorController
         private fun RunDetailContent() {
             val rows by progress.rowsState.collectAsState()
             val active by runService.observeActive().collectAsState()
+            val pending by actions.controlIntent.collectAsState()
             val callbacks =
                 remember(this) {
                     ProgressCallbacks(
@@ -255,7 +258,7 @@ public class IndicatorController
                         onClose = ::collapseDetail,
                     )
                 }
-            RunDetailScreen(active = active, rows = rows, callbacks = callbacks)
+            RunDetailScreen(active = active, rows = rows, callbacks = callbacks, intent = pending)
         }
     }
 

@@ -49,6 +49,9 @@ import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.overlay.R
+import com.example.autop.feature.overlay.panel.ControlIntent
+import com.example.autop.feature.overlay.panel.ControlIntentKind
+import com.example.autop.feature.overlay.panel.controlIntentLabelRes
 import com.example.autop.feature.overlay.rememberBreath
 import com.example.autop.task.ActiveRunInfo
 import kotlin.random.Random
@@ -71,6 +74,9 @@ private const val BREATH_HALF_MS: Long = 700L
 /** 按压回弹的缩放下限。 */
 private const val PRESSED_SCALE: Float = 0.88f
 
+/** 过渡态按钮的置暗透明度。 */
+private const val PENDING_ALPHA: Float = 0.5f
+
 /** 入场 / 图标交叉过渡 / 箭头过渡时长（毫秒）。 */
 private const val BAR_APPEAR_MS: Int = 250
 private const val ICON_SWAP_MS: Int = 180
@@ -85,6 +91,7 @@ internal fun RunBarScreen(
     active: ActiveRunInfo,
     expanded: Boolean,
     visible: Boolean,
+    pending: ControlIntent? = null,
     onToggleExpand: () -> Unit,
     onAction: (RunBarAction) -> Unit,
 ) {
@@ -116,7 +123,7 @@ internal fun RunBarScreen(
         StatusDot(hint = spec.hint, breath = breath)
         InfoArea(
             expanded = expanded,
-            text = hintTextOf(spec.hint),
+            text = pendingHintTextOf(pending) ?: hintTextOf(spec.hint),
             onToggleExpand = onToggleExpand,
             modifier = Modifier.weight(1f),
         )
@@ -124,6 +131,7 @@ internal fun RunBarScreen(
             key(buttonSlotOf(action)) {
                 RunBarActionButton(
                     action = action,
+                    pending = pending != null && pending.kind == action.toControlIntentKind(),
                     onClick = { onAction(action) },
                     modifier = Modifier.padding(start = BUTTON_GAP),
                 )
@@ -239,11 +247,13 @@ private fun ExpandChevron(
 
 /**
  * 状态按钮：圆形图标按钮（暂停/继续、中止），按压回弹 + 涟漪反馈；
- * 暂停/继续同一槽位（[buttonSlotOf]）复用节点，图标交叉过渡。
+ * 暂停/继续同一槽位（[buttonSlotOf]）复用节点，图标交叉过渡；
+ * [pending] 过渡态（点击即反馈）：置暗并禁用防连点，落地后自动恢复。
  */
 @Composable
 private fun RunBarActionButton(
     action: RunBarAction,
+    pending: Boolean,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -266,9 +276,11 @@ private fun RunBarActionButton(
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
+                    alpha = if (pending) PENDING_ALPHA else 1f
                 }.clip(CircleShape)
                 .background(container)
                 .clickable(
+                    enabled = !pending,
                     interactionSource = interaction,
                     indication = LocalIndication.current,
                     onClick = onClick,
@@ -321,4 +333,17 @@ private fun buttonLabelOf(action: RunBarAction): String =
         RunBarAction.PAUSE -> stringResource(R.string.panel_action_pause)
         RunBarAction.RESUME -> stringResource(R.string.panel_action_resume)
         RunBarAction.STOP -> stringResource(R.string.run_bar_stop)
+    }
+
+/** 过渡态文案（点击即反馈，落地后回常规状态文案）。 */
+@Composable
+private fun pendingHintTextOf(pending: ControlIntent?): String? =
+    pending?.let { stringResource(controlIntentLabelRes(it.kind)) }
+
+/** 控制条按钮 → 控制意图种类（过渡态反馈对齐）。 */
+private fun RunBarAction.toControlIntentKind(): ControlIntentKind =
+    when (this) {
+        RunBarAction.PAUSE -> ControlIntentKind.PAUSE
+        RunBarAction.RESUME -> ControlIntentKind.RESUME
+        RunBarAction.STOP -> ControlIntentKind.STOP
     }

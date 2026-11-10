@@ -35,6 +35,8 @@ import com.example.autop.core.ui.theme.LocalSemanticColors
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.tone
 import com.example.autop.feature.overlay.R
+import com.example.autop.feature.overlay.panel.ControlIntent
+import com.example.autop.feature.overlay.panel.ControlIntentKind
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunStatus
 
@@ -50,6 +52,7 @@ internal fun ProgressScreen(
     active: ActiveRunInfo?,
     rows: List<ProgressRow>,
     callbacks: ProgressCallbacks,
+    intent: ControlIntent? = null,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
@@ -78,8 +81,8 @@ internal fun ProgressScreen(
             onClose = callbacks.onClose,
         )
         ProgressMessageList(rows = rows, modifier = Modifier.weight(1f))
-        AlertCards(active = active, callbacks = callbacks)
-        ControlRow(active = active, expanded = header.runControls, callbacks = callbacks)
+        AlertCards(active = active, callbacks = callbacks, intent = intent)
+        ControlRow(active = active, expanded = header.runControls, callbacks = callbacks, intent = intent)
         if (header.runControls) {
             SteerRow(callbacks = callbacks)
         }
@@ -185,12 +188,14 @@ private fun HeaderHint(
     }
 }
 
-/** 控制行（N185）：运行中暂停/停止/打开对话；结束后收起运行控制只留「打开对话」。 */
+/** 控制行（N185）：运行中暂停/停止/打开对话；结束后收起运行控制只留「打开对话」；
+ *  按钮带过渡态反馈（[intent]，点击即换「正在…」文案并禁用防连点）。 */
 @Composable
 private fun ControlRow(
     active: ActiveRunInfo?,
     expanded: Boolean,
     callbacks: ProgressCallbacks,
+    intent: ControlIntent? = null,
     modifier: Modifier = Modifier,
 ) {
     Row(
@@ -198,20 +203,22 @@ private fun ControlRow(
         horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
     ) {
         if (expanded) {
+            val paused = active?.run?.status == RunStatus.PAUSED
+            val toggleKind = if (paused) ControlIntentKind.RESUME else ControlIntentKind.PAUSE
             AutopTonalButton(
                 text =
-                    stringResource(
-                        if (active?.run?.status == RunStatus.PAUSED) {
-                            R.string.panel_action_resume
-                        } else {
-                            R.string.panel_action_pause
-                        },
+                    pendingLabelOf(
+                        intent,
+                        toggleKind,
+                        if (paused) R.string.panel_action_resume else R.string.panel_action_pause,
                     ),
                 onClick = callbacks.onPauseResume,
+                enabled = intent?.kind != toggleKind,
             )
             AutopTonalButton(
-                text = stringResource(R.string.panel_action_stop),
+                text = pendingLabelOf(intent, ControlIntentKind.STOP, R.string.panel_action_stop),
                 onClick = callbacks.onStop,
+                enabled = intent?.kind != ControlIntentKind.STOP,
             )
             // 流程执行中：只停流程、对话继续（P1-3 取消粒度）。
             if (active?.flow != null) {

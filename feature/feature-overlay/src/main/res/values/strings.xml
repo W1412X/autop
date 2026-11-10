@@ -17,6 +17,9 @@
     <string name="panel_action_pause">暂停</string>
     <string name="panel_action_resume">继续</string>
     <string name="panel_action_stop">停止</string>
+    <string name="control_intent_pause">正在暂停…</string>
+    <string name="control_intent_resume">正在继续…</string>
+    <string name="control_intent_stop">正在停止…</string>
     <string name="panel_action_stop_flow">停止流程</string>
     <string name="panel_action_open_chat">打开对话</string>
     <string name="panel_ask_self">自己输入</string>

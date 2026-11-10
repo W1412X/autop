@@ -35,6 +35,9 @@ import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.overlay.R
+import com.example.autop.feature.overlay.panel.ControlIntent
+import com.example.autop.feature.overlay.panel.ControlIntentKind
+import com.example.autop.feature.overlay.panel.controlIntentLabelRes
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunStatus
 
@@ -60,6 +63,7 @@ internal class ProgressCallbacks(
 internal fun AlertCards(
     active: ActiveRunInfo?,
     callbacks: ProgressCallbacks,
+    intent: ControlIntent? = null,
     modifier: Modifier = Modifier,
 ) {
     val run = active?.run ?: return
@@ -83,13 +87,14 @@ internal fun AlertCards(
                     actions = {
                         Spacer(modifier = Modifier.weight(1f))
                         AutopTextButton(
-                            text = stringResource(R.string.panel_blocked_finish),
+                            text = pendingLabelOf(intent, ControlIntentKind.STOP, R.string.panel_blocked_finish),
                             destructive = true,
                             onClick = callbacks.onFinishBlocked,
                         )
                         AutopButton(
-                            text = stringResource(R.string.panel_blocked_continue),
+                            text = pendingLabelOf(intent, ControlIntentKind.RESUME, R.string.panel_blocked_continue),
                             onClick = callbacks.onContinueBlocked,
+                            enabled = intent?.kind != ControlIntentKind.RESUME,
                         )
                     },
                 )
@@ -100,13 +105,25 @@ internal fun AlertCards(
                     actions = {
                         Spacer(modifier = Modifier.weight(1f))
                         AutopButton(
-                            text = stringResource(R.string.panel_action_resume),
+                            text = pendingLabelOf(intent, ControlIntentKind.RESUME, R.string.panel_action_resume),
                             onClick = callbacks.onPauseResume,
+                            enabled = intent?.kind != ControlIntentKind.RESUME,
                         )
                     },
                 )
         }
     }
+}
+
+/** 过渡态按钮文案（点击即反馈）：命中意图换「正在…」，暂停/继续类由调用方同步禁用防连点。 */
+@Composable
+internal fun pendingLabelOf(
+    intent: ControlIntent?,
+    kind: ControlIntentKind,
+    defaultRes: Int,
+): String {
+    val textRes = if (intent?.kind == kind) controlIntentLabelRes(kind) else defaultRes
+    return stringResource(textRes)
 }
 
 /** 等待回答卡（AskCard 同款，N181/N182）：问题 + 选项每行一个 + 「自己输入」独立输入行。 */
