@@ -9,17 +9,19 @@
 ## 消息模型（src/main/kotlin/…/llm/）
 
 - `Message.kt`：`Role`（USER/ASSISTANT/TOOL）与 `Block` 密封层级
-  （`Text`/`Image`/`ToolCall`/`ToolResult`/`Thinking`）+ `Msg`；字段 `@SerialName` 与事件 payload 带 `v`。
-- `MsgValidator.kt`：`MsgValidator.validate(messages)` 结构约束校验——
-  ToolCall 只能在 assistant、ToolResult 只能在 tool、tool 消息只含 ToolResult 且 callId 集合与
-  未决调用一一对应、user 消息前不允许有未决调用、结尾不允许未决调用。违反抛
-  `IllegalStateException`（属编程错误）。
+  （`Text`/`Image`/`ToolCall`/`ToolResult`/`Thinking`）+ `Msg`（`producedBy`：产生该消息的模型配置 id，
+  历史净化用）；字段 `@SerialName` 与事件 payload 带 `v`。
+- `MsgValidator.kt`：`MsgValidator.problems(messages)` 收集结构约束违反项（ToolCall 只能在 assistant、
+  ToolResult 只能在 tool、tool 消息只含 ToolResult 且 callId 集合与未决调用一一对应、user 消息前不允许有
+  未决调用、结尾不允许未决调用），**不抛异常**；Provider 发送前检查，非空抛
+  `LlmException(AppError(llm.invalid_history))`。`validate` 保留为断言式入口。
 
 ## 请求与流事件
 
 - `LlmRequest.kt`：`SystemPart`（含 `cacheBreakpoint`）、`ToolSchema`/`ToolChoice`、`LlmRequest`
   （system/messages/tools/toolChoice/maxOutputTokens/temperature/thinkingBudgetTokens/cacheBreakpointMessageIndex）。
-- `LlmStreamEvent.kt`：`Usage`、`StopReason` 与密封事件
+- `LlmStreamEvent.kt`：`Usage`（`inputTokens` = 本次请求全部输入 token，含缓存命中与缓存写入）、
+  `StopReason` 与密封事件
   `TextDelta`/`ThinkingDelta`/`ToolCallStarted`/`ToolCallArgsDelta`/`UsageReported`/`Completed`。
 
 ## 端口
@@ -39,7 +41,8 @@
 ## 错误码
 
 - `LlmErrorCodes.kt`：`llm.not_configured`/`auth`/`rate_limited`/`context_exceeded`/`bad_request`/
-  `server`/`network`/`timeout`/`bad_response`/`refused`（docs/tech/03 §4.4 照抄）。
+  `server`/`network`/`timeout`/`bad_response`/`refused`/`invalid_history`（docs/tech/03 §4.4 照抄）。
+  `retryable` 由 `mapHttpError` 单一判定（HTTP 状态码 ∈ `retryStatus`；`context_exceeded` 恒 false）。
 
 ## 测试
 
