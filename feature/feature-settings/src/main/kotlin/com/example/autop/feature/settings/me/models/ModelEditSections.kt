@@ -39,6 +39,7 @@ import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.settings.R
 import com.example.autop.llm.ProbeResult
+import com.example.autop.llm.ProbeVerdict
 
 /** 保存后自动测试的结果对话框：配置已保存的提示 + 逐项结果 + 能力回填提示。 */
 @Composable
@@ -175,29 +176,43 @@ private fun ProbeRow(
 ) {
     val error = result.error
     val detailable = !result.ok && error != null
+    val inconclusive = result.verdict == ProbeVerdict.INCONCLUSIVE
     ListRow(
         title = stringResource(labelRes),
         subtitle =
-            if (result.ok) {
-                stringResource(R.string.model_probe_elapsed, result.elapsedMs / MS_PER_SECOND)
-            } else {
-                subtitleParts(
-                    error?.message ?: stringResource(R.string.model_probe_status_fail),
-                    if (detailable) stringResource(R.string.model_probe_detail_tap) else null,
-                )
+            when {
+                result.ok -> stringResource(R.string.model_probe_elapsed, result.elapsedMs / MS_PER_SECOND)
+                inconclusive ->
+                    subtitleParts(
+                        stringResource(R.string.model_probe_inconclusive_note),
+                        if (detailable) stringResource(R.string.model_probe_detail_tap) else null,
+                    )
+                else ->
+                    subtitleParts(
+                        error?.message ?: stringResource(R.string.model_probe_status_fail),
+                        if (detailable) stringResource(R.string.model_probe_detail_tap) else null,
+                    )
             },
         modifier = if (error != null && detailable) Modifier.clickable { onShowDetail(error) } else Modifier,
         trailing = {
-            StatusChip(
-                text =
-                    stringResource(
-                        if (result.ok) R.string.model_probe_status_ok else R.string.model_probe_status_fail,
-                    ),
-                tone = if (result.ok) StatusTone.SUCCEEDED else StatusTone.BLOCKED,
-            )
+            StatusChip(text = stringResource(statusRes(result.verdict)), tone = toneOf(result.verdict))
         },
     )
 }
+
+private fun statusRes(verdict: ProbeVerdict): Int =
+    when (verdict) {
+        ProbeVerdict.SUPPORTED -> R.string.model_probe_status_ok
+        ProbeVerdict.UNSUPPORTED -> R.string.model_probe_status_fail
+        ProbeVerdict.INCONCLUSIVE -> R.string.model_probe_status_inconclusive
+    }
+
+private fun toneOf(verdict: ProbeVerdict): StatusTone =
+    when (verdict) {
+        ProbeVerdict.SUPPORTED -> StatusTone.SUCCEEDED
+        ProbeVerdict.UNSUPPORTED -> StatusTone.BLOCKED
+        ProbeVerdict.INCONCLUSIVE -> StatusTone.WAITING
+    }
 
 private const val MS_PER_SECOND: Float = 1000f
 

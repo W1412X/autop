@@ -7,6 +7,7 @@ import com.example.autop.llm.Block
 import com.example.autop.llm.LlmErrorCodes
 import com.example.autop.llm.LlmException
 import com.example.autop.llm.ModelProfile
+import com.example.autop.llm.ProbeVerdict
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
@@ -72,13 +73,71 @@ internal class DefaultModelProbeTest {
     }
 
     @Test
-    fun toolsProbeWithoutEchoToolCallIsNotSupported() {
+    fun toolsProbeWithoutEchoToolCallIsInconclusive() {
         runTest {
             val provider = FakeLlmProvider(profile())
             val report = probe(factory("openai", provider)).probe(profile())
 
-            assertThat(report.tools.ok).isFalse()
+            assertThat(report.tools.verdict).isEqualTo(ProbeVerdict.INCONCLUSIVE)
             assertThat(report.text.ok).isTrue()
+        }
+    }
+
+    @Test
+    fun toolsRequestRejectedWhileTextWorksIsUnsupported() {
+        runTest {
+            val provider =
+                FakeLlmProvider(profile()) { request ->
+                    if (request.tools.isNotEmpty()) {
+                        throw LlmException(AppError(code = LlmErrorCodes.BAD_REQUEST, message = "tools not supported"))
+                    }
+                    completedEvent()
+                }
+            val report = probe(factory("openai", provider)).probe(profile())
+
+            assertThat(report.tools.verdict).isEqualTo(ProbeVerdict.UNSUPPORTED)
+        }
+    }
+
+    @Test
+    fun toolsProbeServerErrorIsInconclusive() {
+        runTest {
+            val provider =
+                FakeLlmProvider(profile()) { request ->
+                    if (request.tools.isNotEmpty()) {
+                        throw LlmException(AppError(code = LlmErrorCodes.SERVER, message = "overloaded"))
+                    }
+                    completedEvent()
+                }
+            val report = probe(factory("openai", provider)).probe(profile())
+
+            assertThat(report.tools.verdict).isEqualTo(ProbeVerdict.INCONCLUSIVE)
+        }
+    }
+
+    @Test
+    fun badRequestWhenTextAlsoFailsIsInconclusiveForTools() {
+        runTest {
+            val failing =
+                FakeLlmProvider(profile()) {
+                    throw LlmException(AppError(code = LlmErrorCodes.BAD_REQUEST, message = "bad model name"))
+                }
+            val report = probe(factory("openai", failing)).probe(profile())
+
+            assertThat(report.text.verdict).isEqualTo(ProbeVerdict.UNSUPPORTED)
+            assertThat(report.tools.verdict).isEqualTo(ProbeVerdict.INCONCLUSIVE)
+        }
+    }
+
+    @Test
+    fun everyProbeUsesProfileMaxOutputTokensAndEchoHasRequiredText() {
+        runTest {
+            val provider = FakeLlmProvider(profile()) { echoToolCompletedEvent() }
+            probe(factory("openai", provider)).probe(profile())
+
+            assertThat(provider.requests.map { it.maxOutputTokens }.distinct()).containsExactly(MAX_OUTPUT)
+            val echo = provider.requests.flatMap { it.tools }.single()
+            assertThat(echo.parameters["required"].toString()).contains("text")
         }
     }
 
@@ -127,7 +186,7 @@ internal class DefaultModelProbeTest {
             apiKeyRef = "secret:model:probe",
             model = "model",
             contextWindow = 8192,
-            maxOutputTokens = 256,
+            maxOutputTokens = MAX_OUTPUT,
         )
 
     private fun probeTimeoutOverrides() =
@@ -135,6 +194,7 @@ internal class DefaultModelProbeTest {
 
     private companion object {
         const val PROBE_COUNT = 3
+        const val MAX_OUTPUT = 4096
         const val PROBE_IMAGE_MIME = "image/png"
         const val PROBE_IMAGE_EDGE = 8
         const val TIMEOUT_MS = 50

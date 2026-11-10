@@ -10,6 +10,8 @@ import com.example.autop.llm.ModelCapabilities
 import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.ModelRoles
 import com.example.autop.llm.ProbeReport
+import com.example.autop.llm.ProbeResult
+import com.example.autop.llm.ProbeVerdict
 
 /** 页面错误提示类型（文案在 strings，ViewModel 不接触资源）。 */
 public enum class ModelsErrorKind {
@@ -169,13 +171,26 @@ internal fun ModelDraft.withQuirk(
 /**
  * 测试连接结果回填（docs/tech/08 §4.5"已根据测试结果更新能力"）：只回填
  * `tools`/`vision`（探测直接给出的两项），`thinking`/`streamUsage` 不自动改（N48）。
+ * 未确认（INCONCLUSIVE）时保持原值：误把支持工具的模型关掉会让 agent 降级到 JSON 回退。
  */
 internal fun ModelDraft.withProbed(
     report: ProbeReport,
     apiKeyTail: String?,
 ): ModelDraft =
     copy(
-        capabilities = capabilities.copy(tools = report.tools.ok, vision = report.vision.ok),
+        capabilities =
+            capabilities.copy(
+                tools = report.tools.applyTo(capabilities.tools),
+                vision = report.vision.applyTo(capabilities.vision),
+            ),
         apiKeyInput = "",
         apiKeyTail = apiKeyTail,
     )
+
+/** 按探测结论更新一项能力：未确认时保持 [current]。 */
+private fun ProbeResult.applyTo(current: Boolean): Boolean =
+    when (verdict) {
+        ProbeVerdict.SUPPORTED -> true
+        ProbeVerdict.UNSUPPORTED -> false
+        ProbeVerdict.INCONCLUSIVE -> current
+    }

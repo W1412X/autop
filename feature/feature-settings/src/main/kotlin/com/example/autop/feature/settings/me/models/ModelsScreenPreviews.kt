@@ -10,6 +10,7 @@ import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.ModelRoles
 import com.example.autop.llm.ProbeReport
 import com.example.autop.llm.ProbeResult
+import com.example.autop.llm.ProbeVerdict
 
 @Preview(name = "Models list light")
 @Composable
@@ -58,9 +59,9 @@ private fun previewEditState(): ModelsUiState =
                 running = false,
                 report =
                     ProbeReport(
-                        text = ProbeResult(ok = true, elapsedMs = 1200),
-                        tools = ProbeResult(ok = true, elapsedMs = 800),
-                        vision = ProbeResult(ok = false, elapsedMs = 300),
+                        text = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 1200),
+                        tools = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 800),
+                        vision = ProbeResult(verdict = ProbeVerdict.UNSUPPORTED, elapsedMs = 300),
                     ),
             ),
     )

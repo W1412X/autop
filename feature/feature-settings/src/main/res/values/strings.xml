@@ -156,6 +156,8 @@
     <string name="model_probe_elapsed">%1$.1fs</string>
     <string name="model_probe_status_ok">可用</string>
     <string name="model_probe_status_fail">不可用</string>
+    <string name="model_probe_status_inconclusive">未确认</string>
+    <string name="model_probe_inconclusive_note">本次没测出结论，保持当前设置</string>
     <string name="model_probe_request_failed">测试请求失败</string>
     <string name="model_probe_hint">已根据测试结果更新能力</string>
     <string name="model_probe_detail_tap">点击查看详情</string>

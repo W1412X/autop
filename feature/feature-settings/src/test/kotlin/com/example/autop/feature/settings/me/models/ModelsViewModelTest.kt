@@ -16,8 +16,11 @@ import com.example.autop.feature.settings.me.RecordingModelDirectory
 import com.example.autop.feature.settings.me.RecordingModelProbe
 import com.example.autop.feature.settings.me.okProbeReport
 import com.example.autop.feature.settings.me.testProfile
+import com.example.autop.llm.ModelCapabilities
 import com.example.autop.llm.ModelRole
 import com.example.autop.llm.ModelRoles
+import com.example.autop.llm.ProbeResult
+import com.example.autop.llm.ProbeVerdict
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -182,6 +185,33 @@ class ModelsViewModelTest {
             val saved = store.profiles.first().single()
             assertThat(saved.capabilities.tools).isTrue()
             assertThat(saved.capabilities.vision).isTrue()
+        }
+
+    @Test
+    fun `inconclusive tools probe keeps existing tools capability`() =
+        runTest(dispatcher) {
+            store.upsert(testProfile("p1").copy(capabilities = ModelCapabilities(tools = true, vision = false)))
+            probe.report =
+                okProbeReport().copy(tools = ProbeResult(verdict = ProbeVerdict.INCONCLUSIVE, elapsedMs = 900))
+            val viewModel = createViewModel()
+            viewModel.onAction(ModelsAction.Edit("p1"))
+            viewModel.onAction(ModelsAction.Save)
+            val saved = store.profiles.first().single()
+            assertThat(saved.capabilities.tools).isTrue()
+            assertThat(saved.capabilities.vision).isTrue()
+        }
+
+    @Test
+    fun `unsupported tools probe turns tools off`() =
+        runTest(dispatcher) {
+            store.upsert(testProfile("p1"))
+            probe.report =
+                okProbeReport().copy(tools = ProbeResult(verdict = ProbeVerdict.UNSUPPORTED, elapsedMs = 900))
+            val viewModel = createViewModel()
+            viewModel.onAction(ModelsAction.Edit("p1"))
+            viewModel.onAction(ModelsAction.Save)
+            val saved = store.profiles.first().single()
+            assertThat(saved.capabilities.tools).isFalse()
         }
 
     @Test

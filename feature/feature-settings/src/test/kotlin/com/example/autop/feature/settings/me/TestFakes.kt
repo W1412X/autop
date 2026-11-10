@@ -9,6 +9,7 @@ import com.example.autop.llm.ModelProbe
 import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.ProbeReport
 import com.example.autop.llm.ProbeResult
+import com.example.autop.llm.ProbeVerdict
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
@@ -78,9 +79,9 @@ internal class FakeIdGenerator : IdGenerator {
 internal class RecordingModelProbe(
     var report: ProbeReport =
         ProbeReport(
-            text = ProbeResult(ok = true, elapsedMs = 1200),
-            tools = ProbeResult(ok = true, elapsedMs = 800),
-            vision = ProbeResult(ok = false, elapsedMs = 300),
+            text = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 1200),
+            tools = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 800),
+            vision = ProbeResult(verdict = ProbeVerdict.UNSUPPORTED, elapsedMs = 300),
         ),
     var error: Exception? = null,
 ) : ModelProbe {
@@ -126,7 +127,7 @@ internal fun testProfile(
 /** 全通过的 [ProbeResult]（能力回填断言用）。 */
 internal fun okProbeReport(): ProbeReport =
     ProbeReport(
-        text = ProbeResult(ok = true, elapsedMs = 1100),
-        tools = ProbeResult(ok = true, elapsedMs = 900),
-        vision = ProbeResult(ok = true, elapsedMs = 700),
+        text = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 1100),
+        tools = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 900),
+        vision = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 700),
     )
