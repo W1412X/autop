@@ -31,6 +31,9 @@ public data class PendingEntry(
 public class PendingRuns {
     private val entries = ConcurrentHashMap<RunId, PendingEntry>()
 
+    /** 取消意图（句柄尚未登记的启动窗口）：Run 启动后消费补投取消。 */
+    private val cancelled = ConcurrentHashMap.newKeySet<RunId>()
+
     /** 登记。 */
     public fun put(
         runId: RunId,
@@ -46,6 +49,14 @@ public class PendingRuns {
     public fun remove(runId: RunId) {
         entries.remove(runId)
     }
+
+    /** 落取消意图（幂等）：句柄未登记时点下的取消，begin 后由执行侧补投。 */
+    public fun markCancelled(runId: RunId) {
+        cancelled += runId
+    }
+
+    /** 消费取消意图：命中返回 true（调用方须立刻补投取消）。 */
+    public fun consumeCancelled(runId: RunId): Boolean = cancelled.remove(runId)
 
     /** 查询（调度门条件用）：独立流程运行是否需要屏幕。 */
     public fun flowNeedsScreen(runId: RunId): Boolean? = entries[runId]?.flow?.needsScreen

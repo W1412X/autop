@@ -89,7 +89,7 @@ public class RunRunner(
         task: Task?,
     ) {
         val startedAt = clock.nowMillis()
-        runStore.mutate(record.id) { it.copy(status = RunStatus.RUNNING, startedAt = startedAt) }
+        if (!launchRecord(record, startedAt)) return
         val entry = pending.take(record.id)
         val flowLaunch = flowLaunchOf(entry, task)
         val needsScreen = flowLaunch?.needsScreen ?: task?.needsScreen ?: true
@@ -138,6 +138,30 @@ public class RunRunner(
         }
     }
 
+    /**
+     * 条件置启动（取消幂等收口）：已被收口（取消/过期）的 Run 不得复活——启动与取消在
+     * runStore 原子 mutate 上仲裁，恰有一方生效；未启动则消费取消意图并返回 false。
+     */
+    private suspend fun launchRecord(
+        record: RunRecord,
+        startedAt: Long,
+    ): Boolean {
+        var launched = false
+        runStore.mutate(record.id) {
+            if (it.status in RunStatus.CANCELABLE) {
+                launched = true
+                it.copy(status = RunStatus.RUNNING, startedAt = startedAt)
+            } else {
+                it
+            }
+        }
+        if (!launched) {
+            pending.consumeCancelled(record.id)
+            logger.d(TAG, "run_closed_before_start", "runId" to record.id.value)
+        }
+        return launched
+    }
+
     private fun isFlowTask(task: Task?): Boolean = task?.executor == TaskExecutor.FLOW && task.flow != null
 
     private fun isFlowRun(
@@ -176,6 +200,11 @@ public class RunRunner(
                 )
             }
         observer.begin(record, handle)
+        // 取消意图补投（取消幂等收口）：句柄登记前窗口落下的取消在此兑现。
+        if (pending.consumeCancelled(record.id)) {
+            logger.d(TAG, "cancel_delivered_after_begin", "runId" to record.id.value)
+            handle.cancel()
+        }
         // 流程运行登记到根 Run（进度互通 P1-2；进度窗可"只停流程" P1-3）。
         if (flowLaunch != null && handle is FlowRunHandle) {
             flowFeed.register(record.id, flowLaunch.definition.name, handle)

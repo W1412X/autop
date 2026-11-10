@@ -107,19 +107,37 @@ public class RunScheduler(
         }
     }
 
-    /** RunControl：重新入队并立即调度（解锁后执行）。 */
+    /** RunControl：重新入队并立即调度（解锁后执行）；仅等待中的 Run 可重排（取消幂等，不复活已收口 Run）。 */
     public fun requeue(runId: RunId) {
         scope.launch {
-            lockReminder.dismiss(runId)
-            val record = runStore.get(runId) ?: return@launch
-            runStore.mutate(runId) { it.copy(status = RunStatus.QUEUED) }
-            enqueue(record)
+            scheduleMutex.withLock {
+                lockReminder.dismiss(runId)
+                val record = runStore.get(runId) ?: return@withLock
+                var requeued = false
+                runStore.mutate(runId) {
+                    if (it.status == RunStatus.WAITING_USER || it.status == RunStatus.WAITING_SCREEN) {
+                        requeued = true
+                        it.copy(status = RunStatus.QUEUED)
+                    } else {
+                        it
+                    }
+                }
+                if (!requeued) {
+                    logger.d(TAG, "requeue_skipped", "runId" to runId.value)
+                    return@withLock
+                }
+                enqueueLocked(record)
+            }
             trySchedule()
         }
     }
 
-    /** 入队（origin 权重已在 RunQueue 内叠加，这里补 Task.priority，越大越先）。 */
-    public fun enqueue(record: RunRecord) {
+    /** 入队（origin 权重已在 RunQueue 内叠加，这里补 Task.priority，越大越先）；与调度共锁。 */
+    public suspend fun enqueue(record: RunRecord) {
+        scheduleMutex.withLock { enqueueLocked(record) }
+    }
+
+    private fun enqueueLocked(record: RunRecord) {
         queue.add(
             RunQueue.Entry(
                 runId = record.id,
@@ -136,44 +154,76 @@ public class RunScheduler(
     }
 
     /**
-     * 跳过/过期收口（Run → CANCELLED/EXPIRED）：改 runStore 后补写
-     * `RunFinished`（带 liveNote），同线程后续 Run 的模型能看到上一个任务没有完成（WP8.2）。
+     * 跳过/过期收口（Run → CANCELLED/EXPIRED）：与调度决策共锁防队列竞态。
+     * 仅未启动（CANCELABLE）状态可收口——已启动的落取消意图由执行侧补投取消，
+     * 避免"取消被启动覆盖、Run 又被拉起"（取消幂等收口）。
      */
-    @Suppress("TooGenericExceptionCaught") // 补写失败只记日志，收口不被单条事件写入阻断
     public suspend fun cancelWaitingRun(
         runId: RunId,
         status: RunStatus = RunStatus.CANCELLED,
         errorCode: String? = null,
     ) {
+        scheduleMutex.withLock { closeWaitingRun(runId, status, errorCode) }
+    }
+
+    /**
+     * 锁内收口（[gateLocked] 在调度锁内调用，直接走这里防重入死锁）：改 runStore 后补写
+     * `RunFinished`（带 liveNote），同线程后续 Run 的模型能看到上一个任务没有完成（WP8.2）。
+     */
+    @Suppress("TooGenericExceptionCaught") // 补写失败只记日志，收口不被单条事件写入阻断
+    private suspend fun closeWaitingRun(
+        runId: RunId,
+        status: RunStatus,
+        errorCode: String?,
+    ) {
         lockReminder.dismiss(runId)
         queue.snapshot().firstOrNull { it.runId == runId }?.let { queue.remove(it) }
-        pending.remove(runId)
+        var closed = false
         runStore.mutate(runId) {
-            it.copy(status = status, endedAt = clock.nowMillis(), errorCode = errorCode ?: it.errorCode)
-        }
-        val record = runStore.get(runId)
-        if (record != null) {
-            val outcome =
-                when (status) {
-                    RunStatus.EXPIRED -> RunOutcome.EXPIRED
-                    else -> RunOutcome.CANCELLED
-                }
-            try {
-                threadStore.append(
-                    record.threadId,
-                    runId,
-                    RunFinished(
-                        status = outcome,
-                        summary = null,
-                        errorCode = errorCode,
-                        liveNote = prompts.runEndedNote(outcome),
-                    ),
-                )
-            } catch (e: Exception) {
-                logger.w(TAG, "append_waiting_finish_failed", "runId" to runId.value, error = e)
+            if (it.status in RunStatus.CANCELABLE) {
+                closed = true
+                it.copy(status = status, endedAt = clock.nowMillis(), errorCode = errorCode ?: it.errorCode)
+            } else {
+                it
             }
         }
+        val record = runStore.get(runId) ?: return
+        if (!closed) {
+            markCancelIntentIfRunning(runId, record.status)
+            return
+        }
+        pending.remove(runId)
+        pending.consumeCancelled(runId)
+        val outcome =
+            when (status) {
+                RunStatus.EXPIRED -> RunOutcome.EXPIRED
+                else -> RunOutcome.CANCELLED
+            }
+        try {
+            threadStore.append(
+                record.threadId,
+                runId,
+                RunFinished(
+                    status = outcome,
+                    summary = null,
+                    errorCode = errorCode,
+                    liveNote = prompts.runEndedNote(outcome),
+                ),
+            )
+        } catch (e: Exception) {
+            logger.w(TAG, "append_waiting_finish_failed", "runId" to runId.value, error = e)
+        }
         logger.d(TAG, "waiting_run_closed", "runId" to runId.value, "status" to status.name)
+    }
+
+    /** 已启动（RUNNING/PAUSED）：落取消意图，begin 后由执行侧补投；重复取消/已终态不动。 */
+    private fun markCancelIntentIfRunning(
+        runId: RunId,
+        status: RunStatus,
+    ) {
+        if (status != RunStatus.RUNNING && status != RunStatus.PAUSED) return
+        pending.markCancelled(runId)
+        logger.d(TAG, "cancel_intent_marked", "runId" to runId.value, "status" to status.name)
     }
 
     /** 锁屏门：SKIP → CANCELLED；REMIND → 提醒并等待（docs/tech/07 §4.3/§4.4）。 */
@@ -182,7 +232,7 @@ public class RunScheduler(
         task: Task?,
     ) {
         if (task?.lockedBehavior == LockedBehavior.SKIP) {
-            cancelWaitingRun(record.id, RunStatus.CANCELLED, TaskErrorCodes.LOCKED)
+            closeWaitingRun(record.id, RunStatus.CANCELLED, TaskErrorCodes.LOCKED)
         } else {
             markWaiting(record, RunStatus.WAITING_USER)
             lockReminder.remind(record)

@@ -200,12 +200,15 @@ public class FakeAgentSession(
     /** 收到的启动请求（按调用顺序）。 */
     public val requests: MutableList<RunRequest> = mutableListOf()
 
+    /** 返回过的句柄（取消意图补投断言用）。 */
+    public val handles: MutableList<FakeRunHandle> = mutableListOf()
+
     override fun start(
         request: RunRequest,
         scope: CoroutineScope,
     ): RunHandle {
         requests += request
-        return FakeRunHandle(request.runId, finished)
+        return FakeRunHandle(request.runId, finished).also { handles += it }
     }
 
     override suspend fun fork(
@@ -224,6 +227,10 @@ public class FakeRunHandle(
 
     override val state: StateFlow<RunState> = MutableStateFlow(RunState.FINISHED)
 
+    /** 取消调用次数（取消意图补投断言用）。 */
+    public var cancelCount: Int = 0
+        private set
+
     override fun steer(text: String): Unit = Unit
 
     override fun pause(
@@ -233,7 +240,9 @@ public class FakeRunHandle(
 
     override fun resume(note: String?): Unit = Unit
 
-    override fun cancel(): Unit = Unit
+    override fun cancel() {
+        cancelCount += 1
+    }
 
     override suspend fun await(): RunFinished = finished
 }

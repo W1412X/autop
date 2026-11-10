@@ -61,4 +61,13 @@ public enum class RunStatus {
 
     /** 触发被拦截（闸门/判定/限额/到点停用）：只留记录不执行，排查"为什么没触发"用。 */
     BLOCKED,
+    ;
+
+    public companion object {
+        /** 未收口（开放）状态（observeOpenRun 口径）。 */
+        public val OPEN: Set<RunStatus> = setOf(QUEUED, WAITING_SCREEN, WAITING_USER, RUNNING, PAUSED)
+
+        /** 可被"取消未启动 Run"收口的状态；已启动（RUNNING/PAUSED）须走句柄取消。 */
+        public val CANCELABLE: Set<RunStatus> = setOf(QUEUED, WAITING_SCREEN, WAITING_USER)
+    }
 }

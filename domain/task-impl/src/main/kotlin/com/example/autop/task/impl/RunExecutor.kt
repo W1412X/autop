@@ -125,6 +125,11 @@ public class RunExecutor(
         scheduler.cancelQueued(runId)
     }
 
+    /** 落取消意图（句柄未登记窗口的取消幂等标记，同步落地供调用方补查句柄）。 */
+    fun markCancelled(runId: RunId) {
+        pending.markCancelled(runId)
+    }
+
     private suspend fun enqueue(
         origin: RunOrigin,
         threadId: ThreadId,

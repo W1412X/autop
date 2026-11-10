@@ -193,6 +193,49 @@ public class RunSchedulerTest {
             assertNotNull(finished.liveNote)
             assertEquals(RunStatus.EXPIRED, fixture.runStore.get(record.id)?.status)
         }
+
+    @Test
+    public fun `cancel of started run keeps status and marks cancel intent`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            val record = fixture.enqueueRun("run-1", RunOrigin.SCHEDULE, taskOf("t1"))
+            fixture.runStore.mutate(record.id) { it.copy(status = RunStatus.RUNNING) }
+
+            fixture.scheduler.cancelWaitingRun(record.id)
+
+            assertEquals(RunStatus.RUNNING, fixture.runStore.get(record.id)?.status)
+            assertTrue(fixture.pending.consumeCancelled(record.id))
+        }
+
+    @Test
+    public fun `closed run is not relaunched by schedule`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            val record = fixture.enqueueRun("run-1", RunOrigin.SCHEDULE, taskOf("t1"))
+            fixture.scheduler.cancelWaitingRun(record.id)
+
+            fixture.scheduler.enqueue(record)
+            fixture.scheduler.trySchedule()
+            pump(fixture)
+
+            assertTrue(fixture.session.requests.isEmpty())
+            assertEquals(RunStatus.CANCELLED, fixture.runStore.get(record.id)?.status)
+        }
+
+    @Test
+    public fun `cancel intent is delivered after handle registration`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            val record = fixture.enqueueRun("run-1", RunOrigin.SCHEDULE, taskOf("t1"))
+            fixture.pending.markCancelled(record.id)
+
+            fixture.scheduler.trySchedule()
+            pump(fixture)
+
+            assertEquals(listOf(record.id), fixture.session.requests.map { it.runId })
+            val handle = fixture.session.handles.single()
+            assertEquals(1, handle.cancelCount)
+        }
 }
 
 /** 测试装配：真实 RunStore/RunRunner/LockReminder + fake 设备端口（docs/tech/07 §9）。 */

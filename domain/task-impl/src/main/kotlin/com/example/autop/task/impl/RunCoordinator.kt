@@ -197,7 +197,11 @@ public class RunCoordinator(
             handle.cancel()
             return
         }
+        // 句柄未登记（排队/启动窗口）：先同步落取消意图再收口，末尾补查一次句柄——
+        // begin 可能恰在上面判断后落地；意图由执行侧 begin 后消费或此处补投（取消幂等）。
+        executor.markCancelled(runId)
         executor.cancelQueued(runId)
+        observer.handleOf(runId)?.cancel()
     }
 
     override suspend fun answer(
@@ -219,7 +223,7 @@ public class RunCoordinator(
     /** 线程未收口的 Run（WP8.5）：最近创建的一个开放状态 Run，没有则 null。 */
     override fun observeOpenRun(threadId: ThreadId): Flow<RunRecord?> =
         runStore.observeThread(threadId).map { records ->
-            records.filter { it.status in OPEN_STATUSES }.maxByOrNull { it.createdAt }
+            records.filter { it.status in RunStatus.OPEN }.maxByOrNull { it.createdAt }
         }
 
     override fun liveEvents(runId: RunId): SharedFlow<AgentEvent> = observer.eventsOf(runId)
@@ -229,15 +233,5 @@ public class RunCoordinator(
 
         /** 可直接落盘 steer 的未启动状态（WP8.5）。 */
         val QUEUED_STEERABLE: Set<RunStatus> = setOf(RunStatus.QUEUED, RunStatus.WAITING_SCREEN, RunStatus.WAITING_USER)
-
-        /** 未收口（开放）状态（WP8.5 observeOpenRun）。 */
-        val OPEN_STATUSES: Set<RunStatus> =
-            setOf(
-                RunStatus.QUEUED,
-                RunStatus.WAITING_SCREEN,
-                RunStatus.WAITING_USER,
-                RunStatus.RUNNING,
-                RunStatus.PAUSED,
-            )
     }
 }
