@@ -14,10 +14,12 @@ import android.view.accessibility.AccessibilityWindowInfo
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.getOrNull
 import com.example.autop.core.common.runCatchingCancellable
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceCaptureSection
 import com.example.autop.core.config.DeviceConfig
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NodeSnapshot
 import com.example.autop.device.Rect
@@ -43,6 +45,7 @@ public class SnapshotCapturer
         private val clock: Clock,
         private val foreground: ForegroundTracker,
         private val contentAreas: ContentAreaProvider,
+        private val prompts: PromptRepository,
         @ApplicationContext private val context: Context,
     ) {
         /**
@@ -89,17 +92,15 @@ public class SnapshotCapturer
             }
 
         /**
-         * 空树重试耗尽（docs/tech/05 §2.3）。N192：附降级指引（部分应用屏蔽无障碍节点）。
-         * 这里只说明 a11y 不可用；是否改走视觉由 [com.example.autop.device.impl.observation.ScreenObserver]
-         * 决定（视觉已启用时会自动切换），不能在这层声称“视觉兜底未生效”。
+         * 空树重试耗尽（docs/tech/05 §2.3）。只报告事实：应用没有提供无障碍节点。
+         * 怎么办交给 `device.a11y.tree_empty_hint` 模板；是否换方式由自动选择决定。
          */
         private fun emptyTreeUnavailable(): Outcome<ScreenSnapshot> =
             Outcome.Err(
                 AppError(
                     code = DeviceErrorCodes.APP_TREE_EMPTY,
-                    message =
-                        "应用窗口节点树为空（该应用可能屏蔽了无障碍节点），当前无障碍观测不可用；" +
-                            "视觉观测可用时会自动切换，也可先用 screenshot 查看界面后按坐标 tap/swipe 继续操作",
+                    message = "app accessibility tree is empty",
+                    hint = prompts.render(PROMPT_TREE_EMPTY_HINT).getOrNull()?.text,
                     retryable = true,
                 ),
             )
@@ -252,3 +253,6 @@ public class SnapshotCapturer
             var truncated: Boolean = false
         }
     }
+
+/** a11y 空树时的处理建议（模型可见文案走模板）。 */
+private const val PROMPT_TREE_EMPTY_HINT: String = "device.a11y.tree_empty_hint"

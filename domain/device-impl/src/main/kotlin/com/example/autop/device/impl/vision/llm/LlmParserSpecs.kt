@@ -36,6 +36,5 @@ internal object LlmParserSpecs {
             ScreenJsonWire.ST_UNCHECKED,
             ScreenJsonWire.ST_SELECTED,
             ScreenJsonWire.ST_DISABLED,
-            ScreenJsonWire.ST_UNCERTAIN,
         )
 }

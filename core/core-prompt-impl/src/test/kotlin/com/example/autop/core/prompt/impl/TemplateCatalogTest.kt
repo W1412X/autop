@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(40)
+        assertThat(toolTemplates).hasSize(45)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -151,8 +151,18 @@ class TemplateCatalogTest {
                 "device.llm_parser.json_only",
                 "device.llm_parser.system",
                 "device.llm_parser.user",
+                "device.a11y.tree_empty_hint",
+                "device.observe.all_failed",
+                "device.observe.auto_all_insufficient",
+                "device.observe.auto_selected",
+                "device.observe.diff_none",
+                "device.observe.insufficient",
+                "device.observe.insufficient.few_nodes",
+                "device.observe.insufficient.no_app_window",
+                "device.observe.insufficient.no_interactive",
+                "device.observe.insufficient.semantic_poor",
+                "device.observe.no_auto_mode",
                 "device.observation.coord",
-                "device.observation.suggest_mode",
                 "device.screenshot.coord_note",
                 "device.screenshot.region_note",
                 "llm.anthropic.leading_user",
@@ -190,9 +200,14 @@ class TemplateCatalogTest {
                 "tool.note",
                 "tool.notify_user",
                 "tool.observe",
+                "tool.observe.full_ignored",
+                "tool.observe.invalid_mode",
                 "tool.observe.mode.a11y",
                 "tool.observe.mode.llm",
                 "tool.observe.mode.visual",
+                "tool.observe.mode_not_auto",
+                "tool.observe.no_effective_mode",
+                "tool.observe.region_ignored",
                 "tool.open_app",
                 "tool.open_uri",
                 "tool.read_notifications",

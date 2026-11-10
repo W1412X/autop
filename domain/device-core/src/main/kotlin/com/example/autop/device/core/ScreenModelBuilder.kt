@@ -34,6 +34,8 @@ public object ScreenModelBuilder {
         degenerate: Boolean,
         poor: Boolean,
         effectiveModes: List<ObserveMode>,
+        noAppWindow: Boolean = false,
+        truncated: Boolean = false,
         cached: Boolean = false,
     ): ScreenModel =
         of(
@@ -55,6 +57,8 @@ public object ScreenModelBuilder {
             degenerate = degenerate,
             poor = poor,
             effectiveModes = effectiveModes,
+            noAppWindow = noAppWindow,
+            truncated = truncated,
             cached = cached,
         )
 
@@ -65,37 +69,38 @@ public object ScreenModelBuilder {
         degenerate: Boolean = false,
         poor: Boolean = false,
         effectiveModes: List<ObserveMode> = listOf(mode),
+        noAppWindow: Boolean = false,
+        truncated: Boolean = false,
         cached: Boolean = false,
     ): ScreenModel {
         val nodes = windows.flatMap { it.kids }.flatMap { flatten(it) }
         val interactive = nodes.count { it.act.isNotEmpty() }
-        val uncertain = if (mode == ObserveMode.A11Y) null else nodes.count { ST_UNCERTAIN in it.st }
-        val a11y = mode == ObserveMode.A11Y
+        val insufficient =
+            when {
+                noAppWindow -> ScreenJsonWire.INSUFFICIENT_NO_APP_WINDOW
+                degenerate -> ScreenJsonWire.INSUFFICIENT_FEW_NODES
+                poor -> ScreenJsonWire.INSUFFICIENT_SEMANTIC_POOR
+                interactive == 0 -> ScreenJsonWire.INSUFFICIENT_NO_INTERACTIVE
+                else -> null
+            }
         val quality =
             ScreenQuality(
                 nodes = nodes.size,
                 interactive = interactive,
-                degenerate = a11y && degenerate,
-                poor = a11y && poor,
-                uncertain = uncertain,
-                // 只有 a11y 的“信息不足”给模式建议；视觉路径由模型自己判断是否需要更贵的观测。
-                suggest =
-                    if (a11y) {
-                        suggestOf(mode, degenerate || poor || interactive == 0, effectiveModes)
-                    } else {
-                        null
-                    },
+                degenerate = degenerate,
+                poor = poor,
+                insufficient = insufficient,
+                suggest = if (insufficient != null) nextModeOf(mode, effectiveModes) else null,
+                truncated = truncated,
             )
         return ScreenModel(mode = mode, windows = windows, quality = quality, cached = cached)
     }
 
     /** 生效模式列表中当前模式之后的第一个模式（§3.5）；没有则 null。 */
-    private fun suggestOf(
+    private fun nextModeOf(
         mode: ObserveMode,
-        insufficient: Boolean,
         effectiveModes: List<ObserveMode>,
     ): ObserveMode? {
-        if (!insufficient) return null
         val pos = effectiveModes.indexOf(mode)
         return if (pos >= 0) effectiveModes.getOrNull(pos + 1) else null
     }
@@ -185,6 +190,4 @@ public object ScreenModelBuilder {
     }
 
     private val EMPTY_BOUNDS: Rect = Rect(0, 0, 0, 0)
-
-    private const val ST_UNCERTAIN: String = ScreenJsonWire.ST_UNCERTAIN
 }

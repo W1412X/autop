@@ -74,14 +74,16 @@ public data class ScreenWindow(
 public data class ScreenQuality(
     val nodes: Int,
     val interactive: Int,
-    /** 仅 a11y：有效节点数不足。 */
+    /** 有效节点数少于 `device.observe.sufficiency.minEffectiveNodes`。 */
     val degenerate: Boolean = false,
-    /** 仅 a11y：语义贫乏。 */
+    /** a11y 语义贫乏（判定依据是 Android 控件类名，只对 a11y 有定义）。 */
     val poor: Boolean = false,
-    /** 仅 visual/llm：存疑节点数。 */
-    val uncertain: Int? = null,
-    /** 建议换用的模式；null=不输出。 */
+    /** 信息不足的原因码（ScreenJsonWire.INSUFFICIENT_*）；null=信息足够。 */
+    val insufficient: String? = null,
+    /** 信息不足时生效方式中的下一种；null=不输出。 */
     val suggest: ObserveMode? = null,
+    /** 节点树被采集上限截断（WP7.8）。 */
+    val truncated: Boolean = false,
 )
 
 /** 一次观测的统一屏幕模型。 */

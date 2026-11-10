@@ -82,7 +82,7 @@ class ScreenJsonRendererTest {
             .containsExactly("text", "icon", "hint", "state", "act", "st")
             .inOrder()
         val quality = screen.getValue("quality").jsonObject
-        assertThat(quality.getValue("uncertain").jsonPrimitive.content).isEqualTo("0")
+        assertThat(quality).doesNotContainKey("uncertain")
         assertThat(quality).doesNotContainKey("degenerate")
     }
 
@@ -92,7 +92,7 @@ class ScreenJsonRendererTest {
             ScreenModel(
                 mode = ObserveMode.LLM,
                 windows = listOf(ScreenWindow(app = "微信")),
-                quality = ScreenQuality(nodes = 0, interactive = 0, uncertain = 0),
+                quality = ScreenQuality(nodes = 0, interactive = 0),
                 cached = true,
             )
         val screen = screenOf(ScreenJsonRenderer.render(model, coordText, null))
@@ -160,7 +160,6 @@ class ScreenJsonRendererTest {
                 ScreenQuality(
                     nodes = nodes.size,
                     interactive = nodes.count { it.act.isNotEmpty() },
-                    uncertain = if (mode == ObserveMode.A11Y) null else 0,
                 ),
         )
 

@@ -106,6 +106,8 @@ public data class ToolOutput(
     val fullContent: List<Block>? = null,
     /** R1/A6：WRITE_SCREEN 工具成功时填写的可回放记录（docs/tech/04 §2.7）。 */
     val replay: ReplayableAction? = null,
+    /** 屏幕变化结论：observe 相对最近观测、动作工具相对动作前观测；无屏幕语义的工具为 null。 */
+    val screenDelta: ScreenDelta? = null,
 )
 
 /** 工具对 Run 生命周期的控制指令。 */

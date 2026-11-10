@@ -50,8 +50,9 @@ public object ScreenJsonParser {
                 interactive = q?.int("interactive") ?: 0,
                 degenerate = q?.bool("degenerate") ?: false,
                 poor = q?.bool("poor") ?: false,
-                uncertain = q?.int("uncertain"),
+                insufficient = q?.str("insufficient"),
                 suggest = ObserveMode.parse(q?.str("suggest")),
+                truncated = q?.bool("truncated") ?: false,
             )
         return ScreenModel(mode, windows, quality, cached = screen.bool("cached") ?: false)
     }

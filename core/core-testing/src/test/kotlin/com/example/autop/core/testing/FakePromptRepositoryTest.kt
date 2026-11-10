@@ -9,9 +9,9 @@ import org.junit.Test
 /** 用真实模板目录（autop.promptDir）验证加载与查询。 */
 class FakePromptRepositoryTest {
     @Test
-    fun `loads all 111 builtin templates from the real prompt dir`() {
+    fun `loads all builtin templates from the real prompt dir`() {
         val repository = FakePromptRepository()
-        assertThat(repository.all()).hasSize(132)
+        assertThat(repository.all()).hasSize(147)
     }
 
     @Test

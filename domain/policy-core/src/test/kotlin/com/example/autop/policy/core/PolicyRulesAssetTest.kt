@@ -16,7 +16,7 @@ class PolicyRulesAssetTest {
     @Test
     fun `asset decodes with schema version and category table`() {
         val doc = load()
-        assertThat((doc["schemaVersion"] as JsonPrimitive).contentOrNull).isEqualTo("3")
+        assertThat((doc["schemaVersion"] as JsonPrimitive).contentOrNull).isEqualTo("4")
         val categories = checkNotNull(doc["categories"] as? JsonObject)
         assertThat(categories.keys).containsAtLeast("payment", "password", "system_security")
         val payment = checkNotNull(categories["payment"] as? JsonObject)

@@ -110,8 +110,9 @@ internal class ConfigSpec {
     var diffMaxRatio: Double = 0.4
     var semanticPoorMinInteractive: Int = 3
     var semanticPoorAreaRatio: Double = 0.5
-    var degenerateNodeThreshold: Int = 5
-    var uncertainConf: Double = 0.6
+    var minEffectiveNodes: Int = 5
+    var positionTolerance: Int = 12
+    var volatilePatterns: List<Regex> = listOf(Regex("\\d+"))
     var renderPrompt: (String, Map<String, String>) -> String = { id, vars -> "[$id]${vars["mode"].orEmpty()}" }
 
     fun build(): SerializerConfig =
@@ -123,8 +124,9 @@ internal class ConfigSpec {
             diffMaxRatio = diffMaxRatio,
             semanticPoorMinInteractive = semanticPoorMinInteractive,
             semanticPoorAreaRatio = semanticPoorAreaRatio,
-            degenerateNodeThreshold = degenerateNodeThreshold,
-            uncertainConf = uncertainConf,
+            minEffectiveNodes = minEffectiveNodes,
+            positionTolerance = positionTolerance,
+            volatilePatterns = volatilePatterns,
             renderPrompt = renderPrompt,
         )
 }

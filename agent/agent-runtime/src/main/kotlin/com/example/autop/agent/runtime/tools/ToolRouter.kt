@@ -165,6 +165,7 @@ internal class ToolRouter(
             durationMs = result.durationMs,
             fullBlocks = output.fullContent,
             replay = output.replay,
+            screenDelta = output.screenDelta,
         )
     }
 

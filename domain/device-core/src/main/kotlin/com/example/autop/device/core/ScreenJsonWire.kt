@@ -48,8 +48,15 @@ public object ScreenJsonWire {
     public const val FIELD_INTERACTIVE: String = "interactive"
     public const val FIELD_DEGENERATE: String = "degenerate"
     public const val FIELD_POOR: String = "poor"
-    public const val FIELD_UNCERTAIN: String = "uncertain"
+    public const val FIELD_INSUFFICIENT: String = "insufficient"
     public const val FIELD_SUGGEST: String = "suggest"
+    public const val FIELD_TRUNCATED: String = "truncated"
+
+    // 信息不足原因码（quality.insufficient 的取值）
+    public const val INSUFFICIENT_NO_APP_WINDOW: String = "no_app_window"
+    public const val INSUFFICIENT_FEW_NODES: String = "few_nodes"
+    public const val INSUFFICIENT_SEMANTIC_POOR: String = "semantic_poor"
+    public const val INSUFFICIENT_NO_INTERACTIVE: String = "no_interactive"
 
     // 差量
     public const val FIELD_ADDED: String = "added"
@@ -69,7 +76,6 @@ public object ScreenJsonWire {
     public const val ST_DISABLED: String = "disabled"
     public const val ST_PASSWORD: String = "password"
     public const val ST_HEADING: String = "heading"
-    public const val ST_UNCERTAIN: String = "uncertain"
 
     // 命中回执
     public const val ROOT_HIT: String = "hit"
@@ -78,7 +84,9 @@ public object ScreenJsonWire {
 
     // 模板
     public const val PROMPT_COORD: String = "device.observation.coord"
-    public const val PROMPT_SUGGEST_MODE: String = "device.observation.suggest_mode"
+    public const val PROMPT_INSUFFICIENT: String = "device.observe.insufficient"
+    public const val PROMPT_INSUFFICIENT_REASON_PREFIX: String = "device.observe.insufficient."
+    public const val PROMPT_DIFF_NONE: String = "device.observe.diff_none"
     public const val PROMPT_HINT_MODE_UNAVAILABLE: String = "device.hint.mode_unavailable"
     public const val PROMPT_HINT_LLM_PARSE_FAILED: String = "device.hint.llm_parse_failed"
 

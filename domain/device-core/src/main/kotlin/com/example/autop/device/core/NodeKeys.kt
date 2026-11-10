@@ -42,7 +42,7 @@ public fun stableNodeKey(
 }
 
 /** 新方案 §2.9：按易变模式抠除 label 中的易变片段（数字、时间、角标“99+”）。 */
-private fun stripVolatile(
+internal fun stripVolatile(
     label: String,
     patterns: List<Regex>,
 ): String = patterns.fold(label) { acc, pattern -> pattern.replace(acc, "") }

@@ -26,6 +26,7 @@ dependencies {
 
     testImplementation(project(":core:core-testing"))
     testImplementation(libs.okhttp.mockwebserver3.junit4)
+    testImplementation(libs.robolectric)
 }
 
 // ADB 注入通道的 SPAKE2 配对 native（libadb.so，搬运自 Shizuku jni/）：prefab 链 BoringSSL。

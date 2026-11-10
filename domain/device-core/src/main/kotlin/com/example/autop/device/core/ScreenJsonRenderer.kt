@@ -57,15 +57,16 @@ public object ScreenJsonRenderer {
         }
     }
 
-    /** 质量对象：false/0 值按 §3.1 省略（uncertain 为计数，保留 0）。 */
+    /** 质量对象：false/null 值按 §3.1 省略。 */
     private fun renderQuality(quality: ScreenQuality): String =
         buildJsonObject {
             put(ScreenJsonWire.FIELD_NODES, quality.nodes)
             put(ScreenJsonWire.FIELD_INTERACTIVE, quality.interactive)
             if (quality.degenerate) put(ScreenJsonWire.FIELD_DEGENERATE, true)
             if (quality.poor) put(ScreenJsonWire.FIELD_POOR, true)
-            quality.uncertain?.let { put(ScreenJsonWire.FIELD_UNCERTAIN, it) }
+            quality.insufficient?.let { put(ScreenJsonWire.FIELD_INSUFFICIENT, it) }
             quality.suggest?.let { put(ScreenJsonWire.FIELD_SUGGEST, it.id) }
+            if (quality.truncated) put(ScreenJsonWire.FIELD_TRUNCATED, true)
         }.toString()
 
     private fun windowLine(window: ScreenWindow): String {

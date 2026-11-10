@@ -10,6 +10,7 @@ import com.example.autop.device.Observation
 import com.example.autop.device.ObservationMode
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.Rect
+import com.example.autop.device.ScreenModel
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.WindowSnapshot
 import com.example.autop.device.WindowType
@@ -24,7 +25,8 @@ public class ScreenSerializer(
 ) {
     /**
      * 序列化 [snapshot]：[mode] 决定 a11y/visual 字段与节点选取；[redaction] 决定窗口脱敏；
-     * [ownPackage] 为自身包名（窗口过滤）；[effectiveModes] 用于 `quality.suggest`。
+     * [ownPackage] 为自身包名（窗口过滤）；[effectiveModes] 用于 `quality.suggest`；
+     * [noAppWindow] 只有 a11y 可能为真（快照里没有任何应用窗口）。
      */
     public fun serialize(
         snapshot: ScreenSnapshot,
@@ -32,6 +34,7 @@ public class ScreenSerializer(
         redaction: (WindowSnapshot) -> RedactionMode,
         ownPackage: String,
         effectiveModes: List<ObserveMode> = listOf(mode),
+        noAppWindow: Boolean = false,
         cached: Boolean = false,
     ): SerializedScreen {
         val index = SnapshotIndex(snapshot)
@@ -62,34 +65,60 @@ public class ScreenSerializer(
                 degenerate = degenerate(snapshot),
                 poor = poor,
                 effectiveModes = effectiveModes,
+                noAppWindow = noAppWindow,
+                truncated = snapshot.truncated,
                 cached = cached,
             )
-        val suggestion =
-            model.quality.suggest?.let {
-                config.renderPrompt(ScreenJsonWire.PROMPT_SUGGEST_MODE, mapOf(VAR_MODE to it.id))
-            }
+        val suggestion = suggestionOf(model, config)
         val text =
             ScreenJsonRenderer.render(
                 model = model,
                 coordText = config.renderPrompt(ScreenJsonWire.PROMPT_COORD, emptyMap()),
                 suggestion = suggestion,
             )
-        val observation =
-            Observation(
-                text = text,
-                mode = ObservationMode.FULL,
-                observeMode = mode,
-                // 只对应用窗口做指纹：系统状态栏时钟/网速等易变节点会让“屏幕未变化”永远判不出来。
-                fingerprint = ScreenFingerprint.of(snapshot.foregroundPackage, snapshot.activity, model.appFlatten()),
-                packageName = snapshot.foregroundPackage,
-                activity = snapshot.activity,
-                summaryLine = summaryLine(snapshot, windows, model.quality.nodes),
-                interactiveCount = model.quality.interactive,
-                nodeCount = model.quality.nodes,
-                semanticPoor = mode == ObserveMode.A11Y && poor,
-            )
-        return SerializedScreen(observation, model)
+        return SerializedScreen(observationOf(snapshot, windows, model, text, mode, poor), model)
     }
+
+    /** 信息不足时的建议尾行（统一口径，所有方式一致）。 */
+    private fun suggestionOf(
+        model: ScreenModel,
+        config: SerializerConfig,
+    ): String? =
+        model.quality.insufficient?.let { code ->
+            config.renderPrompt(
+                ScreenJsonWire.PROMPT_INSUFFICIENT,
+                mapOf(
+                    VAR_REASON to
+                        config.renderPrompt(
+                            ScreenJsonWire.PROMPT_INSUFFICIENT_REASON_PREFIX + code,
+                            emptyMap(),
+                        ),
+                    VAR_SUGGEST to (model.quality.suggest?.id ?: ""),
+                ),
+            )
+        }
+
+    private fun observationOf(
+        snapshot: ScreenSnapshot,
+        windows: List<WindowSnapshot>,
+        model: ScreenModel,
+        text: String,
+        mode: ObserveMode,
+        poor: Boolean,
+    ): Observation =
+        Observation(
+            text = text,
+            mode = ObservationMode.FULL,
+            observeMode = mode,
+            // 只对应用窗口做指纹：系统状态栏时钟/网速等易变节点会让“屏幕未变化”永远判不出来。
+            fingerprint = ScreenFingerprint.of(snapshot.foregroundPackage, snapshot.activity, model.appFlatten()),
+            packageName = snapshot.foregroundPackage,
+            activity = snapshot.activity,
+            summaryLine = summaryLine(snapshot, windows, model.quality.nodes),
+            interactiveCount = model.quality.interactive,
+            nodeCount = model.quality.nodes,
+            semanticPoor = mode == ObserveMode.A11Y && poor,
+        )
 
     private data class DraftContext(
         val snapshot: ScreenSnapshot,
@@ -163,9 +192,9 @@ public class ScreenSerializer(
         )
     }
 
-    /** §3.5：a11y 有效节点数（有面积且有文字/描述/交互位）不足阈值。 */
+    /** §3.5：有效节点数（有面积且有文字/描述/交互位）不足阈值。 */
     private fun degenerate(snapshot: ScreenSnapshot): Boolean =
-        snapshot.nodes.count { isEffective(it) } < config.degenerateNodeThreshold
+        snapshot.nodes.count { isEffective(it) } < config.minEffectiveNodes
 
     private fun isEffective(node: NodeSnapshot): Boolean =
         node.bounds.area > 0 &&
@@ -201,6 +230,7 @@ public class ScreenSerializer(
 
     private companion object {
         const val COORD_SCALE = 1000
-        const val VAR_MODE = "mode"
+        const val VAR_REASON = "reason"
+        const val VAR_SUGGEST = "suggest"
     }
 }

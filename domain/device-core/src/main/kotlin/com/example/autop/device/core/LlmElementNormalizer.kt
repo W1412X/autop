@@ -258,7 +258,6 @@ public object LlmElementNormalizer {
             ScreenJsonWire.ST_UNCHECKED,
             ScreenJsonWire.ST_SELECTED,
             ScreenJsonWire.ST_DISABLED,
-            ScreenJsonWire.ST_UNCERTAIN,
         )
 
     private const val ROOT_ELEMENTS = "elements"

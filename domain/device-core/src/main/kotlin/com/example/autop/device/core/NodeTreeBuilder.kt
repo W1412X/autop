@@ -332,10 +332,6 @@ internal class NodeTreeBuilder(
             if (node.flags and NodeFlags.ENABLED == 0) add(ScreenJsonWire.ST_DISABLED)
             if (!visual && node.flags and NodeFlags.PASSWORD != 0) add(ScreenJsonWire.ST_PASSWORD)
             if (!visual && node.flags and NodeFlags.HEADING != 0) add(ScreenJsonWire.ST_HEADING)
-            if (visual) {
-                val conf = node.visualConf
-                if (conf != null && conf < config.uncertainConf) add(ScreenJsonWire.ST_UNCERTAIN)
-            }
         }
 
     private fun textOf(label: NodeLabel): String = if (label.kind == LabelKind.TEXT) label.text.trim() else ""

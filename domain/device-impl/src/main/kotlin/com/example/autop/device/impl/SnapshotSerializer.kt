@@ -32,14 +32,23 @@ public class SnapshotSerializer
         /** 序列化配置（含 prompt 渲染），差量生成也要用。 */
         public fun configOf(config: ConfigSnapshot): SerializerConfig = rulesLoader.configOf(config, prompts)
 
-        /** 按配置快照与观测模式序列化 [snap]。 */
+        /** 按配置快照与观测模式序列化 [snap]；[noAppWindow] 只有 a11y 可能为真。 */
         public fun serialize(
             snap: ScreenSnapshot,
             mode: ObserveMode,
             config: ConfigSnapshot,
             effectiveModes: List<ObserveMode>,
+            noAppWindow: Boolean = false,
             cached: Boolean = false,
         ): SerializedScreen =
             ScreenSerializer(rulesLoader.get(), configOf(config))
-                .serialize(snap, mode, { redactor.redact(it) }, appIdentity.packageName, effectiveModes, cached)
+                .serialize(
+                    snap,
+                    mode,
+                    { redactor.redact(it) },
+                    appIdentity.packageName,
+                    effectiveModes,
+                    noAppWindow,
+                    cached,
+                )
     }

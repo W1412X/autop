@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "device": {
     "capture": {
       "timeoutMs": 1500,
@@ -40,9 +40,12 @@
     "observe": {
       "priority": ["a11y", "visual", "llm"],
       "modes": {
-        "a11y": { "enabled": true },
-        "visual": { "enabled": true },
-        "llm": { "enabled": true }
+        "a11y": { "enabled": true, "auto": true },
+        "visual": { "enabled": true, "auto": true },
+        "llm": { "enabled": true, "auto": false }
+      },
+      "sufficiency": {
+        "minEffectiveNodes": 5
       },
       "llm": {
         "maxEdge": 1280,
@@ -56,15 +59,18 @@
     },
     "vision": {
       "enabled": true,
-      "degenerateNodeThreshold": 5,
       "roiRatio": 0.5,
       "minConfidence": 0.35,
-      "uncertainConf": 0.6,
       "modelPack": "basic",
       "timeoutMs": 30000,
       "icon": {
         "enabled": true
       }
+    },
+    "change": {
+      "positionTolerance": 12,
+      "frameMaxHamming": 3,
+      "frameMinSsim": 0.97
     },
     "overlay": {
       "hideSettleMs": 120

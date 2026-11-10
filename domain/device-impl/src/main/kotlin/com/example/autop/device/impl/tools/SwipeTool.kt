@@ -39,8 +39,6 @@ internal data class SwipeGesture(
     val durationMs: Long,
     val trajectoryJitterPx: Int,
     val resultText: String,
-    /** 命中树不是实时 a11y 时的说明；null=不需要说明。 */
-    val hitNote: String?,
     val replayArgs: JsonObject,
 )
 
@@ -128,7 +126,6 @@ public class SwipeTool
                     trajectoryJitterPx = cfg.trajectoryJitterPx,
                     resultText =
                         "已滑动 (${start.x}, ${start.y}) → (${end.x}, ${end.y})\n${receipts.receipt(tree, startModel)}",
-                    hitNote = receipts.sourceNote(tree),
                     replayArgs = replayArgsOf(args, hit),
                 )
             return Outcome.Ok(PreparedAction(subject, gesture))
@@ -158,7 +155,6 @@ public class SwipeTool
                 buildList {
                     add(executionLine(ExecMethod.GESTURE, channel = result.channel))
                     add(effectLine(effectOf(moved), effectNoteOf(moved)))
-                    swipe.hitNote?.let { add(it) }
                 }
             return out.copy(content = out.content + notes.map { Block.Text(it) })
         }

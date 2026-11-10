@@ -72,6 +72,12 @@ public object DeviceErrorCodes {
     /** llm 观测解析失败（重试耗尽）。 */
     public const val LLM_PARSE_FAILED: String = "device.llm_parse_failed"
 
+    /** 视觉解析失败（超时或解析器异常）。 */
+    public const val VISUAL_PARSE_FAILED: String = "device.visual_parse_failed"
+
+    /** 所有观测方式都失败。 */
+    public const val NO_OBSERVATION: String = "device.no_observation"
+
     /** 设备已锁屏。 */
     public const val LOCKED: String = "device.locked"
 

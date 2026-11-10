@@ -19,8 +19,8 @@ vars: [coordRule, maxElements, tagList, example]
 
 字段：
 - tag 从这些值中选：{{tagList}}；
-- text 一字不差地抄写图里的文字，不翻译、不概括、不补全；看不清的部分不要猜，给这一条加 st:["uncertain"]；
-- 没有文字的图标写 icon，说明它的功能（如“搜索”“返回”“更多”）；功能不确定时写外观到 desc，并加 uncertain；
+- text 一字不差地抄写图里的文字，不翻译、不概括、不补全；看不清的部分不要猜；
+- 没有文字的图标写 icon，说明它的功能（如“搜索”“返回”“更多”）；功能不确定时写外观到 desc；
 - 输入框里灰色的提示语写 hint，已经输入的内容写 text；
 - 开关、复选框写 checked 或 unchecked；被选中的标签页写 selected；灰色不可用的写 disabled；
 - act 只写看得出的交互：click、edit（输入框）、scroll。

@@ -29,6 +29,10 @@ public class ObserveModeResolver
                 .mapNotNull { ObserveMode.parse(it) }
                 .filter { enabled(it, config) && capabilityReason(it) == null }
 
+        /** 参与 observe 不传 mode 时自动选择的生效方式（按优先级排序）。 */
+        public fun autoCandidates(config: DeviceObserveSection): List<ObserveMode> =
+            effective(config).filter { config.modes.of(it.id).auto }
+
         /** 显式选择 [mode] 时的不可用原因；可用返回 null。 */
         public fun unavailableReason(
             mode: ObserveMode,
@@ -46,12 +50,7 @@ public class ObserveModeResolver
         private fun enabled(
             mode: ObserveMode,
             config: DeviceObserveSection,
-        ): Boolean =
-            when (mode) {
-                ObserveMode.A11Y -> config.modes.a11y.enabled
-                ObserveMode.VISUAL -> config.modes.visual.enabled
-                ObserveMode.LLM -> config.modes.llm.enabled
-            }
+        ): Boolean = config.modes.of(mode.id).enabled
 
         private fun capabilityReason(mode: ObserveMode): String? =
             when (mode) {

@@ -12,6 +12,7 @@ import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.core.SerializerConfig
 import com.example.autop.device.core.SerializerRules
+import com.example.autop.device.core.compileVolatilePatterns
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -42,8 +43,9 @@ public class SerializerRulesLoader
                 diffMaxRatio = device.diffMaxRatio,
                 semanticPoorMinInteractive = device.semanticPoorMinInteractive,
                 semanticPoorAreaRatio = device.semanticPoorAreaRatio,
-                degenerateNodeThreshold = config[DeviceConfig.VISION].degenerateNodeThreshold,
-                uncertainConf = config[DeviceConfig.VISION].uncertainConf,
+                minEffectiveNodes = config[DeviceConfig.OBSERVE].sufficiency.minEffectiveNodes,
+                positionTolerance = config[DeviceConfig.CHANGE].positionTolerance,
+                volatilePatterns = compileVolatilePatterns(get().volatileLabelPatterns),
                 renderPrompt = { id, vars ->
                     prompts
                         .render(id, vars)

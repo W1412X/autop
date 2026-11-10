@@ -22,7 +22,7 @@ public data class ConfigMigration(
 )
 
 /** 配置（用户覆盖）文件的当前 schemaVersion。 */
-public const val CURRENT_SCHEMA_VERSION: Int = 3
+public const val CURRENT_SCHEMA_VERSION: Int = 4
 
 /**
  * 内置迁移链：v2 删除屏幕观测 v4 不再使用的配置键（docs/design/
@@ -36,6 +36,8 @@ public fun builtinConfigMigrations(): List<ConfigMigration> =
             filterAgentTools(cleaned)
         },
         ConfigMigration(from = 2, to = 3) { doc -> doc },
+        // agent-harness-overhaul：仅增删键，无数据变换（旧键由 ignoreUnknownKeys 忽略）。
+        ConfigMigration(from = 3, to = 4) { doc -> doc },
     )
 
 /** v2 删除的配置路径。 */

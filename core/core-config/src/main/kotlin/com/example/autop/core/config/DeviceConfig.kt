@@ -55,6 +55,7 @@ public data class DeviceObserveSection(
     /** 生效模式顺序，必须是三种模式的一个排列。 */
     @SerialName("priority") val priority: List<String> = DEFAULT_PRIORITY,
     @SerialName("modes") val modes: DeviceObserveModesSection = DeviceObserveModesSection(),
+    @SerialName("sufficiency") val sufficiency: DeviceObserveSufficiencySection = DeviceObserveSufficiencySection(),
     @SerialName("llm") val llm: DeviceObserveLlmSection = DeviceObserveLlmSection(),
 ) : ConfigSection {
     override fun validate(): List<String> =
@@ -76,14 +77,35 @@ public data class DeviceObserveSection(
 public data class DeviceObserveModesSection(
     @SerialName("a11y") val a11y: DeviceObserveModeSection = DeviceObserveModeSection(),
     @SerialName("visual") val visual: DeviceObserveModeSection = DeviceObserveModeSection(),
-    @SerialName("llm") val llm: DeviceObserveModeSection = DeviceObserveModeSection(),
-)
+    @SerialName("llm") val llm: DeviceObserveModeSection = DeviceObserveModeSection(auto = false),
+) {
+    /** 按模式 id 取开关（config 模块不依赖 device-api 的 ObserveMode）。 */
+    public fun of(mode: String): DeviceObserveModeSection =
+        when (mode) {
+            "a11y" -> a11y
+            "visual" -> visual
+            "llm" -> llm
+            else -> error("unknown observe mode id: $mode")
+        }
+}
 
 /** 单个观测模式开关。 */
 @Serializable
 public data class DeviceObserveModeSection(
     @SerialName("enabled") val enabled: Boolean = true,
+    /** 是否参与 observe 不传 mode 时的自动选择（agent-harness-overhaul D3）。 */
+    @SerialName("auto") val auto: Boolean = true,
 ) : ConfigSection
+
+/** `device.observe.sufficiency`：判定一次观测“信息不足”的阈值（WP1.3）。 */
+@Serializable
+public data class DeviceObserveSufficiencySection(
+    /** 有效节点（面积>0 且有文字/描述/可交互）少于此数视为信息不足。 */
+    @SerialName("minEffectiveNodes") val minEffectiveNodes: Int = 5,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        if (minEffectiveNodes >= 1) emptyList() else listOf("minEffectiveNodes must be >= 1, was $minEffectiveNodes")
+}
 
 /** `device.observe.llm`：llm 观测模式参数。 */
 @Serializable
@@ -132,13 +154,9 @@ public data class DeviceVisionSection(
 @Serializable
 public data class DeviceVisionParseSection(
     @SerialName("enabled") val enabled: Boolean = true,
-    /** 树退化判定的有效节点数下限（仅作为 quality 信号报告）。 */
-    @SerialName("degenerateNodeThreshold") val degenerateNodeThreshold: Int = 5,
     /** ROI 复检区域比例（相对屏幕尺寸）。 */
     @SerialName("roiRatio") val roiRatio: Double = 0.5,
     @SerialName("minConfidence") val minConfidence: Double = 0.35,
-    /** 视觉行存疑阈值（新方案 §2.7）：visualConf 低于此值的行标“存疑”。 */
-    @SerialName("uncertainConf") val uncertainConf: Double = 0.6,
     /** basic=检测+OCR；full=+caption；vlm=+小 VLM。 */
     @SerialName("modelPack") val modelPack: String = "basic",
     /** 视觉解析整体预算（截图+检测+状态分类+建树）；超时按解析失败报错，不自动换模式（ADR-0010）。 */
@@ -146,15 +164,9 @@ public data class DeviceVisionParseSection(
 ) : ConfigSection {
     override fun validate(): List<String> =
         buildList {
-            if (degenerateNodeThreshold < THRESHOLD_MIN) {
-                add("degenerateNodeThreshold must be >= $THRESHOLD_MIN, was $degenerateNodeThreshold")
-            }
             if (roiRatio !in RATIO_MIN..RATIO_MAX) add("roiRatio must be within $RATIO_MIN..$RATIO_MAX, was $roiRatio")
             if (minConfidence !in RATIO_MIN..RATIO_MAX) {
                 add("minConfidence must be within $RATIO_MIN..$RATIO_MAX, was $minConfidence")
-            }
-            if (uncertainConf !in RATIO_MIN..RATIO_MAX) {
-                add("uncertainConf must be within $RATIO_MIN..$RATIO_MAX, was $uncertainConf")
             }
             if (modelPack !in PACKS) add("modelPack must be one of $PACKS, was '$modelPack'")
             if (timeoutMs < TIMEOUT_MIN) add("timeoutMs must be >= $TIMEOUT_MIN, was $timeoutMs")
@@ -163,7 +175,6 @@ public data class DeviceVisionParseSection(
     public companion object {
         /** 支持的模型档位。 */
         public val PACKS: Set<String> = setOf("basic", "full", "vlm")
-        private const val THRESHOLD_MIN: Int = 1
         private const val RATIO_MIN: Double = 0.0
         private const val RATIO_MAX: Double = 1.0
         private const val TIMEOUT_MIN: Long = 1000
@@ -175,6 +186,31 @@ public data class DeviceVisionParseSection(
 public data class DeviceVisionIconSection(
     @SerialName("enabled") val enabled: Boolean = true,
 ) : ConfigSection
+
+/** `device.change`：屏幕变化判定（WP1.5、WP2.4）。 */
+@Serializable
+public data class DeviceChangeSection(
+    /** 节点配对的位置容差（0–1000 坐标，中心点每轴允许的偏移）。 */
+    @SerialName("positionTolerance") val positionTolerance: Int = 12,
+    /** 画面运动判定：aHash 汉明距离上限（≤ 视为画面未动）。 */
+    @SerialName("frameMaxHamming") val frameMaxHamming: Int = 3,
+    /** 画面运动判定：SSIM 下限（≥ 视为画面未动）。 */
+    @SerialName("frameMinSsim") val frameMinSsim: Double = 0.97,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (positionTolerance !in 0..POSITION_TOLERANCE_MAX) {
+                add("positionTolerance must be within 0..$POSITION_TOLERANCE_MAX, was $positionTolerance")
+            }
+            if (frameMaxHamming !in 0..FRAME_MAX_HAMMING_MAX) {
+                add("frameMaxHamming must be within 0..$FRAME_MAX_HAMMING_MAX, was $frameMaxHamming")
+            }
+            if (frameMinSsim !in 0.0..1.0) add("frameMinSsim must be within 0..1, was $frameMinSsim")
+        }
+}
+
+private const val POSITION_TOLERANCE_MAX: Int = 100
+private const val FRAME_MAX_HAMMING_MAX: Int = 64
 
 /** `device.overlay`：悬浮窗隐藏稳定。 */
 @Serializable
@@ -335,6 +371,8 @@ public object DeviceConfig {
         ConfigKey("device.vision", DeviceVisionParseSection.serializer()) { DeviceVisionParseSection() }
     public val VISION_ICON: ConfigKey<DeviceVisionIconSection> =
         ConfigKey("device.vision.icon", DeviceVisionIconSection.serializer()) { DeviceVisionIconSection() }
+    public val CHANGE: ConfigKey<DeviceChangeSection> =
+        ConfigKey("device.change", DeviceChangeSection.serializer()) { DeviceChangeSection() }
     public val OVERLAY: ConfigKey<DeviceOverlaySection> =
         ConfigKey("device.overlay", DeviceOverlaySection.serializer()) { DeviceOverlaySection() }
     public val TOUCH: ConfigKey<DeviceTouchSection> =
@@ -362,6 +400,7 @@ public object DeviceConfig {
             OBSERVE,
             VISION,
             VISION_ICON,
+            CHANGE,
             OVERLAY,
             TOUCH,
             TAP,

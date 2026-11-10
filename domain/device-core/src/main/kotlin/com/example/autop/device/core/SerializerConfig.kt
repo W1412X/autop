@@ -28,10 +28,12 @@ public data class SerializerConfig(
     val semanticPoorMinInteractive: Int,
     /** 贫乏类名节点面积占屏幕比例阈值。 */
     val semanticPoorAreaRatio: Double,
-    /** a11y 有效节点数低于此值 → quality.degenerate。 */
-    val degenerateNodeThreshold: Int,
-    /** 视觉行存疑阈值（visualConf 低于此值标 uncertain）。 */
-    val uncertainConf: Double,
+    /** 有效节点数低于此值 → quality.degenerate（所有观测方式同口径）。 */
+    val minEffectiveNodes: Int,
+    /** 节点配对的位置容差（0–1000 坐标，中心点每轴允许的偏移）。 */
+    val positionTolerance: Int,
+    /** 易变标签模式（预编译），配对前去易变片段。 */
+    val volatilePatterns: List<Regex>,
     /** 模板渲染（id, vars）→ 文本。 */
     val renderPrompt: (id: String, vars: Map<String, String>) -> String,
 )

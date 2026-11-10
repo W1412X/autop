@@ -1,7 +1,7 @@
 /**
- * `tool.observe`（docs/design/observation-modes-coordinate-actions §2、§3）：
- * 按显式 mode 获取统一 JSON 观测；a11y/visual 的 `full=false` 出差量，llm 恒完整。
- * 不再自动附图、不再自动切换模式；调试图仅在 visual + 调试开关下采集。
+ * `tool.observe`（agent-harness-overhaul WP1.7）：mode 缺省时按优先级自动选择，
+ * 显式 mode 不自动更换；a11y/visual 的 `full=false` 出差量，llm 恒完整。
+ * 调试图仅在最终用了 visual + 调试开关时附上。
  */
 package com.example.autop.device.impl.tools
 
@@ -17,6 +17,7 @@ import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.impl.ObserveModeResolver
+import com.example.autop.device.impl.ObserveSelection
 import com.example.autop.device.impl.observation.ScreenObserver
 import com.example.autop.device.impl.vision.VisualDebugCapture
 import com.example.autop.llm.Block
@@ -42,27 +43,29 @@ public class ObserveTool
 
         override val access: ToolAccess = ToolAccess.READ_SCREEN
 
-        /** §2.3：mode 枚举与说明按当前生效模式动态生成。 */
+        /** §2.3：mode 枚举与说明按当前生效模式动态生成；不参与自动选择的方式在说明里标注。 */
         override fun specFor(ctx: ToolContext): ToolSpec {
             val config = ctx.config[DeviceConfig.OBSERVE]
             val effective = modes.effective(config)
             // 无生效模式（服务/模型未就绪）时枚举回退配置清单，但明确告知可能不可用，避免模型误以为一切正常。
             val ordered = effective.ifEmpty { config.priority.mapNotNull(ObserveMode::parse) }
-            val warn = if (effective.isEmpty()) "$NO_EFFECTIVE_MODE\n" else ""
+            val warn = if (effective.isEmpty()) render(PROMPT_NO_EFFECTIVE_MODE) + "\n" else ""
+            val notAuto = render(PROMPT_MODE_NOT_AUTO)
+            val modeList =
+                ordered
+                    .mapIndexed { index, mode ->
+                        val text =
+                            prompts
+                                .render("$MODE_PROMPT_PREFIX${mode.id}")
+                                .getOrNull()
+                                ?.text
+                                .orEmpty()
+                        val suffix = if (config.modes.of(mode.id).auto) "" else " $notAuto"
+                        "${index + 1}. $text$suffix"
+                    }.joinToString("\n")
             return DeviceToolSpecs.observeFor(
                 modeIds = ordered.map { it.id },
-                modeList =
-                    warn +
-                        ordered
-                            .mapIndexed { index, mode ->
-                                val text =
-                                    prompts
-                                        .render("$MODE_PROMPT_PREFIX${mode.id}")
-                                        .getOrNull()
-                                        ?.text
-                                        .orEmpty()
-                                if (index == 0) "（优先）$text" else text
-                            }.joinToString("\n"),
+                modeList = warn + modeList,
             )
         }
 
@@ -70,52 +73,103 @@ public class ObserveTool
             args: JsonObject,
             ctx: ToolContext,
         ): ToolOutput {
-            val mode = ObserveMode.parse(args.str("mode")) ?: return invalidArgOutput(args)
+            val rawMode = args.str("mode")
+            val selection =
+                if (rawMode == null) {
+                    ObserveSelection.Auto
+                } else {
+                    val parsed = ObserveMode.parse(rawMode) ?: return invalidArgOutput(ctx, rawMode)
+                    ObserveSelection.Explicit(parsed)
+                }
             val full = args.bool("full") == true
             val region =
-                when (val parsed = regionFor(mode, args)) {
+                when (val parsed = regionFor(selection, args)) {
                     is RegionArg.Malformed -> return toolError(CommonErrorCodes.INVALID_ARGUMENT, MALFORMED_REGION)
                     is RegionArg.Value -> parsed.rect
                     is RegionArg.None -> null
                 }
-            val captureDebug = mode == ObserveMode.VISUAL && ctx.debugImages
+            val captureDebug = ctx.debugImages && mayUseVisual(selection)
             if (captureDebug) debug.begin()
-            val got = observer.observe(ctx, mode, full, region)
-            val debugImages = if (captureDebug) debug.take() else emptyList()
+            val got = observer.observe(ctx, selection, full, region)
+            val taken = if (captureDebug) debug.take() else emptyList()
             val observed =
                 when (got) {
                     is Outcome.Ok -> got.value
                     is Outcome.Err -> return errorOutput(got.error)
                 }
-            val notes = observationNotes(mode, full, args)
+            val debugImages =
+                if (observed.screen.model.mode == ObserveMode.VISUAL) {
+                    taken.map { Block.Image(it.fileRef, "image/png", it.width, it.height, it.alt) }
+                } else {
+                    emptyList()
+                }
+            val notes =
+                (selection as? ObserveSelection.Explicit)
+                    ?.let { observationNotes(it.mode, full, args) { id -> render(id) } }
+                    .orEmpty()
             val blocks =
                 listOf<Block>(Block.Text(observed.observation.text)) +
                     notes.map { Block.Text(it) } +
-                    debugImages.map { Block.Image(it.fileRef, "image/png", it.width, it.height, it.alt) }
+                    debugImages
             return ToolOutput(
                 ok = true,
                 content = blocks,
                 data = buildJsonObject { put("interactiveCount", observed.observation.interactiveCount) },
                 observation = observed.ref,
+                screenDelta = observed.delta,
             )
         }
 
-        private fun invalidArgOutput(args: JsonObject): ToolOutput =
-            toolError(
+        private fun invalidArgOutput(
+            ctx: ToolContext,
+            rawMode: String,
+        ): ToolOutput {
+            val allowed =
+                modes
+                    .effective(ctx.config[DeviceConfig.OBSERVE])
+                    .map { it.id }
+                    .ifEmpty { ObserveMode.entries.map { it.id } }
+                    .joinToString("、")
+            return toolError(
                 CommonErrorCodes.INVALID_ARGUMENT,
-                "mode 必须是 a11y、visual、llm 之一（收到 ${args.str("mode").orEmpty()}）",
+                render(PROMPT_INVALID_MODE, mapOf("got" to rawMode, "allowed" to allowed)),
             )
+        }
 
-        /** region 只对 llm 生效；其余模式一律忽略（不解析，避免误报格式错误）。 */
+        /** region 只对 llm 生效；显式非 llm 一律忽略（不解析，避免误报格式错误）。 */
         private fun regionFor(
-            mode: ObserveMode,
+            selection: ObserveSelection,
             args: JsonObject,
-        ): RegionArg = if (mode == ObserveMode.LLM) regionOf(args.obj("region")) else RegionArg.None
+        ): RegionArg =
+            when (selection) {
+                ObserveSelection.Auto -> regionOf(args.obj("region"))
+                is ObserveSelection.Explicit ->
+                    if (selection.mode == ObserveMode.LLM) regionOf(args.obj("region")) else RegionArg.None
+            }
+
+        /** 自动选择可能落到 visual；显式只有 visual 会用到调试图。 */
+        private fun mayUseVisual(selection: ObserveSelection): Boolean =
+            when (selection) {
+                ObserveSelection.Auto -> true
+                is ObserveSelection.Explicit -> selection.mode == ObserveMode.VISUAL
+            }
+
+        private fun render(
+            id: String,
+            vars: Map<String, String> = emptyMap(),
+        ): String =
+            prompts
+                .render(id, vars)
+                .getOrNull()
+                ?.text
+                .orEmpty()
 
         private companion object {
             const val MALFORMED_REGION = "region 必须是 [x1,y1,x2,y2]（0–1000，x1<x2、y1<y2）"
             const val MODE_PROMPT_PREFIX = "tool.observe.mode."
-            const val NO_EFFECTIVE_MODE = "（当前无可用观测模式：服务/模型未就绪，所选模式可能返回 device.mode_unavailable）"
+            const val PROMPT_NO_EFFECTIVE_MODE = "tool.observe.no_effective_mode"
+            const val PROMPT_MODE_NOT_AUTO = "tool.observe.mode_not_auto"
+            const val PROMPT_INVALID_MODE = "tool.observe.invalid_mode"
         }
     }
 
@@ -127,11 +181,12 @@ internal fun observationNotes(
     mode: ObserveMode,
     full: Boolean,
     args: JsonObject,
+    render: (String) -> String,
 ): List<String> =
     buildList {
-        if (mode != ObserveMode.LLM && args.containsKey("region")) add(REGION_IGNORED)
-        if (mode == ObserveMode.LLM && full) add(FULL_IGNORED)
+        if (mode != ObserveMode.LLM && args.containsKey("region")) add(render(PROMPT_REGION_IGNORED))
+        if (mode == ObserveMode.LLM && full) add(render(PROMPT_FULL_IGNORED))
     }
 
-internal const val REGION_IGNORED = "region 只对 mode=llm 生效，本次已忽略；a11y/visual 观测始终是整屏。"
-internal const val FULL_IGNORED = "llm 观测固定返回完整结果，full 已忽略。"
+private const val PROMPT_REGION_IGNORED = "tool.observe.region_ignored"
+private const val PROMPT_FULL_IGNORED = "tool.observe.full_ignored"

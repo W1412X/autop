@@ -48,8 +48,6 @@ private data class TapAction(
     val hitKnown: Boolean,
     /** 有节点树但落点不在任何节点内（回执 `hit:none`）。 */
     val hitNone: Boolean,
-    /** 命中树不是实时 a11y 时的说明；null=不需要说明。 */
-    val hitNote: String?,
     val resultText: String,
     val replayArgs: JsonObject,
 )
@@ -122,7 +120,6 @@ public class TapTool
                     waitMs = args.long("wait_ms"),
                     hitKnown = tree != null,
                     hitNone = tree != null && receipts.node(tree, modelPoint) == null,
-                    hitNote = receipts.sourceNote(tree),
                     resultText = resultTextOf(x, y, long, receipts.receipt(tree, actualModel)),
                     replayArgs = replayArgsOf(args, receipts.describe(tree, actualModel)),
                 )
@@ -228,7 +225,6 @@ public class TapTool
                         !tap.hitKnown -> add(HIT_UNKNOWN_TEXT)
                         tap.hitNone -> add(HIT_NONE_TEXT)
                     }
-                    tap.hitNote?.let { add(it) }
                     if (newlyBlocked) add(BLOCKED_TEXT)
                 }
             return out.copy(content = out.content + notes.map { Block.Text(it) })

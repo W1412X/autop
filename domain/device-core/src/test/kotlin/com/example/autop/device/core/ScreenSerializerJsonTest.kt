@@ -70,9 +70,7 @@ class ScreenSerializerJsonTest {
                         },
             )
         val windows =
-            Json
-                .parseToJsonElement(TestScreens.serialize(withIme).observation.text)
-                .jsonObject
+            jsonOf(TestScreens.serialize(withIme).observation.text)
                 .getValue("screen")
                 .jsonObject
                 .getValue("windows")
@@ -102,7 +100,6 @@ class ScreenSerializerJsonTest {
         assertThat(node.str("icon")).isEqualTo("勾")
         assertThat(node).doesNotContainKey("cls")
         assertThat(node).doesNotContainKey("vid")
-        assertThat(node.array("st")).containsExactly("uncertain")
         val fields =
             jsonOf(screen, ObserveMode.VISUAL)
                 .getValue("screen")
@@ -141,11 +138,11 @@ class ScreenSerializerJsonTest {
                 .getValue("quality")
                 .jsonObject
         assertThat(quality.getValue("suggest").jsonPrimitive.content).isEqualTo("visual")
-        assertThat(result.observation.text).endsWith("[device.observation.suggest_mode]visual")
+        assertThat(result.observation.text).contains("[device.observe.insufficient]")
     }
 
     @Test
-    fun `visual cached result is labelled and never suggests another mode`() {
+    fun `visual cached result is labelled cached and shares unified quality`() {
         val result =
             ScreenSerializer(TestScreens.rules, TestScreens.config())
                 .serialize(
@@ -157,14 +154,14 @@ class ScreenSerializerJsonTest {
                     cached = true,
                 )
         val screenJson =
-            Json
-                .parseToJsonElement(result.observation.text)
-                .jsonObject
+            jsonOf(result.observation.text)
                 .getValue("screen")
                 .jsonObject
         assertThat(screenJson.getValue("cached").jsonPrimitive.content).isEqualTo("true")
-        assertThat(screenJson.getValue("quality").jsonObject).doesNotContainKey("suggest")
-        assertThat(result.observation.text).doesNotContain("[device.observation.suggest_mode]")
+        // 统一口径：visual 与 a11y 一样按 insufficient/suggest 输出，不做来源区分。
+        val quality = screenJson.getValue("quality").jsonObject
+        assertThat(quality.getValue("insufficient").jsonPrimitive.content).isEqualTo("few_nodes")
+        assertThat(quality.getValue("suggest").jsonPrimitive.content).isEqualTo("llm")
     }
 
     @Test
@@ -243,7 +240,12 @@ class ScreenSerializerJsonTest {
         mode: ObserveMode = ObserveMode.A11Y,
     ): JsonObject = jsonOf(TestScreens.serialize(screen, mode = mode).observation.text)
 
-    private fun jsonOf(text: String): JsonObject = Json.parseToJsonElement(text).jsonObject
+    /** 信息不足时会追加建议尾行（非 JSON）；解析正文时丢掉末行。 */
+    private fun jsonOf(text: String): JsonObject {
+        val lines = text.lines()
+        val body = if (lines.last().trimEnd().endsWith("}")) text else lines.dropLast(1).joinToString("\n")
+        return Json.parseToJsonElement(body).jsonObject
+    }
 
     private fun JsonObject.str(key: String): String = getValue(key).jsonPrimitive.content
 

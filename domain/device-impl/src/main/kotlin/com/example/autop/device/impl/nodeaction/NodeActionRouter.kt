@@ -224,7 +224,7 @@ public class NodeActionRouter
 
         /** 当前观测是否来自 a11y（未观测过按默认 a11y）；仅此时节点树与指纹可信。 */
         internal fun isA11ySource(ctx: ToolContext): Boolean =
-            (ctx.deviceHistory().lastMode ?: ObserveMode.A11Y) == ObserveMode.A11Y
+            (ctx.deviceHistory().last?.mode ?: ObserveMode.A11Y) == ObserveMode.A11Y
 
         /** 指纹变化的可信判定：a11y 来源且有节点树，才能说“屏幕变了/没变”；否则返回 null（不判断）。 */
         internal fun movedOrNull(

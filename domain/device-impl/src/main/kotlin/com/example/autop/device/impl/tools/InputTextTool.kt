@@ -51,8 +51,6 @@ private data class InputAction(
     val clickDurationMs: Long,
     /** 命中回执行（没给坐标时不带）。 */
     val receipt: String?,
-    /** 命中树不是实时 a11y 时的说明；null=不需要说明。 */
-    val hitNote: String?,
     val replayArgs: JsonObject,
 )
 
@@ -154,7 +152,6 @@ public class InputTextTool
                     clickPoint = entry.clickPoint,
                     clickDurationMs = tapDurationOf(ctx, long = false),
                     receipt = entry.receipt,
-                    hitNote = entry.receipt?.let { receipts.sourceNote(tree) },
                     replayArgs = replayArgsOf(args, entry.hit),
                 )
             return Outcome.Ok(PreparedAction(subject, action))
@@ -354,7 +351,6 @@ public class InputTextTool
                 }
             traces += written.traces
             traces += effectLine(ExecEffect.UNKNOWN, EFFECT_UNKNOWN_NOTE)
-            input.hitNote?.let { traces += it }
             val text = (listOfNotNull(written.text, input.receipt) + traces).joinToString("\n")
             return epilogue.finish(ctx, text, input.waitMs, ReplayInput(ID, pre, input.replayArgs, gesture))
         }

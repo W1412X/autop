@@ -1,6 +1,6 @@
 /**
- * 观测差量（docs/design/observation-modes-coordinate-actions §3.4）：
- * 同页同模式才差量；换模式、换页、变化超阈值或 llm 一律完整。
+ * 观测差量（docs/design/observation-modes-coordinate-actions §3.4、agent-harness-overhaul WP1.5）：
+ * 同页同模式才差量；换模式、换页、变化超阈值或 llm 一律完整。配对按内容＋位置容差。
  */
 package com.example.autop.device.core
 
@@ -23,19 +23,20 @@ class ScreenJsonDifferTest {
     @Test
     fun `no baseline returns full observation`() {
         val cur = TestScreens.serialize(screen("确定"))
-        val observation = ScreenJsonDiffer.diff(null, cur, config)
-        assertThat(observation.mode).isEqualTo(ObservationMode.FULL)
+        val outcome = ScreenJsonDiffer.diff(null, cur, config)
+        assertThat(outcome.observation.mode).isEqualTo(ObservationMode.FULL)
+        assertThat(outcome.match).isNull()
     }
 
     @Test
     fun `same page changed state yields diff`() {
         val prev = TestScreens.serialize(screen("确定"))
         val cur = TestScreens.serialize(screen("确定", enabled = false))
-        val observation = ScreenJsonDiffer.diff(prev, cur, config.copy(diffMaxRatio = 1.0))
-        assertThat(observation.mode).isEqualTo(ObservationMode.DIFF)
+        val outcome = ScreenJsonDiffer.diff(prev, cur, config.copy(diffMaxRatio = 1.0))
+        assertThat(outcome.observation.mode).isEqualTo(ObservationMode.DIFF)
         val diff =
             Json
-                .parseToJsonElement(observation.text)
+                .parseToJsonElement(outcome.observation.text)
                 .jsonObject
                 .getValue("diff")
                 .jsonObject
@@ -47,25 +48,41 @@ class ScreenJsonDifferTest {
     }
 
     @Test
-    fun `mode switch always returns full`() {
+    fun `diff of reordered visual tree is empty`() {
+        val prev = TestScreens.serialize(twoButtons(first = true), mode = ObserveMode.VISUAL)
+        val cur = TestScreens.serialize(twoButtons(first = false), mode = ObserveMode.VISUAL)
+        val outcome = ScreenJsonDiffer.diff(prev, cur, config)
+        assertThat(outcome.match?.empty).isTrue()
+        assertThat(outcome.observation.mode).isEqualTo(ObservationMode.DIFF)
+        assertThat(outcome.observation.text).isEqualTo("[device.observe.diff_none]")
+    }
+
+    @Test
+    fun `mode switch returns full and null match`() {
         val prev = TestScreens.serialize(screen("确定"), mode = ObserveMode.A11Y)
         val cur = TestScreens.serialize(screen("确定"), mode = ObserveMode.VISUAL)
-        assertThat(ScreenJsonDiffer.diff(prev, cur, config).mode).isEqualTo(ObservationMode.FULL)
+        val outcome = ScreenJsonDiffer.diff(prev, cur, config)
+        assertThat(outcome.observation.mode).isEqualTo(ObservationMode.FULL)
+        assertThat(outcome.match).isNull()
     }
 
     @Test
     fun `llm always returns full`() {
         val prev = TestScreens.serialize(screen("确定"), mode = ObserveMode.LLM)
         val cur = TestScreens.serialize(screen("确定"), mode = ObserveMode.LLM)
-        assertThat(ScreenJsonDiffer.diff(prev, cur, config).mode).isEqualTo(ObservationMode.FULL)
+        val outcome = ScreenJsonDiffer.diff(prev, cur, config)
+        assertThat(outcome.observation.mode).isEqualTo(ObservationMode.FULL)
+        assertThat(outcome.match).isNull()
     }
 
     @Test
-    fun `change ratio above threshold returns full`() {
+    fun `ratio above diffMaxRatio returns full with match`() {
         val prev = TestScreens.serialize(screen("确定"))
         val cur = TestScreens.serialize(screen("取消"))
-        val observation = ScreenJsonDiffer.diff(prev, cur, config.copy(diffMaxRatio = 0.1))
-        assertThat(observation.mode).isEqualTo(ObservationMode.FULL)
+        val outcome = ScreenJsonDiffer.diff(prev, cur, config.copy(diffMaxRatio = 0.1))
+        assertThat(outcome.observation.mode).isEqualTo(ObservationMode.FULL)
+        assertThat(outcome.match).isNotNull()
+        assertThat(outcome.match?.empty).isFalse()
     }
 
     @Test
@@ -81,8 +98,30 @@ class ScreenJsonDifferTest {
     fun `page change returns full`() {
         val prev = TestScreens.serialize(screen("确定"))
         val other = screen("确定").copy(activity = "com.example.app.OtherActivity")
-        assertThat(ScreenJsonDiffer.diff(prev, TestScreens.serialize(other), config).mode)
+        assertThat(ScreenJsonDiffer.diff(prev, TestScreens.serialize(other), config).observation.mode)
             .isEqualTo(ObservationMode.FULL)
+    }
+
+    /** 两个位置不同、内容不同的按钮；[first] 决定节点顺序（模拟视觉识别顺序变化）。 */
+    private fun twoButtons(first: Boolean): ScreenSnapshot {
+        val a =
+            TestScreens.node(2) {
+                className = "visual.Button"
+                text = "搜索"
+                bounds = Rect(0, 0, 100, 50)
+            }
+        val b =
+            TestScreens.node(3) {
+                className = "visual.Button"
+                text = "返回"
+                bounds = Rect(0, 200, 100, 250)
+            }
+        val ordered = if (first) listOf(a, b) else listOf(b, a)
+        val root = TestScreens.node(1) { children = ordered.map { it.idx } }
+        return TestScreens.snapshot(
+            windows = listOf(TestScreens.window { title = "设置" }),
+            nodes = listOf(root) + ordered.map { it.copy(parent = 1) },
+        )
     }
 
     /** 应用窗口 + 系统状态栏窗口（时钟按 [clock] 变化）。 */

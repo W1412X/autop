@@ -33,8 +33,7 @@ import com.example.autop.device.impl.SerializerRulesLoader
 import com.example.autop.device.impl.deviceHistory
 import com.example.autop.device.impl.pixelCropOf
 import com.example.autop.device.impl.vision.FrameSignature
-import com.example.autop.device.impl.vision.VisualFrameDiff
-import com.example.autop.device.impl.vision.visionImageOf
+import com.example.autop.device.impl.vision.frameSignatureOf
 import com.example.autop.llm.Block
 import com.example.autop.llm.CoordSpace
 import com.example.autop.llm.LlmGateway
@@ -59,6 +58,12 @@ import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.roundToInt
 
+/** llm 观测解析结果：统一屏幕模型 + 本次截图帧签名（与模型来自同一张截图）。 */
+internal data class LlmParseResult(
+    val model: ScreenModel,
+    val signature: FrameSignature,
+)
+
 /** 截图 → 视觉大模型解析 → 统一屏幕模型。 */
 @Singleton
 public class LlmScreenParser
@@ -76,14 +81,14 @@ public class LlmScreenParser
          * 解析 [frame]（已裁好基准区信息）；[region] 为内容区 0–1000 的局部区域。
          * 失败统一返回 `device.llm_parse_failed`（§4.1）。
          */
-        public suspend fun parse(
+        internal suspend fun parse(
             ctx: ToolContext,
             frame: VisualFrame,
             region: Rect?,
             app: String,
             page: String?,
             effectiveModes: List<ObserveMode>,
-        ): Outcome<ScreenModel> {
+        ): Outcome<LlmParseResult> {
             val provider = providerOf() ?: return Outcome.Err(parseFailed("视觉模型不可用"))
             val profile = provider.profile
             val observe = configProvider.current()[DeviceConfig.OBSERVE]
@@ -97,11 +102,15 @@ public class LlmScreenParser
             if (cached != null) {
                 prepared.file.delete()
                 return Outcome.Ok(
-                    ScreenModelBuilder.of(
-                        mode = ObserveMode.LLM,
-                        windows = cached.windows,
-                        effectiveModes = effectiveModes,
-                        cached = true,
+                    LlmParseResult(
+                        model =
+                            ScreenModelBuilder.of(
+                                mode = ObserveMode.LLM,
+                                windows = cached.windows,
+                                effectiveModes = effectiveModes,
+                                cached = true,
+                            ),
+                        signature = prepared.signature,
                     ),
                 )
             }
@@ -123,7 +132,11 @@ public class LlmScreenParser
                         model = model,
                     )
             }
-            return if (model != null) Outcome.Ok(model) else Outcome.Err(parseFailed("模型输出无法解析"))
+            return if (model != null) {
+                Outcome.Ok(LlmParseResult(model, prepared.signature))
+            } else {
+                Outcome.Err(parseFailed("模型输出无法解析"))
+            }
         }
 
         private suspend fun request(
@@ -164,9 +177,22 @@ public class LlmScreenParser
                     }
                 if (nodes != null) {
                     val window = ScreenWindow(app = page.app, page = page.activity, active = true, kids = nodes)
+                    val minEffective =
+                        configProvider.current()[DeviceConfig.OBSERVE].sufficiency.minEffectiveNodes
+                    val degenerate =
+                        nodes.count { n ->
+                            n.bounds.area > 0 &&
+                                (
+                                    !n.text.isNullOrEmpty() ||
+                                        !n.desc.isNullOrEmpty() ||
+                                        !n.icon.isNullOrEmpty() ||
+                                        n.act.isNotEmpty()
+                                )
+                        } < minEffective
                     return ScreenModelBuilder.of(
                         mode = ObserveMode.LLM,
                         windows = listOf(window),
+                        degenerate = degenerate,
                         effectiveModes = effectiveModes,
                     )
                 }
@@ -299,7 +325,7 @@ public class LlmScreenParser
                     file = file,
                     width = scaled.width,
                     height = scaled.height,
-                    signature = signatureOf(scaled),
+                    signature = frameSignatureOf(scaled),
                 )
             } finally {
                 bitmap.recycle()
@@ -346,10 +372,6 @@ public class LlmScreenParser
                 }
             }.getOrNull()
         }
-
-        /** 与视觉链路同一帧签名判据（64×64 亮度降采样，§4.6）。 */
-        private fun signatureOf(bitmap: Bitmap): FrameSignature =
-            VisualFrameDiff.signature(VisualFrameDiff.grayOf(visionImageOf(bitmap)))
 
         private fun cacheDir(): File {
             val dir = File(context.cacheDir, "llm_observe")

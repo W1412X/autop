@@ -168,9 +168,11 @@ internal class ObservePortImpl(
     private val defaultMode: String,
 ) : ObservePort {
     override suspend fun observe(mode: String?): Observed {
+        // auto = 不传 mode，由工具按优先级自动选择；显式方式照常传入。
+        val wanted = mode ?: defaultMode
         val args =
             buildJsonObject {
-                put("mode", mode ?: defaultMode)
+                if (wanted != AUTO_MODE) put("mode", wanted)
                 put("full", true)
             }
         val out = invoker.invoke(OBSERVE_TOOL, args, ctx)
@@ -211,6 +213,7 @@ internal class ObservePortImpl(
         const val SCREENSHOT_TOOL = "screenshot"
         const val REASON = "flow"
         const val REGION_SIZE = 4
+        const val AUTO_MODE = "auto"
     }
 }
 

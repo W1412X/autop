@@ -172,6 +172,8 @@ public data class ToolResultEvent(
     val fullBlocks: List<Block>? = null,
     /** R1/A6：可回放动作记录（docs/tech/04 §2.7），只在成功时填写。 */
     val replay: ReplayableAction? = null,
+    /** 屏幕变化结论（agent-harness-overhaul D4）；无屏幕语义的工具为 null。 */
+    val screenDelta: ScreenDelta? = null,
 ) : EventPayload
 
 /** R1/B3：本 Thread 的运行笔记（note 工具写入）。 */

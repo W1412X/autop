@@ -15,6 +15,7 @@ import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.UiStabilizer
+import com.example.autop.device.impl.ObserveSelection
 import com.example.autop.device.impl.deviceHistory
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
@@ -82,7 +83,7 @@ public class ActionEpilogue
                     replay = buildReplay(replay, null),
                 )
             }
-            val mode = ctx.deviceHistory().lastMode ?: ObserveMode.A11Y
+            val mode = ctx.deviceHistory().last?.mode ?: ObserveMode.A11Y
             if (mode == ObserveMode.LLM) {
                 val post = probe.sample().getOrNull()
                 // 三态：true/false 是能比较出的结论；null 表示缺少前后状态，不能当成“没变化”。
@@ -110,7 +111,7 @@ public class ActionEpilogue
                     replay = buildReplay(replay, post?.fingerprint),
                 )
             }
-            return when (val observed = observer.observe(ctx, mode)) {
+            return when (val observed = observer.observe(ctx, ObserveSelection.Explicit(mode))) {
                 is Outcome.Ok ->
                     ToolOutput(
                         ok = true,

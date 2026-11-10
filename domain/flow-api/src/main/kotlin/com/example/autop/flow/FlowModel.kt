@@ -88,7 +88,7 @@ public enum class TraceLevel {
 /** 流程级设置。 */
 @Serializable
 public data class FlowSettings(
-    @SerialName("observeMode") val observeMode: String = "a11y",
+    @SerialName("observeMode") val observeMode: String = "auto",
     @SerialName("onFail") val onFail: OnFail? = null,
     @SerialName("maxDurationMs") val maxDurationMs: Long? = null,
     @SerialName("pauseAfterConsecutiveFailures") val pauseAfterConsecutiveFailures: Int = 3,

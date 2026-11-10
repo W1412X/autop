@@ -12,33 +12,35 @@ import org.junit.Test
 
 class ObserveNotesTest {
     private val region = buildJsonObject { put("x1", 0) }
+    private val withRegion = buildJsonObject { put("region", region) }
+    private val noRegion = buildJsonObject { }
+
+    private val render: (String) -> String = { id -> "rendered:$id" }
 
     @Test
     fun `region is reported as ignored for a11y and visual`() {
-        assertThat(observationNotes(ObserveMode.A11Y, full = false, args = buildJsonObject { put("region", region) }))
-            .containsExactly(REGION_IGNORED)
-        assertThat(observationNotes(ObserveMode.VISUAL, full = false, args = buildJsonObject { put("region", region) }))
-            .containsExactly(REGION_IGNORED)
+        val a11y = observationNotes(ObserveMode.A11Y, full = false, args = withRegion, render = render)
+        val visual = observationNotes(ObserveMode.VISUAL, full = false, args = withRegion, render = render)
+        assertThat(a11y).containsExactly("rendered:tool.observe.region_ignored")
+        assertThat(visual).containsExactly("rendered:tool.observe.region_ignored")
     }
 
     @Test
     fun `region is not reported for llm`() {
-        assertThat(observationNotes(ObserveMode.LLM, full = false, args = buildJsonObject { put("region", region) }))
-            .isEmpty()
+        assertThat(observationNotes(ObserveMode.LLM, full = false, args = withRegion, render = render)).isEmpty()
     }
 
     @Test
     fun `full is reported as ignored only for llm`() {
-        assertThat(observationNotes(ObserveMode.LLM, full = true, args = buildJsonObject { }))
-            .containsExactly(FULL_IGNORED)
-        assertThat(observationNotes(ObserveMode.A11Y, full = true, args = buildJsonObject { }))
-            .isEmpty()
+        val llm = observationNotes(ObserveMode.LLM, full = true, args = noRegion, render = render)
+        val a11y = observationNotes(ObserveMode.A11Y, full = true, args = noRegion, render = render)
+        assertThat(llm).containsExactly("rendered:tool.observe.full_ignored")
+        assertThat(a11y).isEmpty()
     }
 
     @Test
     fun `both notes are reported when llm receives region and full`() {
-        assertThat(
-            observationNotes(ObserveMode.LLM, full = true, args = buildJsonObject { put("region", region) }),
-        ).containsExactly(FULL_IGNORED)
+        val notes = observationNotes(ObserveMode.LLM, full = true, args = withRegion, render = render)
+        assertThat(notes).containsExactly("rendered:tool.observe.full_ignored")
     }
 }

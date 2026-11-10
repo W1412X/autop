@@ -22,7 +22,7 @@ public object DeviceToolSpecs {
             descriptionPromptId = "tool.observe",
             descriptionVars = mapOf("modeList" to modeList),
         ) {
-            string("mode", required = true, enum = modeIds)
+            string("mode", enum = modeIds)
             boolean("full")
             obj("region") {
                 integer("x1", required = true)

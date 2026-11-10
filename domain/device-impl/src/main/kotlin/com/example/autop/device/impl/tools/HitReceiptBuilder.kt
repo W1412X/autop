@@ -1,6 +1,6 @@
 /**
  * 命中回执与策略回退共用的节点树来源（docs/design/observation-modes-coordinate-actions §5.4）：
- * 优先用动作前的实时无障碍树，空树时退回本 Run 最近一次观测树。
+ * 跟随最近观测所用的方式；最近观测是 a11y 时用动作前的实时 a11y 树（更新），否则用最近观测的树。
  */
 package com.example.autop.device.impl.tools
 
@@ -33,13 +33,14 @@ public class HitReceiptBuilder
         private val serializer: SnapshotSerializer,
     ) {
         /**
-         * 命中树：动作前实时 a11y 树非空时用它；否则用本 Run 最近观测树；
-         * 都没有返回 null（回执输出 `none`）。
+         * 命中树跟随最近观测所用的方式：最近观测是 a11y 时用动作前的实时 a11y 树（更新），
+         * 否则用最近观测的树；都没有返回 null（回执输出 `none`）。
          */
         internal fun treeOf(
             ctx: ToolContext,
             snapshot: ScreenSnapshot?,
         ): HitTree? {
+            val last = ctx.deviceHistory().last
             val realtime =
                 snapshot
                     ?.takeIf { it.nodes.isNotEmpty() }
@@ -48,10 +49,11 @@ public class HitReceiptBuilder
                             .serialize(it, ObserveMode.A11Y, ctx.config, listOf(ObserveMode.A11Y))
                             .model
                     }
-            if (realtime != null) return HitTree(realtime, ObserveMode.A11Y)
-            val history = ctx.deviceHistory()
-            val last = history.lastTree ?: return null
-            return HitTree(last, history.lastMode ?: ObserveMode.A11Y)
+            return when {
+                last == null -> realtime?.let { HitTree(it, ObserveMode.A11Y) }
+                last.mode == ObserveMode.A11Y -> (realtime ?: last.screen.model).let { HitTree(it, ObserveMode.A11Y) }
+                else -> HitTree(last.screen.model, last.mode)
+            }
         }
 
         /** 落点处命中节点（§5.4）。 */
@@ -65,14 +67,6 @@ public class HitReceiptBuilder
             tree: HitTree?,
             point: Point,
         ): String = HitResolver.receipt(point, tree?.model, tree?.from)
-
-        /** 命中树不是实时 a11y 时，明确告诉模型回执只是参考（视觉伪树/旧树）。 */
-        internal fun sourceNote(tree: HitTree?): String? =
-            tree
-                ?.takeIf { it.from != ObserveMode.A11Y }
-                ?.let {
-                    "命中回执来自最近一次 ${it.from.id} 观测树，不是实时无障碍树；坐标命中仅供参考。"
-                }
 
         /** 回放参数里的 `_hit` 描述（未命中时为 null）。 */
         internal fun describe(

@@ -8,7 +8,7 @@ vars: [open, close]
 顶层：{"format":"autop.flow","schemaVersion":1,"id":"flow_xxx","name":"名称","description":"一句话说明","params":[...],"settings":{...},"steps":[节点...]}
 
 params 每项：{"name","type":"string|number|boolean|list|object|time|any","required","default","description","enum":[...],"secret"}。
-settings：observeMode("a11y"|"visual"|"llm"，默认 a11y)、onFail、maxDurationMs、pauseAfterConsecutiveFailures(默认3)、pacing{"betweenNodesMs":数字或{"min","max"}}、budget{"maxLlmTokens","maxLlmCalls","maxApiCalls"}、allowedTools、trace("full"|"failures"|"none")、memoryLog{"enabled","keep"}。
+settings：observeMode("auto"|"a11y"|"visual"|"llm"，默认 auto)、onFail、maxDurationMs、pauseAfterConsecutiveFailures(默认3)、pacing{"betweenNodesMs":数字或{"min","max"}}、budget{"maxLlmTokens","maxLlmCalls","maxApiCalls"}、allowedTools、trace("full"|"failures"|"none")、memoryLog{"enabled","keep"}。
 
 ## 变量与表达式
 - 字符串里的 {{open}} 表达式 {{close}} 在运行时求值；整个字符串恰好是一个表达式时保留原类型。
