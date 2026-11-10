@@ -113,6 +113,10 @@
       "repeatWarn": 3,
       "repeatStop": 5
     },
+    "turn": {
+      "maxTruncatedRetries": 2,
+      "maxEmptyRetries": 1
+    },
     "plan": {
       "blockFinishOnce": true
     },

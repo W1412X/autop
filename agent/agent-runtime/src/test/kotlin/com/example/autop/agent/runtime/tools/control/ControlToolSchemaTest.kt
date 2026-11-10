@@ -5,6 +5,7 @@ import com.example.autop.agent.ThreadRecall
 import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolProbeFixtures
 import com.example.autop.agent.ToolSchemaBuilder
+import com.example.autop.agent.runtime.testing.TestPromptRepository
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakePromptRepository
 import com.google.common.truth.Truth.assertThat
@@ -18,7 +19,7 @@ class ControlToolSchemaTest {
         listOf(
             AskUserTool(prompts),
             UpdatePlanTool(),
-            FinishTool(),
+            FinishTool(TestPromptRepository()),
             NoteTool(prompts),
             RuntimeStateTool(),
             HistoryRecallTool(EmptyRecall),

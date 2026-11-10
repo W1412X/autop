@@ -24,7 +24,7 @@ class DiModulesTest {
             val tools =
                 listOf(
                     AgentRuntimeModule.provideUpdatePlanTool(),
-                    AgentRuntimeModule.provideFinishTool(),
+                    AgentRuntimeModule.provideFinishTool(TestPromptRepository()),
                     AgentRuntimeModule.provideAskUserTool(prompts),
                     AgentRuntimeModule.provideNoteTool(prompts),
                     AgentRuntimeModule.provideHistoryRecallTool(recall),

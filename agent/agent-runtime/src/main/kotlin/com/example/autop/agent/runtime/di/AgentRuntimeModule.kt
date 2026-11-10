@@ -48,7 +48,7 @@ public object AgentRuntimeModule {
 
     @Provides
     @IntoSet
-    public fun provideFinishTool(): Tool = FinishTool()
+    public fun provideFinishTool(prompts: PromptRepository): Tool = FinishTool(prompts)
 
     @Provides
     @IntoSet

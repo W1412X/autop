@@ -11,12 +11,16 @@ import com.example.autop.agent.ToolControl
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.ToolSpec
 import com.example.autop.agent.toolSpec
+import com.example.autop.core.common.getOrNull
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** 结束工具。 */
-internal class FinishTool : Tool {
+internal class FinishTool(
+    private val prompts: PromptRepository,
+) : Tool {
     override val id: String = "tool.finish"
 
     override val spec: ToolSpec =
@@ -32,13 +36,32 @@ internal class FinishTool : Tool {
         args: JsonObject,
         ctx: ToolContext,
     ): ToolOutput {
-        val succeeded = args["status"]!!.jsonPrimitive.content == "success"
+        val succeeded = requireNotNull(args["status"]) { "schema guarantees status" }.jsonPrimitive.content == "success"
         val status = if (succeeded) RunOutcome.SUCCEEDED else RunOutcome.FAILED
-        val summary = args["summary"]!!.jsonPrimitive.content
+        val summary = requireNotNull(args["summary"]) { "schema guarantees summary" }.jsonPrimitive.content
         return ToolOutput(
             ok = true,
-            content = listOf(Block.Text("已交付结果。")),
-            control = ToolControl.Finish(status = status, summary = summary, outputs = args["outputs"] as? JsonObject),
+            // 「已收到结束请求」不暗示已经结束：被计划门拦下时模型不会误解（WP5.3）。
+            content =
+                listOf(
+                    Block.Text(
+                        prompts
+                            .render(ID_RECEIVED, emptyMap())
+                            .getOrNull()
+                            ?.text
+                            .orEmpty(),
+                    ),
+                ),
+            control =
+                ToolControl.Finish(
+                    status = status,
+                    summary = summary,
+                    outputs = args["outputs"] as? JsonObject,
+                ),
         )
+    }
+
+    private companion object {
+        const val ID_RECEIVED = "tool.finish.received"
     }
 }

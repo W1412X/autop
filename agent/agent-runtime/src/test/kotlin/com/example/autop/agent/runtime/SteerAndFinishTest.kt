@@ -67,7 +67,7 @@ class SteerAndFinishTest {
                     handle.steer("先别结束，再检查一遍")
                     okText("done")
                 }
-            val h = RuntimeHarness(tools = setOf(tool, FinishTool()))
+            val h = RuntimeHarness(tools = setOf(tool, FinishTool(TestPromptRepository())))
             h.llm
                 .call(
                     FakeTool.FAKE_NAME to "{}",
@@ -96,7 +96,7 @@ class SteerAndFinishTest {
     @Test
     fun `无 steer 时 finish 正常收口`() =
         runTest {
-            val h = RuntimeHarness(tools = setOf(FinishTool()))
+            val h = RuntimeHarness(tools = setOf(FinishTool(TestPromptRepository())))
             h.llm.call("finish" to """{"status":"success","summary":"交付结果"}""")
             val thread = h.newThread()
 

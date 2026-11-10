@@ -8,6 +8,7 @@ import com.example.autop.agent.EventPayload
 import com.example.autop.agent.RunFinished
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.ThreadEvent
+import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
 import com.example.autop.core.common.getOrNull
@@ -49,6 +50,11 @@ internal class LoopJournal(
             injectBlocks(listOf(Block.Text(item.text)), item.kind)
         }
         return steers.map { it.text }
+    }
+
+    /** 写一条工具结果（截断丢弃的调用配对用，WP5.4）。 */
+    suspend fun toolResult(event: ToolResultEvent) {
+        controller.append(event)
     }
 
     /** 写 RunFinished 并返回（收口唯一入口）。 */

@@ -39,11 +39,14 @@ internal class UpdatePlanTool : Tool {
         ctx: ToolContext,
     ): ToolOutput {
         val items =
-            args["items"]!!.jsonArray.map { el ->
+            requireNotNull(args["items"]) { "schema guarantees items" }.jsonArray.map { el ->
                 val one = el.jsonObject
                 PlanItem(
-                    step = one["step"]!!.jsonPrimitive.content,
-                    status = statusOf(one["status"]!!.jsonPrimitive.content),
+                    step = requireNotNull(one["step"]) { "schema guarantees step" }.jsonPrimitive.content,
+                    status =
+                        statusOf(
+                            requireNotNull(one["status"]) { "schema guarantees status" }.jsonPrimitive.content,
+                        ),
                 )
             }
         ctx.threadStore.append(ctx.threadId, ctx.runId, PlanUpdated(items = items, explanation = explanationOf(args)))

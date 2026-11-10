@@ -44,8 +44,22 @@ internal class ToolErrors(
     fun invalidArgs(errors: List<String>): ToolOutput =
         errorOutput(AgentErrorCodes.INVALID_ARGS, "invalid arguments", errors.joinToString("; "))
 
-    fun skipped(): ToolOutput =
-        errorOutput(AgentErrorCodes.SKIPPED_PREVIOUS_FAILED, "skipped: previous screen write failed")
+    /** 批次内被跳过的结果（WP5.2）。 */
+    fun skipped(reason: SkipReason): ToolOutput =
+        when (reason) {
+            SkipReason.PREVIOUS_FAILED ->
+                errorOutput(
+                    AgentErrorCodes.SKIPPED_PREVIOUS_FAILED,
+                    "skipped: an earlier write in this batch failed",
+                    render(ID_SKIPPED_PREVIOUS_FAILED_HINT, emptyMap()),
+                )
+            SkipReason.AFTER_CONTROL ->
+                errorOutput(
+                    AgentErrorCodes.SKIPPED_AFTER_CONTROL,
+                    "skipped: an earlier call in this batch ended or paused the run",
+                    render(ID_SKIPPED_AFTER_CONTROL_HINT, emptyMap()),
+                )
+        }
 
     fun missingOutput(): ToolOutput = errorOutput(AgentErrorCodes.TOOL_CRASHED, "missing result")
 
@@ -57,5 +71,7 @@ internal class ToolErrors(
 
     private companion object {
         const val ID_ERROR_RESULT = "agent.tool.error_result"
+        const val ID_SKIPPED_PREVIOUS_FAILED_HINT = "agent.tool.skipped_hint.previous_failed"
+        const val ID_SKIPPED_AFTER_CONTROL_HINT = "agent.tool.skipped_hint.after_control"
     }
 }

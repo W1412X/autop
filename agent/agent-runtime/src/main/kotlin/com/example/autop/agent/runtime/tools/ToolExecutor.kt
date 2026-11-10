@@ -44,17 +44,16 @@ internal class ToolExecutor(
     private val json = Json { ignoreUnknownKeys = true }
     val errors = ToolErrors(prompts)
 
-    /** 执行一个调用：未知工具/参数不合法/前置失败直接出错误结果。 */
+    /** 执行一个调用：未知工具/参数不合法直接出错误结果（批次跳过判断在 router，WP5.2）。 */
     suspend fun runOne(
         call: Block.ToolCall,
         ctx: ToolContext,
-        screenWriteFailed: Boolean,
     ): ToolCallResult {
         val tool = byName[call.name]
         val parsed = parseArgs(call)
         val validated =
             if (tool != null && parsed != null) ArgsValidator.validate(tool.specFor(ctx).parameters, parsed) else null
-        val rejected = reject(tool, parsed, validated, call, screenWriteFailed)
+        val rejected = reject(tool, parsed, validated, call)
         if (rejected != null) return done(call, rejected)
         val start = clock.nowMillis()
         return ToolCallResult(call, executeLocked(tool!!, validated!!.args!!, ctx), clock.nowMillis() - start)
@@ -74,19 +73,17 @@ internal class ToolExecutor(
         return ToolCallResult(call, executeLocked(tool, args, ctx), clock.nowMillis() - start)
     }
 
-    /** 前置拒绝：未知工具 / 参数不合法 / 前一屏幕写入失败而跳过。 */
+    /** 前置拒绝：未知工具 / 参数不合法。 */
     private fun reject(
         tool: Tool?,
         parsed: JsonObject?,
         validated: ArgsValidation?,
         call: Block.ToolCall,
-        screenWriteFailed: Boolean,
     ): ToolOutput? =
         when {
             tool == null -> errors.unknownTool(call.name, byName.keys.toList())
             parsed == null -> errors.invalidArgsJson()
             validated?.args == null -> errors.invalidArgs(validated?.errors.orEmpty())
-            tool.access == ToolAccess.WRITE_SCREEN && screenWriteFailed -> errors.skipped()
             else -> null
         }
 

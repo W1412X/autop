@@ -24,8 +24,11 @@ import com.example.autop.agent.protocol.ResolvedCalls
 import com.example.autop.agent.protocol.finalSummaryOf
 import com.example.autop.agent.protocol.lastTextOf
 import com.example.autop.agent.runtime.guard.BreakerVerdict
+import com.example.autop.agent.runtime.guard.TurnGuard
+import com.example.autop.agent.runtime.guard.TurnVerdict
 import com.example.autop.agent.runtime.replay.ReplayRunner
 import com.example.autop.agent.runtime.state.RuntimeStateTracker
+import com.example.autop.agent.runtime.tools.ToolErrors
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.getOrNull
@@ -60,6 +63,8 @@ internal class TurnLoop(
     private val prompts get() = parts.engines.ports.prompts
     private val guards = RunGuards(req, controller, parts.renderer, parts.engines, parts.router)
     private val journal = LoopJournal(controller, parts.engines.ports.prompts)
+    private val turnGuard =
+        TurnGuard(req, journal, ToolErrors(parts.engines.ports.prompts), parts.engines.ports.prompts)
     private val sampler = TurnSampler(req, controller, parts.engines.ports.prompts)
     private val phase = ToolPhase(req, controller, parts, guards, journal)
     private val allSchemas by lazy { parts.router.schemas(phase.context) }
@@ -213,7 +218,14 @@ internal class TurnLoop(
                     ),
                 )
                 guards.noteAdded(completed.message.blocks)
-                afterSample(completed)
+                when (val verdict = turnGuard.judge(completed, nativeTools)) {
+                    TurnVerdict.Proceed -> afterSample(completed)
+                    is TurnVerdict.Retry -> {
+                        verdict.apply()
+                        LoopStep.NextRound
+                    }
+                    is TurnVerdict.Fail -> fail(verdict.error)
+                }
             }
         }
     }
@@ -321,7 +333,10 @@ internal class TurnLoop(
             naturalEnd(finalText ?: lastTextOf(message))
         }
 
-    /** 控制工具：Finish 与 steer 竞争（R1/B2）；Pause 关门等 resume 后继续守卫流程。 */
+    /**
+     * 控制工具：Finish 与 steer 竞争（R1/B2）；Pause 关门等 resume 后继续守卫流程。
+     * 一批至多一个控制结果（WP5.2 保证控制之后的调用全被跳过）。
+     */
     private suspend fun handleControl(outputs: List<ToolOutput>): LoopStep? {
         val control = outputs.firstNotNullOfOrNull { it.control } ?: return null
         return when (control) {
@@ -331,11 +346,25 @@ internal class TurnLoop(
             }
             is ToolControl.Finish -> {
                 val steers = journal.drainSteers()
-                if (steers.isEmpty()) {
-                    LoopStep.End(journal.finishEvent(control.status, control.summary, control.outputs, null))
-                } else {
-                    journal.inject(ID_DEFERRED, emptyMap())
-                    LoopStep.NextRound
+                // finish 与自然结束共用同一个计划门（WP5.3）；声明失败的 finish 不过计划门。
+                val open =
+                    if (steers.isEmpty() &&
+                        control.status == RunOutcome.SUCCEEDED
+                    ) {
+                        guards.planGateItems()
+                    } else {
+                        null
+                    }
+                when {
+                    steers.isNotEmpty() -> {
+                        journal.inject(ID_DEFERRED, emptyMap())
+                        LoopStep.NextRound
+                    }
+                    open != null -> {
+                        journal.inject(ID_UNFINISHED, mapOf("items" to open.planText()))
+                        LoopStep.NextRound
+                    }
+                    else -> LoopStep.End(journal.finishEvent(control.status, control.summary, control.outputs, null))
                 }
             }
         }

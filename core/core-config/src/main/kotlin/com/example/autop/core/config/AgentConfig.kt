@@ -233,6 +233,19 @@ public data class AgentStateSection(
     }
 }
 
+/** `agent.turn`：单轮输出异常的重试上限（WP5.4）。 */
+@Serializable
+public data class AgentTurnSection(
+    @SerialName("maxTruncatedRetries") val maxTruncatedRetries: Int = 2,
+    @SerialName("maxEmptyRetries") val maxEmptyRetries: Int = 1,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (maxTruncatedRetries < 0) add("maxTruncatedRetries must be >= 0, was $maxTruncatedRetries")
+            if (maxEmptyRetries < 0) add("maxEmptyRetries must be >= 0, was $maxEmptyRetries")
+        }
+}
+
 /** `agent.plan`：计划行为。 */
 @Serializable
 public data class AgentPlanSection(
@@ -313,6 +326,8 @@ public object AgentConfig {
         ConfigKey("agent.budget", AgentBudgetSection.serializer()) { AgentBudgetSection() }
     public val BREAKER: ConfigKey<AgentBreakerSection> =
         ConfigKey("agent.breaker", AgentBreakerSection.serializer()) { AgentBreakerSection() }
+    public val TURN: ConfigKey<AgentTurnSection> =
+        ConfigKey("agent.turn", AgentTurnSection.serializer()) { AgentTurnSection() }
     public val PLAN: ConfigKey<AgentPlanSection> =
         ConfigKey("agent.plan", AgentPlanSection.serializer()) { AgentPlanSection() }
     public val THINKING: ConfigKey<AgentThinkingSection> =
@@ -339,6 +354,7 @@ public object AgentConfig {
             COMPACTION,
             BUDGET,
             BREAKER,
+            TURN,
             PLAN,
             THINKING,
             FALLBACK,

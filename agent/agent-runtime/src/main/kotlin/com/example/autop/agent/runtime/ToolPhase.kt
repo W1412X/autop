@@ -50,6 +50,7 @@ internal class ToolPhase(
                     guards.noteAdded(event.blocks)
                 },
                 emitInjected = { blocks -> journal.injectBlocks(blocks, UserMessageKind.INJECTED) },
+                beforeEach = { controller.awaitOpen() },
             )
         parts.engines.budget.recordToolRound(outputs)
         return outputs

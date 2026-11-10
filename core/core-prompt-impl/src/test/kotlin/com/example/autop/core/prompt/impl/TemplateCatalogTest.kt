@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(46)
+        assertThat(toolTemplates).hasSize(47)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -94,6 +94,11 @@ class TemplateCatalogTest {
                 "agent.budget.dimension.screenshots",
                 "agent.budget.dimension.steps",
                 "agent.budget.dimension.tokens",
+                "agent.tool.skipped_hint.after_control",
+                "agent.tool.skipped_hint.previous_failed",
+                "agent.turn.empty_reply",
+                "agent.turn.output_truncated",
+                "agent.turn.truncated_call_hint",
                 "agent.state.budget.dim.duration",
                 "agent.state.budget.dim.screenshots",
                 "agent.state.budget.dim.steps",
@@ -124,6 +129,7 @@ class TemplateCatalogTest {
                 "agent.state.tools.reason.filtered",
                 "agent.state.tools.reason.vision",
                 "tool.note.saved",
+                "tool.finish.received",
                 "agent.breaker.repeat_warn",
                 "agent.breaker.repeat_stop",
                 "agent.breaker.same_error_stop",
