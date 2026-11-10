@@ -9,6 +9,7 @@ import com.example.autop.agent.protocol.FallbackMode
 import com.example.autop.agent.protocol.RequestBuilder
 import com.example.autop.agent.protocol.ResolvedCalls
 import com.example.autop.agent.protocol.displayTextOf
+import com.example.autop.agent.protocol.sanitizeTextsOf
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.Clock
@@ -343,10 +344,10 @@ internal class FlowAuthorSessionImpl(
         val builder =
             RequestBuilder(
                 prompts = d.prompts,
-                fallback = !nativeTools,
+                profile = provider.profile,
                 thinking = config[AgentConfig.THINKING],
-                thinkingCapable = provider.profile.capabilities.thinking,
-                maxOutputTokens = MAX_OUTPUT,
+                texts = sanitizeTextsOf(d.prompts),
+                maxOutputTokensOverride = MAX_OUTPUT,
             )
         val schemas = tools.schemas()
         val system =

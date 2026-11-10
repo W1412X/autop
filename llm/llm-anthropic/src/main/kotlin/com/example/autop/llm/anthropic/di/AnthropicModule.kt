@@ -1,5 +1,7 @@
 package com.example.autop.llm.anthropic.di
 
+import com.example.autop.core.common.Clock
+import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.SecretStore
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.LlmConfig
@@ -47,9 +49,11 @@ public object AnthropicModule {
             contextExceededPatterns = errors.contextExceededPatterns.split('|').filter { it.isNotEmpty() },
             imageMaxEdge = image.maxEdge,
             apiVersion = anthropic.apiVersion,
+            contextExceededStatus = errors.contextExceededStatus,
         )
     }
 
+    @Suppress("LongParameterList") // Hilt 装配：Context 是依赖打包类，逐项注入
     @Provides
     @Singleton
     public fun provideAnthropicContext(
@@ -58,6 +62,8 @@ public object AnthropicModule {
         secrets: SecretStore,
         mapper: AnthropicRequestMapper,
         quirksDefaults: AnthropicQuirksDefaults,
+        dispatchers: DispatcherProvider,
+        clock: Clock,
     ): AnthropicContext =
         AnthropicContext(
             client = client,
@@ -65,6 +71,8 @@ public object AnthropicModule {
             secrets = secrets,
             mapper = mapper,
             quirksDefaults = quirksDefaults,
+            dispatchers = dispatchers,
+            clock = clock,
         )
 
     @Provides

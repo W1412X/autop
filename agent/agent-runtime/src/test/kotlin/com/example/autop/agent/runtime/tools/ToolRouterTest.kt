@@ -205,6 +205,47 @@ class ToolRouterTest {
             assertThat(beforeEachCount).isEqualTo(2)
         }
 
+    @Test
+    fun `screenshot hidden when model has no vision`() {
+        val shot = VisionTool("tool.screenshot", "screenshot")
+        val prompts = TestPromptRepository()
+        val clock = FakeClock(1_000L)
+        val builder =
+            RouterBuilder(
+                tools = setOf(shot),
+                enrichers = emptySet(),
+                llm =
+                    com.example.autop.agent.runtime.testing.FakeLlmGateway(
+                        com.example.autop.agent.runtime.testing
+                            .ScriptedLlmProvider(),
+                    ),
+                prompts = prompts,
+                clock = clock,
+                policy = FakePolicyEngine(),
+                platform =
+                    com.example.autop.agent.runtime.testing
+                        .FakePlatform(),
+                audit = null,
+            )
+        val build = builder.build(request(), toolFilter = null, modelVision = false)
+
+        assertThat(build.hidden.map { it.name to it.reason }).containsExactly("screenshot" to "vision")
+        assertThat(build.router.toolIds()).isEmpty()
+    }
+
+    private fun request(): RunRequest =
+        RunRequest(
+            runId = RunId("run-vision"),
+            threadId =
+                com.example.autop.core.common
+                    .ThreadId("t2"),
+            input = emptyList(),
+            goal = null,
+            vars = emptyMap(),
+            config = FakeConfigProvider().current(),
+            toolFilter = null,
+        )
+
     private fun call(name: String): Block.ToolCall = Block.ToolCall(id = "c-$name", name = name, argsJson = "{}")
 
     private fun okOutput(): ToolOutput = ToolOutput(ok = true, content = listOf(Block.Text("ok")))
@@ -280,6 +321,21 @@ class ToolRouterTest {
             action: com.example.autop.agent.PreparedAction,
             ctx: ToolContext,
         ): ToolOutput = result()
+    }
+
+    private class VisionTool(
+        override val id: String,
+        name: String,
+    ) : Tool {
+        override val spec: ToolSpec = toolSpec(name = name, descriptionPromptId = "tool.fake") { }
+        override val access: ToolAccess = ToolAccess.READ_SCREEN
+        override val requiredCapabilities: Set<Capability> = emptySet()
+        override val requiresModelVision: Boolean = true
+
+        override suspend fun invoke(
+            args: JsonObject,
+            ctx: ToolContext,
+        ): ToolOutput = ToolOutput(ok = true, content = emptyList())
     }
 
     private class ScriptedTool(

@@ -1,5 +1,8 @@
 package com.example.autop.llm.openai.di
 
+import com.example.autop.core.common.Clock
+import com.example.autop.core.common.DispatcherProvider
+import com.example.autop.core.common.Logger
 import com.example.autop.core.common.SecretStore
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.LlmConfig
@@ -50,9 +53,11 @@ public object OpenAiModule {
         return OpenAiQuirksDefaults(
             contextExceededPatterns = errors.contextExceededPatterns.split('|').filter { it.isNotEmpty() },
             imageMaxEdge = image.maxEdge,
+            contextExceededStatus = errors.contextExceededStatus,
         )
     }
 
+    @Suppress("LongParameterList") // Hilt 装配：Context 是依赖打包类，逐项注入
     @Provides
     @Singleton
     public fun provideOpenAiContext(
@@ -61,6 +66,9 @@ public object OpenAiModule {
         secrets: SecretStore,
         mapper: OpenAiRequestMapper,
         quirksDefaults: OpenAiQuirksDefaults,
+        dispatchers: DispatcherProvider,
+        clock: Clock,
+        logger: Logger,
     ): OpenAiContext =
         OpenAiContext(
             client = client,
@@ -68,12 +76,16 @@ public object OpenAiModule {
             secrets = secrets,
             mapper = mapper,
             quirksDefaults = quirksDefaults,
+            dispatchers = dispatchers,
+            clock = clock,
+            logger = logger,
         )
 
     @Provides
     @Singleton
     public fun provideOpenAiEmbeddingContext(
         client: OkHttpClient,
+        retryConfig: RetryConfig,
         secrets: SecretStore,
         profiles: ModelProfileStore,
         quirksDefaults: OpenAiQuirksDefaults,
@@ -83,6 +95,7 @@ public object OpenAiModule {
             secrets = secrets,
             profiles = profiles,
             quirksDefaults = quirksDefaults,
+            retryStatus = retryConfig.retryStatus,
         )
 
     @Provides

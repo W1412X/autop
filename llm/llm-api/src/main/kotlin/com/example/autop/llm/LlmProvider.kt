@@ -26,6 +26,12 @@ public interface LlmProvider {
     public fun stream(request: LlmRequest): Flow<LlmStreamEvent>
 }
 
+/** 协议标识常量（工厂 [LlmProviderFactory.protocolId] 的取值，按 profile.protocol 匹配）。 */
+public object LlmProtocols {
+    public const val OPENAI: String = "openai"
+    public const val ANTHROPIC: String = "anthropic"
+}
+
 /** [LlmProvider] 工厂（扩展点：DI 多绑定，按 [protocolId] 匹配 `profile.protocol`）。 */
 public interface LlmProviderFactory {
     /** 协议标识（`"openai"` / `"anthropic"`）。 */

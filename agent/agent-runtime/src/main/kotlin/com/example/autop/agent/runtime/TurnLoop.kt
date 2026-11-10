@@ -65,7 +65,7 @@ internal class TurnLoop(
     private val journal = LoopJournal(controller, parts.engines.ports.prompts)
     private val turnGuard =
         TurnGuard(req, journal, ToolErrors(parts.engines.ports.prompts), parts.engines.ports.prompts)
-    private val sampler = TurnSampler(req, controller, parts.engines.ports.prompts)
+    private val sampler = TurnSampler(req, controller, parts.engines.ports.prompts, parts.engines.ports.logger)
     private val phase = ToolPhase(req, controller, parts, guards, journal)
     private val allSchemas by lazy { parts.router.schemas(phase.context) }
 

@@ -70,4 +70,6 @@ public sealed interface Block {
 public data class Msg(
     val role: Role,
     val blocks: List<Block>,
+    /** 产生该消息的模型配置 id（只对 ASSISTANT 有意义；历史净化据此判断思考块归属，WP6.7）。 */
+    val producedBy: String? = null,
 )

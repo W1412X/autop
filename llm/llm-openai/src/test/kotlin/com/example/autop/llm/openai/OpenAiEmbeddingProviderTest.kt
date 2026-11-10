@@ -135,6 +135,7 @@ internal class OpenAiEmbeddingProviderTest {
                     secrets = secrets,
                     profiles = FakeModelProfileStore(listOf(profile(baseUrl))),
                     quirksDefaults = OpenAiQuirksDefaults(emptyList(), 1024),
+                    retryStatus = setOf(429, 500),
                 ),
         )
 

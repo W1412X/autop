@@ -1,5 +1,6 @@
 /**
- * HTTP 失败到统一错误码的映射（docs/tech/03 §4.3–§4.4）。
+ * HTTP 失败到统一错误码的映射（docs/tech/03 §4.3–§4.4、agent-harness-overhaul WP6.1）。
+ * `retryable` 的单一来源：恒等于 `status in retryStatus`（`CONTEXT_EXCEEDED` 除外，恒 false）。
  */
 package com.example.autop.llm.http
 
@@ -8,22 +9,30 @@ import com.example.autop.llm.LlmErrorCodes
 import java.time.ZonedDateTime
 import java.time.format.DateTimeFormatter
 
-/** 状态码映射（docs/tech/03 §4.4）；[contextPatterns] 为 `|` 拆分后的子串列表。 */
+/**
+ * 状态码映射（docs/tech/03 §4.4）；[contextPatterns] 为 `|` 拆分后的子串列表，
+ * [contextStatus] 触发上下文超长识别，[retryStatus] 决定可重试性。
+ */
 public fun mapHttpError(
     status: Int,
     bodySnippet: String,
     contextPatterns: List<String>,
-): AppError =
-    when {
-        status == HTTP_BAD_REQUEST && matchesContextExceeded(bodySnippet, contextPatterns) ->
-            error(LlmErrorCodes.CONTEXT_EXCEEDED, status, bodySnippet)
-        status == HTTP_UNAUTHORIZED || status == HTTP_FORBIDDEN -> error(LlmErrorCodes.AUTH, status, bodySnippet)
-        status == HTTP_TOO_MANY_REQUESTS -> error(LlmErrorCodes.RATE_LIMITED, status, bodySnippet, retryable = true)
-        status in HTTP_SERVER_ERROR_MIN..HTTP_SERVER_ERROR_MAX ->
-            error(LlmErrorCodes.SERVER, status, bodySnippet, retryable = true)
-        status in HTTP_BAD_REQUEST..HTTP_CLIENT_ERROR_MAX -> error(LlmErrorCodes.BAD_REQUEST, status, bodySnippet)
-        else -> error(LlmErrorCodes.BAD_RESPONSE, status, bodySnippet)
-    }
+    contextStatus: Set<Int>,
+    retryStatus: Set<Int>,
+): AppError {
+    val code =
+        when {
+            status in contextStatus && matchesContextExceeded(bodySnippet, contextPatterns) ->
+                LlmErrorCodes.CONTEXT_EXCEEDED
+            status == HTTP_UNAUTHORIZED || status == HTTP_FORBIDDEN -> LlmErrorCodes.AUTH
+            status == HTTP_TOO_MANY_REQUESTS -> LlmErrorCodes.RATE_LIMITED
+            status in HTTP_SERVER_ERROR_MIN..HTTP_SERVER_ERROR_MAX -> LlmErrorCodes.SERVER
+            status in HTTP_BAD_REQUEST..HTTP_CLIENT_ERROR_MAX -> LlmErrorCodes.BAD_REQUEST
+            else -> LlmErrorCodes.BAD_RESPONSE
+        }
+    val retryable = code != LlmErrorCodes.CONTEXT_EXCEEDED && status in retryStatus
+    return error(code, status, bodySnippet, retryable)
+}
 
 /** 上下文超长识别：body 含任一子串（大小写不敏感，docs/tech/03 §4.3）。 */
 public fun matchesContextExceeded(

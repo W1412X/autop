@@ -3,6 +3,7 @@ package com.example.autop.llm.http
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
+import com.example.autop.llm.Block
 import com.example.autop.llm.EmbeddingConfig
 import com.example.autop.llm.EmbeddingProvider
 import com.example.autop.llm.EmbeddingProviderFactory
@@ -99,6 +100,14 @@ internal fun completedEvent(): LlmStreamEvent.Completed =
     LlmStreamEvent.Completed(
         message = Msg(role = Role.USER, blocks = emptyList()),
         stopReason = StopReason.END_TURN,
+        usage = null,
+    )
+
+/** 一次调用 echo 工具的 [LlmStreamEvent.Completed]（tools 探测判定用，WP6.10）。 */
+internal fun echoToolCompletedEvent(): LlmStreamEvent.Completed =
+    LlmStreamEvent.Completed(
+        message = Msg(role = Role.ASSISTANT, blocks = listOf(Block.ToolCall("call_probe", "echo", "{}"))),
+        stopReason = StopReason.TOOL_USE,
         usage = null,
     )
 

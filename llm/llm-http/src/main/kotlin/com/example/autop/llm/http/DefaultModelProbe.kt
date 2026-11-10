@@ -6,12 +6,14 @@
 package com.example.autop.llm.http
 
 import com.example.autop.core.common.AppError
+import com.example.autop.core.common.Clock
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.LlmConfig
 import com.example.autop.llm.Block
 import com.example.autop.llm.LlmErrorCodes
 import com.example.autop.llm.LlmException
+import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.LlmProviderFactory
 import com.example.autop.llm.LlmRequest
 import com.example.autop.llm.LlmStreamEvent
@@ -37,6 +39,7 @@ public class DefaultModelProbe
         private val factories: Set<@JvmSuppressWildcards LlmProviderFactory>,
         private val configProvider: ConfigProvider,
         @param:ProbeTempDir private val imageDir: File,
+        private val clock: Clock,
     ) : ModelProbe {
         override suspend fun probe(profile: ModelProfile): ProbeReport {
             val factory =
@@ -44,11 +47,17 @@ public class DefaultModelProbe
                     ?: return ProbeReport(fail(profile), fail(profile), fail(profile))
             val provider = factory.create(profile)
             val timeoutMs = configProvider.current()[LlmConfig.PROBE].timeoutMs
-            return ProbeReport(
-                text = runProbe(timeoutMs) { provider.complete(textRequest()) },
-                tools = runProbe(timeoutMs) { provider.complete(toolsRequest()) },
-                vision = runProbe(timeoutMs) { provider.complete(visionRequest()) },
-            )
+            val imageFile = File.createTempFile(PROBE_IMAGE_PREFIX, PROBE_IMAGE_SUFFIX, imageDir)
+            try {
+                imageFile.writeBytes(ProbePng.solidRgb8x8())
+                return ProbeReport(
+                    text = runProbe(timeoutMs) { provider.complete(textRequest()) },
+                    tools = runProbe(timeoutMs) { toolsProbe(provider) },
+                    vision = runProbe(timeoutMs) { provider.complete(visionRequest(imageFile)) },
+                )
+            } finally {
+                imageFile.delete()
+            }
         }
 
         private fun fail(profile: ModelProfile): ProbeResult =
@@ -65,7 +74,7 @@ public class DefaultModelProbe
             timeoutMs: Long,
             block: suspend () -> Outcome<LlmStreamEvent.Completed>,
         ): ProbeResult {
-            val started = System.nanoTime()
+            val started = clock.nowMillis()
             val error =
                 try {
                     withTimeout(timeoutMs) {
@@ -83,9 +92,26 @@ public class DefaultModelProbe
                 } catch (e: LlmException) {
                     e.error
                 }
-            val elapsedMs = (System.nanoTime() - started) / NANOS_PER_MILLISECOND
+            val elapsedMs = clock.nowMillis() - started
             return ProbeResult(ok = error == null, error = error, elapsedMs = elapsedMs)
         }
+
+        /** tools 判定（WP6.10）：必须真的调用了 `echo` 工具，否则视为不支持。 */
+        private suspend fun toolsProbe(provider: LlmProvider): Outcome<LlmStreamEvent.Completed> {
+            val outcome = provider.complete(toolsRequest())
+            if (outcome is Outcome.Ok && !callsEchoTool(outcome.value.message)) {
+                return Outcome.Err(
+                    AppError(
+                        code = LlmErrorCodes.BAD_RESPONSE,
+                        message = "tools probe: model did not call the echo tool",
+                    ),
+                )
+            }
+            return outcome
+        }
+
+        private fun callsEchoTool(message: Msg): Boolean =
+            message.blocks.filterIsInstance<Block.ToolCall>().any { it.name == ECHO_TOOL_NAME }
 
         private fun textRequest(): LlmRequest =
             LlmRequest(
@@ -112,24 +138,21 @@ public class DefaultModelProbe
                 maxOutputTokens = PROBE_MAX_OUTPUT_TOKENS,
             )
 
-        private fun visionRequest(): LlmRequest {
-            val file = File.createTempFile(PROBE_IMAGE_PREFIX, PROBE_IMAGE_SUFFIX, imageDir)
-            file.writeBytes(ProbePng.solidRgb8x8())
-            return LlmRequest(
+        private fun visionRequest(imageFile: File): LlmRequest =
+            LlmRequest(
                 system = emptyList(),
                 messages =
                     listOf(
                         Msg(
                             Role.USER,
                             listOf(
-                                Block.Image(file.absolutePath, PROBE_IMAGE_MIME, ProbePng.SIZE, ProbePng.SIZE),
+                                Block.Image(imageFile.absolutePath, PROBE_IMAGE_MIME, ProbePng.SIZE, ProbePng.SIZE),
                                 Block.Text(VISION_PROBE),
                             ),
                         ),
                     ),
                 maxOutputTokens = PROBE_MAX_OUTPUT_TOKENS,
             )
-        }
 
         private companion object {
             // 三段探测文本是协议烟测载荷而非用户可编辑 prompt（见 questions.md N35）。
@@ -142,6 +165,5 @@ public class DefaultModelProbe
             const val PROBE_IMAGE_SUFFIX = ".png"
             const val PROBE_IMAGE_MIME = "image/png"
             const val PROBE_MAX_OUTPUT_TOKENS = 32
-            const val NANOS_PER_MILLISECOND = 1_000_000L
         }
     }

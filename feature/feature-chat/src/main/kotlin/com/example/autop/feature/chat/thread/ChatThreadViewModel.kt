@@ -138,7 +138,19 @@ public class ChatThreadViewModel
                     .flatMapLatest { runId ->
                         if (runId == null) emptyFlow() else runService.liveEvents(runId)
                     }.collect { event ->
-                        if (event !is AgentEvent.Persisted) {
+                        if (event is AgentEvent.SampleRetrying) {
+                            // 重试前丢弃本轮已显示的增量（WP6.6）。
+                            timeline.update {
+                                it.copy(
+                                    live =
+                                        it.live.filterNot { e ->
+                                            e is AgentEvent.TextDelta ||
+                                                e is AgentEvent.ThinkingDelta ||
+                                                e is AgentEvent.ToolCallStreaming
+                                        },
+                                )
+                            }
+                        } else if (event !is AgentEvent.Persisted) {
                             timeline.update { it.copy(live = it.live + event) }
                         }
                     }

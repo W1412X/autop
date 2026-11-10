@@ -85,7 +85,7 @@ public class OpenAiRequestMapper(
         for (msg in request.messages) {
             when (msg.role) {
                 Role.USER -> out += userMessage(msg, quirks)
-                Role.ASSISTANT -> out += assistantMessage(msg)
+                Role.ASSISTANT -> out += assistantMessage(msg, quirks)
                 Role.TOOL -> out += toolMessages(msg, quirks)
             }
         }
@@ -135,12 +135,20 @@ public class OpenAiRequestMapper(
         }
     }
 
-    private fun assistantMessage(msg: Msg): JsonObject {
+    private fun assistantMessage(
+        msg: Msg,
+        quirks: OpenAiQuirks,
+    ): JsonObject {
         val text = msg.blocks.filterIsInstance<Block.Text>().joinToString("") { it.text }
         val calls = msg.blocks.filterIsInstance<Block.ToolCall>()
+        val reasoning = msg.blocks.filterIsInstance<Block.Thinking>().joinToString("") { it.text }
         return buildJsonObject {
             put("role", "assistant")
             put("content", if (text.isEmpty()) JsonNull else JsonPrimitive(text))
+            // echoReasoning=true 时把思考文本回显到与解析同名的字段（WP6.7）。
+            if (quirks.echoReasoning && reasoning.isNotEmpty()) {
+                put(quirks.reasoningField, reasoning)
+            }
             if (calls.isNotEmpty()) {
                 put("tool_calls", JsonArray(calls.map { toolCallJson(it) }))
             }

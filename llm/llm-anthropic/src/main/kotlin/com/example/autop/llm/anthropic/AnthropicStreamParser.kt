@@ -23,6 +23,8 @@ import java.util.TreeMap
 
 public class AnthropicStreamParser(
     private val contextPatterns: List<String>,
+    private val contextStatus: Set<Int> = DEFAULT_CONTEXT_EXCEEDED_STATUS.toSet(),
+    private val retryStatus: Set<Int> = emptySet(),
 ) {
     private val blocks = TreeMap<Int, PendingBlock>()
     private var stopReason: StopReason? = null
@@ -78,8 +80,13 @@ public class AnthropicStreamParser(
                 blocks[index] = PendingBlock.Redacted(contentBlock["data"]?.jsonPrimitive?.contentOrNull.orEmpty())
                 emptyList()
             }
-            else -> {
+            "text" -> {
                 blocks[index] = PendingBlock.Text()
+                emptyList()
+            }
+            else -> {
+                // 未知内容块类型：忽略且不产出块（WP6.8）
+                blocks[index] = PendingBlock.Ignored
                 emptyList()
             }
         }
@@ -134,7 +141,7 @@ public class AnthropicStreamParser(
 
     private fun onComplete(): List<LlmStreamEvent> {
         stopped = true
-        val message = Msg(Role.ASSISTANT, blocks.values.map { it.toBlock() })
+        val message = Msg(Role.ASSISTANT, blocks.values.mapNotNull { it.toBlock() })
         // inputTokens 统一口径（WP4.4）：本次请求全部输入 = 基础输入 + 缓存命中 + 缓存写入。
         val currentUsage =
             Usage(
@@ -197,15 +204,22 @@ public class AnthropicStreamParser(
     }
 
     private fun serverError(message: String): AppError =
-        mapHttpError(status = 529, bodySnippet = message, contextPatterns = contextPatterns)
+        mapHttpError(
+            status = 529,
+            bodySnippet = message,
+            contextPatterns = contextPatterns,
+            contextStatus = contextStatus,
+            retryStatus = retryStatus,
+        )
 
     private sealed class PendingBlock {
-        abstract fun toBlock(): Block
+        /** 组装消息时产出的块；未知块与空白文本块返回 null（WP6.8）。 */
+        abstract fun toBlock(): Block?
 
         class Text : PendingBlock() {
             val buffer: StringBuilder = StringBuilder()
 
-            override fun toBlock(): Block = Block.Text(buffer.toString())
+            override fun toBlock(): Block? = buffer.toString().takeIf { it.isNotBlank() }?.let { Block.Text(it) }
         }
 
         class ToolCall(
@@ -228,6 +242,11 @@ public class AnthropicStreamParser(
             val data: String,
         ) : PendingBlock() {
             override fun toBlock(): Block = Block.Thinking("", redacted = data)
+        }
+
+        /** 未知内容块类型：不产出块（WP6.8）。 */
+        object Ignored : PendingBlock() {
+            override fun toBlock(): Block? = null
         }
     }
 }

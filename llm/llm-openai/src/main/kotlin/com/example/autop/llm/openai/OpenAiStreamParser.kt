@@ -2,15 +2,22 @@
  * OpenAI 流式 chunk → 统一流事件（docs/tech/03 §5.1 流解析）。
  * Thinking 增量同样累积进 [LlmStreamEvent.Completed]（[Block.Thinking]，供持久化与
  * UI 展示）；回传请求时由 RequestMapper 剔除（不发回服务端）。
+ * 流内 `error` chunk 映射错误抛 [LlmException]（agent-harness-overhaul WP6.3）；
+ * 工具调用增量对缺 `index` / 分片函数名容错（WP6.9）。
  */
 package com.example.autop.llm.openai
 
+import com.example.autop.core.common.AppError
+import com.example.autop.core.common.Logger
 import com.example.autop.llm.Block
+import com.example.autop.llm.LlmErrorCodes
+import com.example.autop.llm.LlmException
 import com.example.autop.llm.LlmStreamEvent
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.StopReason
 import com.example.autop.llm.Usage
+import com.example.autop.llm.http.matchesContextExceeded
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -21,6 +28,8 @@ import java.util.TreeMap
 
 public class OpenAiStreamParser(
     private val reasoningField: String,
+    private val contextPatterns: List<String>,
+    private val logger: Logger,
 ) {
     private val text = StringBuilder()
     private val thinking = StringBuilder()
@@ -29,8 +38,13 @@ public class OpenAiStreamParser(
     private var usage: Usage? = null
     private var generatedIds = 0
 
+    /** `finish_reason` 出现过即为 true（流结束校验用，WP6.3）。 */
+    public var sawFinishReason: Boolean = false
+        private set
+
     /** 投喂一个 chunk（[DONE] 由 Provider 处理），返回本 chunk 产生的事件。 */
     public fun feed(chunk: JsonObject): List<LlmStreamEvent> {
+        (chunk["error"] as? JsonObject)?.let { throw LlmException(mapStreamError(it)) }
         val events = mutableListOf<LlmStreamEvent>()
         parseUsage(chunk)?.let { events += LlmStreamEvent.UsageReported(it) }
         // 显式 null 字段按缺失处理（兼容服务常见 "tool_calls": null / "choices": null）
@@ -41,7 +55,10 @@ public class OpenAiStreamParser(
             ?.get("finish_reason")
             ?.jsonPrimitive
             ?.contentOrNull
-            ?.let { stopReason = mapStopReason(it) }
+            ?.let {
+                stopReason = mapStopReason(it)
+                sawFinishReason = true
+            }
         return events
     }
 
@@ -84,7 +101,7 @@ public class OpenAiStreamParser(
         events: MutableList<LlmStreamEvent>,
     ) {
         val obj = delta as? JsonObject ?: return
-        val index = obj["index"]?.jsonPrimitive?.intOrNull ?: return
+        val index = toolCallIndex(obj) ?: return
         val call = toolCalls.getOrPut(index) { PendingCall() }
         val function = obj["function"] as? JsonObject
         val id = obj["id"]?.jsonPrimitive?.contentOrNull
@@ -95,10 +112,40 @@ public class OpenAiStreamParser(
             call.name = name.orEmpty()
             call.started = true
             events += LlmStreamEvent.ToolCallStarted(index, call.id, call.name)
+        } else if (name != null) {
+            // 部分服务分片下发函数名：started 之后继续追加（WP6.9）
+            call.name += name
         }
         function?.get("arguments")?.jsonPrimitive?.contentOrNull?.takeIf { it.isNotEmpty() }?.let {
             call.args.append(it)
             events += LlmStreamEvent.ToolCallArgsDelta(index, it)
+        }
+    }
+
+    /** 增量缺 `index` 时按在途调用归并；多个在途无法归并则丢弃该片段并记 warn（WP6.9）。 */
+    private fun toolCallIndex(obj: JsonObject): Int? {
+        obj["index"]?.jsonPrimitive?.intOrNull?.let { return it }
+        if (toolCalls.size > 1) {
+            logger.w(TAG, "tool_call_delta_without_index_dropped", "inFlight" to toolCalls.size)
+            return null
+        }
+        return toolCalls.keys.firstOrNull() ?: 0
+    }
+
+    /** 流内 `error` chunk → 错误映射（WP6.3）。 */
+    private fun mapStreamError(error: JsonObject): AppError {
+        val type = error["type"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val code = error["code"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val message = error["message"]?.jsonPrimitive?.contentOrNull.orEmpty()
+        val probe = (type + " " + code).lowercase()
+        return when {
+            matchesContextExceeded(message, contextPatterns) ->
+                AppError(code = LlmErrorCodes.CONTEXT_EXCEEDED, message = message)
+            probe.contains(RATE_LIMIT_PROBE) ->
+                AppError(code = LlmErrorCodes.RATE_LIMITED, message = message, retryable = true)
+            SERVER_PROBES.any { probe.contains(it) } ->
+                AppError(code = LlmErrorCodes.SERVER, message = message, retryable = true)
+            else -> AppError(code = LlmErrorCodes.BAD_RESPONSE, message = "stream error: $message")
         }
     }
 
@@ -134,3 +181,7 @@ public class OpenAiStreamParser(
         var started: Boolean = false
     }
 }
+
+private const val TAG = "OpenAiStreamParser"
+private const val RATE_LIMIT_PROBE = "rate_limit"
+private val SERVER_PROBES = listOf("overloaded", "server_error", "internal", "timeout")

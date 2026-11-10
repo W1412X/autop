@@ -141,6 +141,33 @@ class AnthropicStreamParserTest {
         assertThat(e.error.code).isEqualTo(LlmErrorCodes.CONTEXT_EXCEEDED)
     }
 
+    @Test
+    fun `unknown block type produces no block`() {
+        val parser = AnthropicStreamParser(emptyList())
+        val unknown = obj("""{"index":0,"content_block":{"type":"server_tool_use","id":"c1","name":"web"}}""")
+        val events = mutableListOf<LlmStreamEvent>()
+        events += parser.feed("content_block_start", unknown)
+        events += parser.feed("content_block_start", obj("""{"index":1,"content_block":{"type":"text"}}"""))
+        events += parser.feed("content_block_delta", obj("""{"index":1,"delta":{"type":"text_delta","text":"hi"}}"""))
+        events += parser.feed("message_stop", obj("{}"))
+
+        val completed = events.filterIsInstance<LlmStreamEvent.Completed>().single()
+        assertThat(completed.message.blocks).containsExactly(Block.Text("hi"))
+    }
+
+    @Test
+    fun `empty text block is dropped`() {
+        val parser = AnthropicStreamParser(emptyList())
+        parser.feed("content_block_start", obj("""{"index":0,"content_block":{"type":"text"}}"""))
+        parser.feed("content_block_delta", obj("""{"index":0,"delta":{"type":"text_delta","text":"  "}}"""))
+        parser.feed("content_block_start", obj("""{"index":1,"content_block":{"type":"text"}}"""))
+        parser.feed("content_block_delta", obj("""{"index":1,"delta":{"type":"text_delta","text":"ok"}}"""))
+        val events = parser.feed("message_stop", obj("{}"))
+
+        val completed = events.filterIsInstance<LlmStreamEvent.Completed>().single()
+        assertThat(completed.message.blocks).containsExactly(Block.Text("ok"))
+    }
+
     private fun obj(text: String): JsonObject = Json.parseToJsonElement(text).jsonObject
 
     private companion object {

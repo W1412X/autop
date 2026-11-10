@@ -48,6 +48,12 @@ public sealed interface AgentEvent {
         val event: ThreadEvent,
     ) : AgentEvent
 
+    /** 流式采样中途失败、即将重试：UI 应丢弃本轮已显示的增量（WP6.6）。 */
+    public data class SampleRetrying(
+        val attempt: Int,
+        val code: String,
+    ) : AgentEvent
+
     public data class TextDelta(
         val text: String,
     ) : AgentEvent

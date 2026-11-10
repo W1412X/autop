@@ -94,6 +94,8 @@ class TemplateCatalogTest {
                 "agent.budget.dimension.screenshots",
                 "agent.budget.dimension.steps",
                 "agent.budget.dimension.tokens",
+                "agent.history.empty_tool_result",
+                "agent.history.image_unsupported",
                 "agent.tool.skipped_hint.after_control",
                 "agent.tool.skipped_hint.previous_failed",
                 "agent.turn.empty_reply",

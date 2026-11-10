@@ -42,6 +42,7 @@ public class OpenAiEmbeddingContext(
     public val secrets: SecretStore,
     public val profiles: ModelProfileStore,
     public val quirksDefaults: OpenAiQuirksDefaults,
+    public val retryStatus: Set<Int>,
 )
 
 /** [EmbeddingProviderFactory] 实现：按 [id] 匹配 `llm.embedding.provider`。 */
@@ -132,7 +133,15 @@ public class OpenAiEmbeddingProvider(
             if (response.isSuccessful) {
                 parseEmbeddings(snippet)
             } else {
-                Outcome.Err(mapHttpError(response.code, snippet, quirks.contextExceededPatterns))
+                Outcome.Err(
+                    mapHttpError(
+                        status = response.code,
+                        bodySnippet = snippet,
+                        contextPatterns = quirks.contextExceededPatterns,
+                        contextStatus = quirks.contextExceededStatus.toSet(),
+                        retryStatus = context.retryStatus,
+                    ),
+                )
             }
         } catch (e: IOException) {
             Outcome.Err(

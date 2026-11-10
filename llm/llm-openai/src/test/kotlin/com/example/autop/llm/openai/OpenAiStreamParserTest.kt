@@ -1,16 +1,19 @@
 package com.example.autop.llm.openai
 
 import com.example.autop.llm.Block
+import com.example.autop.llm.LlmErrorCodes
+import com.example.autop.llm.LlmException
 import com.example.autop.llm.LlmStreamEvent
 import com.example.autop.llm.StopReason
 import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import org.junit.Assert.assertThrows
 import org.junit.Test
 
 class OpenAiStreamParserTest {
-    private val parser = OpenAiStreamParser("reasoning_content")
+    private val parser = OpenAiStreamParser("reasoning_content", listOf("too long"), RecordingLogger())
 
     @Test
     fun `text deltas are collected into completed message`() {
@@ -115,6 +118,107 @@ class OpenAiStreamParserTest {
         parser.feed(chunk("""{"choices": [{"delta": {"content": "ok"}}]}"""))
 
         assertThat(parser.finish().message.blocks).containsExactly(Block.Text("ok"))
+    }
+
+    @Test
+    fun `error chunk throws mapped exception`() {
+        val rateLimited =
+            assertThrows(LlmException::class.java) {
+                parser.feed(
+                    chunk("""{"error": {"type": "rate_limit_error", "code": "rate_limit", "message": "slow"}}"""),
+                )
+            }
+        assertThat(rateLimited.error.code).isEqualTo(LlmErrorCodes.RATE_LIMITED)
+        assertThat(rateLimited.error.retryable).isTrue()
+
+        val context =
+            assertThrows(LlmException::class.java) {
+                parser.feed(chunk("""{"error": {"message": "prompt is TOO LONG"}}"""))
+            }
+        assertThat(context.error.code).isEqualTo(LlmErrorCodes.CONTEXT_EXCEEDED)
+        assertThat(context.error.retryable).isFalse()
+
+        val generic =
+            assertThrows(LlmException::class.java) {
+                parser.feed(chunk("""{"error": {"message": "boom"}}"""))
+            }
+        assertThat(generic.error.code).isEqualTo(LlmErrorCodes.BAD_RESPONSE)
+        assertThat(generic.error.message).isEqualTo("stream error: boom")
+    }
+
+    @Test
+    fun `missing index with single call merges`() {
+        parser.feed(
+            chunk(
+                """{"choices": [{"delta": {"tool_calls": [
+                    |{"index": 0, "id": "call_1", "function": {"name": "echo", "arguments": ""}}
+                    |]}}]}""",
+            ),
+        )
+        parser.feed(
+            chunk(
+                """{"choices": [{"delta": {"tool_calls": [
+                    |{"function": {"arguments": "{\"x\":1}"}}
+                    |]}}]}""",
+            ),
+        )
+
+        val call =
+            parser
+                .finish()
+                .message.blocks
+                .single() as Block.ToolCall
+        assertThat(call.id).isEqualTo("call_1")
+        assertThat(call.name).isEqualTo("echo")
+        assertThat(call.argsJson).isEqualTo("""{"x":1}""")
+    }
+
+    @Test
+    fun `name fragments are appended`() {
+        parser.feed(
+            chunk(
+                """{"choices": [{"delta": {"tool_calls": [
+                    |{"index": 0, "id": "call_1", "function": {"name": "ge", "arguments": ""}}
+                    |]}}]}""",
+            ),
+        )
+        parser.feed(
+            chunk(
+                """{"choices": [{"delta": {"tool_calls": [
+                    |{"index": 0, "function": {"name": "t_time", "arguments": "{}"}}
+                    |]}}]}""",
+            ),
+        )
+
+        val call =
+            parser
+                .finish()
+                .message.blocks
+                .single() as Block.ToolCall
+        assertThat(call.name).isEqualTo("get_time")
+    }
+
+    @Test
+    fun `fragment without index is dropped when multiple calls are open`() {
+        val logger = RecordingLogger()
+        val multi = OpenAiStreamParser("reasoning_content", listOf("too long"), logger)
+        multi.feed(
+            chunk(
+                """{"choices": [{"delta": {"tool_calls": [
+                    |{"index": 0, "id": "call_1", "function": {"name": "a", "arguments": ""}},
+                    |{"index": 1, "id": "call_2", "function": {"name": "b", "arguments": ""}}
+                    |]}}]}""",
+            ),
+        )
+        multi.feed(chunk("""{"choices": [{"delta": {"tool_calls": [{"function": {"arguments": "1}"}}]}}]}"""))
+
+        val calls =
+            multi
+                .finish()
+                .message.blocks
+                .filterIsInstance<Block.ToolCall>()
+        assertThat(calls.map { it.argsJson }).containsExactly("{}", "{}").inOrder()
+        assertThat(logger.warns).contains("tool_call_delta_without_index_dropped")
     }
 
     private fun chunk(text: String): JsonObject = Json.parseToJsonElement(text.trimMargin()).jsonObject

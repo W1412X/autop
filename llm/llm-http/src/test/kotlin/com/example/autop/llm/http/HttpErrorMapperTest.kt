@@ -7,7 +7,8 @@ import org.junit.Test
 class HttpErrorMapperTest {
     @Test
     fun `400 with context pattern maps to context exceeded`() {
-        val error = mapHttpError(400, "Error: prompt is too long", listOf("prompt is too long"))
+        val error =
+            mapHttpError(400, "Error: prompt is too long", listOf("prompt is too long"), CONTEXT_STATUS, RETRY_STATUS)
 
         assertThat(error.code).isEqualTo(LlmErrorCodes.CONTEXT_EXCEEDED)
         assertThat(error.retryable).isFalse()
@@ -15,20 +16,22 @@ class HttpErrorMapperTest {
 
     @Test
     fun `400 without context pattern maps to bad request`() {
-        val error = mapHttpError(400, "bad request", listOf("prompt is too long"))
+        val error = mapHttpError(400, "bad request", listOf("prompt is too long"), CONTEXT_STATUS, RETRY_STATUS)
 
         assertThat(error.code).isEqualTo(LlmErrorCodes.BAD_REQUEST)
     }
 
     @Test
     fun `401 and 403 map to auth`() {
-        assertThat(mapHttpError(401, "no", emptyList()).code).isEqualTo(LlmErrorCodes.AUTH)
-        assertThat(mapHttpError(403, "no", emptyList()).code).isEqualTo(LlmErrorCodes.AUTH)
+        val unauthorized = mapHttpError(401, "no", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
+        val forbidden = mapHttpError(403, "no", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
+        assertThat(unauthorized.code).isEqualTo(LlmErrorCodes.AUTH)
+        assertThat(forbidden.code).isEqualTo(LlmErrorCodes.AUTH)
     }
 
     @Test
     fun `429 maps to rate limited and is retryable`() {
-        val error = mapHttpError(429, "slow down", emptyList())
+        val error = mapHttpError(429, "slow down", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
 
         assertThat(error.code).isEqualTo(LlmErrorCodes.RATE_LIMITED)
         assertThat(error.retryable).isTrue()
@@ -36,7 +39,7 @@ class HttpErrorMapperTest {
 
     @Test
     fun `5xx maps to server and is retryable`() {
-        val error = mapHttpError(503, "unavailable", emptyList())
+        val error = mapHttpError(503, "unavailable", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
 
         assertThat(error.code).isEqualTo(LlmErrorCodes.SERVER)
         assertThat(error.retryable).isTrue()
@@ -44,12 +47,35 @@ class HttpErrorMapperTest {
 
     @Test
     fun `other 4xx map to bad request and unexpected status maps to bad response`() {
-        val notFound = mapHttpError(404, "missing", emptyList())
+        val notFound = mapHttpError(404, "missing", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
         assertThat(notFound.code).isEqualTo(LlmErrorCodes.BAD_REQUEST)
         assertThat(notFound.retryable).isFalse()
 
-        val weird = mapHttpError(600, "weird", emptyList())
+        val weird = mapHttpError(600, "weird", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
         assertThat(weird.code).isEqualTo(LlmErrorCodes.BAD_RESPONSE)
+    }
+
+    @Test
+    fun `408 is retryable`() {
+        val error = mapHttpError(408, "timeout", emptyList(), CONTEXT_STATUS, setOf(408))
+
+        assertThat(error.code).isEqualTo(LlmErrorCodes.BAD_REQUEST)
+        assertThat(error.retryable).isTrue()
+    }
+
+    @Test
+    fun `413 with pattern is context exceeded`() {
+        val error = mapHttpError(413, "prompt is too long", listOf("too long"), CONTEXT_STATUS, RETRY_STATUS)
+
+        assertThat(error.code).isEqualTo(LlmErrorCodes.CONTEXT_EXCEEDED)
+    }
+
+    @Test
+    fun `context exceeded is never retryable`() {
+        val error = mapHttpError(400, "prompt is too long", listOf("prompt is too long"), CONTEXT_STATUS, setOf(400))
+
+        assertThat(error.code).isEqualTo(LlmErrorCodes.CONTEXT_EXCEEDED)
+        assertThat(error.retryable).isFalse()
     }
 
     @Test
@@ -78,5 +104,10 @@ class HttpErrorMapperTest {
         assertThat(parseRetryAfterMs(null, nowMs = 0L)).isNull()
         assertThat(parseRetryAfterMs("", nowMs = 0L)).isNull()
         assertThat(parseRetryAfterMs("soon", nowMs = 0L)).isNull()
+    }
+
+    private companion object {
+        val CONTEXT_STATUS = setOf(400, 413, 422)
+        val RETRY_STATUS = setOf(408, 409, 429, 500, 502, 503, 504, 529)
     }
 }

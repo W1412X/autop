@@ -2,11 +2,14 @@ package com.example.autop.llm.anthropic
 
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.SecretStore
+import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeSecretStore
+import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.llm.LlmErrorCodes
 import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.http.RetryConfig
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import mockwebserver3.MockResponse
 import mockwebserver3.MockWebServer
@@ -90,6 +93,8 @@ internal class AnthropicModelDirectoryTest {
                     secrets = secrets,
                     mapper = AnthropicRequestMapper(FakeImageLoader(), FakePrompts()),
                     quirksDefaults = AnthropicQuirksDefaults(emptyList(), 1024, API_VERSION),
+                    dispatchers = TestDispatcherProvider(Dispatchers.IO),
+                    clock = FakeClock(),
                 ),
         )
 

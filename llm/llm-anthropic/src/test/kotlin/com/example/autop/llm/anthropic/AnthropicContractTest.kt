@@ -7,14 +7,17 @@ package com.example.autop.llm.anthropic
 import com.example.autop.core.testing.ContractFixtures
 import com.example.autop.core.testing.ContractTarget
 import com.example.autop.core.testing.ContractTool
+import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeSecretStore
 import com.example.autop.core.testing.Fixtures
 import com.example.autop.core.testing.ProviderContractTest
+import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.Usage
 import com.example.autop.llm.http.RetryConfig
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.Dispatchers
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -79,6 +82,8 @@ internal class AnthropicContractTest :
                             imageMaxEdge = 1024,
                             apiVersion = "2023-06-01",
                         ),
+                    dispatchers = TestDispatcherProvider(Dispatchers.IO),
+                    clock = FakeClock(),
                 ),
         )
 

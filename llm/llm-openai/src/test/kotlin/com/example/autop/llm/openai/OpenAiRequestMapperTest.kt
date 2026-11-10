@@ -213,6 +213,7 @@ class OpenAiRequestMapperTest {
             embeddingsPath = "/embeddings",
             maxTokensField = maxTokensField,
             reasoningField = "reasoning_content",
+            echoReasoning = false,
             contextExceededPatterns = listOf("ctx"),
             imageMaxEdge = 1568,
         )

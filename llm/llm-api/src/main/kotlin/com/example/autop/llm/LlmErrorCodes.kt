@@ -34,4 +34,7 @@ public object LlmErrorCodes {
 
     /** 服务端拒绝（安全拦截等，retryable=false）。 */
     public const val REFUSED: String = "llm.refused"
+
+    /** 消息序列非法（WP6.5，retryable=false）。 */
+    public const val INVALID_HISTORY: String = "llm.invalid_history"
 }

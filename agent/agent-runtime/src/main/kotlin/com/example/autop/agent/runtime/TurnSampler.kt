@@ -10,7 +10,9 @@ import com.example.autop.agent.RunState
 import com.example.autop.agent.protocol.FallbackMode
 import com.example.autop.agent.protocol.RequestBuilder
 import com.example.autop.agent.protocol.ResolvedCalls
+import com.example.autop.agent.protocol.sanitizeTextsOf
 import com.example.autop.core.common.AppError
+import com.example.autop.core.common.Logger
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.LlmErrorCodes
@@ -21,6 +23,9 @@ import com.example.autop.llm.LlmStreamEvent
 import com.example.autop.llm.Msg
 import com.example.autop.llm.SystemPart
 import com.example.autop.llm.ToolSchema
+import kotlinx.coroutines.delay
+
+private const val TAG = "TurnSampler"
 
 /** 一次采样的走向。 */
 internal sealed interface Sampled {
@@ -40,6 +45,7 @@ internal class TurnSampler(
     private val req: RunRequest,
     private val controller: RunController,
     private val prompts: PromptRepository,
+    private val logger: Logger,
 ) {
     private var turn = 0
     private lateinit var fallback: FallbackMode
@@ -57,10 +63,9 @@ internal class TurnSampler(
         requestBuilder =
             RequestBuilder(
                 prompts = prompts,
-                fallback = !profile.capabilities.tools,
+                profile = profile,
                 thinking = req.config[AgentConfig.THINKING],
-                thinkingCapable = profile.capabilities.thinking,
-                maxOutputTokens = profile.maxOutputTokens,
+                texts = sanitizeTextsOf(prompts),
             )
     }
 
@@ -83,11 +88,34 @@ internal class TurnSampler(
         compact: suspend () -> CompactResult,
     ): Sampled {
         turn++
-        val first = stream(provider, requestBuilder.build(system(), render(), schemas, finalRound))
+        val build: suspend () -> LlmRequest = { requestBuilder.build(system(), render(), schemas, finalRound) }
+        val first = streamWithRetry(provider, build)
         if (first !is Sampled.Failed || first.error.code != LlmErrorCodes.CONTEXT_EXCEEDED) return first
         return when (val compacted = compact()) {
             is CompactResult.End -> Sampled.Failed(compacted.error)
-            CompactResult.Continue -> stream(provider, requestBuilder.build(system(), render(), schemas, finalRound))
+            CompactResult.Continue -> streamWithRetry(provider, build)
+        }
+    }
+
+    /** 流式中途可重试错误的回合级重试（WP6.6）：指数退避，超限返回最后一次失败。 */
+    private suspend fun streamWithRetry(
+        provider: LlmProvider,
+        build: suspend () -> LlmRequest,
+    ): Sampled {
+        val cfg = req.config[AgentConfig.SAMPLING]
+        var attempt = 0
+        while (true) {
+            val result = stream(provider, build())
+            val failed = result as? Sampled.Failed ?: return result
+            val retry =
+                failed.error.retryable &&
+                    failed.error.code != LlmErrorCodes.CONTEXT_EXCEEDED &&
+                    attempt < cfg.maxStreamRetries
+            if (!retry) return result
+            attempt += 1
+            controller.emit(AgentEvent.SampleRetrying(attempt, failed.error.code))
+            logger.w(TAG, "sample_retry", "runId" to req.runId, "attempt" to attempt, "code" to failed.error.code)
+            delay(minOf(cfg.retryBaseDelayMs * (1L shl (attempt - 1)), cfg.retryMaxDelayMs))
         }
     }
 

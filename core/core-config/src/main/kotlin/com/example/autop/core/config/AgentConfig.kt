@@ -246,6 +246,22 @@ public data class AgentTurnSection(
         }
 }
 
+/** `agent.sampling`：流式中途可重试错误的回合级重试（WP6.6）。 */
+@Serializable
+public data class AgentSamplingSection(
+    @SerialName("maxStreamRetries") val maxStreamRetries: Int = 2,
+    @SerialName("retryBaseDelayMs") val retryBaseDelayMs: Long = 1000,
+    @SerialName("retryMaxDelayMs") val retryMaxDelayMs: Long = 8000,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (maxStreamRetries < 0) add("maxStreamRetries must be >= 0, was $maxStreamRetries")
+            if (retryBaseDelayMs < 0 || retryMaxDelayMs < retryBaseDelayMs) {
+                add("retry delays invalid: base=$retryBaseDelayMs max=$retryMaxDelayMs")
+            }
+        }
+}
+
 /** `agent.plan`：计划行为。 */
 @Serializable
 public data class AgentPlanSection(
@@ -328,6 +344,8 @@ public object AgentConfig {
         ConfigKey("agent.breaker", AgentBreakerSection.serializer()) { AgentBreakerSection() }
     public val TURN: ConfigKey<AgentTurnSection> =
         ConfigKey("agent.turn", AgentTurnSection.serializer()) { AgentTurnSection() }
+    public val SAMPLING: ConfigKey<AgentSamplingSection> =
+        ConfigKey("agent.sampling", AgentSamplingSection.serializer()) { AgentSamplingSection() }
     public val PLAN: ConfigKey<AgentPlanSection> =
         ConfigKey("agent.plan", AgentPlanSection.serializer()) { AgentPlanSection() }
     public val THINKING: ConfigKey<AgentThinkingSection> =
@@ -355,6 +373,7 @@ public object AgentConfig {
             BUDGET,
             BREAKER,
             TURN,
+            SAMPLING,
             PLAN,
             THINKING,
             FALLBACK,

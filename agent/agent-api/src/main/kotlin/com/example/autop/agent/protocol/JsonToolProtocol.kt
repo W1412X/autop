@@ -106,8 +106,9 @@ public object JsonToolProtocol {
                 Role.TOOL ->
                     Msg(
                         Role.USER,
-                        msg.blocks.map { block ->
-                            val result = block as? Block.ToolResult ?: return@map block
+                        // 每个 ToolResult 一组：结果文字 + 原图片（图片不因降级丢失，WP6.7）。
+                        msg.blocks.flatMap { block ->
+                            val result = block as? Block.ToolResult ?: return@flatMap listOf(block)
                             val name = namesByCallId[result.callId] ?: result.callId
                             val body = result.content.filterIsInstance<Block.Text>().joinToString("\n") { it.text }
                             val text =
@@ -116,7 +117,7 @@ public object JsonToolProtocol {
                                     .getOrNull()
                                     ?.text
                                     .orEmpty()
-                            Block.Text(text)
+                            listOf(Block.Text(text)) + result.content.filterIsInstance<Block.Image>()
                         },
                     )
                 Role.USER -> msg

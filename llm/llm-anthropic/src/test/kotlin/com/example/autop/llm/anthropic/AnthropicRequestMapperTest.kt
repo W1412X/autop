@@ -90,7 +90,7 @@ class AnthropicRequestMapperTest {
         }
 
     @Test
-    fun `thinking and tool_use blocks map with signature and empty input fallback`() =
+    fun `thinking and tool_use blocks map with signature`() =
         runTest {
             val request =
                 requestOf(
@@ -99,7 +99,7 @@ class AnthropicRequestMapperTest {
                         listOf(
                             Block.Thinking("plan", signature = "sig"),
                             Block.Thinking("", redacted = "red"),
-                            Block.ToolCall("c1", "echo", "not json"),
+                            Block.ToolCall("c1", "echo", "{}"),
                         ),
                     ),
                 )

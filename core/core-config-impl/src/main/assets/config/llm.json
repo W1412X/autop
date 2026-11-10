@@ -13,7 +13,8 @@
       "retryStatus": [408, 409, 429, 500, 502, 503, 504, 529]
     },
     "errors": {
-      "contextExceededPatterns": "context_length_exceeded|maximum context length|prompt is too long|too many tokens"
+      "contextExceededPatterns": "context_length_exceeded|maximum context length|prompt is too long|too many tokens|exceeds the context window|input is too long|context window|reduce the length",
+      "contextExceededStatus": [400, 413, 422]
     },
     "anthropic": {
       "apiVersion": "2023-06-01"

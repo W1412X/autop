@@ -44,6 +44,7 @@ public class ScreenshotTool
         private val prompts: PromptRepository,
         private val logger: Logger,
     ) : Tool {
+        override val requiresModelVision: Boolean = true
         override val id: String = "tool.screenshot"
 
         override val spec = DeviceToolSpecs.screenshot

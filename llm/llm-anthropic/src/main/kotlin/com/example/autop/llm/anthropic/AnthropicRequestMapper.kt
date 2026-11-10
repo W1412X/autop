@@ -18,10 +18,9 @@ import com.example.autop.llm.ToolChoice
 import com.example.autop.llm.ToolSchema
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import java.util.Base64
 
@@ -164,7 +163,8 @@ public class AnthropicRequestMapper(
                     buildJsonObject {
                         put("type", "thinking")
                         put("thinking", block.text)
-                        put("signature", block.signature?.let { JsonPrimitive(it) } ?: JsonNull)
+                        // 净化只保留带签名的思考块（WP6.7）。
+                        put("signature", requireNotNull(block.signature) { "sanitizer keeps only signed thinking" })
                     }
                 }
             is Block.ToolResult -> toolResultBlock(block, quirks)
@@ -216,9 +216,7 @@ public class AnthropicRequestMapper(
                 ),
         )
 
-    private fun parseArgs(argsJson: String): JsonObject =
-        runCatching { Json.parseToJsonElement(argsJson).let { it as? JsonObject ?: JsonObject(emptyMap()) } }
-            .getOrElse { JsonObject(emptyMap()) }
+    private fun parseArgs(argsJson: String): JsonObject = Json.parseToJsonElement(argsJson).jsonObject
 
     private fun leadingUser(): JsonObject {
         val rendered = prompts.render(LEADING_USER_ID)

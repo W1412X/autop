@@ -57,7 +57,7 @@ public interface Tool {
     public val requiredCapabilities: Set<Capability>
         get() = emptySet()
 
-    /** R1/A5：为真时只在当前主模型支持图片输入时暴露（如带坐标点击的工具），避免模型没看图就盲点坐标。 */
+    /** 为真时只在主模型支持图片输入时暴露（返回图片给主模型的工具）。 */
     public val requiresModelVision: Boolean
         get() = false
 

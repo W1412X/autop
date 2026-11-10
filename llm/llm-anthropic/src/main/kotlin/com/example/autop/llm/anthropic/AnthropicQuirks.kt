@@ -11,6 +11,7 @@ public object AnthropicQuirkKeys {
     public const val MODELS_PATH: String = "modelsPath"
     public const val TOOL_CHOICE_NONE: String = "toolChoiceNone"
     public const val CONTEXT_EXCEEDED_PATTERNS: String = "contextExceededPatterns"
+    public const val CONTEXT_EXCEEDED_STATUS: String = "contextExceededStatus"
     public const val IMAGE_MAX_EDGE: String = "imageMaxEdge"
 }
 
@@ -25,6 +26,8 @@ public data class AnthropicQuirksDefaults(
     val contextExceededPatterns: List<String>,
     val imageMaxEdge: Int,
     val apiVersion: String,
+    /** `llm.errors.contextExceededStatus` 默认值（agent-harness-overhaul WP6.2）。 */
+    val contextExceededStatus: List<Int> = DEFAULT_CONTEXT_EXCEEDED_STATUS,
 )
 
 /** quirk 解析后的值（默认值见 docs/tech/03 §6）。 */
@@ -33,6 +36,7 @@ public data class AnthropicQuirks(
     val toolChoiceNone: ToolChoiceNoneMode,
     val contextExceededPatterns: List<String>,
     val imageMaxEdge: Int,
+    val contextExceededStatus: List<Int> = DEFAULT_CONTEXT_EXCEEDED_STATUS,
 ) {
     public companion object {
         public fun of(
@@ -49,6 +53,11 @@ public data class AnthropicQuirks(
                     ),
                 imageMaxEdge =
                     profile.quirks[AnthropicQuirkKeys.IMAGE_MAX_EDGE]?.toIntOrNull() ?: defaults.imageMaxEdge,
+                contextExceededStatus =
+                    statusList(
+                        profile.quirks[AnthropicQuirkKeys.CONTEXT_EXCEEDED_STATUS],
+                        defaults.contextExceededStatus,
+                    ),
             )
 
         private fun mode(raw: String?): ToolChoiceNoneMode =
@@ -64,8 +73,21 @@ public data class AnthropicQuirks(
                 ?.filter { it.isNotEmpty() }
                 ?.takeIf { it.isNotEmpty() }
                 ?: fallback
+
+        private fun statusList(
+            quirk: String?,
+            fallback: List<Int>,
+        ): List<Int> =
+            quirk
+                ?.split(',', '|')
+                ?.mapNotNull { it.trim().toIntOrNull() }
+                ?.takeIf { it.isNotEmpty() }
+                ?: fallback
     }
 }
 
 private const val DEFAULT_MESSAGES_PATH = "/v1/messages"
 private const val OMIT_TOOLS_VALUE = "omit_tools"
+
+/** `llm.errors.contextExceededStatus` 的默认值（agent-harness-overhaul WP6.2）。 */
+public val DEFAULT_CONTEXT_EXCEEDED_STATUS: List<Int> = listOf(400, 413, 422)

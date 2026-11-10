@@ -117,6 +117,11 @@
       "maxTruncatedRetries": 2,
       "maxEmptyRetries": 1
     },
+    "sampling": {
+      "maxStreamRetries": 2,
+      "retryBaseDelayMs": 1000,
+      "retryMaxDelayMs": 8000
+    },
     "plan": {
       "blockFinishOnce": true
     },

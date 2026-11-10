@@ -75,7 +75,7 @@ internal class HistoryRenderer(
                     items +=
                         RenderItem(
                             seq = seq,
-                            msg = Msg(Role.ASSISTANT, payload.blocks),
+                            msg = Msg(Role.ASSISTANT, payload.blocks, producedBy = payload.modelProfileId),
                             observation = null,
                             toolId = null,
                         )

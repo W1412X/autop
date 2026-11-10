@@ -1,6 +1,7 @@
 package com.example.autop.llm.http
 
 import com.example.autop.core.common.AppError
+import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.llm.Block
 import com.example.autop.llm.LlmErrorCodes
@@ -24,7 +25,7 @@ internal class DefaultModelProbeTest {
     @Test
     fun allProbesReturnOkForHealthyProvider() {
         runTest {
-            val provider = FakeLlmProvider(profile())
+            val provider = FakeLlmProvider(profile()) { echoToolCompletedEvent() }
             val report = probe(factory("openai", provider)).probe(profile())
             assertThat(report.text.ok).isTrue()
             assertThat(report.tools.ok).isTrue()
@@ -71,24 +72,38 @@ internal class DefaultModelProbeTest {
     }
 
     @Test
-    fun visionProbeCarriesLocalPngImage() {
+    fun toolsProbeWithoutEchoToolCallIsNotSupported() {
         runTest {
             val provider = FakeLlmProvider(profile())
+            val report = probe(factory("openai", provider)).probe(profile())
+
+            assertThat(report.tools.ok).isFalse()
+            assertThat(report.text.ok).isTrue()
+        }
+    }
+
+    @Test
+    fun visionProbeCarriesLocalPngImage() {
+        runTest {
+            var image: Block.Image? = null
+            var bytes: ByteArray? = null
+            val provider =
+                FakeLlmProvider(profile()) { request ->
+                    request.messages.single().blocks.filterIsInstance<Block.Image>().singleOrNull()?.let { block ->
+                        image = block
+                        bytes = File(block.fileRef).readBytes()
+                    }
+                    completedEvent()
+                }
             val imageDir = folder.newFolder()
             probe(factory("openai", provider), imageDir = imageDir).probe(profile())
-            val image =
-                provider.requests
-                    .last()
-                    .messages
-                    .single()
-                    .blocks
-                    .filterIsInstance<Block.Image>()
-                    .single()
-            val bytes = File(image.fileRef).readBytes()
-            assertThat(bytes.copyOf(PNG_SIGNATURE.size).toList()).isEqualTo(pngSignature().toList())
-            assertThat(image.mime).isEqualTo(PROBE_IMAGE_MIME)
-            assertThat(image.width).isEqualTo(PROBE_IMAGE_EDGE)
-            assertThat(image.height).isEqualTo(PROBE_IMAGE_EDGE)
+            val captured = requireNotNull(image)
+            val png = requireNotNull(bytes)
+            assertThat(png.copyOf(PNG_SIGNATURE.size).toList()).isEqualTo(pngSignature().toList())
+            assertThat(captured.mime).isEqualTo(PROBE_IMAGE_MIME)
+            assertThat(captured.width).isEqualTo(PROBE_IMAGE_EDGE)
+            assertThat(captured.height).isEqualTo(PROBE_IMAGE_EDGE)
+            assertThat(imageDir.listFiles()).isEmpty()
         }
     }
 
@@ -96,7 +111,7 @@ internal class DefaultModelProbeTest {
         factory: FakeLlmProviderFactory,
         config: FakeConfigProvider = FakeConfigProvider(),
         imageDir: File = folder.root,
-    ): DefaultModelProbe = DefaultModelProbe(setOf(factory), config, imageDir)
+    ): DefaultModelProbe = DefaultModelProbe(setOf(factory), config, imageDir, FakeClock())
 
     private fun factory(
         protocolId: String,

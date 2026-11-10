@@ -28,13 +28,23 @@ public data class LlmRetrySection(
     }
 }
 
-/** `llm.errors`：错误识别（正则模式，`|` 分隔）。 */
+/** `llm.errors`：错误识别（正则模式，`|` 分隔；WP6.2）。 */
 @Serializable
 public data class LlmErrorsSection(
     @SerialName("contextExceededPatterns")
     val contextExceededPatterns: String =
-        "context_length_exceeded|maximum context length|prompt is too long|too many tokens",
+        "context_length_exceeded|maximum context length|prompt is too long|too many tokens|" +
+            "exceeds the context window|input is too long|context window|reduce the length",
+    /** 上下文超长识别适用的 HTTP 状态码。 */
+    @SerialName("contextExceededStatus") val contextExceededStatus: List<Int> = DEFAULT_CONTEXT_EXCEEDED_STATUS,
 ) : ConfigSection
+
+private const val STATUS_BAD_REQUEST: Int = 400
+private const val STATUS_PAYLOAD_TOO_LARGE: Int = 413
+private const val STATUS_UNPROCESSABLE: Int = 422
+
+private val DEFAULT_CONTEXT_EXCEEDED_STATUS: List<Int> =
+    listOf(STATUS_BAD_REQUEST, STATUS_PAYLOAD_TOO_LARGE, STATUS_UNPROCESSABLE)
 
 /** `llm.anthropic`：Anthropic 协议参数。 */
 @Serializable

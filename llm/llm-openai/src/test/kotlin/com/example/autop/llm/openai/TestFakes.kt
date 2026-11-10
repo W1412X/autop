@@ -1,5 +1,6 @@
 package com.example.autop.llm.openai
 
+import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.core.prompt.PromptSource
@@ -47,4 +48,37 @@ internal class FakePrompts : PromptRepository {
     ): Outcome<RenderedPrompt> = renderPrompt(template, vars)
 
     override fun all(): List<PromptTemplate> = listOf(template)
+}
+
+/** 记录 warn 事件的假 Logger（断言工具调用片段丢弃日志用，WP6.9）。 */
+internal class RecordingLogger : Logger {
+    val warns: MutableList<String> = mutableListOf()
+
+    override fun d(
+        tag: String,
+        event: String,
+        vararg kv: Pair<String, Any?>,
+    ) = Unit
+
+    override fun i(
+        tag: String,
+        event: String,
+        vararg kv: Pair<String, Any?>,
+    ) = Unit
+
+    override fun w(
+        tag: String,
+        event: String,
+        vararg kv: Pair<String, Any?>,
+        error: Throwable?,
+    ) {
+        warns += event
+    }
+
+    override fun e(
+        tag: String,
+        event: String,
+        vararg kv: Pair<String, Any?>,
+        error: Throwable?,
+    ) = Unit
 }

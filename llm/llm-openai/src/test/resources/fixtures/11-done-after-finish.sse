@@ -1,0 +1,7 @@
+data: {"choices":[{"delta":{"content":"Hello"}}]}
+
+data: {"choices":[{"delta":{},"finish_reason":"stop"}]}
+
+data: [DONE]
+
+data: {"choices":[{"delta":{"content":"ignored"}}]}

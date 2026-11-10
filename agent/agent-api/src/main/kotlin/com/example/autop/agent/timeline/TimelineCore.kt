@@ -422,6 +422,7 @@ private fun appendLive(
         is AgentEvent.ToolCallStreaming -> appendLiveStep(entries, event)
         is AgentEvent.ToolProgress -> applyToolProgress(entries, event)
         is AgentEvent.StateChanged,
+        is AgentEvent.SampleRetrying,
         is AgentEvent.Persisted,
         -> Unit
     }

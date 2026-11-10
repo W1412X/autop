@@ -40,7 +40,15 @@ public class OpenAiModelDirectory(
                 if (response.isSuccessful) {
                     parseModelIds(body)
                 } else {
-                    Outcome.Err(mapHttpError(response.code, body, quirks.contextExceededPatterns))
+                    Outcome.Err(
+                        mapHttpError(
+                            status = response.code,
+                            bodySnippet = body,
+                            contextPatterns = quirks.contextExceededPatterns,
+                            contextStatus = quirks.contextExceededStatus.toSet(),
+                            retryStatus = context.retryConfig.retryStatus,
+                        ),
+                    )
                 }
             }
         } catch (e: IOException) {
