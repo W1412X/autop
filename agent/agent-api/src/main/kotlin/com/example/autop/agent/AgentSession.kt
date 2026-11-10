@@ -40,6 +40,15 @@ public enum class RunState {
     PAUSED,
     WAITING_USER,
     FINISHED,
+    ;
+
+    public companion object {
+        /**
+         * 执行态集合（触摸盾屏蔽集合同源）：暂停门关闭期间 `RunController.setState` 吞掉
+         * 向这些状态的迁移——在途采样/批次不得把 PAUSED 翻回执行态。
+         */
+        public val EXECUTION_STATES: Set<RunState> = setOf(STARTING, SAMPLING, EXECUTING_TOOLS, COMPACTING)
+    }
 }
 
 /** 给 UI 的实时事件；持久化事件也会以 [AgentEvent.Persisted] 形式转发。 */

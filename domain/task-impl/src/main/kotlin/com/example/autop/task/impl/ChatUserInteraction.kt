@@ -52,8 +52,10 @@ public class ChatUserInteraction(
             } finally {
                 pending.remove(runId)
             }
+        // 只清等待字段；状态回 RUNNING 仅限仍是 WAITING_USER——期间被暂停/取消的不得翻回。
         runStore.mutate(runId) {
-            it.copy(status = RunStatus.RUNNING, waitingQuestion = null, waitingOptions = emptyList())
+            val resumed = if (it.status == RunStatus.WAITING_USER) RunStatus.RUNNING else it.status
+            it.copy(status = resumed, waitingQuestion = null, waitingOptions = emptyList())
         }
         return if (answer != null) {
             Outcome.Ok(answer)

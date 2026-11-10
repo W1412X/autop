@@ -42,9 +42,6 @@ public class TouchShieldWatcher
         }
     }
 
-/** 是否应在该 Run 状态下屏蔽用户屏幕触摸（docs/tech/07 §4.3）。 */
-internal fun shouldShield(state: RunState): Boolean = state in SHIELD_STATES
-
-/** 屏蔽生效的 Run 状态（执行态；暂停/等待回答/结束时放开，用户可操作手机）。 */
-private val SHIELD_STATES: Set<RunState> =
-    setOf(RunState.STARTING, RunState.SAMPLING, RunState.EXECUTING_TOOLS, RunState.COMPACTING)
+/** 是否应在该 Run 状态下屏蔽用户屏幕触摸（docs/tech/07 §4.3）：执行态集合同源
+ * [com.example.autop.agent.RunState.EXECUTION_STATES]（暂停门吞并迁移用同一集合）。 */
+internal fun shouldShield(state: RunState): Boolean = state in RunState.EXECUTION_STATES

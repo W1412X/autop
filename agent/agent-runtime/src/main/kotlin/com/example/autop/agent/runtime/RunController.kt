@@ -53,6 +53,10 @@ internal class RunController(
     private val result = CompletableDeferred<RunFinished>()
     private var job: Job? = null
 
+    /** 暂停置位：门关闭期间 [setState] 吞掉执行态迁移（在途采样/批次不得把 PAUSED 翻回执行态）。 */
+    @Volatile
+    private var pausedFlag: Boolean = false
+
     /** 经观察包装的存储：工具经 ToolContext 写入的事件同样转为 Persisted。 */
     val toolStore: ThreadStore =
         ObservedThreadStore(store) { event -> _events.emit(AgentEvent.Persisted(event)) }
@@ -63,6 +67,9 @@ internal class RunController(
 
     fun setState(state: RunState) {
         if (_state.value == state) return
+        // 暂停门关闭期间吞掉执行态迁移：否则在途阶段（采样完成进工具批次等）会把
+        // PAUSED 翻回执行态，状态/触摸盾/控制条跟着"复活"，实际循环仍停在 awaitOpen。
+        if (pausedFlag && state in RunState.EXECUTION_STATES) return
         _state.value = state
         _events.tryEmit(AgentEvent.StateChanged(state))
     }
@@ -89,6 +96,7 @@ internal class RunController(
         reason: PauseReason,
         detail: String?,
     ) {
+        pausedFlag = true
         gate.value = false
         setState(RunState.PAUSED)
         scope.launch { append(RunPaused(reason = reason, detail = detail)) }
@@ -102,18 +110,25 @@ internal class RunController(
      * note 必须**同步**入队（若放在 scope.launch 里会与 drain 竞态迟到/丢失）。
      */
     override fun resume(note: String?) {
+        // 同步清暂停置位（与 pause 交错时"最后一下点击赢"）：其后的暂停会重新置位，
+        // 本次收尾随之作废；note 仍同步入队（上注）。
+        pausedFlag = false
         if (!note.isNullOrBlank()) {
             steers.send(note, UserMessageKind.STEER)
         }
         scope.launch {
+            // 恢复未落地就又被暂停：整段收尾作废（不落 RunResumed、不开门）。
+            if (pausedFlag) return@launch
             append(RunResumed(userNote = note))
             // 恢复提示：要求模型先观察屏幕再行动（docs/tech/04 §3.2 要点）
             val reobserve = prompts.render(ID_REOBSERVE, emptyMap()).getOrNull()?.text
             if (reobserve != null) {
                 steers.send(reobserve, UserMessageKind.INJECTED)
             }
+            // gate 最后开且复核暂停置位：保证 RunResumed/恢复提示先于循环继续落盘，
+            // 且收尾期间落下的暂停不被开门覆盖。
             setState(RunState.STARTING)
-            gate.value = true
+            if (!pausedFlag) gate.value = true
         }
     }
 
