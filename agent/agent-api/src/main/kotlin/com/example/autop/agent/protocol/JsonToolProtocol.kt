@@ -19,6 +19,7 @@ import com.example.autop.llm.ToolSchema
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -69,6 +70,36 @@ public object JsonToolProtocol {
         }
     }
 
+    /**
+     * 原生工具模式下的正文兜底：部分服务/代理会把工具调用漏进正文。只在**整段正文**
+     * （去掉 ``` 包裹后）恰好是一个含非空 `tool_calls` 数组的 JSON 对象、且所有工具名都在
+     * [toolNames] 中时返回调用；正文里举例提到 JSON 的普通回答不会被当成调用。
+     */
+    public fun parseStrictCalls(
+        text: String,
+        turn: Int,
+        toolNames: Set<String>,
+    ): List<Block.ToolCall>? {
+        val body = stripFence(text.trim())
+        val whole = body.startsWith('{') && scanObject(body, 0) == body
+        val array =
+            if (whole) {
+                runCatching { json.parseToJsonElement(body).jsonObject["tool_calls"] as? JsonArray }.getOrNull()
+            } else {
+                null
+            }
+        val calls = array?.takeIf { it.isNotEmpty() }?.let { runCatching { toCalls(it, turn) }.getOrNull() }
+        return calls?.takeIf { list -> list.all { it.name in toolNames } }
+    }
+
+    /** 去掉整段 ``` / ```json 包裹；没有包裹原样返回。 */
+    private fun stripFence(text: String): String {
+        if (!text.startsWith(FENCE) || !text.endsWith(FENCE) || text.length < FENCE.length * 2) return text
+        return text.removeSuffix(FENCE).substringAfter('\n', "").trim()
+    }
+
+    private const val FENCE = "```"
+
     /** `tool_calls` 数组转工具调用（id = `fb_<turn>_<i>`）。 */
     private fun toCalls(
         calls: JsonArray,
@@ -83,7 +114,11 @@ public object JsonToolProtocol {
             )
         }
 
-    /** 历史降级：ToolResult → USER 文本（模板 `agent.fallback.tool_result`），ToolCall → 其 JSON 文本。 */
+    /**
+     * 历史降级：ToolResult → USER 文本（模板 `agent.fallback.tool_result`）；一条助手消息里的
+     * 全部 ToolCall 合成一段协议 JSON `{"tool_calls":[…]}`（与 `agent.fallback.json_protocol`
+     * 要求模型输出的格式一致，模型看到的自己的历史就是它该写的样子）。
+     */
     public fun downgrade(
         messages: List<Msg>,
         prompts: PromptRepository,
@@ -96,13 +131,11 @@ public object JsonToolProtocol {
         }
         return messages.map { msg ->
             when (msg.role) {
-                Role.ASSISTANT ->
-                    Msg(
-                        Role.ASSISTANT,
-                        msg.blocks.map { block ->
-                            if (block is Block.ToolCall) Block.Text(callJsonText(block)) else block
-                        },
-                    )
+                Role.ASSISTANT -> {
+                    val calls = msg.blocks.filterIsInstance<Block.ToolCall>()
+                    val others = msg.blocks.filter { it !is Block.ToolCall }
+                    if (calls.isEmpty()) msg else Msg(Role.ASSISTANT, others + Block.Text(callsJsonText(calls)))
+                }
                 Role.TOOL ->
                     Msg(
                         Role.USER,
@@ -140,11 +173,22 @@ public object JsonToolProtocol {
             "${tool.name}($params): $firstLine"
         }
 
-    /** 某个 ToolCall 的 JSON 文本（历史降级用）。 */
-    public fun callJsonText(call: Block.ToolCall): String =
+    /** 一组 ToolCall 的协议 JSON 文本 `{"tool_calls":[{"name","arguments"}]}`（历史降级用）。 */
+    public fun callsJsonText(calls: List<Block.ToolCall>): String =
         buildJsonObject {
-            put("name", call.name)
-            put("arguments", json.parseToJsonElement(call.argsJson.ifEmpty { "{}" }))
+            put(
+                "tool_calls",
+                buildJsonArray {
+                    for (call in calls) {
+                        add(
+                            buildJsonObject {
+                                put("name", call.name)
+                                put("arguments", json.parseToJsonElement(call.argsJson.ifEmpty { "{}" }))
+                            },
+                        )
+                    }
+                },
+            )
         }.toString()
 
     /** 提取第一个顶层 JSON 对象（跳过 ``` 包裹与前后文字，括号配对且跳过字符串字面量）。 */

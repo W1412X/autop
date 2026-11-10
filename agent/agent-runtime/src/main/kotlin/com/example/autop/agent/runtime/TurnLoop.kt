@@ -208,17 +208,10 @@ internal class TurnLoop(
                 val completed = sampled.completed
                 parts.engines.budget.recordUsage(completed.usage, estimated)
                 guards.noteReportedInput(completed.usage)
-                controller.append(
-                    AssistantMessage(
-                        blocks = completed.message.blocks,
-                        usage = completed.usage,
-                        stopReason = completed.stopReason,
-                        modelProfileId = provider.profile.id,
-                    ),
-                )
-                guards.noteAdded(completed.message.blocks)
-                when (val verdict = turnGuard.judge(completed, nativeTools)) {
-                    TurnVerdict.Proceed -> afterSample(completed)
+                val verdict = turnGuard.judge(completed, nativeTools)
+                val resolved = recordReply(completed, verdict, provider)
+                when (verdict) {
+                    TurnVerdict.Proceed -> afterSample(completed, requireNotNull(resolved))
                     is TurnVerdict.Retry -> {
                         verdict.apply()
                         LoopStep.NextRound
@@ -227,6 +220,39 @@ internal class TurnLoop(
                 }
             }
         }
+    }
+
+    /**
+     * 解析本轮调用并写 AssistantMessage：只有正常轮次才解析（截断/空回复/拒答不消耗回退协议的
+     * 解析重试次数）；正文解析出的调用落成 ToolCall 块（工具结果才能配对）。返回解析结果。
+     */
+    private suspend fun recordReply(
+        completed: LlmStreamEvent.Completed,
+        verdict: TurnVerdict,
+        provider: LlmProvider,
+    ): ResolvedCalls? {
+        val resolved =
+            if (verdict == TurnVerdict.Proceed) {
+                sampler.resolveCalls(completed.message, allSchemas.mapTo(mutableSetOf()) { it.name })
+            } else {
+                null
+            }
+        if (nativeTools && resolved is ResolvedCalls.ToolCalls && resolved.fromText) {
+            // 能力开关是“支持原生工具”，模型却把调用写进了正文：开关可能与模型实际行为不一致。
+            parts.engines.ports.logger
+                .w(TAG, "tool_calls_in_content", "runId" to req.runId, "profile" to provider.profile.id)
+        }
+        val message = resolved?.let { sampler.persistable(completed.message, it) } ?: completed.message
+        controller.append(
+            AssistantMessage(
+                blocks = message.blocks,
+                usage = completed.usage,
+                stopReason = completed.stopReason,
+                modelProfileId = provider.profile.id,
+            ),
+        )
+        guards.noteAdded(message.blocks)
+        return resolved
     }
 
     /** 压缩一次；成功后重新组装 system（记忆索引、流程目录等可能已变化，WP4.1）。 */
@@ -284,8 +310,11 @@ internal class TurnLoop(
     }
 
     /** 采样后的走向：工具执行 → 控制 → 熔断 → steer → 自然结束判定。 */
-    private suspend fun afterSample(completed: LlmStreamEvent.Completed): LoopStep =
-        when (val resolved = sampler.resolveCalls(completed.message)) {
+    private suspend fun afterSample(
+        completed: LlmStreamEvent.Completed,
+        resolved: ResolvedCalls,
+    ): LoopStep =
+        when (resolved) {
             is ResolvedCalls.Retry -> {
                 journal.injectBlocks(listOf(Block.Text(resolved.injectText)), UserMessageKind.INJECTED)
                 LoopStep.NextRound
@@ -301,7 +330,7 @@ internal class TurnLoop(
         val calls = (resolved as? ResolvedCalls.ToolCalls)?.calls.orEmpty()
         val finalText = (resolved as? ResolvedCalls.Done)?.text
         if (calls.isNotEmpty()) {
-            // 调用发出即播报（回退协议解析出的调用不落 ToolCall 块，UI 靠这条实时出行）。
+            // 调用发出即播报（回退协议的调用在采样结束后才解析出来，流式阶段没有 ToolCallStarted）。
             calls.forEachIndexed { index, call ->
                 controller.emit(AgentEvent.ToolCallStreaming(index, call.name, callId = call.id))
             }

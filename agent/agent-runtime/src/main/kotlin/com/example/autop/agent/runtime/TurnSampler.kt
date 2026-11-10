@@ -73,7 +73,16 @@ internal class TurnSampler(
     fun staticToolList(schemas: List<ToolSchema>): String? = fallback.staticToolList(schemas)
 
     /** 解析本轮工具调用（原生 ToolCall 或 JSON 回退）。 */
-    fun resolveCalls(message: Msg): ResolvedCalls = fallback.resolveCalls(message, turn)
+    fun resolveCalls(
+        message: Msg,
+        toolNames: Set<String>,
+    ): ResolvedCalls = fallback.resolveCalls(message, turn, toolNames)
+
+    /** 写入历史的助手消息（正文解析出的调用落成 ToolCall 块）。 */
+    fun persistable(
+        message: Msg,
+        resolved: ResolvedCalls,
+    ): Msg = fallback.persistable(message, resolved)
 
     /**
      * 采样一次；`llm.context_exceeded` 时强制压缩后重试本轮（每轮最多 1 次，docs/tech/04 §3.2）。

@@ -16,9 +16,13 @@ import com.example.autop.llm.ToolSchema
 
 /** 一轮回复的解析走向。 */
 public sealed interface ResolvedCalls {
-    /** 有工具调用（原生 ToolCall 块或解析出的 `fb_<turn>_<i>` 调用）。 */
+    /**
+     * 有工具调用（原生 ToolCall 块或解析出的 `fb_<turn>_<i>` 调用）。
+     * [fromText] 为真表示调用是从正文 JSON 解析出来的（消息里没有 ToolCall 块）。
+     */
     public data class ToolCalls(
         val calls: List<Block.ToolCall>,
+        val fromText: Boolean = false,
     ) : ResolvedCalls
 
     /** 无工具调用的自然收尾；[text] 为回退协议的 `final` 文本（原生模式为 null，用模型原文）。 */
@@ -49,21 +53,45 @@ public class FallbackMode(
             ?.text
     }
 
-    /** 解析本轮回复的工具调用（docs/tech/04 §3.8）。 */
+    /**
+     * 解析本轮回复的工具调用（docs/tech/04 §3.8）：两种模式都**先读外层 ToolCall 块，没有再读正文**，
+     * 能力开关测得不准时调用也不会被漏掉。
+     * - 原生模式：正文只在整段恰好是协议 JSON 且工具名都在 [toolNames] 中时当作调用
+     *   （[JsonToolProtocol.parseStrictCalls]），否则是最终回答；
+     * - 回退模式：按协议宽松解析正文（容忍前后说明文字），失败注入重试提示。
+     */
     public fun resolveCalls(
         msg: Msg,
         turn: Int,
+        toolNames: Set<String>,
     ): ResolvedCalls {
+        val outer = msg.blocks.filterIsInstance<Block.ToolCall>()
+        if (outer.isNotEmpty()) return ResolvedCalls.ToolCalls(outer)
         if (nativeTools) {
-            val calls = msg.blocks.filterIsInstance<Block.ToolCall>()
-            return if (calls.isEmpty()) ResolvedCalls.Done(null) else ResolvedCalls.ToolCalls(calls)
+            val inText = JsonToolProtocol.parseStrictCalls(allTextOf(msg), turn, toolNames)
+            return if (inText == null) ResolvedCalls.Done(null) else ResolvedCalls.ToolCalls(inText, fromText = true)
         }
         return when (val parsed = JsonToolProtocol.parse(lastTextOf(msg), turn)) {
-            is JsonParsed.Calls -> ResolvedCalls.ToolCalls(parsed.calls)
+            is JsonParsed.Calls -> ResolvedCalls.ToolCalls(parsed.calls, fromText = true)
             is JsonParsed.Final -> ResolvedCalls.Done(parsed.text)
             is JsonParsed.Invalid -> retryOrFail(parsed.error)
         }
     }
+
+    /**
+     * 写入历史的助手消息：调用从正文解析出来时，正文（协议 JSON）替换为 [Block.ToolCall] 块。
+     * 工具结果要靠 ToolCall 块配对（缺块会被当成无主结果丢弃）；回退模式发送前
+     * [JsonToolProtocol.downgrade] 再按协议格式还原成 JSON 正文。思考等非文本块原样保留。
+     */
+    public fun persistable(
+        msg: Msg,
+        resolved: ResolvedCalls,
+    ): Msg {
+        if (resolved !is ResolvedCalls.ToolCalls || !resolved.fromText) return msg
+        return msg.copy(blocks = msg.blocks.filter { it !is Block.Text } + resolved.calls)
+    }
+
+    private fun allTextOf(msg: Msg): String = msg.blocks.filterIsInstance<Block.Text>().joinToString("") { it.text }
 
     /** 解析失败：限内注入 parse_error 重试；超限后当纯文本收尾。 */
     private fun retryOrFail(error: String): ResolvedCalls {

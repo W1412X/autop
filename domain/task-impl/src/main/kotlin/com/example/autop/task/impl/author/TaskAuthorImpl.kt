@@ -291,7 +291,7 @@ internal class TaskAuthorSessionImpl(
         completed: LlmStreamEvent.Completed,
         turn: Int,
     ): Boolean =
-        when (val resolved = runtime.resolver.resolveCalls(completed.message, turn)) {
+        when (val resolved = runtime.resolver.resolveCalls(completed.message, turn, runtime.toolNames)) {
             is ResolvedCalls.Retry -> {
                 // 解析失败：保留模型原文供下轮纠正并注入重试提示，协议 JSON 不作为正文上屏。
                 conversation += completed.message
@@ -300,9 +300,10 @@ internal class TaskAuthorSessionImpl(
                 false
             }
             is ResolvedCalls.ToolCalls -> {
-                conversation += completed.message
-                // 回退模式下正文就是协议 JSON，不能当助手消息展示。
-                publish(completed.message, showRawText = runtime.nativeTools)
+                // 正文解析出的调用落成 ToolCall 块（工具结果才有配对的调用）。
+                conversation += runtime.resolver.persistable(completed.message, resolved)
+                // 调用来自正文时正文就是协议 JSON，不能当助手消息展示。
+                publish(completed.message, showRawText = !resolved.fromText)
                 val results =
                     resolved.calls.map { call ->
                         if (call.name !in SELF_REPORTING) activity(call.name)
@@ -619,6 +620,9 @@ private class TaskPipeline(
     val system: List<SystemPart>,
     val schemas: List<ToolSchema>,
 ) {
+    /** 本会话可用工具名（原生模式正文兜底解析时校验）。 */
+    val toolNames: Set<String> get() = schemas.mapTo(mutableSetOf()) { it.name }
+
     fun request(conversation: List<Msg>): LlmRequest = builder.build(system, conversation, schemas, finalRound = false)
 }
 
