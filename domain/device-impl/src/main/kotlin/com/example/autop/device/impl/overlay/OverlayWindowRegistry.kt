@@ -9,9 +9,7 @@ import android.view.View
 import android.view.WindowManager
 import com.example.autop.core.common.Logger
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
-import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlaySpec
-import com.example.autop.device.Rect
 import com.example.autop.device.impl.ServiceHolder
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -36,6 +34,9 @@ public class OverlayWindowRegistry
         /** 截图隐藏期间为 true（此间新附着的窗口保持隐藏）。 */
         private var hidden = false
 
+        /** 输入封锁期间为 true（此间新附着的窗口保持不可触摸，N216 复发收口）。 */
+        private var inputBlocked = false
+
         /** 注册内容工厂；该 id 正在显示时用新工厂重建内容。 */
         public fun register(
             id: String,
@@ -54,7 +55,7 @@ public class OverlayWindowRegistry
             spec: OverlaySpec,
             channel: OverlayChannel?,
         ) {
-            val entry = entries.getOrPut(id) { Entry(spec) }
+            val entry = entries.getOrPut(id) { Entry(spec, blocked = inputBlocked) }
             entry.spec = spec
             detach(entry)
             if (channel != null) attach(id, channel)
@@ -103,10 +104,7 @@ public class OverlayWindowRegistry
         }
 
         /** 显示中、未隐藏且可触摸的窗口规格（触摸探针排除自家窗口用，questions.md N139）。 */
-        public fun touchableSpecs(): List<OverlaySpec> =
-            entries.values
-                .filter { !hidden && !it.blocked && it.spec.touchable && it.window != null }
-                .map { it.spec }
+        public fun touchableSpecs(): List<OverlaySpec> = touchableEntries().map { (_, entry) -> entry.spec }
 
         /** 截图隐藏：全部窗口透明且不可触摸（docs/tech/05 §10）。 */
         public fun setHidden(value: Boolean) {
@@ -122,40 +120,35 @@ public class OverlayWindowRegistry
         }
 
         /**
-         * 输入封锁（N216，P2 收窄）：只封锁与注入区域 [target] 相交的自家窗口（null = 全部）。
-         * 注入落点之外的窗口收不到这次注入，不需要因此变为不可触摸。
+         * 输入封锁（N216）：注入期间全部自家窗口一律不可触摸（保持可见，不闪烁），
+         * 避免它们把注入的点击吞掉（实测进度窗遮挡导致点击不生效）。
+         * 不按注入区域收窄（P2 收窄已回退）：吞注入的机制不止"落点在窗口矩形内"——
+         * z 序遮挡、聚焦输入、矩形失真都会让注入失效，且注入窗口只有毫秒级，
+         * 全部封锁的代价可忽略。封锁期间新附着的窗口继承封锁态（对齐 [setHidden]）。
          * 只有封锁状态真正变化的窗口才会更新布局，避免每次动作对所有窗口做无效重排。
          */
-        public fun setInputBlocked(
-            value: Boolean,
-            target: Rect?,
-        ) {
+        public fun setInputBlocked(value: Boolean) {
+            inputBlocked = value
             entries.values.forEach { entry ->
-                val want = value && intersects(entry.spec, target)
-                if (entry.blocked != want) {
-                    entry.blocked = want
+                if (entry.blocked != value) {
+                    entry.blocked = value
                     entry.window?.let { window ->
                         window.windowManager.updateViewLayout(
                             window.view,
-                            buildOverlayParams(window.channel, entry.spec, hidden, want),
+                            buildOverlayParams(window.channel, entry.spec, hidden, value),
                         )
                     }
                 }
             }
         }
 
-        /** 窗口是否与注入区域相交；无法判断（非左上对齐或 MATCH_PARENT）时保守地视为相交。 */
-        private fun intersects(
-            spec: OverlaySpec,
-            target: Rect?,
-        ): Boolean {
-            if (target == null) return true
-            if (spec.gravity != OverlayGravity.TOP_LEFT || spec.width < 0 || spec.height < 0) return true
-            return spec.x < target.r &&
-                spec.x + spec.width > target.l &&
-                spec.y < target.b &&
-                spec.y + spec.height > target.t
-        }
+        /** 仍可触摸的自家窗口 id（封锁自检留痕用；注入期应为空）。 */
+        public fun touchableWindowIds(): List<String> = touchableEntries().map { (id, _) -> id }
+
+        /** 显示中、未隐藏、未封锁且可触摸的窗口条目。 */
+        private fun touchableEntries(): List<Map.Entry<String, Entry>> =
+            entries.entries
+                .filter { (_, entry) -> !hidden && !entry.blocked && entry.spec.touchable && entry.window != null }
 
         private fun attach(
             id: String,
@@ -207,11 +200,10 @@ public class OverlayWindowRegistry
 /** 显示中的窗口条目：spec 可被 update 替换。 */
 private class Entry(
     var spec: OverlaySpec,
+    /** 输入封锁（注入期间不可触摸，仍可见）；按窗口单独记录，只更新变化的窗口。 */
+    var blocked: Boolean = false,
 ) {
     var window: AttachedWindow? = null
-
-    /** 输入封锁（注入期间不可触摸，仍可见）；按窗口单独记录，只更新变化的窗口。 */
-    var blocked: Boolean = false
 }
 
 /** 已附着到 WindowManager 的窗口。 */

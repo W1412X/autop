@@ -108,7 +108,7 @@ public class GestureControllerImpl
             val attempt = shellTap(x, y, durationMs)
             if (attempt is ShellAttempt.Done) return InjectionResult.shell(ok = true)
             val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
-            return injectionResultOf(attempt, stroke(path, durationMs, OP_TAP, pointRect(x, y)))
+            return injectionResultOf(attempt, stroke(path, durationMs, OP_TAP))
         }
 
         /**
@@ -128,7 +128,7 @@ public class GestureControllerImpl
             val path = buildSwipePath(fromX, fromY, toX, toY, jitterPx)
             return injectionResultOf(
                 attempt,
-                stroke(path, durationMs, OP_SWIPE, spanRect(fromX, fromY, toX, toY)),
+                stroke(path, durationMs, OP_SWIPE),
             )
         }
 
@@ -212,27 +212,13 @@ public class GestureControllerImpl
             return path
         }
 
-        /** 点击的注入区域（一个像素）：只封锁落点所在的自家窗口（P2）。 */
-        private fun pointRect(
-            x: Int,
-            y: Int,
-        ): Rect = Rect(x, y, x + 1, y + 1)
-
-        /** 滑动的注入区域：起止点的包围盒（P2）。 */
-        private fun spanRect(
-            fromX: Int,
-            fromY: Int,
-            toX: Int,
-            toY: Int,
-        ): Rect = Rect(minOf(fromX, toX), minOf(fromY, toY), maxOf(fromX, toX) + 1, maxOf(fromY, toY) + 1)
-
         /** shell 注入点击：通道已连接时放行触摸盾＋标记自身动作窗口后注入 `input` 命令。 */
         private suspend fun shellTap(
             x: Int,
             y: Int,
             durationMs: Long,
         ): ShellAttempt =
-            shellAction(pointRect(x, y)) { shellInput.tap(x, y, durationMs) }.also { attempt ->
+            shellAction { shellInput.tap(x, y, durationMs) }.also { attempt ->
                 if (attempt is ShellAttempt.Done) {
                     logger.i(TAG, EVENT_CHANNEL, "op" to OP_TAP, "channel" to CHANNEL_SHELL, "x" to x, "y" to y)
                 }
@@ -246,9 +232,9 @@ public class GestureControllerImpl
             toY: Int,
             durationMs: Long,
         ): ShellAttempt =
-            shellAction(
-                spanRect(fromX, fromY, toX, toY),
-            ) { shellInput.swipe(fromX, fromY, toX, toY, durationMs) }.also { attempt ->
+            shellAction {
+                shellInput.swipe(fromX, fromY, toX, toY, durationMs)
+            }.also { attempt ->
                 if (attempt is ShellAttempt.Done) {
                     logger.i(
                         TAG,
@@ -267,14 +253,11 @@ public class GestureControllerImpl
          * 注入同走输入管道，盾放行＋自身动作标记。
          */
         @Suppress("TooGenericExceptionCaught") // shell 通道实现可能抛任意运行时异常，统一转 COMMAND_FAILED（WP7.4）
-        private suspend fun shellAction(
-            target: Rect?,
-            block: suspend () -> Boolean,
-        ): ShellAttempt {
+        private suspend fun shellAction(block: suspend () -> Boolean): ShellAttempt {
             if (shellInput.state.value != ShellState.Connected) return ShellAttempt.Skipped(ShellSkip.NOT_CONNECTED)
             val ok =
                 try {
-                    shielded(target) { selfAction { block() } }
+                    shielded { selfAction { block() } }
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -290,26 +273,26 @@ public class GestureControllerImpl
          */
         override suspend fun globalAction(action: GlobalAction): InjectionResult {
             val keyCode = keyCodeOf(action)
-            val attempt = if (keyCode != null) shellAction(null) { shellInput.keyEvent(keyCode) } else null
+            val attempt = if (keyCode != null) shellAction { shellInput.keyEvent(keyCode) } else null
             if (attempt is ShellAttempt.Done) {
                 logger.i(TAG, EVENT_CHANNEL, "op" to OP_GLOBAL_ACTION, "channel" to CHANNEL_SHELL, "keyCode" to keyCode)
                 return InjectionResult.shell(ok = true)
             }
             // 回落无障碍 API
             logger.i(TAG, EVENT_CHANNEL, "op" to OP_GLOBAL_ACTION, "channel" to CHANNEL_A11Y)
-            val ok = shielded(null) { selfAction { holder.current()?.performGlobalAction(globalId(action)) == true } }
+            val ok = shielded { selfAction { holder.current()?.performGlobalAction(globalId(action)) == true } }
             // 无对应 keyevent 的动作（通知面板等）首选就是无障碍，没有 shell 跳过原因。
             return if (attempt == null) InjectionResult.accessibility(ok, null) else injectionResultOf(attempt, ok)
         }
 
         /** shell 注入按键（input_text 的粘贴/回车等）：统一走盾放行＋自身动作标记。 */
         override suspend fun shellKeyEvent(code: Int): Boolean =
-            shellAction(null) { shellInput.keyEvent(code) } is ShellAttempt.Done
+            shellAction { shellInput.keyEvent(code) } is ShellAttempt.Done
 
         /** shell 注入组合键（如 Ctrl+A）。 */
         @Suppress("SpreadOperator") // 组合键只有 2 键，一次性小数组拷贝可忽略；vararg 端口只能展开传入
         override suspend fun shellKeyCombination(codes: List<Int>): Boolean =
-            shellAction(null) { shellInput.keyCombination(*codes.toIntArray()) } is ShellAttempt.Done
+            shellAction { shellInput.keyCombination(*codes.toIntArray()) } is ShellAttempt.Done
 
         /** GlobalAction 映射到 KeyEvent KEYCODE_*。 */
         private fun keyCodeOf(action: GlobalAction): Int? =
@@ -326,14 +309,13 @@ public class GestureControllerImpl
             path: Path,
             durationMs: Long,
             op: String,
-            target: Rect?,
         ): Boolean {
             val service = holder.current() ?: return false
             val stroke = GestureDescription.StrokeDescription(path, 0, durationMs)
             val gesture = GestureDescription.Builder().addStroke(stroke).build()
             // N186/N191：注入手势走输入管道，会被触摸盾截获——动作期间临时放行。
             logger.i(TAG, EVENT_CHANNEL, "op" to op, "channel" to CHANNEL_A11Y)
-            return shielded(target) { selfAction { dispatchGesture(service, gesture) } }
+            return shielded { selfAction { dispatchGesture(service, gesture) } }
         }
 
         /**
@@ -341,11 +323,8 @@ public class GestureControllerImpl
          * performGlobalAction 注入按键）期间临时放行触摸盾（beginAction 等放行落地后才注入，
          * 动作完成才收尾保证覆盖全程）；performNodeAction 不走输入管道无需放行。
          */
-        private suspend fun shielded(
-            target: Rect?,
-            block: suspend () -> Boolean,
-        ): Boolean {
-            touchShield.beginAction(target)
+        private suspend fun shielded(block: suspend () -> Boolean): Boolean {
+            touchShield.beginAction()
             return try {
                 block()
             } finally {

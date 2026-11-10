@@ -27,7 +27,6 @@ import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlaySpec
-import com.example.autop.device.Rect
 import com.example.autop.device.TouchShield
 import com.example.autop.device.impl.overlay.OverlayWindowManager
 import java.util.concurrent.atomic.AtomicInteger
@@ -88,20 +87,25 @@ public class TouchShieldController
          * 封锁期间保持可见，不做隐藏闪烁。
          * 失败/取消时回退深度并恢复拦截，防永久放行。
          */
-        public suspend fun beginAction(target: Rect?) {
+        public suspend fun beginAction() {
             actionDepth.incrementAndGet()
             var released = false
             try {
                 overlay.updateNow(SHIELD_ID, ::shieldSpecOf)
-                val landed = overlay.blockInput(target, relayoutTimeoutMs())
+                val landed = overlay.blockInput(relayoutTimeoutMs())
                 released = true
+                val stillTouchable = overlay.touchableWindowIds()
                 logger.i(
                     TAG,
                     "shield_release",
                     "depth" to actionDepth.get(),
                     "shielding" to shielding(),
                     "landed" to landed,
+                    "stillTouchable" to stillTouchable.joinToString(","),
                 )
+                if (stillTouchable.isNotEmpty()) {
+                    logger.w(TAG, "shield_block_leak", "ids" to stillTouchable.joinToString(","))
+                }
             } finally {
                 if (!released) {
                     actionDepth.decrementAndGet()
