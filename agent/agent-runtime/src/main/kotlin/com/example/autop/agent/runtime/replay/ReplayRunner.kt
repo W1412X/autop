@@ -19,6 +19,7 @@ import com.example.autop.agent.ReplayableAction
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.core.common.getOrNull
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.llm.Block
 import com.example.autop.llm.StopReason
 import kotlinx.coroutines.delay
@@ -35,6 +36,7 @@ internal data class ReplayStepResult(
  *
  * @param plan 回放计划（脚本 + 执行参数）。
  * @param probe 当前屏幕采样端口（device-impl）。
+ * @param config Run 配置快照（采样用，WP2.8）。
  * @param resolver 目标重解析端口（§5.7）；null 时按记录坐标执行。
  * @param toolNameOf 工具 id → 模型可见工具名（写回放合成消息用）。
  * @param emit 写持久化事件（AssistantMessage(origin=REPLAY) 与 ToolResultEvent）。
@@ -43,6 +45,7 @@ internal data class ReplayStepResult(
 internal class ReplayRunner(
     private val plan: ReplayPlan,
     private val probe: ReplayStateProbe,
+    private val config: ConfigSnapshot,
     private val resolver: ReplayTargetResolver?,
     private val toolNameOf: (String) -> String?,
     private val emit: suspend (EventPayload) -> Unit,
@@ -86,7 +89,7 @@ internal class ReplayRunner(
         var waited = 0L
         var best = 0.0
         while (true) {
-            val sample = probe.sample().getOrNull()
+            val sample = probe.sample(expected.observeMode, config).getOrNull()
             if (sample != null) {
                 val s = StateSimilarity.score(expected, sample, cfg.keysWeight, cfg.appWeight)
                 best = maxOf(best, s)
@@ -129,6 +132,7 @@ internal class ReplayRunner(
             durationMs = result.durationMs,
             fullBlocks = output.fullContent,
             replay = output.replay,
+            screenDelta = output.screenDelta,
         )
     }
 

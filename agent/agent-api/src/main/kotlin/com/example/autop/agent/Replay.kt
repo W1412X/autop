@@ -8,6 +8,7 @@ package com.example.autop.agent
 
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.config.ConfigSnapshot
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
@@ -23,15 +24,17 @@ public data class ReplayStateSample(
     @SerialName("keys") val keys: List<String>,
     /**
      * 观测语义版本：1=旧口径（缺省，旧数据兼容），2=v2（合并修复 + 稳定键去易变文字），
-     * 3=统一 JSON 观测（节点不再输出短 ID，键口径随 v3 序列化）。新采样写
-     * [REPLAY_SEMANTICS_VERSION]；比对时版本不一致跳过 fingerprint/keys，只比
-     * package/activity 并重新解析目标节点。
+     * 3=统一 JSON 观测（节点不再输出短 ID，键口径随 v3 序列化），4=按录制时的观测方式采样
+     * （agent-harness-overhaul，新增 [observeMode]）。新采样写 [REPLAY_SEMANTICS_VERSION]；
+     * 比对时版本不一致跳过 fingerprint/keys，只比 package/activity 并重新解析目标节点。
      */
     @SerialName("semanticsVersion") val semanticsVersion: Int = 1,
+    /** 录制时使用的观测方式（a11y/visual/llm）；回放按它采样（WP2.8）。 */
+    @SerialName("observeMode") val observeMode: String,
 )
 
-/** 新采样的观测语义版本（v3：统一 JSON 观测，节点去短 ID）。 */
-public const val REPLAY_SEMANTICS_VERSION: Int = 3
+/** 新采样的观测语义版本（v4：按录制时的观测方式采样，agent-harness-overhaul）。 */
+public const val REPLAY_SEMANTICS_VERSION: Int = 4
 
 /** 一次可回放的动作记录（docs/tech/04 §2.7）。 */
 @Serializable
@@ -61,7 +64,11 @@ public enum class MessageOrigin {
 
 /** 回放前比对用的端口：由 device-impl 实现，返回当前屏幕的语义样本。 */
 public interface ReplayStateProbe {
-    public suspend fun sample(): Outcome<ReplayStateSample>
+    /** 按 [observeMode]（a11y/visual/llm）采样；[config] 为 Run 配置快照（WP2.8）。 */
+    public suspend fun sample(
+        observeMode: String,
+        config: ConfigSnapshot,
+    ): Outcome<ReplayStateSample>
 }
 
 /**

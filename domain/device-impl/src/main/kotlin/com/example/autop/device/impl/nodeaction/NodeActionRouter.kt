@@ -3,7 +3,7 @@
  *
  * 走节点的前提：配置开启；本次动作使用的快照里有实时无障碍节点树（视觉/llm 只影响观测文本，
  * 动作快照仍来自实时 a11y 采集）；落点处能选到带有对应动作的节点；该应用没有被记录为屏蔽节点动作。
- * 效果验证仍保守：只有 a11y 来源才把指纹变化当作“节点动作有效/无效”的证据。
+ * 效果证据来自工具收尾的变化结论（ScreenDelta，agent-harness-overhaul D4），本类只消费。
  * 应用屏蔽判定：节点动作被拒或无效，而随后的手势在同一应用上有效，累计到阈值即记录该应用。
  */
 package com.example.autop.device.impl.nodeaction
@@ -16,7 +16,6 @@ import com.example.autop.device.GestureController
 import com.example.autop.device.NodeActionBlockStore
 import com.example.autop.device.NodeActionOutcome
 import com.example.autop.device.NodeFlags
-import com.example.autop.device.ObserveMode
 import com.example.autop.device.Point
 import com.example.autop.device.Rect
 import com.example.autop.device.ScreenSnapshot
@@ -136,11 +135,11 @@ public class NodeActionRouter
         private val blocks: NodeActionBlockStore,
         private val clock: Clock,
     ) {
-        /** 节点动作无效（被拒或无变化）的最近时间，按包名。 */
-        private val suspects = ConcurrentHashMap<String, Long>()
-
-        /** “节点无效而手势有效”的证据次数，按包名。 */
+        /** “节点无效而手势有效”的证据次数，按包名（跨 Run 单例：学习结果跨 Run 生效）。 */
         private val evidence = ConcurrentHashMap<String, Int>()
+
+        /** 本 Run 的节点动作疑点（agent-harness-overhaul WP2.6）。 */
+        private fun suspects(ctx: ToolContext): MutableMap<String, Long> = ctx.deviceHistory().nodeActionSuspects
 
         /** 尝试走节点动作；返回 [NodeRoute.Skipped] 或 [NodeRoute.Rejected] 时调用方用手势。 */
         internal suspend fun attempt(req: NodeRouteRequest): NodeRoute {
@@ -157,12 +156,13 @@ public class NodeActionRouter
             return when {
                 pkg == null -> NodeRoute.Skipped(SkipReason.NO_NODE)
                 blocks.isBlocked(pkg) -> NodeRoute.Skipped(SkipReason.BLOCKED, pkg)
-                recentlySuspect(pkg, cfg.retryWindowMs) -> NodeRoute.Skipped(SkipReason.ESCALATE, pkg)
-                else -> execute(target, pkg, req.actionId)
+                recentlySuspect(req.ctx, pkg, cfg.retryWindowMs) -> NodeRoute.Skipped(SkipReason.ESCALATE, pkg)
+                else -> execute(req.ctx, target, pkg, req.actionId)
             }
         }
 
         private suspend fun execute(
+            ctx: ToolContext,
             target: NodeTarget,
             packageName: String,
             actionId: Int,
@@ -170,29 +170,30 @@ public class NodeActionRouter
             when (gestures.performAtPath(target.windowId, target.path, target.node.bounds, actionId)) {
                 NodeActionOutcome.DONE -> NodeRoute.Done(packageName)
                 NodeActionOutcome.REJECTED ->
-                    NodeRoute.Rejected(packageName).also { suspects[packageName] = clock.nowMillis() }
+                    NodeRoute.Rejected(packageName).also { suspects(ctx)[packageName] = clock.nowMillis() }
                 NodeActionOutcome.STALE -> NodeRoute.Skipped(SkipReason.STALE, packageName)
             }
 
         /**
-         * 滚动容器：落点处最上层的可滚动节点 bounds；只在 a11y 来源且有节点树时返回，
-         * 其余（视觉/llm 观测、空树）返回 null，由调用方用内容区。
+         * 滚动容器：落点处最上层的可滚动节点 bounds；只在有 a11y 节点树时返回
+         * （节点动作只存在于 a11y 快照，这是能力判断），其余返回 null，由调用方用内容区。
          */
         internal fun scrollContainer(
-            ctx: ToolContext,
             snapshot: ScreenSnapshot,
             point: Point,
         ): Rect? {
-            if (!isA11ySource(ctx) || snapshot.nodes.isEmpty()) return null
+            if (snapshot.nodes.isEmpty()) return null
             val query = NodeQuery(requiredFlag = NodeFlags.SCROLLABLE)
             return NodeActionSelector.select(snapshot, point, query)?.node?.bounds
         }
 
         /** 节点动作被应用接受之后：[moved] 为 true 说明节点路径有效（清空疑点与证据）；false 记为疑点；null 不判断。 */
         internal fun afterNodeDone(
+            ctx: ToolContext,
             packageName: String,
             moved: Boolean?,
         ) {
+            val suspects = suspects(ctx)
             when (moved) {
                 true -> {
                     suspects.remove(packageName)
@@ -214,31 +215,12 @@ public class NodeActionRouter
         ): Boolean {
             if (packageName == null || moved != true) return false
             val cfg = ctx.config[DeviceConfig.NODE_ACTION]
-            if (suspects.remove(packageName) == null) return false
+            if (suspects(ctx).remove(packageName) == null) return false
             val count = evidence.merge(packageName, 1, Int::plus) ?: 1
             if (count < cfg.blockAfterEvidence) return false
             evidence.remove(packageName)
             blocks.block(packageName, REASON_GESTURE_OK)
             return true
-        }
-
-        /** 当前观测是否来自 a11y（未观测过按默认 a11y）；仅此时节点树与指纹可信。 */
-        internal fun isA11ySource(ctx: ToolContext): Boolean =
-            (ctx.deviceHistory().last?.mode ?: ObserveMode.A11Y) == ObserveMode.A11Y
-
-        /** 指纹变化的可信判定：a11y 来源且有节点树，才能说“屏幕变了/没变”；否则返回 null（不判断）。 */
-        internal fun movedOrNull(
-            ctx: ToolContext,
-            snapshot: ScreenSnapshot,
-            preFingerprint: String?,
-            postFingerprint: String?,
-        ): Boolean? {
-            val trusted = isA11ySource(ctx) && snapshot.nodes.isNotEmpty()
-            return if (trusted && preFingerprint != null && postFingerprint != null) {
-                preFingerprint != postFingerprint
-            } else {
-                null
-            }
         }
 
         /** 选择落点处的节点；区分“没有节点”和“节点过大”，回执能说明具体原因。 */
@@ -261,9 +243,10 @@ public class NodeActionRouter
         }
 
         private fun recentlySuspect(
+            ctx: ToolContext,
             packageName: String,
             windowMs: Long,
-        ): Boolean = suspects[packageName]?.let { clock.nowMillis() - it <= windowMs } == true
+        ): Boolean = suspects(ctx)[packageName]?.let { clock.nowMillis() - it <= windowMs } == true
 
         private sealed interface Selection {
             data object None : Selection

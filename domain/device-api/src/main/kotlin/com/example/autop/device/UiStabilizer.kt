@@ -3,6 +3,14 @@
  */
 package com.example.autop.device
 
+/** 一次稳定等待的结果。 */
+public data class StableWait(
+    /** 实际等待时长（毫秒）。 */
+    val waitedMs: Long,
+    /** 是否判定为稳定；false = 到上限界面仍在变化。 */
+    val settled: Boolean,
+)
+
 /** 动作后等待界面稳定。 */
 public interface UiStabilizer {
     /**
@@ -12,12 +20,12 @@ public interface UiStabilizer {
      * ② 收到事件后等待静默 [quietMs]；
      * ③ 到 [maxWaitMs] 上限时，连续两次 [sampleFingerprint]（ScreenFingerprint）相同也算稳定。
      *
-     * 返回实际等待时长（超时不是错误）。
+     * 返回实际等待时长与是否稳定（超时不是错误）。
      */
     public suspend fun awaitStable(
         quietMs: Long,
         maxWaitMs: Long,
         firstEventTimeoutMs: Long,
         sampleFingerprint: suspend () -> String?,
-    ): Long
+    ): StableWait
 }

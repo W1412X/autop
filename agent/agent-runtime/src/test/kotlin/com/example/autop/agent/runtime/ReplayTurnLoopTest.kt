@@ -23,6 +23,7 @@ import com.example.autop.agent.runtime.testing.HarnessFakes
 import com.example.autop.agent.runtime.testing.RuntimeHarness
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.policy.PolicyDecision
 import com.example.autop.policy.PolicyErrorCodes
 import com.google.common.truth.Truth.assertThat
@@ -174,10 +175,14 @@ class ReplayTurnLoopTest {
             activity = "Main",
             fingerprint = "fp",
             keys = keys,
+            observeMode = "a11y",
         )
 
     private fun fixedProbe(sample: ReplayStateSample): ReplayStateProbe =
         object : ReplayStateProbe {
-            override suspend fun sample(): Outcome<ReplayStateSample> = Outcome.Ok(sample)
+            override suspend fun sample(
+                observeMode: String,
+                config: ConfigSnapshot,
+            ): Outcome<ReplayStateSample> = Outcome.Ok(sample)
         }
 }

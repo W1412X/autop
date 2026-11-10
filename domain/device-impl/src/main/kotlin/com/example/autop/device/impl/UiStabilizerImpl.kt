@@ -9,6 +9,7 @@ import android.view.accessibility.AccessibilityEvent
 import com.example.autop.core.common.Clock
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceConfig
+import com.example.autop.device.StableWait
 import com.example.autop.device.UiStabilizer
 import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.coroutineScope
@@ -32,7 +33,7 @@ public class UiStabilizerImpl
             maxWaitMs: Long,
             firstEventTimeoutMs: Long,
             sampleFingerprint: suspend () -> String?,
-        ): Long =
+        ): StableWait =
             coroutineScope {
                 val spec =
                     WaitSpec(
@@ -58,17 +59,19 @@ public class UiStabilizerImpl
                 }
             }
 
-        /** ① 无事件返回 0；② 静默返回已等待时长；③ 指纹相同返回已等待时长，否则返回 maxWaitMs。 */
+        /** ① 无事件返回已稳定；② 静默返回已等待时长；③ 指纹相同返回已等待时长；否则到上限仍在变化。 */
         private suspend fun waitPhases(
             spec: WaitSpec,
             lastEventAt: () -> Long?,
             sampleFingerprint: suspend () -> String?,
-        ): Long =
+        ): StableWait =
             when {
-                !awaitFirstEvent(spec, lastEventAt) -> NO_WAIT
-                awaitQuiet(spec, lastEventAt) -> clock.nowMillis() - spec.start
-                fingerprintStable(spec.pollMs, sampleFingerprint) -> clock.nowMillis() - spec.start
-                else -> spec.maxWaitMs
+                !awaitFirstEvent(spec, lastEventAt) -> StableWait(NO_WAIT, settled = true)
+                awaitQuiet(spec, lastEventAt) -> StableWait(clock.nowMillis() - spec.start, settled = true)
+                fingerprintStable(spec.pollMs, sampleFingerprint) -> {
+                    StableWait(clock.nowMillis() - spec.start, settled = true)
+                }
+                else -> StableWait(spec.maxWaitMs, settled = false)
             }
 
         /** ① 等第一个事件，最多 firstEventTimeoutMs；一直没有事件返回 false。 */

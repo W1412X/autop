@@ -1,11 +1,12 @@
 /**
- * 运行熔断（docs/tech/04 §3.7）：同错误重复、原地打转、重复动作三种检测。
- * 任一成功且屏幕有变化的动作重置相应计数。
+ * 运行熔断（agent-harness-overhaul WP2.9）：重复动作、同错误、原地打转三种检测，
+ * 只消费工具收尾的变化结论（ScreenDelta），不再自行比较指纹。
  */
 package com.example.autop.agent.runtime.guard
 
+import com.example.autop.agent.ScreenDelta
+import com.example.autop.agent.ScreenDeltaKind
 import com.example.autop.agent.ToolAccess
-import com.example.autop.agent.ToolOutput
 import com.example.autop.core.config.AgentBreakerSection
 
 /** 一次调用的熔断观察输入。 */
@@ -13,7 +14,9 @@ internal data class BreakerEntry(
     val toolId: String,
     val argsJson: String,
     val access: ToolAccess,
-    val output: ToolOutput,
+    val ok: Boolean,
+    val errorCode: String?,
+    val screenDelta: ScreenDelta?,
 )
 
 /** 熔断判定结果。 */
@@ -31,18 +34,61 @@ internal sealed interface BreakerVerdict {
     ) : BreakerVerdict
 }
 
+/** 一个计数器：达到 warn/stop 各只触发一次；计数归零时重新允许触发。 */
+private class Counter(
+    private val warn: Int,
+    private val stop: Int,
+) {
+    var count: Int = 0
+        private set
+
+    private var warned = false
+    private var stopped = false
+
+    fun reset() {
+        count = 0
+        warned = false
+        stopped = false
+    }
+
+    fun set(value: Int) {
+        if (value < count) {
+            warned = false
+            stopped = false
+        }
+        count = value
+    }
+
+    fun increment() {
+        count += 1
+    }
+
+    /** 返回本次应触发的级别；同一级别只触发一次。 */
+    fun level(): Level? =
+        when {
+            stop > 0 && count >= stop && !stopped -> {
+                stopped = true
+                Level.STOP
+            }
+            count >= warn && !warned -> {
+                warned = true
+                Level.WARN
+            }
+            else -> null
+        }
+
+    enum class Level { WARN, STOP }
+}
+
 /** 熔断器（每次 Run 一个）。 */
 internal class CircuitBreaker(
     private val cfg: AgentBreakerSection,
 ) {
     private var lastErrorKey: Pair<String, String>? = null
-    private var sameErrorCount = 0
-    private var stuckCount = 0
     private var lastArgsKey: Pair<String, String>? = null
-    private var repeatCount = 0
-
-    /** 最近一次观测指纹（任意工具的同源 post 观测）：用于无 replay 时判断屏幕是否变化。 */
-    private var lastFingerprint: String? = null
+    private val repeat = Counter(cfg.repeatWarn, cfg.repeatStop)
+    private val sameError = Counter(cfg.sameErrorWarn, cfg.sameErrorStop)
+    private val stuck = Counter(cfg.stuckWarn, cfg.stuckStop)
 
     /** 按调用顺序观察一批结果，返回最高级别判定（Stop > Warn）。 */
     fun observe(entries: List<BreakerEntry>): BreakerVerdict {
@@ -55,101 +101,106 @@ internal class CircuitBreaker(
     }
 
     private fun observeOne(entry: BreakerEntry): BreakerVerdict {
-        // 无法判断（前/后可比较指纹缺失）按“未变化”计：盲操作里连续同动作也必须能被拦住。
-        val changed = screenChanged(entry.output) == true
-        val repeat = observeRepeat(entry, changed)
-        if (repeat != null) return repeat
-        return if (entry.output.ok) {
-            lastErrorKey = null
-            sameErrorCount = 0
-            // 屏幕变了就重置原地打转计数，READ_SCREEN（observe/screenshot）观测到变化同样算数。
-            if (changed) stuckCount = 0
-            observeWriteScreen(entry, changed)
-        } else {
-            stuckCount = 0
-            observeError(entry)
-        }
+        // 无法判断（UNKNOWN、null）按“未变化”计：盲操作里连续同动作也必须能被拦住。
+        val changed = entry.screenDelta?.kind == ScreenDeltaKind.CHANGED
+        observeRepeat(entry, changed)
+        observeSameError(entry)
+        observeStuck(entry, changed)
+        return verdictOf()
     }
 
-    /** 同一工具 + 同一 errorCode 连续计数。 */
-    private fun observeError(entry: BreakerEntry): BreakerVerdict {
-        val code = entry.output.error?.code ?: return BreakerVerdict.None
-        val key = entry.toolId to code
-        sameErrorCount = if (key == lastErrorKey) sameErrorCount + 1 else 1
-        lastErrorKey = key
-        return when (sameErrorCount) {
-            cfg.sameErrorStop ->
-                BreakerVerdict.Stop(
-                    PROMPT_SAME_ERROR_STOP,
-                    mapOf("tool" to entry.toolId, "count" to sameErrorCount.toString()),
-                )
-            cfg.sameErrorWarn ->
-                BreakerVerdict.Warn(
-                    PROMPT_SAME_ERROR_WARN,
-                    mapOf("tool" to entry.toolId, "code" to code, "count" to sameErrorCount.toString()),
-                )
-            else -> BreakerVerdict.None
-        }
-    }
-
-    /** 连续 WRITE_SCREEN 成功但屏幕无变化 = 原地打转。 */
-    private fun observeWriteScreen(
-        entry: BreakerEntry,
-        changed: Boolean,
-    ): BreakerVerdict {
-        val watching = entry.access == ToolAccess.WRITE_SCREEN
-        if (watching && changed) stuckCount = 0
-        if (!watching || changed) return BreakerVerdict.None
-        stuckCount += 1
-        return when (stuckCount) {
-            cfg.stuckStop ->
-                BreakerVerdict.Stop(PROMPT_STUCK_STOP, mapOf("count" to stuckCount.toString()))
-            cfg.stuckWarn ->
-                BreakerVerdict.Warn(PROMPT_STUCK_WARN, mapOf("count" to stuckCount.toString()))
-            else -> BreakerVerdict.None
-        }
-    }
-
-    /** 同一工具 + 完全相同的参数连续计数。 */
+    /** 重复动作（所有工具）：屏幕有变化即重新计数。 */
     private fun observeRepeat(
         entry: BreakerEntry,
         changed: Boolean,
-    ): BreakerVerdict? {
+    ) {
         val key = entry.toolId to entry.argsJson
-        repeatCount = if (key == lastArgsKey) repeatCount + 1 else 1
-        lastArgsKey = key
         if (changed) {
-            repeatCount = 1
+            repeat.set(1)
+            lastArgsKey = key
+            return
         }
-        return if (repeatCount == cfg.repeatWarn) {
-            BreakerVerdict.Warn(
-                PROMPT_REPEAT_WARN,
-                mapOf("tool" to entry.toolId, "count" to repeatCount.toString()),
-            )
+        if (key == lastArgsKey) {
+            repeat.increment()
         } else {
-            null
+            repeat.set(1)
+            lastArgsKey = key
         }
     }
 
-    /**
-     * 屏幕是否变化（N170 审计修复）：优先用连续的观测指纹做同源比较——本次 post 观测指纹
-     * 对比上一次观测指纹。应用屏蔽节点树时 replay 缺失（pre 取不到），但 visual 观测仍带指纹，
-     * 据此可判断屏幕其实一直在变，不再把“拿不到 replay”误判成“没变化”而错误熔断。
-     * 没有观测指纹时退回 replay 的 pre/post；两者都缺返回 null（无法判断）。
-     * 调用方把 null 当作“未变化”，否则完全盲操作（无任何指纹）时重复动作永远触发不了熔断。
-     */
-    private fun screenChanged(output: ToolOutput): Boolean? {
-        val current = output.observation?.fingerprint
-        if (current != null) {
-            val previous = lastFingerprint
-            lastFingerprint = current
-            if (previous != null) return current != previous
+    /** 同错误：同一工具 + 同一 errorCode 连续计数；成功即归零。 */
+    private fun observeSameError(entry: BreakerEntry) {
+        if (entry.ok) {
+            sameError.reset()
+            lastErrorKey = null
+            return
         }
-        val pre = output.replay?.pre?.fingerprint
-        val now = output.replay?.postFingerprint ?: output.observation?.fingerprint
-        if (pre == null || now == null) return null
-        return now != pre
+        val code = entry.errorCode ?: return
+        val key = entry.toolId to code
+        if (key == lastErrorKey) {
+            sameError.increment()
+        } else {
+            sameError.set(1)
+            lastErrorKey = key
+        }
     }
+
+    /** 原地打转：WRITE_SCREEN 成功但没变化；失败的调用不动计数。 */
+    private fun observeStuck(
+        entry: BreakerEntry,
+        changed: Boolean,
+    ) {
+        if (changed) {
+            stuck.reset()
+            return
+        }
+        if (entry.access == ToolAccess.WRITE_SCREEN && entry.ok) stuck.increment()
+    }
+
+    /** 三个计数器各自出级别，取最高；同级优先 stuck > sameError > repeat。 */
+    private fun verdictOf(): BreakerVerdict {
+        val levels =
+            listOf(
+                STUCK to stuck.level(),
+                SAME_ERROR to sameError.level(),
+                REPEAT to repeat.level(),
+            ).filter { it.second != null }
+        val top = levels.maxOfOrNull { it.second ?: error("checked non-null") } ?: return BreakerVerdict.None
+        val (which, level) = levels.first { it.second == top }
+        return when (which) {
+            STUCK -> verdict(level, PROMPT_STUCK_WARN, PROMPT_STUCK_STOP, mapOf(VAR_COUNT to stuck.count.toString()))
+            SAME_ERROR ->
+                verdict(
+                    level,
+                    PROMPT_SAME_ERROR_WARN,
+                    PROMPT_SAME_ERROR_STOP,
+                    mapOf(
+                        VAR_TOOL to lastErrorKey?.first.orEmpty(),
+                        VAR_CODE to lastErrorKey?.second.orEmpty(),
+                        VAR_COUNT to sameError.count.toString(),
+                    ),
+                )
+            else ->
+                verdict(
+                    level,
+                    PROMPT_REPEAT_WARN,
+                    PROMPT_REPEAT_STOP,
+                    mapOf(VAR_TOOL to lastArgsKey?.first.orEmpty(), VAR_COUNT to repeat.count.toString()),
+                )
+        }
+    }
+
+    private fun verdict(
+        level: Counter.Level?,
+        warnId: String,
+        stopId: String,
+        vars: Map<String, String>,
+    ): BreakerVerdict =
+        when (level) {
+            Counter.Level.STOP -> BreakerVerdict.Stop(stopId, vars)
+            Counter.Level.WARN -> BreakerVerdict.Warn(warnId, vars)
+            null -> BreakerVerdict.None
+        }
 
     private fun maxOf(
         a: BreakerVerdict,
@@ -162,10 +213,19 @@ internal class CircuitBreaker(
         }
 
     private companion object {
+        const val STUCK = "stuck"
+        const val SAME_ERROR = "sameError"
+        const val REPEAT = "repeat"
+
         const val PROMPT_SAME_ERROR_WARN = "agent.breaker.same_error_warn"
         const val PROMPT_SAME_ERROR_STOP = "agent.breaker.same_error_stop"
         const val PROMPT_STUCK_WARN = "agent.breaker.stuck_warn"
         const val PROMPT_STUCK_STOP = "agent.breaker.stuck_stop"
         const val PROMPT_REPEAT_WARN = "agent.breaker.repeat_warn"
+        const val PROMPT_REPEAT_STOP = "agent.breaker.repeat_stop"
+
+        const val VAR_TOOL = "tool"
+        const val VAR_CODE = "code"
+        const val VAR_COUNT = "count"
     }
 }

@@ -140,7 +140,9 @@ internal class RunGuards(
                     toolId = tool?.id ?: call.name,
                     argsJson = call.argsJson,
                     access = tool?.access ?: ToolAccess.CONTROL,
-                    output = output,
+                    ok = output.ok,
+                    errorCode = output.error?.code,
+                    screenDelta = output.screenDelta,
                 )
             },
         )

@@ -54,7 +54,7 @@ class PopupFinderTest {
     @Test
     fun `close button identified by description inside the popup is chosen`() {
         val close = node(1, Rect(900, 820, 960, 880), desc = "关闭")
-        val pick = PopupFinder.find(snapshot(listOf(main, popup), listOf(close)), rules)
+        val pick = PopupFinder.find(snapshot(listOf(main, popup), listOf(close)), rules, windowScoped = true)
         assertThat(pick?.node?.idx).isEqualTo(1)
         assertThat(pick?.reason).isEqualTo("desc")
     }
@@ -62,27 +62,44 @@ class PopupFinderTest {
     @Test
     fun `close text is used when no description matches`() {
         val cancel = node(1, Rect(200, 1300, 400, 1380), text = "取消")
-        val pick = PopupFinder.find(snapshot(listOf(main, popup), listOf(cancel)), rules)
+        val pick = PopupFinder.find(snapshot(listOf(main, popup), listOf(cancel)), rules, windowScoped = true)
         assertThat(pick?.reason).isEqualTo("text")
     }
 
     @Test
     fun `buttons outside the popup window are ignored`() {
         val outside = node(1, Rect(10, 10, 100, 100), desc = "关闭")
-        assertThat(PopupFinder.find(snapshot(listOf(main, popup), listOf(outside)), rules)).isNull()
+        val pick = PopupFinder.find(snapshot(listOf(main, popup), listOf(outside)), rules, windowScoped = true)
+        assertThat(pick).isNull()
     }
 
     @Test
     fun `no popup window means nothing to dismiss`() {
         val close = node(1, Rect(900, 820, 960, 880), desc = "关闭")
-        assertThat(PopupFinder.find(snapshot(listOf(main), listOf(close)), rules)).isNull()
+        assertThat(PopupFinder.find(snapshot(listOf(main), listOf(close)), rules, windowScoped = true)).isNull()
     }
 
     @Test
     fun `buttons whose label matches an avoided word are never chosen`() {
         val agree = node(1, Rect(200, 1300, 400, 1380), text = "同意并继续")
         val cancel = node(2, Rect(500, 1300, 700, 1380), text = "取消")
-        val pick = PopupFinder.find(snapshot(listOf(main, popup), listOf(agree, cancel)), rules)
+        val pick = PopupFinder.find(snapshot(listOf(main, popup), listOf(agree, cancel)), rules, windowScoped = true)
         assertThat(pick?.node?.idx).isEqualTo(2)
+    }
+
+    @Test
+    fun `windowScoped false finds close text on full screen visual snapshot`() {
+        val cancel = node(1, Rect(200, 300, 400, 380), text = "取消")
+        val pick = PopupFinder.find(snapshot(listOf(main), listOf(cancel)), rules, windowScoped = false)
+        assertThat(pick?.reason).isEqualTo("text")
+    }
+
+    @Test
+    fun `avoid texts are never picked in either scope`() {
+        val agree = node(1, Rect(200, 1300, 400, 1380), text = "同意并继续")
+        assertThat(PopupFinder.find(snapshot(listOf(main, popup), listOf(agree)), rules, windowScoped = true))
+            .isNull()
+        assertThat(PopupFinder.find(snapshot(listOf(main), listOf(agree)), rules, windowScoped = false))
+            .isNull()
     }
 }

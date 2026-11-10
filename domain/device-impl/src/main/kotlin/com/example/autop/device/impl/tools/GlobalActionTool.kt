@@ -39,6 +39,7 @@ public class GlobalActionTool
         private val gestures: GestureController,
         private val subjects: PolicySubjectBuilder,
         private val epilogue: ActionEpilogue,
+        private val trace: ExecutionTraceRenderer,
     ) : ScreenActionTool {
         override val id: String = "tool.global_action"
 
@@ -76,7 +77,6 @@ public class GlobalActionTool
             ctx: ToolContext,
         ): ToolOutput {
             val payload = action.payload as GlobalActionPayload
-            val pre = epilogue.begin(ctx)
             val result = gestures.globalAction(payload.action)
             if (!result.ok) {
                 return toolError(DeviceErrorCodes.ACTION_FAILED, "全局动作 ${payload.action.name} 执行失败")
@@ -86,17 +86,12 @@ public class GlobalActionTool
                     ctx,
                     "已执行 ${payload.action.name}",
                     null,
-                    ReplayInput(ID, pre, payload.replayArgs, gesture = null),
+                    ReplayInput(ID, payload.replayArgs, gesture = null),
                 )
-            val notes =
-                listOf(
-                    executionLine(ExecMethod.GLOBAL_ACTION, channel = result.channel),
-                    effectLine(
-                        ExecEffect.UNKNOWN,
-                        "已送出 ${payload.action.name} 事件，但没有校验界面是否响应；需要时用 observe 确认当前界面。",
-                    ),
-                )
-            return out.copy(content = out.content + notes.map { Block.Text(it) })
+            return out.copy(
+                content =
+                    out.content + Block.Text(trace.executionLine(ExecMethod.GLOBAL_ACTION, channel = result.channel)),
+            )
         }
 
         private fun actionOf(name: String): GlobalAction? =

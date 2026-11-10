@@ -22,7 +22,6 @@ import com.example.autop.device.core.SwipeJitter
 import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.CoordSpaceResolver
 import com.example.autop.device.impl.PolicySubjectBuilder
-import com.example.autop.device.impl.nodeaction.NodeActionRouter
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
 import com.example.autop.llm.Block
@@ -55,7 +54,7 @@ public class SwipeTool
         private val coords: CoordSpaceResolver,
         private val contentAreas: ContentAreaProvider,
         private val receipts: HitReceiptBuilder,
-        private val router: NodeActionRouter,
+        private val trace: ExecutionTraceRenderer,
     ) : ScreenActionTool {
         override val id: String = TOOL_ID
 
@@ -136,7 +135,6 @@ public class SwipeTool
             ctx: ToolContext,
         ): ToolOutput {
             val swipe = action.payload as SwipeGesture
-            val pre = epilogue.begin(ctx)
             val result =
                 gestures.swipe(
                     swipe.from.x,
@@ -149,32 +147,18 @@ public class SwipeTool
             if (!result.ok) return errorOutput(injectFailed("滑动"))
             val gesture =
                 gestureJson(swipe.from.x, swipe.from.y, swipe.to.x, swipe.to.y, swipe.durationMs)
-            val out = epilogue.finish(ctx, swipe.resultText, null, ReplayInput(TOOL_ID, pre, swipe.replayArgs, gesture))
-            val moved = movedAfter(ctx, swipe.snapshot, pre?.fingerprint)
-            val notes =
-                buildList {
-                    add(executionLine(ExecMethod.GESTURE, channel = result.channel))
-                    add(effectLine(effectOf(moved), effectNoteOf(moved)))
-                }
-            return out.copy(content = out.content + notes.map { Block.Text(it) })
+            val out =
+                epilogue.finish(
+                    ctx,
+                    swipe.resultText,
+                    null,
+                    ReplayInput(TOOL_ID, swipe.replayArgs, gesture),
+                )
+            return out.copy(
+                content =
+                    out.content + Block.Text(trace.executionLine(ExecMethod.GESTURE, channel = result.channel)),
+            )
         }
-
-        /** 与 tap 同一口径：非 a11y 来源或没有节点树时不判断效果。 */
-        private suspend fun movedAfter(
-            ctx: ToolContext,
-            snapshot: ScreenSnapshot,
-            preFingerprint: String?,
-        ): Boolean? {
-            if (preFingerprint == null) return null
-            return router.movedOrNull(ctx, snapshot, preFingerprint, epilogue.fingerprintNow())
-        }
-
-        private fun effectNoteOf(moved: Boolean?): String? =
-            when (moved) {
-                false -> "滑动后界面没有变化；如果预期会翻页/滚动，先 observe 确认是否已经到头或手势没被接收。"
-                null -> "滑动是相对位移，当前观测无法比较动作前后的屏幕；需要时用 observe 或 screenshot 复核。"
-                true -> null
-            }
     }
 
 private const val TOOL_ID = "tool.swipe"

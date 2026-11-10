@@ -77,7 +77,7 @@ class GuardTest {
                 RuntimeHarness(
                     tools = setOf(tool),
                     configOverrides =
-                        overridesOf("agent", "breaker", "sameErrorStop" to 2, "sameErrorWarn" to 99),
+                        overridesOf("agent", "breaker", "sameErrorStop" to 2, "sameErrorWarn" to 1),
                 )
             h.llm
                 .call(FakeTool.FAKE_NAME to "{}")

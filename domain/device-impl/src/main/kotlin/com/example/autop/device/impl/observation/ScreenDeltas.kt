@@ -48,3 +48,11 @@ internal object ScreenDeltas {
         }
     }
 }
+
+/** 变化结论 → 节点动作学习的三态证据（WP2.5）：CHANGED=true，UNCHANGED=false，UNKNOWN/null=null。 */
+internal fun ScreenDelta?.moved(): Boolean? =
+    when (this?.kind) {
+        ScreenDeltaKind.CHANGED -> true
+        ScreenDeltaKind.UNCHANGED -> false
+        else -> null
+    }

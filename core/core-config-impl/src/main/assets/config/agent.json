@@ -110,7 +110,8 @@
       "sameErrorStop": 5,
       "stuckWarn": 3,
       "stuckStop": 6,
-      "repeatWarn": 3
+      "repeatWarn": 3,
+      "repeatStop": 5
     },
     "plan": {
       "blockFinishOnce": true

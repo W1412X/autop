@@ -271,7 +271,7 @@ internal class PatchFlowNodeToolTest {
                             ),
                     ),
                 ),
-            pre = ReplayStateSample(null, null, "fp", emptyList()),
+            pre = ReplayStateSample(null, null, "fp", emptyList(), observeMode = "a11y"),
             postFingerprint = null,
             execution = "node_action",
         )

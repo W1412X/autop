@@ -247,6 +247,7 @@ private fun actionOf(toolId: String): ReplayableAction =
                 activity = "Main",
                 fingerprint = "fp",
                 keys = listOf("k"),
+                observeMode = "a11y",
             ),
         postFingerprint = null,
         execution = "node_action",

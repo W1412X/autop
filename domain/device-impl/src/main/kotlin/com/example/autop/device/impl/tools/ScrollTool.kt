@@ -16,6 +16,7 @@ import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.DeviceScrollSection
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.GestureController
 import com.example.autop.device.Point
 import com.example.autop.device.Rect
@@ -35,7 +36,9 @@ import com.example.autop.device.impl.nodeaction.NodeKind
 import com.example.autop.device.impl.nodeaction.NodeRoute
 import com.example.autop.device.impl.nodeaction.NodeRouteRequest
 import com.example.autop.device.impl.observation.ActionEpilogue
+import com.example.autop.device.impl.observation.FrameMotion
 import com.example.autop.device.impl.observation.ReplayInput
+import com.example.autop.device.impl.vision.FrameSignature
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.ThreadLocalRandom
@@ -57,10 +60,12 @@ private data class ScrollAction(
     val replayArgs: JsonObject,
 )
 
-/** 一步的执行结果。 */
+/** 一步的执行结果（WP2.6：moved 由画面帧签名比较得出）。 */
 private data class StepResult(
-    /** 屏幕是否变化；null 表示不可判断（非 a11y 来源、空树或静默模式）。 */
+    /** 屏幕是否变化；null 表示不可判断（帧签名缺失或静默模式）。 */
     val moved: Boolean?,
+    /** 本步结束时的帧签名，直接作为下一步的 before。 */
+    val after: FrameSignature?,
     val gesture: JsonObject?,
     val newlyBlocked: Boolean,
     /** 这一步实际怎么执行的回执（模型可见）。 */
@@ -70,7 +75,7 @@ private data class StepResult(
 
 /** 滚动工具。 */
 @Singleton
-@Suppress("LongParameterList") // 装配类：读屏/手势/策略/收尾/坐标/内容区/回执/节点路由均为滚动必需，不可再减（N114 口径）
+@Suppress("LongParameterList") // 装配类：读屏/手势/策略/收尾/坐标/内容区/回执/节点路由/帧比较均为滚动必需，不可再减
 public class ScrollTool
     @Inject
     constructor(
@@ -82,6 +87,9 @@ public class ScrollTool
         private val contentAreas: ContentAreaProvider,
         private val receipts: HitReceiptBuilder,
         private val router: NodeActionRouter,
+        private val frameMotion: FrameMotion,
+        private val trace: ExecutionTraceRenderer,
+        private val prompts: PromptRepository,
     ) : ScreenActionTool {
         override val id: String = ID
 
@@ -143,9 +151,8 @@ public class ScrollTool
             ctx: ToolContext,
         ): ToolOutput {
             val scroll = action.payload as ScrollAction
-            val pre = epilogue.begin(ctx)
             var snap = scroll.snapshot
-            var before = baselineFingerprint(pre?.fingerprint)
+            var before = frameMotion.capture()
             var done = 0
             var reachedEnd = false
             var blocked = false
@@ -160,11 +167,17 @@ public class ScrollTool
                 blocked = blocked || step.newlyBlocked
                 if (done == 1) firstGesture = step.gesture
                 reachedEnd = step.moved == false
-                if (before != null && !reachedEnd && done < scroll.steps) before = epilogue.fingerprintNow() ?: before
+                before = step.after ?: before
             }
-            val replay = ReplayInput(ID, pre, scroll.replayArgs, firstGesture)
+            val replay = ReplayInput(ID, scroll.replayArgs, firstGesture)
             val out = epilogue.finish(ctx, resultText(scroll, done, reachedEnd, traces), null, replay)
-            return if (blocked) out.copy(content = out.content + Block.Text(BLOCKED_TEXT)) else out
+            return if (blocked) {
+                out.copy(
+                    content = out.content + Block.Text(prompts.text(PROMPT_NEWLY_BLOCKED)),
+                )
+            } else {
+                out
+            }
         }
 
         /** 一步：优先节点动作；节点无效（被拒或屏幕无变化）时补一次手势——滚动没有副作用，重复无害。 */
@@ -172,7 +185,7 @@ public class ScrollTool
             ctx: ToolContext,
             scroll: ScrollAction,
             snap: ScreenSnapshot,
-            before: String?,
+            before: FrameSignature?,
         ): StepResult {
             val label = NodeActionIds.scrollLabelOf(scroll.direction)
             val base = contentAreas.base()
@@ -180,34 +193,40 @@ public class ScrollTool
             val anchor = mapper.toScreen(scroll.anchor.x, scroll.anchor.y)
             if (anchor == null) {
                 return StepResult(
-                    null,
-                    null,
-                    false,
-                    "",
-                    AppError(CommonErrorCodes.INVALID_ARGUMENT, "滚动坐标换算失败"),
+                    moved = null,
+                    after = null,
+                    gesture = null,
+                    newlyBlocked = false,
+                    trace = "",
+                    error = AppError(CommonErrorCodes.INVALID_ARGUMENT, "滚动坐标换算失败"),
                 )
             }
             val route = router.attempt(nodeRequest(ctx, snap, anchor, scroll.direction))
             if (route is NodeRoute.Done) {
-                val moved = movedAfterAction(ctx, snap, before)
-                router.afterNodeDone(route.packageName, moved)
+                epilogue.awaitStable(ctx)
+                val after = frameMotion.capture()
+                val moved = movedOf(ctx, before, after)
+                router.afterNodeDone(ctx, route.packageName, moved)
                 if (moved != false) {
-                    return StepResult(moved, null, false, nodeTrace(label, moved))
+                    return StepResult(moved, after, null, false, trace.executionLine(ExecMethod.NODE_ACTION, label))
                 }
             }
             val area = base ?: Rect(0, 0, snap.screenWidth, snap.screenHeight)
             val container =
-                router.scrollContainer(ctx, snap, anchor)?.let { ScrollGeometry.intersectOrSelf(it, area) } ?: area
+                router.scrollContainer(snap, anchor)?.let { ScrollGeometry.intersectOrSelf(it, area) } ?: area
             val shot =
                 swipe(ctx, container, anchor, scroll.direction)
                     ?: return StepResult(
-                        null,
-                        null,
-                        false,
-                        "",
-                        injectFailed("滚动手势"),
+                        moved = null,
+                        after = null,
+                        gesture = null,
+                        newlyBlocked = false,
+                        trace = "",
+                        error = injectFailed("滚动手势"),
                     )
-            val moved = movedAfterAction(ctx, snap, before)
+            epilogue.awaitStable(ctx)
+            val after = frameMotion.capture()
+            val moved = movedOf(ctx, before, after)
             val learnPkg =
                 when (route) {
                     is NodeRoute.Done -> route.packageName
@@ -218,20 +237,21 @@ public class ScrollTool
                 if (route is NodeRoute.Done) {
                     "节点动作无变化（$label），补一次手势"
                 } else {
-                    routeFallback(route, label)
+                    trace.routeFallback(route, label)
                 }
-            val trace =
-                executionLine(ExecMethod.GESTURE, channel = shot.result.channel, fallback = fallback) +
-                    effectSuffix(moved)
-            return StepResult(moved, shot.replay, router.afterGesture(ctx, learnPkg, moved), trace)
+            val line = trace.executionLine(ExecMethod.GESTURE, channel = shot.result.channel, fallback = fallback)
+            return StepResult(moved, after, shot.replay, router.afterGesture(ctx, learnPkg, moved), line)
         }
 
-        private fun nodeTrace(
-            label: String,
-            moved: Boolean?,
-        ): String = executionLine(ExecMethod.NODE_ACTION, label) + effectSuffix(moved)
-
-        private fun effectSuffix(moved: Boolean?): String = "；${effectLine(effectOf(moved))}"
+        /** 画面帧签名比较（WP2.6）：任一帧缺失返回 null（不可判断）。 */
+        private fun movedOf(
+            ctx: ToolContext,
+            before: FrameSignature?,
+            after: FrameSignature?,
+        ): Boolean? {
+            if (before == null || after == null) return null
+            return !frameMotion.same(before, after, ctx.config[DeviceConfig.CHANGE])
+        }
 
         private fun nodeRequest(
             ctx: ToolContext,
@@ -268,29 +288,13 @@ public class ScrollTool
                 cfg.maxDurationMs,
             )
 
-        /** 基线指纹：优先动作前采样；quiet（流程）下自补一份，否则 moved 判不出来、到头也不提前停。 */
-        private suspend fun baselineFingerprint(preFingerprint: String?): String? =
-            preFingerprint ?: epilogue.fingerprintNow()
-
-        /** 动作后等界面稳定，再用探针取指纹与 [before] 比较；静默模式（[before] 为空）或不可信时返回 null。 */
-        private suspend fun movedAfterAction(
-            ctx: ToolContext,
-            snap: ScreenSnapshot,
-            before: String?,
-        ): Boolean? {
-            if (before == null) return null
-            epilogue.awaitStable(ctx)
-            return router.movedOrNull(ctx, snap, before, epilogue.fingerprintNow())
-        }
-
+        /** 结果文字：滚动汇总行（steps/到头）+ 截断/忽略说明 + 每步执行回执。 */
         private fun resultText(
             scroll: ScrollAction,
             done: Int,
             reachedEnd: Boolean,
             traces: List<String>,
         ): String {
-            val steps = if (done > 1) "（共 $done 步）" else ""
-            val end = if (reachedEnd) "，已到头，继续向该方向滚动不会有新内容" else ""
             val clamped =
                 if (scroll.requestedSteps > scroll.steps) {
                     "；steps 超出上限，已截断到 ${scroll.steps} 步"
@@ -298,8 +302,13 @@ public class ScrollTool
                     ""
                 }
             val ignored = if (scroll.amountIgnored) "；amount 已废弃，本次已忽略（距离由容器尺寸决定）" else ""
+            val summary =
+                prompts.text(
+                    PROMPT_SCROLL_SUMMARY,
+                    mapOf(VAR_STEPS to done.toString(), VAR_REACHED_END to if (reachedEnd) "1" else ""),
+                )
             val detail = traces.takeIf { it.isNotEmpty() }?.joinToString("\n", prefix = "\n") ?: ""
-            return "已向${directionName(scroll.direction)}滚动$steps$end$clamped$ignored$detail"
+            return "已向${directionName(scroll.direction)}滚动$clamped$ignored\n$summary$detail"
         }
 
         private fun directionName(direction: ScrollDirection): String =
@@ -314,6 +323,9 @@ public class ScrollTool
             const val ID = "tool.scroll"
             const val EXTRA_DIRECTION = "direction"
             const val CENTER = 500
-            const val BLOCKED_TEXT = "该应用不响应无障碍节点操作，已记录；之后对它的点击、长按、滚动会自动改用手势。"
+            const val PROMPT_NEWLY_BLOCKED = "device.node_action.newly_blocked"
+            const val PROMPT_SCROLL_SUMMARY = "device.scroll.summary"
+            const val VAR_STEPS = "steps"
+            const val VAR_REACHED_END = "reachedEnd"
         }
     }

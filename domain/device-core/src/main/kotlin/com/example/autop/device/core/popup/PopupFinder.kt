@@ -44,22 +44,31 @@ public data class PopupPick(
 
 /** 弹窗关闭按钮查找。 */
 public object PopupFinder {
-    /** 找到第一个可关闭的弹窗按钮；没有弹窗或没有合适按钮返回 null。 */
+    /**
+     * 找到第一个可关闭的弹窗按钮；没有弹窗或没有合适按钮返回 null。
+     * [windowScoped] 为 true（a11y 快照）时只在非全屏窗口内找；
+     * false（视觉伪树只有一个全屏窗口）跳过窗口筛选，在全部可见可点击节点里找。
+     */
     public fun find(
         snap: ScreenSnapshot,
         rules: PopupRules,
+        windowScoped: Boolean,
     ): PopupPick? {
-        val screenArea = snap.screenWidth.toDouble() * snap.screenHeight
-        if (screenArea <= 0.0) return null
-        val popups =
-            snap.windows
-                .filter { it.type == WindowType.APPLICATION || it.type == WindowType.SYSTEM }
-                .map { it.bounds }
-                .filter { inAreaRange(it.area() / screenArea, rules) }
-        if (popups.isEmpty()) return null
         val candidates =
-            snap.nodes.filter { n ->
-                isVisibleClickable(n) && popups.any { n.bounds.inside(it) } && !avoided(n, rules)
+            if (windowScoped) {
+                val screenArea = snap.screenWidth.toDouble() * snap.screenHeight
+                if (screenArea <= 0.0) return null
+                val popups =
+                    snap.windows
+                        .filter { it.type == WindowType.APPLICATION || it.type == WindowType.SYSTEM }
+                        .map { it.bounds }
+                        .filter { inAreaRange(it.area() / screenArea, rules) }
+                if (popups.isEmpty()) return null
+                snap.nodes.filter { n ->
+                    isVisibleClickable(n) && popups.any { n.bounds.inside(it) } && !avoided(n, rules)
+                }
+            } else {
+                snap.nodes.filter { n -> isVisibleClickable(n) && !avoided(n, rules) }
             }
         return candidates.firstOrNull { matches(it.contentDesc, rules.closeDescs) }?.let { PopupPick(it, REASON_DESC) }
             ?: candidates.firstOrNull { matches(it.text, rules.closeTexts) }?.let { PopupPick(it, REASON_TEXT) }

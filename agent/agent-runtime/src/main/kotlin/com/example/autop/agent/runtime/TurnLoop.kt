@@ -207,6 +207,7 @@ internal class TurnLoop(
             ReplayRunner(
                 plan = plan,
                 probe = probe,
+                config = req.config,
                 resolver = parts.engines.ports.replayTargets,
                 toolNameOf = parts.router::toolNameOf,
                 emit = { payload -> controller.append(payload) },

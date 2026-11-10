@@ -53,7 +53,7 @@ class RunEvidenceTest {
                     ReplayableAction(
                         toolId = tool,
                         replayArgs = JsonObject(hit?.let { mapOf("_hit" to it) } ?: emptyMap()),
-                        pre = ReplayStateSample(null, null, "fp", emptyList()),
+                        pre = ReplayStateSample(null, null, "fp", emptyList(), observeMode = "a11y"),
                         postFingerprint = null,
                         execution = "test",
                     ),

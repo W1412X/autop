@@ -34,7 +34,7 @@ internal class ScreenService(
         dirty = true
     }
 
-    /** 节点结束时记录屏幕指纹，供 `screenChanged(since=节点)` 使用。 */
+    /** 节点结束时记录屏幕指纹，供 `changedSince(since=节点)` 使用。 */
     fun nodeFinished(nodeId: String) {
         cache?.let { nodeBaselines[nodeId] = it.fingerprint }
     }

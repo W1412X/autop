@@ -91,5 +91,6 @@ class StateSimilarityTest {
             fingerprint = "fp",
             keys = keys,
             semanticsVersion = semanticsVersion,
+            observeMode = "a11y",
         )
 }

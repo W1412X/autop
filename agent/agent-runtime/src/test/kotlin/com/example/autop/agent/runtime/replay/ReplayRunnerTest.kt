@@ -19,6 +19,8 @@ import com.example.autop.agent.ToolResultEvent
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.config.ConfigSnapshot
+import com.example.autop.core.testing.FakeConfigProvider
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
@@ -158,6 +160,7 @@ class ReplayRunnerTest {
         ReplayRunner(
             plan = planOf(steps, waitMs = waitMs, pollMs = pollMs),
             probe = probe,
+            config = FakeConfigProvider().current(),
             resolver = null,
             toolNameOf = { names[it] },
             emit = { emitted += it },
@@ -196,6 +199,7 @@ class ReplayRunnerTest {
                     activity = "Main",
                     fingerprint = "fp",
                     keys = keys,
+                    observeMode = "a11y",
                 ),
             postFingerprint = null,
             execution = "node_action",
@@ -215,7 +219,10 @@ class ReplayRunnerTest {
     ) : ReplayStateProbe {
         private var calls = 0
 
-        override suspend fun sample(): Outcome<ReplayStateSample> {
+        override suspend fun sample(
+            observeMode: String,
+            config: ConfigSnapshot,
+        ): Outcome<ReplayStateSample> {
             val index = calls
             calls += 1
             val s = sampleAt?.invoke(index) ?: samples[minOf(index, samples.size - 1)]

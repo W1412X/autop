@@ -20,6 +20,7 @@ import com.example.autop.task.impl.sources.NetworkSource
 import com.example.autop.task.impl.sources.NotificationTriggerSource
 import com.example.autop.task.impl.sources.ScreenUnlockSource
 import com.example.autop.task.impl.store.RunStore
+import com.example.autop.task.impl.store.TaskJsonCodec
 import com.example.autop.task.impl.store.TaskStore
 import com.example.autop.task.impl.store.TriggerStateStore
 import dagger.Module
@@ -67,12 +68,14 @@ public object TaskTriggerModule {
         configProvider: ConfigProvider,
         sources: Set<@JvmSuppressWildcards TriggerSource>,
         flowState: com.example.autop.flow.FlowStateStore,
+        logger: Logger,
     ): TaskStore =
         TaskStore(
             db = db,
             runStore = runStore,
             configProvider = configProvider,
             knownSources = { sources.map { it.id }.toSet() },
+            codec = TaskJsonCodec(logger = logger),
             onDeleted = {
                 flowState.clearScope(
                     com.example.autop.flow.FlowStateStore

@@ -190,7 +190,20 @@ public data class AgentBreakerSection(
     @SerialName("stuckWarn") val stuckWarn: Int = 3,
     @SerialName("stuckStop") val stuckStop: Int = 6,
     @SerialName("repeatWarn") val repeatWarn: Int = 3,
-) : ConfigSection
+    @SerialName("repeatStop") val repeatStop: Int = 5,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (sameErrorWarn < 1) add("sameErrorWarn must be >= 1, was $sameErrorWarn")
+            if (sameErrorWarn >= sameErrorStop) {
+                add("sameErrorWarn must be < sameErrorStop, was $sameErrorWarn >= $sameErrorStop")
+            }
+            if (stuckWarn < 1) add("stuckWarn must be >= 1, was $stuckWarn")
+            if (stuckWarn >= stuckStop) add("stuckWarn must be < stuckStop, was $stuckWarn >= $stuckStop")
+            if (repeatWarn < 1) add("repeatWarn must be >= 1, was $repeatWarn")
+            if (repeatWarn >= repeatStop) add("repeatWarn must be < repeatStop, was $repeatWarn >= $repeatStop")
+        }
+}
 
 /** `agent.plan`：计划行为。 */
 @Serializable

@@ -95,7 +95,6 @@ public class RestartAppTool
                     "请用 global_action back 或 home 返回，再用 open_app 打开 $pkg",
                 )
             }
-            val pre = epilogue.begin(ctx)
             if (!shell.forceStop(pkg)) {
                 return toolError(DeviceErrorCodes.RESTART_UNAVAILABLE, "强制结束 $pkg 失败")
             }
@@ -109,7 +108,7 @@ public class RestartAppTool
                     "已发送重启请求 $pkg（force-stop 已执行，随后请求启动）",
                     null,
                     // 回放参数带上解析后的包名（含缺省时取的前台应用），否则回放会重启到别的应用。
-                    ReplayInput(ID, pre, buildJsonObject { put("package", pkg) }, gesture = null),
+                    ReplayInput(ID, buildJsonObject { put("package", pkg) }, gesture = null),
                 )
             val fg = out.observation?.packageName
             val note =

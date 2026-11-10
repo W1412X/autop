@@ -97,7 +97,6 @@ public class OpenAppTool
             app: AppAction,
             ctx: ToolContext,
         ): ToolOutput {
-            val pre = epilogue.begin(ctx)
             if (!apps.launch(targetPkg)) {
                 return toolError(DeviceErrorCodes.LAUNCH_FAILED, "打开 $targetPkg 失败")
             }
@@ -106,7 +105,7 @@ public class OpenAppTool
                     ctx,
                     "已发送启动请求 $targetPkg",
                     null,
-                    ReplayInput(ID, pre, app.replayArgs, gesture = null),
+                    ReplayInput(ID, app.replayArgs, gesture = null),
                 )
             val fg = out.observation?.packageName
             val note =

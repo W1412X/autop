@@ -34,6 +34,7 @@ import com.example.autop.device.impl.DirectResolvedNode
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
+import com.example.autop.llm.Block
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
@@ -80,6 +81,7 @@ public class InputTextTool
         private val coords: CoordSpaceResolver,
         private val contentAreas: ContentAreaProvider,
         private val receipts: HitReceiptBuilder,
+        private val trace: ExecutionTraceRenderer,
     ) : ScreenActionTool {
         override val id: String = ID
 
@@ -211,7 +213,7 @@ public class InputTextTool
                     mapOf(ACTION_ARGUMENT_SET_TEXT to value),
                 )
             if (!ok) return null
-            val traces = mutableListOf(executionLine(ExecMethod.NODE_ACTION, "ACTION_SET_TEXT"))
+            val traces = mutableListOf(trace.executionLine(ExecMethod.NODE_ACTION, "ACTION_SET_TEXT"))
             val submit = submitOf(node, input, traces)
             return WriteOutcome(typedText(input) + submit, traces)
         }
@@ -266,7 +268,7 @@ public class InputTextTool
             val traces = mutableListOf<String>()
             fallback?.let { traces += "回退：$it" }
             focusNote?.let { traces += it }
-            traces += executionLine(ExecMethod.SHELL_KEY, CLIPBOARD_PASTE)
+            traces += trace.executionLine(ExecMethod.SHELL_KEY, CLIPBOARD_PASTE)
             traces += restoreNote
             val submit = shellSubmitOf(input, traces)
             return Outcome.Ok(WriteOutcome(typedText(input) + submit, traces))
@@ -281,11 +283,11 @@ public class InputTextTool
             if (!input.submit) return ""
             val hasImeEnter = node.snapshot.actions.contains(ACTION_IME_ENTER)
             if (hasImeEnter && gestures.performNodeAction(node, ACTION_IME_ENTER)) {
-                traces += executionLine(ExecMethod.NODE_ACTION, "ACTION_IME_ENTER")
+                traces += trace.executionLine(ExecMethod.NODE_ACTION, "ACTION_IME_ENTER")
                 return SUBMIT_OK
             }
             if (shell.state.value == ShellState.Connected && gestures.shellKeyEvent(KEYCODE_ENTER)) {
-                traces += executionLine(ExecMethod.SHELL_KEY, "Enter")
+                traces += trace.executionLine(ExecMethod.SHELL_KEY, "Enter")
                 return SUBMIT_OK
             }
             return SUBMIT_FAILED
@@ -298,7 +300,7 @@ public class InputTextTool
         ): String {
             if (!input.submit) return ""
             return if (gestures.shellKeyEvent(KEYCODE_ENTER)) {
-                traces += executionLine(ExecMethod.SHELL_KEY, "Enter")
+                traces += trace.executionLine(ExecMethod.SHELL_KEY, "Enter")
                 SUBMIT_OK
             } else {
                 SUBMIT_FAILED
@@ -334,13 +336,12 @@ public class InputTextTool
             ctx: ToolContext,
         ): ToolOutput {
             val input = action.payload as InputAction
-            val pre = epilogue.begin(ctx)
             val traces = mutableListOf<String>()
             val gesture =
                 input.clickPoint?.let {
                     val result = gestures.tap(it.x, it.y, input.clickDurationMs)
                     if (!result.ok) return errorOutput(injectFailed("点击输入框"))
-                    traces += executionLine(ExecMethod.GESTURE, channel = result.channel)
+                    traces += trace.executionLine(ExecMethod.GESTURE, channel = result.channel)
                     epilogue.awaitStable(ctx)
                     gestureJson(it.x, it.y, input.clickDurationMs)
                 }
@@ -350,9 +351,9 @@ public class InputTextTool
                     is Outcome.Ok -> got.value
                 }
             traces += written.traces
-            traces += effectLine(ExecEffect.UNKNOWN, EFFECT_UNKNOWN_NOTE)
-            val text = (listOfNotNull(written.text, input.receipt) + traces).joinToString("\n")
-            return epilogue.finish(ctx, text, input.waitMs, ReplayInput(ID, pre, input.replayArgs, gesture))
+            val text = (listOfNotNull(written.text, input.receipt)).joinToString("\n")
+            val out = epilogue.finish(ctx, text, input.waitMs, ReplayInput(ID, input.replayArgs, gesture))
+            return out.copy(content = out.content + traces.map { Block.Text(it) })
         }
 
         private fun NodeSnapshot.has(flag: Int): Boolean = flags and flag != 0
@@ -385,7 +386,6 @@ public class InputTextTool
                 "没有找到可输入的输入框，请先点击输入框，或在 input_text 里给出输入框的坐标。"
             const val FOCUS_UNKNOWN_NOTE =
                 "焦点：写入前没有找到可编辑的焦点节点，已按剪贴板粘贴处理；可能没有写进目标输入框，请用 observe 确认。"
-            const val EFFECT_UNKNOWN_NOTE = "输入工具只确认写入动作被接受，不校验框内文字；需要时用 observe 确认。"
             const val CLIPBOARD_RESTORED = "剪贴板：已恢复动作前的内容"
             const val CLIPBOARD_EMPTY = "剪贴板：动作前没有可保存的内容，当前保留输入文字"
             const val CLIPBOARD_UNREADABLE = "剪贴板：无法读取动作前的内容，未恢复（当前为输入文字）"

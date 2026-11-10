@@ -198,7 +198,8 @@ class ScreenObserverAutoTest {
                 clock = FakeClock(0L),
             )
         val modes = ObserveModeResolver(holder, visual, NoVisionGateway)
-        return ScreenObserver(reader, capturer, contentAreas, visual, llm, serializer, modes)
+        val preparer = ScreenPreparer(reader, capturer, contentAreas, visual, llm, serializer)
+        return ScreenObserver(preparer, serializer, modes)
     }
 
     private fun service(): AutopAccessibilityService =

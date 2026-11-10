@@ -118,7 +118,7 @@ internal class SaveAsFlowToolTest {
                                         put("x", JsonPrimitive(10))
                                         put("y", JsonPrimitive(20))
                                     },
-                                pre = ReplayStateSample(null, null, "fp", emptyList()),
+                                pre = ReplayStateSample(null, null, "fp", emptyList(), observeMode = "a11y"),
                                 postFingerprint = null,
                                 execution = "test",
                             ),

@@ -74,12 +74,11 @@ public class OpenUriTool
             ctx: ToolContext,
         ): ToolOutput {
             val uri = action.payload as String
-            val pre = epilogue.begin(ctx)
             if (!apps.openUri(uri)) {
                 return toolError(DeviceErrorCodes.URI_FAILED, "无法打开 $uri")
             }
             val replayArgs = buildJsonObject { put(EXTRA_URI, uri) }
-            val out = epilogue.finish(ctx, "已发送打开请求 $uri", null, ReplayInput(ID, pre, replayArgs, gesture = null))
+            val out = epilogue.finish(ctx, "已发送打开请求 $uri", null, ReplayInput(ID, replayArgs, gesture = null))
             val fg = out.observation?.packageName
             return out.copy(
                 content =

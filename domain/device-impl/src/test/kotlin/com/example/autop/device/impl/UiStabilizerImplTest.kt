@@ -28,7 +28,7 @@ class UiStabilizerImplTest {
                     samples++
                     "fp"
                 }
-            assertThat(waited).isEqualTo(NO_WAIT)
+            assertThat(waited.waitedMs).isEqualTo(NO_WAIT)
             assertThat(samples).isEqualTo(0)
             // 一直没事件要等满 firstEventTimeoutMs 才认定界面没变化
             assertThat(testScheduler.currentTime).isAtLeast(FIRST_MS)
@@ -52,7 +52,7 @@ class UiStabilizerImplTest {
                     "fp"
                 }
             // 事件 500/700ms 才到：等到 700 + quietMs=300 → 1000ms，而不是首事件超时就返回
-            assertThat(waited).isEqualTo(EVENT_TWO_MS + QUIET_MS)
+            assertThat(waited.waitedMs).isEqualTo(EVENT_TWO_MS + QUIET_MS)
             assertThat(samples).isEqualTo(0)
         }
 
@@ -72,7 +72,7 @@ class UiStabilizerImplTest {
                     "fp-same"
                 }
             // 事件不停 → 到 maxWaitMs 后连续两次指纹相同即稳定（间隔 pollMs）
-            assertThat(waited).isEqualTo(MAX_WAIT_MS + POLL_MS)
+            assertThat(waited.waitedMs).isEqualTo(MAX_WAIT_MS + POLL_MS)
         }
 
     @Test
@@ -91,7 +91,7 @@ class UiStabilizerImplTest {
                 stabilizer.awaitStable(quietMs = QUIET_MS, maxWaitMs = MAX_WAIT_MS, firstEventTimeoutMs = FIRST_MS) {
                     "fp-${n++}"
                 }
-            assertThat(waited).isEqualTo(MAX_WAIT_MS)
+            assertThat(waited.waitedMs).isEqualTo(MAX_WAIT_MS)
         }
 
     private fun event(): A11yEventLite =

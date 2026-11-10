@@ -112,6 +112,7 @@ class ReplayRecorderTest {
                     activity = "Main",
                     fingerprint = "fp1",
                     keys = emptyList(),
+                    observeMode = "a11y",
                 ),
             postFingerprint = "fp2",
             execution = "node_action",
