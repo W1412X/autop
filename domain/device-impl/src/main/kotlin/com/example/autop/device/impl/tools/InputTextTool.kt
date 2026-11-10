@@ -16,6 +16,7 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.GestureController
 import com.example.autop.device.NodeFlags
@@ -69,6 +70,7 @@ private data class ClipboardBackup(
 
 /** 输入工具。 */
 @Singleton
+@Suppress("LongParameterList") // 端口聚合类：执行链的依赖各司其职，参数只增不减（questions.md N114 口径）
 public class InputTextTool
     @Inject
     constructor(
@@ -82,6 +84,7 @@ public class InputTextTool
         private val contentAreas: ContentAreaProvider,
         private val receipts: HitReceiptBuilder,
         private val trace: ExecutionTraceRenderer,
+        private val prompts: PromptRepository,
     ) : ScreenActionTool {
         override val id: String = ID
 
@@ -142,6 +145,7 @@ public class InputTextTool
                     snap,
                     targetNode,
                     mapOf(EXTRA_INPUT_LENGTH to text.length.toString()),
+                    ctx.config,
                     fallbackTree = tree?.model,
                     fallbackPoint = entry.modelPoint,
                 )
@@ -173,6 +177,7 @@ public class InputTextTool
         /**
          * 写入文字：焦点输入框优先 ACTION_SET_TEXT；被拒绝时补一次 shell 剪贴板粘贴并说明；
          * 没有可编辑焦点时直接走 shell，同时提示焦点不确定（可能没写进目标框）。
+         * append 需要输入框当前内容（WP7.11）：刷新失败不能拿旧文本拼接，直接报错。
          */
         private suspend fun writeText(input: InputAction): Outcome<WriteOutcome> {
             val focused = gestures.focusedInput()
@@ -180,7 +185,14 @@ public class InputTextTool
                 val editable = focused?.takeIf { it.snapshot.flags and NodeFlags.EDITABLE != 0 }
                 when {
                     editable != null -> {
-                        val done = focusedWrite(editable, input)
+                        val value =
+                            if (input.append) {
+                                val current = editable.currentText() ?: return Outcome.Err(refreshFailed())
+                                current + input.text
+                            } else {
+                                input.text
+                            }
+                        val done = focusedWrite(editable, input, value)
                         if (done != null) {
                             Outcome.Ok(done)
                         } else {
@@ -203,9 +215,8 @@ public class InputTextTool
         private suspend fun focusedWrite(
             node: ResolvedNode,
             input: InputAction,
+            value: String,
         ): WriteOutcome? {
-            val current = node.currentText() ?: node.snapshot.text.orEmpty()
-            val value = if (input.append) current + input.text else input.text
             val ok =
                 gestures.performNodeAction(
                     node,
@@ -217,6 +228,14 @@ public class InputTextTool
             val submit = submitOf(node, input, traces)
             return WriteOutcome(typedText(input) + submit, traces)
         }
+
+        /** 输入框当前内容刷新失败（WP7.11）：不拿旧文本做 append，改用 mode=replace 重新输入。 */
+        private fun refreshFailed(): AppError =
+            AppError(
+                code = DeviceErrorCodes.ACTION_FAILED,
+                message = "读取输入框当前内容失败，append 写入已放弃",
+                hint = prompts.text(PROMPT_REFRESH_FAILED_HINT),
+            )
 
         /** 焦点节点不可用：shell 剪贴板粘贴；通道未连接返回 `device.not_editable`。 */
         private suspend fun shellWrite(
@@ -341,7 +360,12 @@ public class InputTextTool
                 input.clickPoint?.let {
                     val result = gestures.tap(it.x, it.y, input.clickDurationMs)
                     if (!result.ok) return errorOutput(injectFailed("点击输入框"))
-                    traces += trace.executionLine(ExecMethod.GESTURE, channel = result.channel)
+                    traces +=
+                        trace.executionLine(
+                            ExecMethod.GESTURE,
+                            channel = result.channel,
+                            shellSkip = result.shellSkip,
+                        )
                     epilogue.awaitStable(ctx)
                     gestureJson(it.x, it.y, input.clickDurationMs)
                 }
@@ -382,6 +406,7 @@ public class InputTextTool
             const val MODE_APPEND = "append"
             const val CLIP_LABEL = "autop"
             const val CLIPBOARD_PASTE = "剪贴板粘贴"
+            const val PROMPT_REFRESH_FAILED_HINT = "device.input.refresh_failed_hint"
             const val NOT_EDITABLE_HINT =
                 "没有找到可输入的输入框，请先点击输入框，或在 input_text 里给出输入框的坐标。"
             const val FOCUS_UNKNOWN_NOTE =

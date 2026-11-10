@@ -45,7 +45,7 @@ public class SnapshotSerializer
                 .serialize(
                     snap,
                     mode,
-                    { redactor.redact(it) },
+                    { redactor.redact(it, config) },
                     appIdentity.packageName,
                     effectiveModes,
                     noAppWindow,

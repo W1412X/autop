@@ -16,7 +16,9 @@ import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.ToolSpec
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.toolSpec
+import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentConfig
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.booleanOrNull
@@ -27,6 +29,7 @@ import kotlinx.serialization.json.longOrNull
 /** 历史检索工具。 */
 internal class HistoryRecallTool(
     private val recall: ThreadRecall,
+    private val prompts: PromptRepository,
 ) : Tool {
     override val id: String = "tool.history_recall"
 
@@ -62,7 +65,7 @@ internal class HistoryRecallTool(
             hits
                 .map { hit -> "${hit.seq} · ${typeOf(ctx, hit.seq)} · ${hit.snippet}" }
                 .joinToString("\n")
-        return ToolOutput(ok = true, content = listOf(Block.Text(text.ifEmpty { "没有找到相关记录。" })))
+        return ToolOutput(ok = true, content = listOf(Block.Text(text.ifEmpty { render(ID_NONE, emptyMap()) })))
     }
 
     /** seq 范围：事件原文，按 `maxChars` 分页截断。 */
@@ -117,7 +120,17 @@ internal class HistoryRecallTool(
             truncatedHint(seq)
         }
 
-    private fun truncatedHint(nextSeq: Long): String = "\n…（已截断，可用 seq_from=$nextSeq 继续查看）"
+    private fun truncatedHint(nextSeq: Long): String = "\n" + render(ID_TRUNCATED, mapOf("next" to nextSeq.toString()))
+
+    private fun render(
+        id: String,
+        vars: Map<String, String>,
+    ): String =
+        prompts
+            .render(id, vars)
+            .getOrNull()
+            ?.text
+            .orEmpty()
 
     private suspend fun typeOf(
         ctx: ToolContext,
@@ -158,6 +171,9 @@ internal class HistoryRecallTool(
     )
 
     private companion object {
+        const val ID_NONE = "tool.history_recall.none"
+        const val ID_TRUNCATED = "tool.history_recall.truncated"
+
         const val TYPE_USER = "user_message"
         const val TYPE_RUNTIME_STATE = "runtime_state"
         const val TYPE_ASSISTANT = "assistant_message"

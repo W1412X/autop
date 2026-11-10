@@ -13,6 +13,7 @@ import com.example.autop.agent.ScreenDeltaKind
 import com.example.autop.agent.ScreenDeltaReasons
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
+import com.example.autop.core.common.Clock
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.ConfigSnapshot
@@ -21,6 +22,7 @@ import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.StableWait
 import com.example.autop.device.UiStabilizer
+import com.example.autop.device.UserActivityMonitor
 import com.example.autop.device.impl.ObserveSelection
 import com.example.autop.device.impl.RecordedObservation
 import com.example.autop.device.impl.deviceHistory
@@ -47,6 +49,7 @@ public data class EpilogueResult(
 
 /** WRITE_SCREEN 工具 perform 之后的统一收尾。 */
 @Singleton
+@Suppress("LongParameterList") // 装配类：稳定器+观测+回放+帧比较+模板+时钟+触摸监测，不可再减（N114）
 public class ActionEpilogue
     @Inject
     constructor(
@@ -55,16 +58,20 @@ public class ActionEpilogue
         private val probe: ReplayStateProbe,
         private val frameMotion: FrameMotion,
         private val prompts: PromptRepository,
+        private val clock: Clock,
+        private val activityMonitor: UserActivityMonitor,
     ) {
         /**
          * 等待界面稳定（[waitMs] 为空取 `device.stabilize.maxWaitMs`）；按最近观测方式取样：
          * null/a11y 用 a11y 快照指纹（便宜），visual/llm 用画面帧签名（WP2.10）。
+         * 等待前后登记自身动作窗口，等待期间的触摸不算用户操作（WP7.3）。
          */
         public suspend fun awaitStable(
             ctx: ToolContext,
             waitMs: Long? = null,
         ): StableWait {
             val cfg = ctx.config[DeviceConfig.STABILIZE]
+            val touch = ctx.config[DeviceConfig.TOUCH]
             val mode = ctx.deviceHistory().last?.mode
             val sample: suspend () -> String? =
                 if (mode == null || mode == ObserveMode.A11Y) {
@@ -72,7 +79,11 @@ public class ActionEpilogue
                 } else {
                     { frameMotion.capture()?.hash?.toString() }
                 }
-            return stabilizer.awaitStable(cfg.quietMs, waitMs ?: cfg.maxWaitMs, cfg.firstEventTimeoutMs, sample)
+            val waitStart = clock.nowMillis()
+            activityMonitor.markSelfActionWindow(waitStart, waitStart + touch.selfActionMaxMs)
+            val wait = stabilizer.awaitStable(cfg.quietMs, waitMs ?: cfg.maxWaitMs, cfg.firstEventTimeoutMs, sample)
+            activityMonitor.markSelfActionWindow(waitStart, clock.nowMillis() + touch.selfActionGraceMs)
+            return wait
         }
 
         /**

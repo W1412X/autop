@@ -25,6 +25,12 @@ internal class OnnxTextRecognizer(
     /** 类数校验失败（字典与模型不匹配）后保持 false，不再尝试。 */
     private var charsetOk: Boolean = true
 
+    /** 永久停用原因（WP7.6：对外可查，供“视觉不可用原因”细化）；未停用为 null。 */
+    private var disabled: String? = null
+
+    override val disabledReason: String?
+        get() = disabled
+
     override val ready: Boolean
         get() = charsetOk && charset.isNotEmpty() && store.session(REC) != null
 
@@ -74,6 +80,7 @@ internal class OnnxTextRecognizer(
                 val classes = value[0][0].size
                 if (!PpOcrCodec.charsetMatches(classes, charset)) {
                     charsetOk = false
+                    disabled = "字典与模型不匹配（模型输出 $classes 类，字典 ${charset.size}+1 类）"
                     Log.e(TAG, "rec 输出类数 $classes 与字典 ${charset.size}+1 不符，OCR 识别停用")
                     return emptyList()
                 }

@@ -23,6 +23,12 @@ public interface NotificationFeed {
         limit: Int,
     ): List<NotificationInfo>
 
+    /**
+     * 环形缓冲溢出后最早保留通知的时间（WP7.10）；没有溢出过返回 null。
+     * `read_notifications` 的 since 早于该时间时，结果要提示更早的通知已丢弃。
+     */
+    public suspend fun earliestRetainedAt(): Long? = null
+
     /** 监听服务是否连接。 */
     public val connected: StateFlow<Boolean>
 

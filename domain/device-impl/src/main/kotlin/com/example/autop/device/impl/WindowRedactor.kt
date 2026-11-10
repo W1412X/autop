@@ -4,6 +4,7 @@
  */
 package com.example.autop.device.impl
 
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.device.WindowSnapshot
 import com.example.autop.device.core.RedactionMode
 import com.example.autop.policy.PolicyEngine
@@ -12,8 +13,11 @@ import javax.inject.Singleton
 
 /** 窗口脱敏决策端口。 */
 public interface WindowRedactor {
-    /** 对窗口的脱敏处理。 */
-    public fun redact(window: WindowSnapshot): RedactionMode
+    /** 对窗口的脱敏处理（屏蔽名单取自 [config]，WP7.2）。 */
+    public fun redact(
+        window: WindowSnapshot,
+        config: ConfigSnapshot,
+    ): RedactionMode
 }
 
 /** 策略引擎驱动的实现（docs/tech/06 §5 `PolicyEngine.redaction`）：屏蔽应用的窗口整体隐藏。 */
@@ -23,6 +27,9 @@ public class PolicyWindowRedactor
     constructor(
         private val policy: PolicyEngine,
     ) : WindowRedactor {
-        override fun redact(window: WindowSnapshot): RedactionMode =
-            if (policy.redaction(window.packageName)) RedactionMode.HIDE_WINDOW else RedactionMode.NONE
+        override fun redact(
+            window: WindowSnapshot,
+            config: ConfigSnapshot,
+        ): RedactionMode =
+            if (policy.redaction(window.packageName, config)) RedactionMode.HIDE_WINDOW else RedactionMode.NONE
     }

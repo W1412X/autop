@@ -37,9 +37,13 @@ internal class FakePolicyEngine(
     override suspend fun evaluate(
         subject: PolicySubject,
         overrides: PolicyOverrides,
+        config: com.example.autop.core.config.ConfigSnapshot,
     ): PolicyDecision = decision
 
-    override fun redaction(packageName: String?): Boolean = false
+    override fun redaction(
+        packageName: String?,
+        config: com.example.autop.core.config.ConfigSnapshot,
+    ): Boolean = false
 }
 
 /** 记录渲染变量的 [PromptRepository] 假实现。 */

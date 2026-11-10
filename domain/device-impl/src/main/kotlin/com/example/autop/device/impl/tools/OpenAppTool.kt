@@ -11,6 +11,7 @@ import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.device.AppInfo
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceErrorCodes
@@ -55,12 +56,13 @@ public class OpenAppTool
             // N193 空树降级：应用匹配不依赖节点树；空树应用上的恢复路径（open_app）不能被卡死。
             when (val got = screenReader.snapshotOrDegraded()) {
                 is Outcome.Err -> got
-                is Outcome.Ok -> prepareWith(got.value, args)
+                is Outcome.Ok -> prepareWith(got.value, args, ctx.config)
             }
 
         private suspend fun prepareWith(
             snap: ScreenSnapshot,
             args: JsonObject,
+            config: ConfigSnapshot,
         ): Outcome<PreparedAction> {
             val pkg = args.str("package")
             val name = args.str("name")
@@ -73,7 +75,7 @@ public class OpenAppTool
                 else ->
                     Outcome.Ok(
                         PreparedAction(
-                            subjects.build(ID, snap, null, extra),
+                            subjects.build(ID, snap, null, extra, config),
                             AppAction(targetPkg, candidates, name, replayArgsOf(args, hit = null)),
                         ),
                     )
@@ -91,15 +93,13 @@ public class OpenAppTool
             }
         }
 
-        /** 启动应用：候选列表路径不是屏幕动作，不记录回放。 */
+        /** 启动应用：候选列表路径不是屏幕动作，不记录回放；失败原因（WP7.5）原样带给模型。 */
         private suspend fun launchTarget(
             targetPkg: String,
             app: AppAction,
             ctx: ToolContext,
         ): ToolOutput {
-            if (!apps.launch(targetPkg)) {
-                return toolError(DeviceErrorCodes.LAUNCH_FAILED, "打开 $targetPkg 失败")
-            }
+            apps.launchWithError(targetPkg)?.let { return errorOutput(it) }
             val out =
                 epilogue.finish(
                     ctx,

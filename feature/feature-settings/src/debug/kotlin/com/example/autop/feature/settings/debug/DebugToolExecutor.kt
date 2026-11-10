@@ -81,7 +81,7 @@ internal class DebugToolExecutor
                     is Outcome.Err -> return errorOutput(got.error)
                     is Outcome.Ok -> got.value
                 }
-            return when (val decision = policy.evaluate(prepared.subject, overridesOf(ctx.config))) {
+            return when (val decision = policy.evaluate(prepared.subject, overridesOf(ctx.config), ctx.config)) {
                 PolicyDecision.Allow -> tool.perform(prepared, ctx)
                 is PolicyDecision.Block -> blockedOutput(decision)
             }

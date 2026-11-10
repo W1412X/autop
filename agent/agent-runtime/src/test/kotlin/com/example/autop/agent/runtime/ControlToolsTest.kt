@@ -127,7 +127,7 @@ class ControlToolsTest {
                     put("k", 3)
                 }
 
-            val out = HistoryRecallTool(recall).invoke(args, context(store, config(), thread))
+            val out = HistoryRecallTool(recall, TestPromptRepository()).invoke(args, context(store, config(), thread))
 
             assertThat(recall.lastK).isEqualTo(3)
             val text = (out.content[0] as Block.Text).text
@@ -148,7 +148,7 @@ class ControlToolsTest {
             val recall = StubRecall(emptyList())
             val args = buildJsonObject { put("query", "不存在的关键词") }
 
-            val out = HistoryRecallTool(recall).invoke(args, context(store, config(), thread))
+            val out = HistoryRecallTool(recall, TestPromptRepository()).invoke(args, context(store, config(), thread))
 
             assertThat(recall.lastK).isEqualTo(8)
             assertThat((out.content[0] as Block.Text).text).isEqualTo("没有找到相关记录。")
@@ -167,7 +167,9 @@ class ControlToolsTest {
                     put("include_images", true)
                 }
 
-            val out = HistoryRecallTool(StubRecall(emptyList())).invoke(args, context(store, config(), thread))
+            val out =
+                HistoryRecallTool(StubRecall(emptyList()), TestPromptRepository())
+                    .invoke(args, context(store, config(), thread))
 
             val text = (out.content[0] as Block.Text).text
             assertThat(text).contains("#1 user_message\n第一句")
@@ -186,7 +188,9 @@ class ControlToolsTest {
             val args = buildJsonObject { put("seq_from", 1) }
             val config = FakeConfigProvider(overridesOf("agent", "recall", "maxChars" to 20)).current()
 
-            val out = HistoryRecallTool(StubRecall(emptyList())).invoke(args, context(store, config, thread))
+            val out =
+                HistoryRecallTool(StubRecall(emptyList()), TestPromptRepository())
+                    .invoke(args, context(store, config, thread))
 
             val text = (out.content[0] as Block.Text).text
             assertThat(text).contains("已截断，可用 seq_from=")

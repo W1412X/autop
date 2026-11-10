@@ -64,7 +64,7 @@ class RunGuardsTest {
             val router =
                 ToolRouter(
                     emptyList(),
-                    ToolExecutor(emptyList(), FakePolicyEngine(), null, prompts, clock),
+                    ToolExecutor(emptyList(), FakePolicyEngine(), null, prompts, clock, NoopLogger),
                     emptyList(),
                     prompts,
                 )

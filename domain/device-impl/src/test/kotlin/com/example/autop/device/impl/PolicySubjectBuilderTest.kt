@@ -18,12 +18,13 @@ class PolicySubjectBuilderTest {
 
     @Test
     fun `target text merges text desc and visible descendant labels`() {
-        val builder = PolicySubjectBuilder(FakeConfigProvider(), cache)
+        val provider = FakeConfigProvider()
+        val builder = PolicySubjectBuilder(cache)
         val screen =
             screenOf(
                 listOf(container(0, listOf(1, 2), text = "标题"), leaf(1, text = "确定"), leaf(2, text = "取消")),
             )
-        val subject = builder.build("tool.tap", screen, screen.nodes[0], emptyMap())
+        val subject = builder.build("tool.tap", screen, screen.nodes[0], emptyMap(), provider.current())
         assertThat(subject.targetText).isEqualTo("标题 · 确定 · 取消")
         assertThat(subject.packageName).isEqualTo("com.example.app")
         assertThat(subject.targetIsPassword).isFalse()
@@ -31,10 +32,11 @@ class PolicySubjectBuilderTest {
 
     @Test
     fun `password and data sensitive flags surface on the subject`() {
-        val builder = PolicySubjectBuilder(FakeConfigProvider(), cache)
+        val provider = FakeConfigProvider()
+        val builder = PolicySubjectBuilder(cache)
         val flags = NodeFlags.VISIBLE or NodeFlags.PASSWORD or NodeFlags.DATA_SENSITIVE
         val screen = screenOf(listOf(leaf(0, text = "密码", flags = flags)))
-        val subject = builder.build("tool.tap", screen, screen.nodes[0], mapOf("k" to "v"))
+        val subject = builder.build("tool.tap", screen, screen.nodes[0], mapOf("k" to "v"), provider.current())
         assertThat(subject.targetIsPassword).isTrue()
         assertThat(subject.targetDataSensitive).isTrue()
         assertThat(subject.hasPasswordField).isTrue()
@@ -43,22 +45,24 @@ class PolicySubjectBuilderTest {
 
     @Test
     fun `secure window cache expires after configured time`() {
-        val builder = PolicySubjectBuilder(FakeConfigProvider(), cache)
+        val provider = FakeConfigProvider()
+        val builder = PolicySubjectBuilder(cache)
         val screen = screenOf(listOf(leaf(0, text = "确定")))
         cache.markSecure()
-        assertThat(builder.build("tool.tap", screen, null, emptyMap()).windowSecure).isTrue()
+        assertThat(builder.build("tool.tap", screen, null, emptyMap(), provider.current()).windowSecure).isTrue()
         clock.advanceBy(5_001L)
-        assertThat(builder.build("tool.tap", screen, null, emptyMap()).windowSecure).isFalse()
+        assertThat(builder.build("tool.tap", screen, null, emptyMap(), provider.current()).windowSecure).isFalse()
     }
 
     @Test
     fun `screen texts respect configured cap and skip invisible labels`() {
         val overrides = overlay("""{"policy":{"subject":{"maxScreenTexts":2}}}""")
-        val builder = PolicySubjectBuilder(FakeConfigProvider(overrides), cache)
+        val provider = FakeConfigProvider(overrides)
+        val builder = PolicySubjectBuilder(cache)
         val invisible = leaf(1, text = "隐藏", flags = 0)
         val screen =
             screenOf(listOf(leaf(0, text = "甲"), invisible, leaf(2, text = "乙"), leaf(3, text = "丙")))
-        val subject = builder.build("tool.tap", screen, null, emptyMap())
+        val subject = builder.build("tool.tap", screen, null, emptyMap(), provider.current())
         assertThat(subject.screenTexts).containsExactly("甲", "乙").inOrder()
     }
 

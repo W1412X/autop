@@ -15,6 +15,7 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolControl
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.Clock
+import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.PolicyConfig
@@ -37,6 +38,7 @@ internal class ToolExecutor(
     private val audit: ToolAuditSink?,
     prompts: PromptRepository,
     private val clock: Clock,
+    private val logger: Logger,
 ) {
     private val byName: Map<String, Tool> = tools.associateBy { it.spec.name }
     private val screenLock = ReadWriteMutex()
@@ -56,7 +58,8 @@ internal class ToolExecutor(
         val rejected = reject(tool, parsed, validated, call)
         if (rejected != null) return done(call, rejected)
         val start = clock.nowMillis()
-        return ToolCallResult(call, executeLocked(tool!!, validated!!.args!!, ctx), clock.nowMillis() - start)
+        val output = normalized(executeLocked(tool!!, validated!!.args!!, ctx))
+        return ToolCallResult(call, output, clock.nowMillis() - start)
     }
 
     /**
@@ -70,7 +73,7 @@ internal class ToolExecutor(
     ): ToolCallResult {
         val tool = byName[call.name] ?: return done(call, errors.unknownTool(call.name, byName.keys.toList()))
         val start = clock.nowMillis()
-        return ToolCallResult(call, executeLocked(tool, args, ctx), clock.nowMillis() - start)
+        return ToolCallResult(call, normalized(executeLocked(tool, args, ctx)), clock.nowMillis() - start)
     }
 
     /** 前置拒绝：未知工具 / 参数不合法。 */
@@ -136,7 +139,8 @@ internal class ToolExecutor(
         ctx: ToolContext,
     ): ToolOutput {
         val section = ctx.config[PolicyConfig.POLICY]
-        val decision = policy.evaluate(action.subject, PolicyOverrides(section.overrides.allowCategories.toSet()))
+        val overrides = PolicyOverrides(section.overrides.allowCategories.toSet())
+        val decision = policy.evaluate(action.subject, overrides, ctx.config)
         audit?.record(ctx.runId, tool.id, action.subject.targetText, decision, null)
         if (decision is PolicyDecision.Block) {
             val hint = errors.render(ID_BLOCKED_HINT, mapOf("category" to decision.category))
@@ -152,6 +156,22 @@ internal class ToolExecutor(
         return output
     }
 
+    /** 失败结果统一格式（WP7.1）：正文 = agent.tool.error_result(code, message, hint)，保留工具附带的图片块。 */
+    private fun normalized(output: ToolOutput): ToolOutput {
+        if (output.ok) return output
+        val error = output.error
+        if (error == null) {
+            logger.w(TAG, "tool_failed_without_error")
+            return output
+        }
+        val text =
+            errors.render(
+                ID_ERROR_RESULT,
+                mapOf("code" to error.code, "message" to error.message, "hint" to (error.hint ?: "")),
+            )
+        return output.copy(content = listOf(Block.Text(text)) + output.content.filterIsInstance<Block.Image>())
+    }
+
     /** 解析失败一律转 invalid_args_json。 */
     private fun parseArgs(call: Block.ToolCall): JsonObject? =
         runCatching { json.parseToJsonElement(call.argsJson.ifEmpty { "{}" }) as? JsonObject }.getOrNull()
@@ -162,6 +182,8 @@ internal class ToolExecutor(
     ): ToolCallResult = ToolCallResult(call, output, 0)
 
     private companion object {
+        const val TAG = "ToolExecutor"
+        const val ID_ERROR_RESULT = "agent.tool.error_result"
         const val ID_BLOCKED_HINT = "agent.policy.blocked_hint"
     }
 }

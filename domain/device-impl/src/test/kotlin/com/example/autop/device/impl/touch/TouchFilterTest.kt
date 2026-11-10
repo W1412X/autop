@@ -51,7 +51,7 @@ public class TouchFilterTest {
 
     @Test
     public fun `self window is closed interval`() {
-        val windows = listOf(100L to 200L)
+        val windows = listOf(100L..200L)
         assertTrue(insideSelfWindow(windows, 100))
         assertTrue(insideSelfWindow(windows, 150))
         assertTrue(insideSelfWindow(windows, 200))

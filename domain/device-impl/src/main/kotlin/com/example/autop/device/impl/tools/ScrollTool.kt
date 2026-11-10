@@ -128,6 +128,7 @@ public class ScrollTool
                     snap,
                     nodeAt(snap, center.x, center.y),
                     mapOf(EXTRA_DIRECTION to direction.id),
+                    ctx.config,
                     fallbackTree = tree?.model,
                     fallbackPoint = Point(x, y),
                 )
@@ -233,15 +234,27 @@ public class ScrollTool
                     is NodeRoute.Rejected -> route.packageName
                     is NodeRoute.Skipped -> route.packageName
                 }
-            val fallback =
-                if (route is NodeRoute.Done) {
-                    "节点动作无变化（$label），补一次手势"
-                } else {
-                    trace.routeFallback(route, label)
-                }
-            val line = trace.executionLine(ExecMethod.GESTURE, channel = shot.result.channel, fallback = fallback)
+            val fallback = fallbackOf(route, label)
+            val line =
+                trace.executionLine(
+                    ExecMethod.GESTURE,
+                    channel = shot.result.channel,
+                    fallback = fallback,
+                    shellSkip = shot.result.shellSkip,
+                )
             return StepResult(moved, after, shot.replay, router.afterGesture(ctx, learnPkg, moved), line)
         }
+
+        /** 手势补位的原因说明：节点动作做了但无变化，或压根没走节点动作。 */
+        private fun fallbackOf(
+            route: NodeRoute,
+            label: String,
+        ): String? =
+            if (route is NodeRoute.Done) {
+                "节点动作无变化（$label），补一次手势"
+            } else {
+                trace.routeFallback(route, label)
+            }
 
         /** 画面帧签名比较（WP2.6）：任一帧缺失返回 null（不可判断）。 */
         private fun movedOf(

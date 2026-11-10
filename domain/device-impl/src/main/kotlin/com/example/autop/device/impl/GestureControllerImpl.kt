@@ -19,9 +19,11 @@ import com.example.autop.device.NodeActionOutcome
 import com.example.autop.device.Rect
 import com.example.autop.device.ResolvedNode
 import com.example.autop.device.ShellInput
+import com.example.autop.device.ShellSkip
 import com.example.autop.device.ShellState
 import com.example.autop.device.UserActivityMonitor
 import com.example.autop.device.impl.touch.TouchShieldController
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import java.util.concurrent.ThreadLocalRandom
 import javax.inject.Inject
@@ -57,6 +59,25 @@ private const val KEYCODE_APP_SWITCH: Int = 187
 private const val SWIPE_STEP_PX: Int = 150
 private const val SWIPE_MAX_POINTS: Int = 8
 
+/** shell 注入的一次尝试（WP7.4）：已完成，或因 [reason] 跳过、转走无障碍。 */
+internal sealed interface ShellAttempt {
+    data object Done : ShellAttempt
+
+    data class Skipped(
+        val reason: ShellSkip,
+    ) : ShellAttempt
+}
+
+/** ShellAttempt → InjectionResult（WP7.4）：Done 走 shell；Skipped 回落无障碍并记录没走 shell 的原因。 */
+internal fun injectionResultOf(
+    attempt: ShellAttempt,
+    accessibilityOk: Boolean,
+): InjectionResult =
+    when (attempt) {
+        ShellAttempt.Done -> InjectionResult.shell(ok = true)
+        is ShellAttempt.Skipped -> InjectionResult.accessibility(accessibilityOk, attempt.reason)
+    }
+
 /** [GestureController] 实现。 */
 @Singleton
 @Suppress("LongParameterList", "TooManyFunctions") // 装配类：服务+监视+配置+时钟+盾+shell 通道+日志，不可再减（N114）；双通道路由辅助计入函数数
@@ -84,9 +105,10 @@ public class GestureControllerImpl
             y: Int,
             durationMs: Long,
         ): InjectionResult {
-            if (shellTap(x, y, durationMs)) return InjectionResult.shell(ok = true)
+            val attempt = shellTap(x, y, durationMs)
+            if (attempt is ShellAttempt.Done) return InjectionResult.shell(ok = true)
             val path = Path().apply { moveTo(x.toFloat(), y.toFloat()) }
-            return InjectionResult.accessibility(stroke(path, durationMs, OP_TAP, pointRect(x, y)))
+            return injectionResultOf(attempt, stroke(path, durationMs, OP_TAP, pointRect(x, y)))
         }
 
         /**
@@ -101,9 +123,11 @@ public class GestureControllerImpl
             durationMs: Long,
             jitterPx: Int,
         ): InjectionResult {
-            if (shellSwipe(fromX, fromY, toX, toY, durationMs)) return InjectionResult.shell(ok = true)
+            val attempt = shellSwipe(fromX, fromY, toX, toY, durationMs)
+            if (attempt is ShellAttempt.Done) return InjectionResult.shell(ok = true)
             val path = buildSwipePath(fromX, fromY, toX, toY, jitterPx)
-            return InjectionResult.accessibility(
+            return injectionResultOf(
+                attempt,
                 stroke(path, durationMs, OP_SWIPE, spanRect(fromX, fromY, toX, toY)),
             )
         }
@@ -207,9 +231,11 @@ public class GestureControllerImpl
             x: Int,
             y: Int,
             durationMs: Long,
-        ): Boolean =
-            shellAction(pointRect(x, y)) { shellInput.tap(x, y, durationMs) }.also { ok ->
-                if (ok) logger.i(TAG, EVENT_CHANNEL, "op" to OP_TAP, "channel" to CHANNEL_SHELL, "x" to x, "y" to y)
+        ): ShellAttempt =
+            shellAction(pointRect(x, y)) { shellInput.tap(x, y, durationMs) }.also { attempt ->
+                if (attempt is ShellAttempt.Done) {
+                    logger.i(TAG, EVENT_CHANNEL, "op" to OP_TAP, "channel" to CHANNEL_SHELL, "x" to x, "y" to y)
+                }
             }
 
         /** shell 注入滑动：同 shellTap。 */
@@ -219,11 +245,11 @@ public class GestureControllerImpl
             toX: Int,
             toY: Int,
             durationMs: Long,
-        ): Boolean =
+        ): ShellAttempt =
             shellAction(
                 spanRect(fromX, fromY, toX, toY),
-            ) { shellInput.swipe(fromX, fromY, toX, toY, durationMs) }.also { ok ->
-                if (ok) {
+            ) { shellInput.swipe(fromX, fromY, toX, toY, durationMs) }.also { attempt ->
+                if (attempt is ShellAttempt.Done) {
                     logger.i(
                         TAG,
                         EVENT_CHANNEL,
@@ -235,39 +261,55 @@ public class GestureControllerImpl
                 }
             }
 
-        /** shell 注入包裹：通道未连接直接回落（返回 false）；注入同走输入管道，盾放行＋自身动作标记。 */
+        /**
+         * shell 注入包裹（WP7.4）：通道未连接返回 [ShellAttempt.Skipped]（NOT_CONNECTED）；
+         * 命令返回 false 或抛出非取消异常返回 Skipped（COMMAND_FAILED，异常记 warn）；
+         * 注入同走输入管道，盾放行＋自身动作标记。
+         */
+        @Suppress("TooGenericExceptionCaught") // shell 通道实现可能抛任意运行时异常，统一转 COMMAND_FAILED（WP7.4）
         private suspend fun shellAction(
             target: Rect?,
             block: suspend () -> Boolean,
-        ): Boolean {
-            if (shellInput.state.value != ShellState.Connected) return false
-            return shielded(target) { selfAction { block() } }
+        ): ShellAttempt {
+            if (shellInput.state.value != ShellState.Connected) return ShellAttempt.Skipped(ShellSkip.NOT_CONNECTED)
+            val ok =
+                try {
+                    shielded(target) { selfAction { block() } }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    logger.w(TAG, "shell_command_failed", error = e)
+                    false
+                }
+            return if (ok) ShellAttempt.Done else ShellAttempt.Skipped(ShellSkip.COMMAND_FAILED)
         }
 
         /**
          * 全局动作。优先走 shell keyevent 注入（真实按键事件，应用无法屏蔽），
-         * 失败回落无障碍 performGlobalAction。
+         * 失败回落无障碍 performGlobalAction（WP7.4：带没走 shell 的原因）。
          */
         override suspend fun globalAction(action: GlobalAction): InjectionResult {
-            // 优先 shell keyevent
             val keyCode = keyCodeOf(action)
-            if (keyCode != null && shellKeyEvent(keyCode)) {
+            val attempt = if (keyCode != null) shellAction(null) { shellInput.keyEvent(keyCode) } else null
+            if (attempt is ShellAttempt.Done) {
                 logger.i(TAG, EVENT_CHANNEL, "op" to OP_GLOBAL_ACTION, "channel" to CHANNEL_SHELL, "keyCode" to keyCode)
                 return InjectionResult.shell(ok = true)
             }
             // 回落无障碍 API
             logger.i(TAG, EVENT_CHANNEL, "op" to OP_GLOBAL_ACTION, "channel" to CHANNEL_A11Y)
             val ok = shielded(null) { selfAction { holder.current()?.performGlobalAction(globalId(action)) == true } }
-            return InjectionResult.accessibility(ok)
+            // 无对应 keyevent 的动作（通知面板等）首选就是无障碍，没有 shell 跳过原因。
+            return if (attempt == null) InjectionResult.accessibility(ok, null) else injectionResultOf(attempt, ok)
         }
 
         /** shell 注入按键（input_text 的粘贴/回车等）：统一走盾放行＋自身动作标记。 */
-        override suspend fun shellKeyEvent(code: Int): Boolean = shellAction(null) { shellInput.keyEvent(code) }
+        override suspend fun shellKeyEvent(code: Int): Boolean =
+            shellAction(null) { shellInput.keyEvent(code) } is ShellAttempt.Done
 
         /** shell 注入组合键（如 Ctrl+A）。 */
         @Suppress("SpreadOperator") // 组合键只有 2 键，一次性小数组拷贝可忽略；vararg 端口只能展开传入
         override suspend fun shellKeyCombination(codes: List<Int>): Boolean =
-            shellAction(null) { shellInput.keyCombination(*codes.toIntArray()) }
+            shellAction(null) { shellInput.keyCombination(*codes.toIntArray()) } is ShellAttempt.Done
 
         /** GlobalAction 映射到 KeyEvent KEYCODE_*。 */
         private fun keyCodeOf(action: GlobalAction): Int? =
@@ -331,11 +373,13 @@ public class GestureControllerImpl
                 )
             }
 
+        /** 自身动作窗口登记（WP7.3）：动作开始前先登记上限窗口，动作完成后按实际结束＋宽限补登记。 */
         private suspend fun selfAction(block: suspend () -> Boolean): Boolean {
+            val cfg = configProvider.current()[DeviceConfig.TOUCH]
             val start = clock.nowMillis()
+            activityMonitor.markSelfActionWindow(start, start + cfg.selfActionMaxMs)
             val ok = block()
-            val grace = configProvider.current()[DeviceConfig.TOUCH].selfActionGraceMs
-            activityMonitor.markSelfActionWindow(start, clock.nowMillis() + grace)
+            activityMonitor.markSelfActionWindow(start, clock.nowMillis() + cfg.selfActionGraceMs)
             return ok
         }
 

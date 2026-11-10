@@ -12,7 +12,6 @@ import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
 import com.example.autop.device.AppLauncher
-import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
@@ -65,7 +64,7 @@ public class OpenUriTool
                     EXTRA_URI to uri,
                     EXTRA_SCHEME to uri.substringBefore(':'),
                 )
-            val subject = subjects.build(ID, snap, null, extra)
+            val subject = subjects.build(ID, snap, null, extra, ctx.config)
             return Outcome.Ok(PreparedAction(subject, uri))
         }
 
@@ -74,9 +73,8 @@ public class OpenUriTool
             ctx: ToolContext,
         ): ToolOutput {
             val uri = action.payload as String
-            if (!apps.openUri(uri)) {
-                return toolError(DeviceErrorCodes.URI_FAILED, "无法打开 $uri")
-            }
+            // 失败原因（WP7.5）原样带给模型，不再只报“无法打开”。
+            apps.openUriWithError(uri)?.let { return errorOutput(it) }
             val replayArgs = buildJsonObject { put(EXTRA_URI, uri) }
             val out = epilogue.finish(ctx, "已发送打开请求 $uri", null, ReplayInput(ID, replayArgs, gesture = null))
             val fg = out.observation?.packageName

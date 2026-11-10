@@ -6,9 +6,13 @@ package com.example.autop.device.impl
 
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.DeviceObserveSection
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.ObserveModeAvailability
 import com.example.autop.device.VisualScreenParser
+import com.example.autop.device.impl.tools.text
+import com.example.autop.device.impl.vision.VisualAvailability
+import com.example.autop.device.impl.vision.VisualUnavailable
 import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.ModelRole
 import javax.inject.Inject
@@ -22,6 +26,7 @@ public class ObserveModeResolver
         private val holder: ServiceHolder,
         private val visual: VisualScreenParser,
         private val gateway: LlmGateway,
+        private val prompts: PromptRepository,
     ) : ObserveModeAvailability {
         /** 当前生效的模式列表（按配置优先级排序）。 */
         public fun effective(config: DeviceObserveSection): List<ObserveMode> =
@@ -56,10 +61,21 @@ public class ObserveModeResolver
             when (mode) {
                 ObserveMode.A11Y ->
                     if (holder.current() == null) "无障碍服务未连接" else null
-                ObserveMode.VISUAL ->
-                    if (visual.available) null else "视觉解析模型未就绪"
+                ObserveMode.VISUAL -> visualReason()
                 ObserveMode.LLM -> llmReason()
             }
+
+        /**
+         * 视觉不可用原因（WP7.6）：OCR 停用单独说明原因，模型未就绪用统一文案；
+         * 文案走模板（`device.visual.*`），不再硬编码。
+         */
+        private fun visualReason(): String? {
+            if (visual.available) return null
+            return when (val why = (visual as? VisualAvailability)?.unavailable()) {
+                is VisualUnavailable.OcrDisabled -> prompts.text(PROMPT_OCR_DISABLED, mapOf(VAR_REASON to why.reason))
+                null, VisualUnavailable.NotReady -> prompts.text(PROMPT_VISUAL_NOT_READY)
+            }
+        }
 
         /** llm 模式要求 VISION 角色已分配且模型声明支持图片（§4.1）。 */
         private fun llmReason(): String? =
@@ -75,5 +91,8 @@ public class ObserveModeResolver
 
         private companion object {
             const val REASON_DISABLED: String = "该模式已在设置中关闭"
+            const val PROMPT_VISUAL_NOT_READY = "device.visual.not_ready"
+            const val PROMPT_OCR_DISABLED = "device.visual.ocr_disabled"
+            const val VAR_REASON = "reason"
         }
     }

@@ -45,6 +45,9 @@ public object DeviceErrorCodes {
     /** 启动应用失败。 */
     public const val LAUNCH_FAILED: String = "device.launch_failed"
 
+    /** 系统拒绝打开（SecurityException / 后台启动拦截等，WP7.5）。 */
+    public const val LAUNCH_DENIED: String = "device.launch_denied"
+
     /** 点位上没有可拾取的元素。 */
     public const val ELEMENT_NOT_FOUND: String = "device.element_not_found"
 

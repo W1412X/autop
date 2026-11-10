@@ -197,7 +197,7 @@ class ScreenObserverAutoTest {
                 dispatchers = TestDispatcherProvider(StandardTestDispatcher()),
                 clock = FakeClock(0L),
             )
-        val modes = ObserveModeResolver(holder, visual, NoVisionGateway)
+        val modes = ObserveModeResolver(holder, visual, NoVisionGateway, prompts)
         val preparer = ScreenPreparer(reader, capturer, contentAreas, visual, llm, serializer)
         return ScreenObserver(preparer, serializer, modes)
     }
@@ -348,7 +348,10 @@ class ScreenObserverAutoTest {
     }
 
     private object NoRedaction : WindowRedactor {
-        override fun redact(window: WindowSnapshot): RedactionMode = RedactionMode.NONE
+        override fun redact(
+            window: WindowSnapshot,
+            config: ConfigSnapshot,
+        ): RedactionMode = RedactionMode.NONE
     }
 
     private class TestContext(

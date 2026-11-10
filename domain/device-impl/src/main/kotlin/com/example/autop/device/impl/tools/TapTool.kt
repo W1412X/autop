@@ -111,6 +111,7 @@ public class TapTool
                     snap,
                     nodeAt(snap, target.x, target.y),
                     emptyMap(),
+                    ctx.config,
                     fallbackTree = tree?.model,
                     fallbackPoint = modelPoint,
                 )
@@ -176,6 +177,7 @@ public class TapTool
                     ExecMethod.GESTURE,
                     channel = gesture?.channel ?: InjectionChannel.NONE,
                     fallback = trace.routeFallback(route, label),
+                    shellSkip = gesture?.shellSkip,
                 )
             }
         }

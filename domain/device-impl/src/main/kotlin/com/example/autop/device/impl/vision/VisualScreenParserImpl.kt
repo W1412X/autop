@@ -1,7 +1,7 @@
 /**
  * [com.example.autop.device.VisualScreenParser] 实现（docs/design/visual-screen-parsing §5.1）：
  * 解码截图 → YOLO 检测＋状态分类＋建树分析＋逐叶子 OCR/图标 → 伪树合成。
- * 引擎未就绪/解析失败返回 null，不抛错。
+ * 引擎未就绪返回 null；推理异常向上抛（ScreenPreparer 转 visual_parse_failed，WP7.6）。
  */
 package com.example.autop.device.impl.vision
 
@@ -19,6 +19,23 @@ import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/** 视觉不可用的具体原因（WP7.6）：ObserveModeResolver 渲染模板文案用。 */
+public sealed interface VisualUnavailable {
+    /** 模型/引擎未就绪。 */
+    public data object NotReady : VisualUnavailable
+
+    /** OCR 永久停用（字典与模型不符等），[reason] 是停用原因详情。 */
+    public data class OcrDisabled(
+        public val reason: String,
+    ) : VisualUnavailable
+}
+
+/** 视觉不可用原因查询（[VisualScreenParserImpl] 实现，WP7.6 细化“视觉解析模型未就绪”）。 */
+internal interface VisualAvailability {
+    /** 不可用原因；可用返回 null。 */
+    fun unavailable(): VisualUnavailable?
+}
+
 /** 视觉屏幕解析器：截图字节 → 伪节点树（每次观测全链路重解析，不缓存）。 */
 @Singleton
 public class VisualScreenParserImpl
@@ -28,7 +45,8 @@ public class VisualScreenParserImpl
         private val configProvider: ConfigProvider,
         private val dispatchers: DispatcherProvider,
         private val debug: VisualDebugCapture,
-    ) : VisualScreenParser {
+    ) : VisualScreenParser,
+        VisualAvailability {
         private val store = VisionModelStore(context.assets)
         private val detector: VisualDetector = OnnxVisualDetector(store)
         private val recognizer: TextRecognizer = OnnxTextRecognizer(store)
@@ -43,7 +61,18 @@ public class VisualScreenParserImpl
         private val iconClassifier: VisualIconClassifier by lazy { OnnxIconClassifier(store, iconTable) }
 
         override val available: Boolean
-            get() = configProvider.current()[DeviceConfig.VISION].enabled && detector.ready && recognizer.ready
+            get() = unavailable() == null
+
+        /** 不可用原因（WP7.6）：OCR 停用与“模型未就绪”分开报；图标识别只在启用时纳入就绪判定。 */
+        override fun unavailable(): VisualUnavailable? {
+            val cfg = configProvider.current()[DeviceConfig.VISION]
+            if (!cfg.enabled) return VisualUnavailable.NotReady
+            val ocrDisabled = recognizer.disabledReason
+            if (ocrDisabled != null) return VisualUnavailable.OcrDisabled(ocrDisabled)
+            val iconCfg = configProvider.current()[DeviceConfig.VISION_ICON]
+            val iconReady = !iconCfg.enabled || iconClassifier.ready
+            return if (detector.ready && recognizer.ready && iconReady) null else VisualUnavailable.NotReady
+        }
 
         /**
          * 预热：把 ONNX 会话（检测/OCR 识别/状态/图标）的加载挪到空闲期。

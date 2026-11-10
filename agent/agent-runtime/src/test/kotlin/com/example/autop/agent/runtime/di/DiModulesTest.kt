@@ -27,7 +27,7 @@ class DiModulesTest {
                     AgentRuntimeModule.provideFinishTool(TestPromptRepository()),
                     AgentRuntimeModule.provideAskUserTool(prompts),
                     AgentRuntimeModule.provideNoteTool(prompts),
-                    AgentRuntimeModule.provideHistoryRecallTool(recall),
+                    AgentRuntimeModule.provideHistoryRecallTool(recall, TestPromptRepository()),
                     AgentRuntimeModule.provideRuntimeStateTool(),
                 )
 

@@ -31,7 +31,7 @@ internal class AskUserTool(
         toolSpec(name = "ask_user", descriptionPromptId = "tool.ask_user") {
             string("question", required = true)
             array("options")
-            integer("timeout_s")
+            integer("timeout_s", min = 1)
         }
 
     override val access: ToolAccess = ToolAccess.CONTROL
@@ -70,13 +70,8 @@ internal class AskUserTool(
         return maxMs
     }
 
-    /** 非超时错误原样透出。 */
-    private fun errorOutput(error: AppError): ToolOutput =
-        ToolOutput(
-            ok = false,
-            content = listOf(Block.Text("错误 ${error.code}: ${error.message}")),
-            error = error,
-        )
+    /** 非超时错误透出；正文由执行器统一成 error_result 格式（WP7.1）。 */
+    private fun errorOutput(error: AppError): ToolOutput = ToolOutput(ok = false, content = emptyList(), error = error)
 
     /** 空问题不再弹窗（N172）。 */
     private fun blankQuestion(): ToolOutput =

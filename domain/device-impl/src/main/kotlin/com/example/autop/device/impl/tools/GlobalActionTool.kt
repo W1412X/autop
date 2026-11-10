@@ -11,6 +11,7 @@ import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.GestureController
 import com.example.autop.device.GlobalAction
@@ -55,19 +56,20 @@ public class GlobalActionTool
             // 空树应用的恢复路径（back/home）不能被节点树卡死。
             when (val got = screenReader.snapshotOrDegraded()) {
                 is Outcome.Err -> got
-                is Outcome.Ok -> prepareWith(got.value, args)
+                is Outcome.Ok -> prepareWith(got.value, args, ctx.config)
             }
 
         private fun prepareWith(
             snap: ScreenSnapshot,
             args: JsonObject,
+            config: ConfigSnapshot,
         ): Outcome<PreparedAction> {
             val name = args.str("action").orEmpty()
             val action = actionOf(name)
             return if (action == null) {
                 Outcome.Err(AppError(code = CommonErrorCodes.INVALID_ARGUMENT, message = "未知的全局动作 $name"))
             } else {
-                val subject = subjects.build(ID, snap, null, mapOf(EXTRA_ACTION to name))
+                val subject = subjects.build(ID, snap, null, mapOf(EXTRA_ACTION to name), config)
                 Outcome.Ok(PreparedAction(subject, GlobalActionPayload(action, replayArgsOf(args, hit = null))))
             }
         }
@@ -90,7 +92,14 @@ public class GlobalActionTool
                 )
             return out.copy(
                 content =
-                    out.content + Block.Text(trace.executionLine(ExecMethod.GLOBAL_ACTION, channel = result.channel)),
+                    out.content +
+                        Block.Text(
+                            trace.executionLine(
+                                ExecMethod.GLOBAL_ACTION,
+                                channel = result.channel,
+                                shellSkip = result.shellSkip,
+                            ),
+                        ),
             )
         }
 

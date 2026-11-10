@@ -13,6 +13,7 @@ import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.DeviceConfig
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ScreenSnapshot
 import kotlinx.coroutines.delay
@@ -27,6 +28,7 @@ public class WaitTool
     constructor(
         private val screenReader: ScreenReader,
         private val clock: Clock,
+        private val prompts: PromptRepository,
     ) : Tool {
         override val id: String = "tool.wait"
 
@@ -80,7 +82,8 @@ public class WaitTool
             ctx: ToolContext,
         ): ToolOutput {
             val waitCfg = ctx.config[DeviceConfig.WAIT]
-            val timeout = (timeoutMs ?: waitCfg.defaultTimeoutMs).coerceIn(0, maxWaitMs(ctx))
+            val requested = timeoutMs ?: waitCfg.defaultTimeoutMs
+            val timeout = requested.coerceIn(0, maxWaitMs(ctx))
             val deadline = clock.nowMillis() + timeout
             val satisfied =
                 awaitCondition(
@@ -92,12 +95,31 @@ public class WaitTool
                         if (degraded) screenReader.snapshotOrDegraded() else screenReader.snapshot()
                     },
                 )
-            return if (satisfied) {
-                textOutput("等待条件已满足")
-            } else {
-                textOutput("等待超时（$timeout 毫秒），${unsatisfiedReason(until)}")
-            }
+            val body =
+                if (satisfied) {
+                    "等待条件已满足"
+                } else {
+                    "等待超时（$timeout 毫秒），${unsatisfiedReason(until)}"
+                }
+            // 等待时长被钳制时说明实际用了多少（WP7.10）。
+            return textOutput(body + argClampedNote(ARG_TIMEOUT_MS, requested, timeout))
         }
+
+        /** 参数被钳制说明（WP7.10，`agent.tool.arg_clamped`）：没有钳制返回空串。 */
+        private fun argClampedNote(
+            name: String,
+            requested: Long,
+            used: Long,
+        ): String =
+            if (requested == used) {
+                ""
+            } else {
+                "\n" +
+                    prompts.text(
+                        PROMPT_ARG_CLAMPED,
+                        mapOf(VAR_NAME to name, VAR_REQUESTED to requested.toString(), VAR_USED to used.toString()),
+                    )
+            }
 
         /** 超时时区分“确实未满足”和“界面压根读不到/文字条件无法判定”，别让模型误以为条件一定是假。 */
         private suspend fun unsatisfiedReason(until: JsonObject): String {
@@ -116,6 +138,12 @@ public class WaitTool
         private companion object {
             /** 预留给执行器的余量（毫秒）。 */
             const val TIMEOUT_MARGIN_MS: Long = 5_000L
+
+            const val PROMPT_ARG_CLAMPED = "agent.tool.arg_clamped"
+            const val ARG_TIMEOUT_MS = "timeout_ms"
+            const val VAR_NAME = "name"
+            const val VAR_REQUESTED = "requested"
+            const val VAR_USED = "used"
         }
     }
 

@@ -17,6 +17,7 @@ import com.example.autop.agent.ToolSpec
 import com.example.autop.agent.runtime.RuntimeToolContext
 import com.example.autop.agent.runtime.testing.FakePolicyEngine
 import com.example.autop.agent.runtime.testing.InMemoryThreadStore
+import com.example.autop.agent.runtime.testing.NoopLogger
 import com.example.autop.agent.runtime.testing.TestPromptRepository
 import com.example.autop.agent.toolSpec
 import com.example.autop.core.common.Capability
@@ -226,6 +227,7 @@ class ToolRouterTest {
                     com.example.autop.agent.runtime.testing
                         .FakePlatform(),
                 audit = null,
+                logger = NoopLogger,
             )
         val build = builder.build(request(), toolFilter = null, modelVision = false)
 
@@ -265,7 +267,7 @@ class ToolRouterTest {
     private fun router(tools: List<Tool>): ToolRouter {
         val prompts = TestPromptRepository()
         val clock = FakeClock(1_000L)
-        val executor = ToolExecutor(tools, FakePolicyEngine(), null, prompts, clock)
+        val executor = ToolExecutor(tools, FakePolicyEngine(), null, prompts, clock, NoopLogger)
         return ToolRouter(tools, executor, emptyList(), prompts)
     }
 

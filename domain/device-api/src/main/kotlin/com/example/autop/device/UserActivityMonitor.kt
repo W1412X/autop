@@ -13,7 +13,10 @@ public interface UserActivityMonitor {
     /** 最近一次用户触摸时间戳。 */
     public fun lastUserTouchAt(): Long?
 
-    /** 标记自身动作的时间窗口，窗口内产生的触摸不视为用户操作。 */
+    /**
+     * 登记一个自身动作的时间窗口，与已登记的窗口取并集（WP7.3）：
+     * 窗口内产生的触摸不视为用户操作，多次登记覆盖动作全程与等待稳定。
+     */
     public fun markSelfActionWindow(
         startMs: Long,
         endMs: Long,

@@ -8,6 +8,7 @@ import com.example.autop.core.common.getOrNull
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.InjectionChannel
 import com.example.autop.device.InjectionResult
+import com.example.autop.device.ShellSkip
 import com.example.autop.device.impl.nodeaction.NodeRoute
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
@@ -33,12 +34,6 @@ internal enum class ExecMethod {
 
     /** shell 键盘注入（剪贴板粘贴、回车等，只经 shell 通道）。 */
     SHELL_KEY,
-}
-
-/** 手势/全局动作本可走 shell 但被跳过的原因（WP7.4 由注入通道填入）。 */
-internal enum class ShellSkip {
-    NOT_CONNECTED,
-    FAILED,
 }
 
 /** 执行方式回执（一行，模型可见）。[fallback] 说明为什么没走首选方式。 */
@@ -117,10 +112,10 @@ public class ExecutionTraceRenderer
         }
     }
 
-/** shell 跳过原因 → 模板后缀。 */
+/** shell 跳过原因 → 模板后缀（WP7.4：统一用 DAPI 的 [ShellSkip]，COMMAND_FAILED 对应 `device.trace.shell_skip.failed`）。 */
 private val ShellSkip.id: String
     get() =
         when (this) {
             ShellSkip.NOT_CONNECTED -> "not_connected"
-            ShellSkip.FAILED -> "failed"
+            ShellSkip.COMMAND_FAILED -> "failed"
         }

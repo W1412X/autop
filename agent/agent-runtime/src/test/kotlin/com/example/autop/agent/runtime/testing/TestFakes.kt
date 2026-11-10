@@ -99,12 +99,16 @@ internal class FakePolicyEngine(
     override suspend fun evaluate(
         subject: PolicySubject,
         overrides: PolicyOverrides,
+        config: com.example.autop.core.config.ConfigSnapshot,
     ): PolicyDecision {
         evaluated += subject
         return decide(subject)
     }
 
-    override fun redaction(packageName: String?): Boolean = false
+    override fun redaction(
+        packageName: String?,
+        config: com.example.autop.core.config.ConfigSnapshot,
+    ): Boolean = false
 }
 
 /** 平台能力：[capabilities] 集合内的能力为可用。 */

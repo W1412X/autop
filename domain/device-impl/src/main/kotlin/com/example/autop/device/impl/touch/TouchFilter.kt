@@ -22,8 +22,8 @@ internal fun insideAny(
             y < it.y + it.height
     }
 
-/** 墙钟时刻是否落在任一自身动作窗口内（闭区间）。 */
+/** 墙钟时刻是否落在任一自身动作窗口内（闭区间；窗口登记取并集，WP7.3）。 */
 internal fun insideSelfWindow(
-    windows: List<Pair<Long, Long>>,
+    windows: Collection<LongRange>,
     now: Long,
-): Boolean = windows.any { now >= it.first && now <= it.second }
+): Boolean = windows.any { now in it }

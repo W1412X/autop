@@ -97,7 +97,7 @@ public class DismissPopupTool
                     windowScoped = windowScoped,
                 )
             val extra = mapOf(EXTRA_REASON to pick.reason)
-            return Outcome.Ok(PreparedAction(subjects.build(ID, observed.snapshot, null, extra), action))
+            return Outcome.Ok(PreparedAction(subjects.build(ID, observed.snapshot, null, extra, ctx.config), action))
         }
 
         override suspend fun perform(
@@ -131,6 +131,7 @@ public class DismissPopupTool
                         ExecMethod.GESTURE,
                         channel = injected?.channel ?: InjectionChannel.NONE,
                         fallback = trace.routeFallback(route, ACTION_CLICK),
+                        shellSkip = injected?.shellSkip,
                     )
                 }
             // 手势坐标点击：回放记录标 execution=gesture 并带实际落点（docs/tech/05 §13）。

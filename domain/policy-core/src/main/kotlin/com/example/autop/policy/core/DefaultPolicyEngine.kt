@@ -5,7 +5,7 @@
 package com.example.autop.policy.core
 
 import com.example.autop.core.common.Logger
-import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.PolicyConfig
 import com.example.autop.core.config.PolicySection
 import com.example.autop.policy.PolicyDecision
@@ -22,7 +22,6 @@ import javax.inject.Singleton
 public class DefaultPolicyEngine
     @Inject
     constructor(
-        private val configProvider: ConfigProvider,
         ruleTypes: Set<@JvmSuppressWildcards PolicyRuleType>,
         private val logger: Logger,
     ) : PolicyEngine {
@@ -35,23 +34,29 @@ public class DefaultPolicyEngine
         override suspend fun evaluate(
             subject: PolicySubject,
             overrides: PolicyOverrides,
+            config: ConfigSnapshot,
         ): PolicyDecision {
-            blockedDecision(subject)?.let { return it }
-            val rules = rulesFor(configProvider.current()[PolicyConfig.POLICY])
+            blockedDecision(subject, config)?.let { return it }
+            val rules = rulesFor(config[PolicyConfig.POLICY])
             return rules.rules.firstNotNullOfOrNull { decisionFor(it, subject, overrides, rules.categories) }
                 ?: PolicyDecision.Allow
         }
 
-        override fun redaction(packageName: String?): Boolean =
-            packageName != null && packageName in configProvider.current()[PolicyConfig.POLICY].blockedPackages
+        override fun redaction(
+            packageName: String?,
+            config: ConfigSnapshot,
+        ): Boolean = packageName != null && packageName in config[PolicyConfig.POLICY].blockedPackages
 
         /**
          * 屏蔽应用（`policy.blockedPackages`）：打开目标（工具自报 `targetPackage`）或
          * 前台命中一律拦截并暂停——此前该名单只参与观测脱敏（[redaction]）、不进求值，
          * 设置形同虚设（2026-11-09 修复）。
          */
-        private fun blockedDecision(subject: PolicySubject): PolicyDecision? {
-            val blocked = configProvider.current()[PolicyConfig.POLICY].blockedPackages
+        private fun blockedDecision(
+            subject: PolicySubject,
+            config: ConfigSnapshot,
+        ): PolicyDecision? {
+            val blocked = config[PolicyConfig.POLICY].blockedPackages
             val hit = subject.extra[EXTRA_TARGET_PACKAGE] in blocked || subject.packageName in blocked
             return if (hit) {
                 PolicyDecision.Block(BLOCKED_RULE_ID, BLOCKED_CATEGORY, BLOCKED_REASON_KEY)

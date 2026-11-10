@@ -79,6 +79,7 @@
       "enabled": true,
       "sources": ["outside_touch", "a11y_events"],
       "selfActionGraceMs": 400,
+      "selfActionMaxMs": 15000,
       "shieldEnabled": true,
       "shieldRelayoutTimeoutMs": 500
     },

@@ -16,6 +16,7 @@ import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.ScreenReader
@@ -61,12 +62,13 @@ public class RestartAppTool
             // N193 空树降级：package 缺省时取前台包名，降级快照照常带前台信息。
             when (val got = screenReader.snapshotOrDegraded()) {
                 is Outcome.Err -> got
-                is Outcome.Ok -> prepareWith(got.value, args)
+                is Outcome.Ok -> prepareWith(got.value, args, ctx.config)
             }
 
         private fun prepareWith(
             snap: ScreenSnapshot,
             args: JsonObject,
+            config: ConfigSnapshot,
         ): Outcome<PreparedAction> {
             val pkg = args.str("package") ?: snap.foregroundPackage
             if (pkg == null) {
@@ -80,7 +82,7 @@ public class RestartAppTool
                     AppError(code = DeviceErrorCodes.RESTART_DENIED, message = "不允许结束应用 $pkg", hint = "请换一个应用包名"),
                 )
             }
-            return Outcome.Ok(PreparedAction(subjects.build(ID, snap, null, mapOf(EXTRA_PACKAGE to pkg)), pkg))
+            return Outcome.Ok(PreparedAction(subjects.build(ID, snap, null, mapOf(EXTRA_PACKAGE to pkg), config), pkg))
         }
 
         override suspend fun perform(

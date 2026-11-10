@@ -6,6 +6,7 @@ package com.example.autop.device.impl.tools
 
 import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.InjectionChannel
+import com.example.autop.device.ShellSkip
 import com.example.autop.device.impl.nodeaction.NodeRoute
 import com.example.autop.device.impl.nodeaction.SkipReason
 import com.google.common.truth.Truth.assertThat

@@ -243,7 +243,7 @@ class DefaultPolicyEngineTest {
         userRules: List<String> = emptyList(),
         blockedPackages: List<String> = emptyList(),
         logger: Logger = NoopLogger,
-    ): DefaultPolicyEngine {
+    ): TestEngine {
         val doc =
             buildJsonObject {
                 put("categories", obj(CATEGORIES))
@@ -260,10 +260,45 @@ class DefaultPolicyEngineTest {
                     },
                 )
             }
-        return DefaultPolicyEngine(FakeConfigProvider(overrides), BuiltinRuleTypes.ALL.toSet(), logger)
+        val provider = FakeConfigProvider(overrides)
+        return TestEngine(DefaultPolicyEngine(BuiltinRuleTypes.ALL.toSet(), logger), provider.current())
     }
 
     private fun subject(): PolicySubject = PolicySubject(toolId = "tool.tap")
+
+    @Test
+    fun `rules come from passed snapshot not global config`() =
+        runTest {
+            val engine = engine(listOf(PAY_TARGET))
+            val decision =
+                engine.engine.evaluate(
+                    subject().copy(targetText = "确认付款 ¥100"),
+                    PolicyOverrides(),
+                    engine.config,
+                )
+            assertThat(decision).isEqualTo(PolicyDecision.Block("pay.target", "payment", "policy_reason_payment"))
+            val empty = engine(emptyList())
+            val ignored =
+                engine.engine.evaluate(
+                    subject().copy(targetText = "确认付款 ¥100"),
+                    PolicyOverrides(),
+                    empty.config,
+                )
+            assertThat(ignored).isEqualTo(PolicyDecision.Allow)
+        }
+
+    /** 测试替身：evaluate/redaction 默认用构造时的配置快照（WP7.2 起规则随参数传入）。 */
+    private class TestEngine(
+        val engine: DefaultPolicyEngine,
+        val config: com.example.autop.core.config.ConfigSnapshot,
+    ) {
+        suspend fun evaluate(
+            subject: PolicySubject,
+            overrides: PolicyOverrides,
+        ): PolicyDecision = engine.evaluate(subject, overrides, config)
+
+        fun redaction(packageName: String?): Boolean = engine.redaction(packageName, config)
+    }
 
     private fun obj(json: String): JsonObject = AutopJson.default.parseToJsonElement(json) as JsonObject
 }

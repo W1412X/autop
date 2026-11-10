@@ -40,6 +40,7 @@ import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.Screenshot
 import com.example.autop.device.StableWait
 import com.example.autop.device.UiStabilizer
+import com.example.autop.device.UserActivityMonitor
 import com.example.autop.device.VisualFrame
 import com.example.autop.device.VisualScreenParser
 import com.example.autop.device.VisualTree
@@ -69,6 +70,8 @@ import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.ModelRole
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
@@ -227,11 +230,12 @@ class ActionEpilogueTest {
                 dispatchers = TestDispatcherProvider(StandardTestDispatcher()),
                 clock = FakeClock(0L),
             )
-        val modes = ObserveModeResolver(holder, visual, CountingGateway)
+        val modes = ObserveModeResolver(holder, visual, CountingGateway, prompts)
         val preparer = ScreenPreparer(reader, capturer, contentAreas, visual, llm, serializer)
         val observer = ScreenObserver(preparer, serializer, modes)
         val frameMotion = FrameMotion(reader, provider)
-        val epilogue = ActionEpilogue(FakeStabilizer, observer, FakeProbe, frameMotion, prompts)
+        val epilogue =
+            ActionEpilogue(FakeStabilizer, observer, FakeProbe, frameMotion, prompts, FakeClock(0L), FakeMonitor)
         return Triple(observer, epilogue, CountingGateway)
     }
 
@@ -398,6 +402,18 @@ class ActionEpilogueTest {
         ): StableWait = StableWait(0L, settled = true)
     }
 
+    /** 触摸监测替身（WP7.3：收尾会登记自身动作窗口，这里只记录不判定）。 */
+    private object FakeMonitor : UserActivityMonitor {
+        override val userTouches: SharedFlow<Long> = MutableSharedFlow()
+
+        override fun lastUserTouchAt(): Long? = null
+
+        override fun markSelfActionWindow(
+            startMs: Long,
+            endMs: Long,
+        ) = Unit
+    }
+
     private object FakeProbe : ReplayStateProbe {
         override suspend fun sample(
             observeMode: String,
@@ -421,7 +437,10 @@ class ActionEpilogueTest {
     }
 
     private object NoRedaction : WindowRedactor {
-        override fun redact(window: WindowSnapshot): RedactionMode = RedactionMode.NONE
+        override fun redact(
+            window: WindowSnapshot,
+            config: ConfigSnapshot,
+        ): RedactionMode = RedactionMode.NONE
     }
 
     private class TestContext(

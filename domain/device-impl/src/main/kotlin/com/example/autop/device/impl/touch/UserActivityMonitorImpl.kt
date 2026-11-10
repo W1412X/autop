@@ -32,7 +32,6 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
-import java.util.concurrent.CopyOnWriteArrayList
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlin.math.roundToInt
@@ -59,8 +58,8 @@ public class UserActivityMonitorImpl
 
         override val userTouches: SharedFlow<Long> = _userTouches.asSharedFlow()
 
-        /** 自身动作时间窗口（墙钟，startMs..endMs）；随手清理过期项。 */
-        private val selfWindows = CopyOnWriteArrayList<Pair<Long, Long>>()
+        /** 自身动作时间窗口（墙钟，startMs..endMs）：登记取并集，判定落在任一窗口内即自身动作（WP7.3）。 */
+        private val selfWindows = ArrayDeque<LongRange>()
 
         @Volatile
         private var lastTouchAt: Long? = null
@@ -89,8 +88,10 @@ public class UserActivityMonitorImpl
             startMs: Long,
             endMs: Long,
         ) {
-            selfWindows.removeAll { it.second < startMs }
-            selfWindows.add(startMs to endMs)
+            synchronized(selfWindows) {
+                selfWindows.removeAll { it.last < clock.nowMillis() - SELF_WINDOW_RETENTION_MS }
+                selfWindows.addLast(startMs..endMs)
+            }
         }
 
         private fun onA11yEvent(event: A11yEventLite) {
@@ -102,7 +103,8 @@ public class UserActivityMonitorImpl
         private fun emitTouch() {
             if (!enabled()) return
             val now = clock.nowMillis()
-            if (insideSelfWindow(selfWindows, now)) return
+            val windows = synchronized(selfWindows) { selfWindows.toList() }
+            if (insideSelfWindow(windows, now)) return
             lastTouchAt = now
             _userTouches.tryEmit(now)
         }
@@ -128,6 +130,9 @@ public class UserActivityMonitorImpl
             const val SOURCE_A11Y_EVENTS = "a11y_events"
             const val PROBE_SIZE_PX = 1
             const val BUFFER = 16
+
+            /** 过期自身动作窗口的清理阈值（只用于清理，不影响判定，WP7.3）。 */
+            const val SELF_WINDOW_RETENTION_MS: Long = 60_000L
 
             /** 触摸语义的无障碍事件（docs/tech/05 §8.3）。 */
             val USER_TOUCH_EVENT_TYPES: Set<Int> =

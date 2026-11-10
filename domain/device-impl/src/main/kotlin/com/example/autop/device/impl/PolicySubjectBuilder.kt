@@ -4,7 +4,7 @@
  */
 package com.example.autop.device.impl
 
-import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.PolicyConfig
 import com.example.autop.device.NodeFlags
@@ -24,7 +24,6 @@ import javax.inject.Singleton
 public class PolicySubjectBuilder
     @Inject
     constructor(
-        private val configProvider: ConfigProvider,
         private val secureCache: SecureWindowCache,
     ) {
         /**
@@ -36,17 +35,18 @@ public class PolicySubjectBuilder
             snapshot: ScreenSnapshot,
             target: NodeSnapshot?,
             extra: Map<String, String>,
+            config: ConfigSnapshot,
             fallbackTree: ScreenModel? = null,
             fallbackPoint: Point? = null,
         ): PolicySubject {
-            val subject = configProvider.current()[PolicyConfig.POLICY].subject
+            val subject = config[PolicyConfig.POLICY].subject
             val fallbackModel = if (snapshot.nodes.isEmpty()) fallbackTree else null
             val fallback = fallbackModel?.let { model -> fallbackPoint?.let { HitResolver.resolve(it, model) } }
             return PolicySubject(
                 toolId = toolId,
                 packageName = snapshot.foregroundPackage,
                 activity = snapshot.activity,
-                targetText = targetText(target, snapshot, fallback),
+                targetText = targetText(target, snapshot, fallback, config),
                 targetIsPassword = isPassword(target, fallback),
                 targetDataSensitive = target != null && target.has(NodeFlags.DATA_SENSITIVE),
                 screenTexts = screenTextsFor(snapshot, fallbackTree, subject.maxScreenTexts),
@@ -60,7 +60,8 @@ public class PolicySubjectBuilder
             target: NodeSnapshot?,
             snapshot: ScreenSnapshot,
             fallback: ScreenNode?,
-        ): String? = target?.let { targetTextOf(snapshot, it) } ?: fallback?.let { fallbackTextOf(it) }
+            config: ConfigSnapshot,
+        ): String? = target?.let { targetTextOf(snapshot, it, config) } ?: fallback?.let { fallbackTextOf(it) }
 
         /** 命中节点或兜底命中节点是否带密码语义。 */
         private fun isPassword(
@@ -100,13 +101,14 @@ public class PolicySubjectBuilder
         private fun targetTextOf(
             snapshot: ScreenSnapshot,
             target: NodeSnapshot,
+            config: ConfigSnapshot,
         ): String? {
             val parts = mutableListOf<String>()
             listOfNotNull(target.text, target.contentDesc)
                 .map { it.trim() }
                 .filter { it.isNotEmpty() }
                 .forEach { parts += it }
-            val limit = configProvider.current()[DeviceConfig.SERIALIZER].maxMergedLabels
+            val limit = config[DeviceConfig.SERIALIZER].maxMergedLabels
             collectLabels(snapshot, target, parts, limit)
             return parts.takeIf { it.isNotEmpty() }?.joinToString(" · ")
         }

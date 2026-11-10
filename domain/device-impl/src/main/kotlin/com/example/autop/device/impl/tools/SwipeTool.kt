@@ -113,6 +113,7 @@ public class SwipeTool
                         "x2" to end.x.toString(),
                         "y2" to end.y.toString(),
                     ),
+                    ctx.config,
                     fallbackTree = tree?.model,
                     fallbackPoint = start,
                 )
@@ -156,7 +157,14 @@ public class SwipeTool
                 )
             return out.copy(
                 content =
-                    out.content + Block.Text(trace.executionLine(ExecMethod.GESTURE, channel = result.channel)),
+                    out.content +
+                        Block.Text(
+                            trace.executionLine(
+                                ExecMethod.GESTURE,
+                                channel = result.channel,
+                                shellSkip = result.shellSkip,
+                            ),
+                        ),
             )
         }
     }

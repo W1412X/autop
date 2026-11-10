@@ -15,7 +15,7 @@ internal interface VisualDetector {
     /** 部署点置信度阈值（v2 metadata `deploy_conf`）；单类档为 null（用配置 minConfidence）。 */
     val deployConf: Double?
 
-    /** 检测控件框；未就绪/推理失败返回空列表。 */
+    /** 检测控件框；未就绪返回空列表，推理异常向上抛（WP7.6：失败不伪装成空结果）。 */
     fun detect(image: VisionImage): List<VisualDetection>
 }
 
@@ -23,6 +23,10 @@ internal interface VisualDetector {
 internal interface TextRecognizer {
     /** 模型与字符集是否可用（类数校验失败为 false）。 */
     val ready: Boolean
+
+    /** 永久停用原因（WP7.6，如字典与模型不符）；未停用为 null。 */
+    val disabledReason: String?
+        get() = null
 
     /** 识别单个文本框；未就绪/推理失败/空文本返回 null。 */
     fun recognize(

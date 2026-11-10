@@ -82,6 +82,15 @@ public enum class InjectionChannel {
     ACCESSIBILITY,
 }
 
+/** shell 通道未被使用的原因。 */
+public enum class ShellSkip {
+    /** 通道未连接（未配对/断开）。 */
+    NOT_CONNECTED,
+
+    /** 通道已连接但命令失败。 */
+    COMMAND_FAILED,
+}
+
 /**
  * 注入结果：是否注入成功 + 实际通道。
  * 工具据此告诉模型“这次到底是怎么执行的”，不要在回退后仍声称走了原通道。
@@ -89,6 +98,8 @@ public enum class InjectionChannel {
 public data class InjectionResult(
     val ok: Boolean,
     val channel: InjectionChannel,
+    /** channel=ACCESSIBILITY 时，没走 shell 的原因；首选就是无障碍的动作为 null。 */
+    val shellSkip: ShellSkip? = null,
 ) {
     public companion object {
         /** 注入失败（没有任何通道送达）。 */
@@ -99,8 +110,15 @@ public data class InjectionResult(
             InjectionResult(ok = ok, channel = if (ok) InjectionChannel.SHELL else InjectionChannel.NONE)
 
         /** 无障碍通道结果。 */
-        public fun accessibility(ok: Boolean): InjectionResult =
-            InjectionResult(ok = ok, channel = if (ok) InjectionChannel.ACCESSIBILITY else InjectionChannel.NONE)
+        public fun accessibility(
+            ok: Boolean,
+            shellSkip: ShellSkip?,
+        ): InjectionResult =
+            InjectionResult(
+                ok = ok,
+                channel = if (ok) InjectionChannel.ACCESSIBILITY else InjectionChannel.NONE,
+                shellSkip = shellSkip,
+            )
     }
 }
 

@@ -15,6 +15,7 @@ import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.ToolResultEnricher
 import com.example.autop.core.common.Capability
 import com.example.autop.core.common.Clock
+import com.example.autop.core.common.Logger
 import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentConfig
@@ -34,6 +35,7 @@ internal class RouterBuilder(
     private val policy: PolicyEngine,
     private val platform: PlatformCapabilities,
     private val audit: ToolAuditSink?,
+    private val logger: Logger,
 ) {
     /** 当前 modelRole 的模型是否支持图片输入。 */
     fun modelVisionOf(request: RunRequest): Boolean =
@@ -66,7 +68,7 @@ internal class RouterBuilder(
         val router =
             ToolRouter(
                 tools = visible,
-                executor = ToolExecutor(visible, policy, audit, prompts, clock),
+                executor = ToolExecutor(visible, policy, audit, prompts, clock, logger),
                 enrichers = enrichers.toList(),
                 prompts = prompts,
             )

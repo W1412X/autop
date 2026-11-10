@@ -35,6 +35,9 @@ public class NotificationFeedImpl
         /** 环形缓冲（旧→新）。 */
         private val buffer = ArrayDeque<NotificationInfo>()
 
+        /** 环形缓冲是否溢出过（WP7.10：溢出后更早的通知读不到，读取方要提示截断）。 */
+        private var overflowed = false
+
         /** 当前仍显示的通知（key → info）。 */
         private val actives = LinkedHashMap<String, NotificationInfo>()
 
@@ -70,10 +73,19 @@ public class NotificationFeedImpl
                     .takeLast(limit)
             }
 
+        /** 最早保留的通知时间（WP7.10）：溢出后为缓冲首条的 postedAt，没溢出过为 null。 */
+        override suspend fun earliestRetainedAt(): Long? =
+            mutex.withLock {
+                if (overflowed) buffer.firstOrNull()?.postedAt else null
+            }
+
         /** 监听服务上报新通知：入环形缓冲并广播。 */
         public suspend fun onPosted(info: NotificationInfo) {
             mutex.withLock {
-                while (buffer.size >= maxBuffer()) buffer.removeFirst()
+                while (buffer.size >= maxBuffer()) {
+                    buffer.removeFirst()
+                    overflowed = true
+                }
                 buffer.addLast(info)
                 actives[info.key] = info
             }

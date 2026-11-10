@@ -224,12 +224,22 @@ public data class DeviceTouchSection(
     @SerialName("enabled") val enabled: Boolean = true,
     @SerialName("sources") val sources: List<String> = listOf("outside_touch", "a11y_events"),
     @SerialName("selfActionGraceMs") val selfActionGraceMs: Long = 400,
+    /** 自身动作窗口上限（动作开始即登记，覆盖动作全程与等待稳定，WP7.3）。 */
+    @SerialName("selfActionMaxMs") val selfActionMaxMs: Long = 15000,
     /** 执行期触摸盾总开关（关闭后任务运行中不屏蔽用户触摸，docs/tech/05 §8.1，N215）。 */
     @SerialName("shieldEnabled") val shieldEnabled: Boolean = true,
     /** 触摸盾放行后等窗口重排落地的上限（docs/tech/05 §8.1，N214）。 */
     @SerialName("shieldRelayoutTimeoutMs") val shieldRelayoutTimeoutMs: Long = 500,
-) : ConfigSection
+) : ConfigSection {
+    override fun validate(): List<String> =
+        if (selfActionMaxMs >= SELF_ACTION_MAX_MS_MIN) {
+            emptyList()
+        } else {
+            listOf("selfActionMaxMs must be >= $SELF_ACTION_MAX_MS_MIN, was $selfActionMaxMs")
+        }
+}
 
+private const val SELF_ACTION_MAX_MS_MIN: Long = 1000
 private const val MAX_TAP_JITTER_RATIO = 0.5
 
 /** `device.tap`：点击手势时长与落点抖动（拟人化，工具内部使用）。 */

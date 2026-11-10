@@ -4,19 +4,24 @@
  */
 package com.example.autop.policy
 
+import com.example.autop.core.config.ConfigSnapshot
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
 /** 策略引擎。 */
 public interface PolicyEngine {
-    /** 对 [subject] 求值；[overrides] 来自 Task 定义（`policy.overrides`）。 */
+    /** 对 [subject] 求值；[overrides] 来自 Task 定义（`policy.overrides`）；规则取自 [config]（Run 快照，WP7.2）。 */
     public suspend fun evaluate(
         subject: PolicySubject,
         overrides: PolicyOverrides,
+        config: ConfigSnapshot,
     ): PolicyDecision
 
-    /** 屏蔽 App：true 时观测隐藏该窗口。 */
-    public fun redaction(packageName: String?): Boolean
+    /** 屏蔽 App：true 时观测隐藏该窗口（名单取自 [config]）。 */
+    public fun redaction(
+        packageName: String?,
+        config: ConfigSnapshot,
+    ): Boolean
 }
 
 /** Task 级覆盖（一般只在 Task 覆盖层中设置）。 */

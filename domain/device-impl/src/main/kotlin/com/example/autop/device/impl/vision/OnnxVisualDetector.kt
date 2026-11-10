@@ -2,7 +2,7 @@
  * ONNX 控件检测引擎（docs/design/visual-screen-parsing §4；vp8c ADR-0008 决策 2/3）：
  * v2 多类直出（metadata `names` 映射类别）或 GPA 单类兜底档（SubtypeRefiner 细化）；
  * labels_version 不认识时拒绝加载（ready=false）。前后处理在 [YoloDecoder]（纯 Kotlin）；
- * 模型缺失/推理失败时 [ready]=false/空列表，不抛错。
+ * 模型缺失时 [ready]=false；推理异常向上抛（WP7.6：不伪装成空树，取消异常原样抛）。
  */
 package com.example.autop.device.impl.vision
 
@@ -29,7 +29,7 @@ internal class OnnxVisualDetector(
 
     override fun detect(image: VisionImage): List<VisualDetection> {
         val session = store.session(MODEL) ?: return emptyList()
-        return runCatching { infer(session, image) }.getOrDefault(emptyList())
+        return infer(session, image)
     }
 
     /** metadata → 档位（会话加载失败按拒绝处理）。 */

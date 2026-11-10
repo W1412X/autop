@@ -10,11 +10,15 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.PermissionChecks
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NotificationFeed
 import com.example.autop.device.NotificationInfo
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -26,6 +30,7 @@ public class ReadNotificationsTool
         private val feed: NotificationFeed,
         private val permissionChecks: PermissionChecks,
         private val clock: Clock,
+        private val prompts: PromptRepository,
     ) : Tool {
         override val id: String = "tool.read_notifications"
 
@@ -62,16 +67,41 @@ public class ReadNotificationsTool
                     ?.content
                     ?.toLongOrNull()
                     ?.coerceIn(0, MAX_SINCE_MINUTES)
-            val limit =
-                args["limit"]
-                    ?.jsonPrimitive
-                    ?.content
-                    ?.toIntOrNull()
-                    ?.coerceIn(1, MAX_LIMIT) ?: DEFAULT_LIMIT
+            val requestedLimit = args["limit"]?.jsonPrimitive?.content?.toIntOrNull()
+            val limit = requestedLimit?.coerceIn(1, MAX_LIMIT) ?: DEFAULT_LIMIT
             val sinceMs = sinceMinutes?.let { clock.nowMillis() - it * MINUTE_MS }
             val items = feed.recent(packageName = pkg, sinceMs = sinceMs, limit = limit)
-            return textOutput(render(items))
+            val notes =
+                buildString {
+                    // limit 被钳制时说明实际用了多少（WP7.10）。
+                    if (requestedLimit != null && requestedLimit != limit) {
+                        append("\n")
+                        append(argClampedNote(ARG_LIMIT, requestedLimit.toLong(), limit.toLong()))
+                    }
+                    // 请求的起点早于最早保留的通知时，说明更早的已丢弃（WP7.10）。
+                    val earliest = feed.earliestRetainedAt()
+                    if (sinceMs != null && earliest != null && sinceMs < earliest) {
+                        append("\n")
+                        append(prompts.text(PROMPT_TRUNCATED, mapOf(VAR_SINCE to formatTime(earliest))))
+                    }
+                }
+            return textOutput(render(items) + notes)
         }
+
+        /** 参数被钳制说明（WP7.10，`agent.tool.arg_clamped`）。 */
+        private fun argClampedNote(
+            name: String,
+            requested: Long,
+            used: Long,
+        ): String =
+            prompts.text(
+                PROMPT_ARG_CLAMPED,
+                mapOf(VAR_NAME to name, VAR_REQUESTED to requested.toString(), VAR_USED to used.toString()),
+            )
+
+        /** 时间点展示（截断提示的 since 变量）。 */
+        private fun formatTime(epochMs: Long): String =
+            SimpleDateFormat(TIME_FORMAT, Locale.getDefault()).format(Date(epochMs))
 
         private fun render(items: List<NotificationInfo>): String {
             if (items.isEmpty()) return "(无通知)"
@@ -95,5 +125,13 @@ public class ReadNotificationsTool
             const val MAX_LIMIT = 50
             const val MINUTE_MS = 60_000L
             const val MAX_SINCE_MINUTES = 43_200L // 30 天，防乘法溢出
+            const val TIME_FORMAT = "yyyy-MM-dd HH:mm"
+            const val PROMPT_ARG_CLAMPED = "agent.tool.arg_clamped"
+            const val PROMPT_TRUNCATED = "device.notifications.truncated"
+            const val ARG_LIMIT = "limit"
+            const val VAR_NAME = "name"
+            const val VAR_REQUESTED = "requested"
+            const val VAR_USED = "used"
+            const val VAR_SINCE = "since"
         }
     }

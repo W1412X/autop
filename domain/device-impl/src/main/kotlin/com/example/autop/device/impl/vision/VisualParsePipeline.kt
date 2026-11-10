@@ -35,7 +35,7 @@ internal data class ParseOptions(
 /** 视觉解析管线。 */
 internal object VisualParsePipeline {
     /**
-     * 解析一帧；检测/OCR 未就绪返回 null（编排层回退现有行为）。
+     * 解析一帧；检测/OCR/图标（启用时）未就绪返回 null（WP7.6：不可用就整体不可用，不返回缺少内容的树）。
      * 检测框截断：v2 多类档用 metadata `deploy_conf`，单类档用 [ParseOptions.minConfidence]。
      * [ParseOptions.area] 非 null 时丢弃内容区外的检测框。
      */
@@ -48,6 +48,7 @@ internal object VisualParsePipeline {
         icons: VisualIconClassifier? = null,
     ): VisualParseResult? {
         if (!detector.ready || !recognizer.ready) return null
+        if (icons != null && !icons.ready) return null
         val floor = detector.deployConf ?: options.minConfidence
         val kept = detector.detect(image).filter { it.confidence >= floor && inArea(it.bounds, options.area) }
         val refined = categorize(detector, kept, image)

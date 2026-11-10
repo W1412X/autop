@@ -81,6 +81,7 @@ public class LlmScreenParser
          * 解析 [frame]（已裁好基准区信息）；[region] 为内容区 0–1000 的局部区域。
          * 失败统一返回 `device.llm_parse_failed`（§4.1）。
          */
+        @Suppress("ReturnCount") // 模型不可用/截图编码/重试失败/超时各自失败出口，是失败分流语义（WP7.11）
         internal suspend fun parse(
             ctx: ToolContext,
             frame: VisualFrame,
@@ -116,29 +117,33 @@ public class LlmScreenParser
             }
             val model =
                 try {
-                    request(provider, profile, prepared, region, PageRef(app, page), effectiveModes)
+                    when (
+                        val got = request(provider, profile, prepared, region, PageRef(app, page), effectiveModes)
+                    ) {
+                        is Outcome.Ok -> got.value
+                        // 保留最后一次失败的 AppError 原文（WP7.11），不再统一成“无法解析”。
+                        is Outcome.Err -> return Outcome.Err(parseFailed(got.error.message))
+                    }
                 } catch (e: TimeoutCancellationException) {
                     return Outcome.Err(parseFailed("识别超时（${llm.timeoutMs}ms）：${e.message}"))
                 } finally {
                     prepared.file.delete()
                 }
-            if (model != null) {
-                history.llmCache.entry =
-                    com.example.autop.device.impl.LlmObservationCache.Entry(
-                        rotation = frame.rotation,
-                        signature = prepared.signature,
-                        region = region,
-                        atMillis = now,
-                        model = model,
-                    )
-            }
-            return if (model != null) {
-                Outcome.Ok(LlmParseResult(model, prepared.signature))
-            } else {
-                Outcome.Err(parseFailed("模型输出无法解析"))
-            }
+            history.llmCache.entry =
+                com.example.autop.device.impl.LlmObservationCache.Entry(
+                    rotation = frame.rotation,
+                    signature = prepared.signature,
+                    region = region,
+                    atMillis = now,
+                    model = model,
+                )
+            return Outcome.Ok(LlmParseResult(model, prepared.signature))
         }
 
+        /**
+         * 重试内的解析请求：全部尝试失败时返回最后一次失败的 [AppError] 原文（WP7.11），
+         * 只有解析失败（没有 AppError）时才用统一文案。
+         */
         private suspend fun request(
             provider: LlmProvider,
             profile: ModelProfile,
@@ -146,16 +151,18 @@ public class LlmScreenParser
             region: Rect?,
             page: PageRef,
             effectiveModes: List<ObserveMode>,
-        ): ScreenModel? {
+        ): Outcome<ScreenModel> {
             val llm = configProvider.current()[DeviceConfig.OBSERVE].llm
             val request = requestOf(profile, prepared, region)
             var attempts = 0
+            var lastFailure: AppError? = null
             while (attempts <= llm.retries) {
                 attempts += 1
                 val completed =
                     withTimeout(llm.timeoutMs) {
                         provider.complete(request)
                     }
+                if (completed is Outcome.Err) lastFailure = completed.error
                 val message = (completed as? Outcome.Ok)?.value?.message ?: continue
                 val params = paramsOf(message, forceToolChoice(profile))
                 val nodes =
@@ -189,16 +196,18 @@ public class LlmScreenParser
                                         n.act.isNotEmpty()
                                 )
                         } < minEffective
-                    return ScreenModelBuilder.of(
-                        mode = ObserveMode.LLM,
-                        windows = listOf(window),
-                        degenerate = degenerate,
-                        effectiveModes = effectiveModes,
+                    return Outcome.Ok(
+                        ScreenModelBuilder.of(
+                            mode = ObserveMode.LLM,
+                            windows = listOf(window),
+                            degenerate = degenerate,
+                            effectiveModes = effectiveModes,
+                        ),
                     )
                 }
             }
             // 请求无法完成的文件由这里统一清理（成功路径在 finally）。
-            return null
+            return Outcome.Err(lastFailure ?: AppError(code = DeviceErrorCodes.LLM_PARSE_FAILED, message = "模型输出无法解析"))
         }
 
         private fun requestOf(
