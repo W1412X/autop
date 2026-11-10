@@ -48,6 +48,11 @@ internal class ObservedThreadStore(
 
     override fun observe(threadId: ThreadId): Flow<ThreadEvent> = delegate.observe(threadId)
 
+    override fun observeFrom(
+        threadId: ThreadId,
+        afterSeq: Long,
+    ): Flow<List<ThreadEvent>> = delegate.observeFrom(threadId, afterSeq)
+
     override fun observeChanges(): Flow<Unit> = delegate.observeChanges()
 
     override suspend fun saveBlob(

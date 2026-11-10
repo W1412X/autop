@@ -14,4 +14,5 @@ public object TaskErrorCodes {
     public const val SCREEN_BUSY: String = "task.screen_busy"
     public const val LOCKED: String = "task.locked"
     public const val EXPIRED: String = "task.expired"
+    public const val LOST_ON_RESTART: String = "task.lost_on_restart"
 }

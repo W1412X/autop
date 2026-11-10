@@ -1,13 +1,12 @@
 /**
- * Run 启动前暂存的输入与触发上下文（进程内，docs/tech/07 §4.3）：
- * Run 启动即消费；进程被杀后未启动的 Run 会在恢复 WP 中按 `runs` 表重建输入。
+ * Run 启动前暂存的触发上下文（进程内，docs/tech/07 §4.3）：Run 启动即消费。
+ * 只暂存 vars/task/flow；输入在入队时已写入事件日志（WP8.1）。
  */
 package com.example.autop.task.impl
 
 import com.example.autop.core.common.RunId
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowRunOptions
-import com.example.autop.llm.Block
 import com.example.autop.task.Task
 import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.ConcurrentHashMap
@@ -22,7 +21,6 @@ public data class FlowLaunch(
 
 /** 一个待启动 Run 的暂存数据。 */
 public data class PendingEntry(
-    val input: List<Block>,
     val vars: Map<String, String>,
     val task: Task?,
     /** 独立运行的流程；任务绑定的流程在执行时按 Task.flow 解析。 */

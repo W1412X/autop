@@ -61,6 +61,9 @@ public enum class RunOutcome {
     /** 熔断 Stop 收口（连续无变化/同错误重复）：与预算耗尽区分，避免误标“预算用尽”。 */
     BREAKER_STOPPED,
     INTERRUPTED,
+
+    /** 等待超时过期（等待中的 Run 未执行即被收口，agent-harness-overhaul WP8）。 */
+    EXPIRED,
 }
 
 /** 计划项状态。 */
@@ -238,4 +241,9 @@ public data class RunFinished(
     /** 最终导致失败的节点（流程运行的失败交回，flows.md §14.1）。 */
     val failedNodeId: String? = null,
     val failedNodeName: String? = null,
+    /** 进入 live 的一行说明（非成功结束时由写入方渲染），让同线程后续 Run 的模型知道上一个任务没有完成。 */
+    val liveNote: String? = null,
 ) : EventPayload
+
+/** Run 结束 liveNote 的模板 id（`agent.run.ended.<outcome 小写>`，附录 A.9）。 */
+public fun runEndedNoteId(status: RunOutcome): String = "agent.run.ended." + status.name.lowercase()

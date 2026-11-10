@@ -246,10 +246,12 @@ private class FakeRunService : RunService {
         text: String?,
     ): com.example.autop.core.common.Outcome<RunRecord> = error("unused")
 
-    override fun steer(
+    override suspend fun steer(
         runId: RunId,
         text: String,
-    ): Unit = Unit
+    ): com.example.autop.core.common.Outcome<Unit> =
+        com.example.autop.core.common.Outcome
+            .Ok(Unit)
 
     override fun pause(runId: RunId): Unit = Unit
 
@@ -290,6 +292,8 @@ private class FakeRunService : RunService {
     override fun skipWaiting(runId: RunId): Unit = Unit
 
     override fun observeRun(runId: RunId): Flow<RunRecord> = emptyFlow()
+
+    override fun observeOpenRun(threadId: ThreadId): Flow<RunRecord?> = emptyFlow()
 
     override fun liveEvents(runId: RunId): Flow<AgentEvent> = emptyFlow()
 }

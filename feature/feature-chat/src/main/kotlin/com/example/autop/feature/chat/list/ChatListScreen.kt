@@ -221,6 +221,7 @@ private fun statusText(status: RunOutcome): String =
             RunOutcome.BUDGET_EXHAUSTED -> R.string.chat_outcome_budget
             RunOutcome.BREAKER_STOPPED -> R.string.chat_outcome_breaker
             RunOutcome.INTERRUPTED -> R.string.chat_outcome_interrupted
+            RunOutcome.EXPIRED -> R.string.chat_outcome_expired
         },
     )
 
@@ -233,6 +234,7 @@ private fun statusIcon(status: RunOutcome?): ImageVector =
         RunOutcome.BUDGET_EXHAUSTED -> AutopIcons.Warning
         RunOutcome.BREAKER_STOPPED -> AutopIcons.Warning
         RunOutcome.INTERRUPTED -> AutopIcons.Pause
+        RunOutcome.EXPIRED -> AutopIcons.Close
     }
 
 @Composable

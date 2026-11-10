@@ -11,6 +11,7 @@ import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.Baseline
 import com.example.autop.agent.HistoryRenderRule
 import com.example.autop.agent.RenderItem
+import com.example.autop.agent.RunFinished
 import com.example.autop.agent.RuntimeStateReported
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
@@ -54,6 +55,7 @@ internal class HistoryRenderer(
         return repairToolPairing(mergeToolMessages(items))
     }
 
+    @Suppress("LongMethod") // 事件→渲染项是一张穷举映射表，拆散反而难核对
     private fun toItems(events: List<ThreadEvent>): List<RenderItem> {
         val items = mutableListOf<RenderItem>()
         for (event in events) {
@@ -87,6 +89,19 @@ internal class HistoryRenderer(
                             observation = null,
                             toolId = null,
                         )
+                is RunFinished -> {
+                    // Run 结束说明进 live（WP8.2）：同线程后续 Run 的模型能看到上一个任务没有完成。
+                    val note = payload.liveNote
+                    if (note != null) {
+                        items +=
+                            RenderItem(
+                                seq = seq,
+                                msg = Msg(Role.USER, listOf(Block.Text(note))),
+                                observation = null,
+                                toolId = null,
+                            )
+                    }
+                }
                 is ToolResultEvent ->
                     items +=
                         RenderItem(

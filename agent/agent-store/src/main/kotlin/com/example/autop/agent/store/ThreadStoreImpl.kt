@@ -19,10 +19,14 @@ import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
 
 /** 线程存储实现。 */
 @Suppress("TooManyFunctions") // ThreadStore 接口的实现面，方法数即接口操作集
@@ -119,6 +123,31 @@ public class ThreadStoreImpl(
     }
 
     override fun observe(threadId: ThreadId): Flow<ThreadEvent> = eventFlow.filter { it.threadId == threadId }
+
+    /**
+     * 订阅线程事件（WP8.3）：先回放 seq > [afterSeq] 的已有事件（一个列表），之后每条新事件
+     * 发一个单元素列表。UNDISPATCHED 先订阅热流再查库，查库期间到达的事件进 buffer，
+     * 靠 `seq > last` 去重，不丢不重。
+     */
+    override fun observeFrom(
+        threadId: ThreadId,
+        afterSeq: Long,
+    ): Flow<List<ThreadEvent>> =
+        channelFlow {
+            val buffer = Channel<ThreadEvent>(Channel.UNLIMITED)
+            launch(start = CoroutineStart.UNDISPATCHED) {
+                eventFlow.filter { it.threadId == threadId }.collect { buffer.send(it) }
+            }
+            val backlog = events(threadId, afterSeq + 1, Long.MAX_VALUE)
+            var last = backlog.lastOrNull()?.seq ?: afterSeq
+            send(backlog)
+            for (event in buffer) {
+                if (event.seq > last) {
+                    send(listOf(event))
+                    last = event.seq
+                }
+            }
+        }
 
     override fun observeChanges(): Flow<Unit> = changesFlow.asSharedFlow()
 

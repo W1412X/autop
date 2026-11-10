@@ -206,5 +206,6 @@ private fun noticeText(notice: ThreadNotice): String =
             ThreadNotice.EXPORT_LOG -> R.string.thread_notice_export
             ThreadNotice.COPIED -> R.string.thread_notice_copied
             ThreadNotice.IMAGE_FAILED -> R.string.thread_notice_image_failed
+            ThreadNotice.STEER_FAILED -> R.string.thread_notice_steer_failed
         },
     )

@@ -1,6 +1,7 @@
 package com.example.autop
 
 import android.app.Application
+import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.core.config.UiConfig
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /**
@@ -92,6 +94,8 @@ class AutopApplication : Application() {
 
     @Inject lateinit var androidLogger: AndroidLogger
 
+    @Inject lateinit var dispatchers: DispatcherProvider
+
     @Inject
     @AppScope
     lateinit var appScope: CoroutineScope
@@ -131,13 +135,18 @@ class AutopApplication : Application() {
         updateChecker.start(appScope)
         // 配对卡：发现即可配对设备即浮出输入小窗（零跳转，不依赖通知权限）。
         pairingCardController.start()
-        // 定时任务闹钟同步（2026-11-09 修复"到点不执行"）：任务变更即重排闹钟，首值覆盖启动重排。
-        alarmSync.start(appScope)
-        // 条件触发事件订阅（2026-11-09 修复"条件不触发"）：通知/前台/充电/网络/解锁事件流接入。
-        triggerHub.start()
-        // 常驻后台随 task.host.persistent 生效：开启即拉起前台服务（启动首值也覆盖），
-        // 进程不死才能持续收充电/网络/切前台等条件事件；关闭由服务自评停服。
+        // WP8.4：重启收口先行，未收口 Run 全部关闭后才允许任何新 Run 入队；
+        // 闹钟同步、条件触发与常驻服务都排在收口之后（要求主线程的部分回 main 调度）。
         appScope.launch {
+            runRecovery.closeUnfinished()
+            withContext(dispatchers.main) {
+                // 定时任务闹钟同步（2026-11-09 修复"到点不执行"）：任务变更即重排闹钟，首值覆盖启动重排。
+                alarmSync.start(appScope)
+                // 条件触发事件订阅（2026-11-09 修复"条件不触发"）：通知/前台/充电/网络/解锁事件流接入。
+                triggerHub.start()
+            }
+            // 常驻后台随 task.host.persistent 生效：开启即拉起前台服务（启动首值也覆盖），
+            // 进程不死才能持续收充电/网络/切前台等条件事件；关闭由服务自评停服。
             configProvider
                 .observe()
                 .map { it[TaskConfig.HOST].persistent }
@@ -145,7 +154,6 @@ class AutopApplication : Application() {
                 .collect { persistent -> if (persistent) hostStarter.ensureRunning() }
         }
         auditCleaner.ensureScheduled()
-        appScope.launch { runRecovery.markInterrupted() }
         // 视觉模型预热：模型资产约 72MB，首次加载要读资产＋校验＋建会话（含 NNAPI 编译），
         // 放在首次观测里会撞穿解析预算并抬高瞬时内存峰值（易超时/被系统回收），
         // 挪到启动后的空闲期做，首次 observe 直接命中已建好的会话。

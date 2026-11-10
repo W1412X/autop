@@ -222,6 +222,34 @@ public class ThreadStoreImplTest {
         }
 
     @Test
+    public fun `observeFrom emits backlog then live without gap or duplicate`(): Unit =
+        runBlocking {
+            val thread = store.createThread(null, null)
+            store.append(thread, null, userText("一"))
+            store.append(thread, null, userText("二"))
+            val batches = mutableListOf<List<com.example.autop.agent.ThreadEvent>>()
+            val job = launch { store.observeFrom(thread, afterSeq = 0).toList(batches) }
+            // backlog 查询期间并发 append（WP8.3）：热流先订阅、事件进 buffer，seq 去重不丢不重。
+            val producer =
+                launch(Dispatchers.Default) {
+                    repeat(3) { index -> store.append(thread, null, userText("并发$index")) }
+                }
+
+            withTimeout(5_000) {
+                while (batches.sumOf { it.size } < 5) {
+                    kotlinx.coroutines.yield()
+                }
+            }
+            job.cancel()
+            producer.join()
+
+            val seqs = batches.flatten().map { it.seq }
+            assertThat(seqs).containsExactly(1L, 2L, 3L, 4L, 5L).inOrder()
+            assertThat(seqs).containsNoDuplicates()
+            assertThat(batches.drop(1).all { it.size == 1 }).isTrue()
+        }
+
+    @Test
     public fun `observeChanges emits on create append rename and delete`(): Unit =
         runBlocking {
             val received = mutableListOf<Unit>()

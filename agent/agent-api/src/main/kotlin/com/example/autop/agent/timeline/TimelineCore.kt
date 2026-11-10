@@ -10,6 +10,7 @@ package com.example.autop.agent.timeline
 import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.Baseline
+import com.example.autop.agent.BaselineReason
 import com.example.autop.agent.PauseReason
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.PlanUpdated
@@ -148,6 +149,8 @@ public sealed interface CoreRow {
     public data class ForkMarker(
         val parentThreadId: String,
         val parentSeq: Long,
+        /** 继承的消息条数（紧随其后的 Baseline(FORK) 的 messages.size 回填，WP8.6）。 */
+        val inheritedCount: Int = 0,
     ) : CoreRow
 }
 
@@ -236,9 +239,12 @@ private fun appendPayload(
             }
             unpaired
         }
+        is Baseline -> {
+            backfillInherited(entries, payload)
+            unpaired
+        }
         is RunStarted,
         is RunFinished,
-        is Baseline,
         is RunNoteAdded,
         is RuntimeStateReported,
         -> unpaired
@@ -258,6 +264,17 @@ private fun appendForkMarker(
             forkable = false,
         ),
     )
+}
+
+/** Baseline(FORK) 遍历到时把继承条数回填到最近的 ForkMarker（WP8.6）。 */
+private fun backfillInherited(
+    entries: MutableList<CoreEntry>,
+    payload: Baseline,
+) {
+    if (payload.reason != BaselineReason.FORK) return
+    val index = entries.indexOfLast { it.row is CoreRow.ForkMarker }
+    val marker = entries.getOrNull(index)?.row as? CoreRow.ForkMarker ?: return
+    entries[index] = entries[index].copy(row = marker.copy(inheritedCount = payload.messages.size))
 }
 
 /** 用户消息 → User（INJECTED 的注入上下文不进时间线）。 */

@@ -7,6 +7,8 @@ package com.example.autop.task.impl
 import com.example.autop.agent.AgentSession
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.USER_IMAGE_NAME_PREFIX
+import com.example.autop.agent.UserMessage
+import com.example.autop.agent.UserMessageKind
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Logger
@@ -62,7 +64,7 @@ public class RunExecutor(
         if (text.isNotBlank()) blocks += Block.Text(text)
         saveImages(thread, images, blocks)
         if (attachCurrentScreen) attachScreen(thread, blocks)
-        val enqueued = enqueue(RunOrigin.CHAT, thread, blocks, emptyMap(), null)
+        val enqueued = enqueue(RunOrigin.CHAT, thread, blocks, UserMessageKind.INPUT, emptyMap(), null)
         if (placeholder != null && enqueued is Outcome.Ok) {
             refineTitle(thread = thread, message = text, placeholder = placeholder)
         }
@@ -78,18 +80,18 @@ public class RunExecutor(
         val input = text?.let { listOf<Block>(Block.Text(it)) } ?: emptyList()
         val title = text?.let { placeholderTitle(it) }
         return agentSession.fork(threadId, atSeq, title = title).flatMap { forked ->
-            enqueue(RunOrigin.FORK, forked, input, emptyMap(), null)
+            enqueue(RunOrigin.FORK, forked, input, if (text == null) null else UserMessageKind.INPUT, emptyMap(), null)
         }
     }
 
-    /** 任务 Run 入队（docs/tech/07 §4.2/§4.3）：每次新建线程。 */
+    /** 任务 Run 入队（docs/tech/07 §4.2/§4.3）：每次新建线程；不写输入，目标由 GoalContributor 注入一次。 */
     suspend fun launchTask(
         task: Task,
         origin: RunOrigin,
         vars: Map<String, String>,
     ): Outcome<RunRecord> {
         val thread = threadStore.createThread(title = task.name, parent = null)
-        return enqueue(origin, thread, listOf(Block.Text(task.goal)), vars, task)
+        return enqueue(origin, thread, emptyList(), null, vars, task)
     }
 
     /** 独立流程运行入队（流程页「运行」与调试，docs/design/flows.md §9.2）。 */
@@ -101,10 +103,10 @@ public class RunExecutor(
     ): Outcome<RunRecord> {
         val thread = threadStore.createThread(title = flow.name, parent = null)
         val launch = FlowLaunch(flow, params, options, needsScreen)
-        return enqueue(RunOrigin.TASK_MANUAL, thread, emptyList(), emptyMap(), null, launch)
+        return enqueue(RunOrigin.TASK_MANUAL, thread, emptyList(), null, emptyMap(), null, launch)
     }
 
-    /** 中断恢复 Run（docs/tech/04 §3.11）：同一 Thread 新起，input 为恢复提示文本。 */
+    /** 中断恢复 Run（docs/tech/04 §3.11）：同一 Thread 新起，input 为恢复提示文本（INJECTED，不显示成用户气泡）。 */
     suspend fun launchResume(
         source: RunRecord,
         text: String,
@@ -113,6 +115,7 @@ public class RunExecutor(
             RunOrigin.RESUME,
             source.threadId,
             listOf(Block.Text(text)),
+            UserMessageKind.INJECTED,
             mapOf(RESUMED_FROM_KEY to source.id.value),
             null,
         )
@@ -126,6 +129,7 @@ public class RunExecutor(
         origin: RunOrigin,
         threadId: ThreadId,
         input: List<Block>,
+        inputKind: UserMessageKind?,
         vars: Map<String, String>,
         task: Task?,
         flow: FlowLaunch? = null,
@@ -148,7 +152,11 @@ public class RunExecutor(
                 waitingQuestion = null,
             )
         runStore.save(record)
-        pending.put(record.id, PendingEntry(input = input, vars = vars, task = task, flow = flow))
+        // 输入入队即落盘（WP8.1）：先写事件日志再暂存入队，进程被杀也不丢用户原话。
+        if (input.isNotEmpty() && inputKind != null) {
+            threadStore.append(threadId, record.id, UserMessage(blocks = input, kind = inputKind))
+        }
+        pending.put(record.id, PendingEntry(vars = vars, task = task, flow = flow))
         scheduler.enqueue(record)
         scheduler.trySchedule()
         return Outcome.Ok(record)

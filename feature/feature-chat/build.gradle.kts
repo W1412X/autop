@@ -12,6 +12,9 @@ dependencies {
     implementation(project(":domain:device-api"))
     implementation(project(":domain:task-api"))
     testImplementation(project(":core:core-testing"))
+    // ChatThreadViewModelTest 用 Robolectric 造 Context（ChatImageReader 注入 @ApplicationContext）。
+    testImplementation(libs.androidx.test.core)
+    testImplementation(libs.robolectric)
 }
 
 // 单测用 FakeConfigProvider 读取真实的配置默认值（docs/tech/02 §5 的 autop.configDir 机制，同 core-testing）。

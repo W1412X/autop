@@ -393,6 +393,7 @@ internal fun outcomeToneOf(outcome: RunOutcome): StatusTone =
         RunOutcome.BUDGET_EXHAUSTED -> StatusTone.PAUSED
         RunOutcome.BREAKER_STOPPED -> StatusTone.BLOCKED
         RunOutcome.INTERRUPTED -> StatusTone.PAUSED
+        RunOutcome.EXPIRED -> StatusTone.NEUTRAL
     }
 
 /** 流式光标闪烁透明度（同对话页，动效受 LocalMotionEnabled 总开关：关闭时静态光标）。 */

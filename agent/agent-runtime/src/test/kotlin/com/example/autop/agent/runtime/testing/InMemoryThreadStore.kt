@@ -18,10 +18,14 @@ import com.example.autop.core.common.RunId
 import com.example.autop.core.common.SystemClock
 import com.example.autop.core.common.ThreadId
 import com.example.autop.llm.Block
+import kotlinx.coroutines.CoroutineStart
+import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.launch
 
 /** 内存线程存储。 */
 internal class InMemoryThreadStore(
@@ -83,6 +87,27 @@ internal class InMemoryThreadStore(
     }
 
     override fun observe(threadId: ThreadId): Flow<ThreadEvent> = eventFlow.filter { it.threadId == threadId }
+
+    /** 同 ThreadStoreImpl：先回放后实时（WP8.3），UNDISPATCHED 先订阅再去重。 */
+    override fun observeFrom(
+        threadId: ThreadId,
+        afterSeq: Long,
+    ): Flow<List<ThreadEvent>> =
+        channelFlow {
+            val buffer = Channel<ThreadEvent>(Channel.UNLIMITED)
+            launch(start = CoroutineStart.UNDISPATCHED) {
+                eventFlow.filter { it.threadId == threadId }.collect { buffer.send(it) }
+            }
+            val backlog = events(threadId, afterSeq + 1, Long.MAX_VALUE)
+            var last = backlog.lastOrNull()?.seq ?: afterSeq
+            send(backlog)
+            for (event in buffer) {
+                if (event.seq > last) {
+                    send(listOf(event))
+                    last = event.seq
+                }
+            }
+        }
 
     override fun observeChanges(): Flow<Unit> = changesFlow.asSharedFlow()
 

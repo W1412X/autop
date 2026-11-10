@@ -20,6 +20,7 @@ import com.example.autop.core.common.TaskId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
+import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.DeviceState
 import com.example.autop.llm.Block
 import com.example.autop.task.RunOrigin
@@ -176,6 +177,7 @@ private class ReplayFixture(
             threadStore = FakeThreadStore(items = events),
             experience = FakeExperienceExtractor(),
             configProvider = config,
+            prompts = FakePromptRepository(),
             clock = clock,
             scope = scope,
             logger = FakeLogger,
@@ -203,7 +205,7 @@ private class ReplayFixture(
                 waitingQuestion = null,
             )
         runStore.save(record)
-        pending.put(record.id, PendingEntry(input = emptyList(), vars = emptyMap(), task = task))
+        pending.put(record.id, PendingEntry(vars = emptyMap(), task = task))
         runner.execute(record, task)
     }
 }

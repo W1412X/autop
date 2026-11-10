@@ -22,7 +22,6 @@ public data class ContextRequest(
     val config: ConfigSnapshot,
     val goal: String?,
     val vars: Map<String, String>,
-    val isFirstRunOfThread: Boolean,
 )
 
 /** 一个上下文片段；[promptIds] 记录用到的模板及其版本（写入 run_started）。 */

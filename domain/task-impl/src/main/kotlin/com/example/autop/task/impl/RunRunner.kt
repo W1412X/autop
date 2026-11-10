@@ -23,6 +23,7 @@ import com.example.autop.core.common.Logger
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.FlowConfig
 import com.example.autop.core.config.TaskConfig
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.ScreenLease
@@ -76,6 +77,7 @@ public class RunRunner(
     private val threadStore: ThreadStore,
     private val experience: ExperienceExtractor,
     private val configProvider: ConfigProvider,
+    private val prompts: PromptRepository,
     private val clock: Clock,
     private val scope: CoroutineScope,
     private val logger: Logger,
@@ -110,7 +112,15 @@ public class RunRunner(
                 throw e
             } catch (e: Exception) {
                 logger.e(TAG, "run_crashed", "runId" to record.id.value, error = e)
-                RunFinished(status = RunOutcome.FAILED, summary = null, errorCode = CommonErrorCodes.UNKNOWN)
+                val failed =
+                    RunFinished(
+                        status = RunOutcome.FAILED,
+                        summary = null,
+                        errorCode = CommonErrorCodes.UNKNOWN,
+                        liveNote = prompts.runEndedNote(RunOutcome.FAILED),
+                    )
+                ensureRunFinished(record, failed)
+                failed
             }
         observer.finish(record.id, finished)
         observer.clear(record.id)
@@ -223,13 +233,32 @@ public class RunRunner(
         RunRequest(
             runId = record.id,
             threadId = record.threadId,
-            input = entry?.input ?: emptyList(),
+            // 输入已在入队时落盘（WP8.1）：这里必须传空，TurnLoop 不再重复写 INPUT（注意事项 9）。
+            input = emptyList(),
             goal = task?.goal,
             vars = (entry?.vars ?: emptyMap()) + mapOf(RUN_MODE_KEY to runMode(record.origin)),
             config = configFor(task),
             toolFilter = task?.allowedTools,
             replay = replayPlan(record, task),
         )
+
+    /**
+     * 崩溃兜底（WP8.2）：线程里本 Run 的最后一条事件还不是 RunFinished 时补写一条
+     * （带 liveNote），保证后续 Run 的模型能看到上一个任务没有完成。
+     */
+    @Suppress("TooGenericExceptionCaught") // 补写失败只记日志，不再外传（原异常已记过）
+    private suspend fun ensureRunFinished(
+        record: RunRecord,
+        finished: RunFinished,
+    ) {
+        try {
+            val last = threadStore.events(record.threadId).lastOrNull { it.runId == record.id }
+            if (last?.payload is RunFinished) return
+            threadStore.append(record.threadId, record.id, finished)
+        } catch (e: Exception) {
+            logger.w(TAG, "append_crash_finish_failed", "runId" to record.id.value, error = e)
+        }
+    }
 
     /** 定时/条件触发且有脚本时优先回放（docs/tech/04 §3.12，R1/A6）。 */
     @Suppress("ReturnCount") // 回放资格逐条早退是选择链的自然结构

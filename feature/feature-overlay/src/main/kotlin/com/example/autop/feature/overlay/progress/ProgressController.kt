@@ -137,19 +137,26 @@ public class ProgressController
 
         /** 落盘事件追加；助手消息/工具结果/Run 收口落盘即作废流式缓存（同对话页，N186）。 */
         private suspend fun collectHistory(threadId: ThreadId) {
-            threadStore.observe(threadId).collect { event ->
-                rowsInput.update { input ->
-                    val live =
-                        if (
-                            event.payload is AssistantMessage ||
-                            event.payload is ToolResultEvent ||
-                            event.payload is RunFinished
-                        ) {
-                            emptyList()
-                        } else {
-                            input.live
-                        }
-                    input.copy(history = (input.history + event).takeLast(MAX_EVENTS), live = live)
+            // observeFrom 先回放后实时（WP8.3）：从已加载历史的最后一条接着订阅，不丢不重。
+            val knownSeq =
+                rowsInput.value.history
+                    .lastOrNull()
+                    ?.seq ?: 0
+            threadStore.observeFrom(threadId, afterSeq = knownSeq).collect { batch ->
+                for (event in batch) {
+                    rowsInput.update { input ->
+                        val live =
+                            if (
+                                event.payload is AssistantMessage ||
+                                event.payload is ToolResultEvent ||
+                                event.payload is RunFinished
+                            ) {
+                                emptyList()
+                            } else {
+                                input.live
+                            }
+                        input.copy(history = (input.history + event).takeLast(MAX_EVENTS), live = live)
+                    }
                 }
             }
         }

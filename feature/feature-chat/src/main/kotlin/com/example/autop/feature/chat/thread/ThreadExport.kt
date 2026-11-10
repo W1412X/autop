@@ -9,10 +9,11 @@ package com.example.autop.feature.chat.thread
 import com.example.autop.agent.EventPayload
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.core.common.AutopJson
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
- * 组装导出文本：事件段每行一个 JSON 对象（旧→新），单条序列化失败降级为注释行
- * （导出不因单条坏数据中断）；日志段原样附在末尾。
+ * 组装导出文本：事件段每行一个 JSON 对象（旧→新）；日志段原样附在末尾。
  */
 internal fun buildThreadExport(
     threadId: String,
@@ -29,10 +30,11 @@ internal fun buildThreadExport(
         append(logText)
     }
 
-/** 单条事件的 JSON 行；序列化失败降级注释行。 */
+/** 单条事件的 JSON 行（WP8.7：结构化构造，不拼字符串；序列化失败属编程错误，让测试暴露）。 */
 private fun eventLine(event: ThreadEvent): String =
-    runCatching {
-        val payload = AutopJson.default.encodeToString(EventPayload.serializer(), event.payload)
-        val runId = event.runId?.value?.let { "\"$it\"" } ?: "null"
-        """{"seq":${event.seq},"createdAt":${event.createdAt},"runId":$runId,"payload":$payload}"""
-    }.getOrDefault("# seq=${event.seq} 序列化失败")
+    buildJsonObject {
+        put("seq", event.seq)
+        put("createdAt", event.createdAt)
+        put("runId", event.runId?.value)
+        put("payload", AutopJson.default.encodeToJsonElement(EventPayload.serializer(), event.payload))
+    }.toString()

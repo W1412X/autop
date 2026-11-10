@@ -1,8 +1,8 @@
 /**
- * [InterruptedRunRecovery] 单测（docs/tech/04 §3.11，07 §1.3）：启动时把残留
- * RUNNING 标记为 INTERRUPTED 并补写 RunFinished 收口事件；“继续”在同一 Thread
- * 新起 RESUME Run（input 为 agent.resume.after_interrupt 模板文本）；非 INTERRUPTED
- * 与不存在的 Run 拒绝。
+ * [InterruptedRunRecovery] 单测（docs/tech/04 §3.11，07 §1.3，WP8.4）：启动收口全部
+ * 未结束 Run（已启动 → INTERRUPTED，未启动 → CANCELLED/LOST_ON_RESTART）并补写带
+ * liveNote 的 RunFinished；“继续”在同一 Thread 新起 RESUME Run（input 为
+ * agent.resume.after_interrupt 模板文本）；非 INTERRUPTED 与不存在的 Run 拒绝。
  */
 package com.example.autop.task.impl
 
@@ -68,12 +68,12 @@ private object NoopTitleGenerator : ChatTitleGenerator {
 @Config(sdk = [34])
 public class InterruptedRunRecoveryTest {
     @Test
-    public fun `启动时残留 RUNNING 标记为 INTERRUPTED 并补写收口事件`() =
+    public fun `started run becomes interrupted`() =
         runTest {
             val fixture = RecoveryFixture(backgroundScope)
-            fixture.saveRunning("run-1")
+            fixture.saveRun("run-1", RunStatus.RUNNING, started = true)
 
-            val count = fixture.recovery.markInterrupted()
+            val count = fixture.recovery.closeUnfinished()
 
             assertEquals(1, count)
             val record = fixture.runStore.get(RunId("run-1"))
@@ -84,14 +84,52 @@ public class InterruptedRunRecoveryTest {
                     .single()
                     .payload as RunFinished
             assertEquals(RunOutcome.INTERRUPTED, finished.status)
+            assertNotNull(finished.liveNote)
+        }
+
+    @Test
+    public fun `queued run becomes cancelled lost_on_restart`() =
+        runTest {
+            val fixture = RecoveryFixture(backgroundScope)
+            fixture.saveRun("run-1", RunStatus.QUEUED, started = false)
+
+            fixture.recovery.closeUnfinished()
+
+            val record = fixture.runStore.get(RunId("run-1"))
+            assertEquals(RunStatus.CANCELLED, record?.status)
+            assertEquals(TaskErrorCodes.LOST_ON_RESTART, record?.errorCode)
+            val finished =
+                fixture.threads.appended
+                    .single()
+                    .payload as RunFinished
+            assertEquals(RunOutcome.CANCELLED, finished.status)
+            assertEquals(TaskErrorCodes.LOST_ON_RESTART, finished.errorCode)
+            assertNotNull(finished.liveNote)
+        }
+
+    @Test
+    public fun `paused and waiting runs are closed`() =
+        runTest {
+            val fixture = RecoveryFixture(backgroundScope)
+            fixture.saveRun("run-paused", RunStatus.PAUSED, started = true)
+            fixture.saveRun("run-waiting", RunStatus.WAITING_USER, started = false)
+
+            val count = fixture.recovery.closeUnfinished()
+
+            assertEquals(2, count)
+            assertEquals(RunStatus.INTERRUPTED, fixture.runStore.get(RunId("run-paused"))?.status)
+            val waiting = fixture.runStore.get(RunId("run-waiting"))
+            assertEquals(RunStatus.CANCELLED, waiting?.status)
+            assertEquals(TaskErrorCodes.LOST_ON_RESTART, waiting?.errorCode)
+            assertEquals(2, fixture.threads.appended.size)
         }
 
     @Test
     public fun `中断的 Run 点继续时同线程新起 Run`() =
         runTest {
             val fixture = RecoveryFixture(backgroundScope)
-            val source = fixture.saveRunning("run-1")
-            fixture.recovery.markInterrupted()
+            val source = fixture.saveRun("run-1", RunStatus.RUNNING, started = true)
+            fixture.recovery.closeUnfinished()
 
             val result = fixture.recovery.resume(source.id)
 
@@ -106,7 +144,7 @@ public class InterruptedRunRecoveryTest {
     public fun `非 INTERRUPTED 状态拒绝恢复`() =
         runTest {
             val fixture = RecoveryFixture(backgroundScope)
-            val source = fixture.saveRunning("run-1")
+            val source = fixture.saveRun("run-1", RunStatus.RUNNING, started = true)
 
             val result = fixture.recovery.resume(source.id)
 
@@ -162,6 +200,7 @@ private class RecoveryFixture(
                     threadStore = threads,
                     experience = FakeExperienceExtractor(),
                     configProvider = config,
+                    prompts = FakePromptRepository(),
                     clock = clock,
                     scope = scope,
                     logger = FakeLogger,
@@ -173,6 +212,8 @@ private class RecoveryFixture(
             lockReminder = LockReminder(context, config, clock),
             notifier = UserNotifierImpl(context, config),
             configProvider = config,
+            threadStore = threads,
+            prompts = FakePromptRepository(),
             clock = clock,
             scope = scope,
             logger = FakeLogger,
@@ -201,18 +242,22 @@ private class RecoveryFixture(
             logger = FakeLogger,
         )
 
-    /** 落一条执行中的 Run。 */
-    suspend fun saveRunning(id: String): RunRecord {
+    /** 落一条指定状态的 Run（[started] 决定 startedAt）。 */
+    suspend fun saveRun(
+        id: String,
+        status: RunStatus,
+        started: Boolean,
+    ): RunRecord {
         val record =
             RunRecord(
                 id = RunId(id),
                 taskId = TaskId("t1"),
                 threadId = ThreadId("thread-$id"),
                 origin = RunOrigin.TASK_MANUAL,
-                status = RunStatus.RUNNING,
+                status = status,
                 triggerContext = emptyMap(),
                 createdAt = RECOVERY_START_MS,
-                startedAt = RECOVERY_START_MS,
+                startedAt = if (started) RECOVERY_START_MS else null,
                 endedAt = null,
                 summary = null,
                 errorCode = null,

@@ -50,6 +50,7 @@ internal class DefaultAgentSession(
             policy = ports.policy,
             platform = ports.platform,
             audit = ports.audit,
+            logger = ports.logger,
         )
 
     @Suppress("TooGenericExceptionCaught") // 主循环异常统一兜底转 RunFinished(FAILED)，不外传（N168）
@@ -74,7 +75,16 @@ internal class DefaultAgentSession(
                         throw e
                     } catch (e: Exception) {
                         ports.logger.e(TAG, "run_crashed", "runId" to request.runId, error = e)
-                        RunFinished(status = RunOutcome.FAILED, summary = null, errorCode = CommonErrorCodes.UNKNOWN)
+                        val crashed =
+                            RunFinished(
+                                status = RunOutcome.FAILED,
+                                summary = null,
+                                errorCode = CommonErrorCodes.UNKNOWN,
+                                liveNote = services.prompts.runEndedNote(RunOutcome.FAILED),
+                            )
+                        // 崩溃也要让后续 Run 看到收口说明（WP8.2）：先落盘 RunFinished 再 complete。
+                        services.store.append(request.threadId, request.runId, crashed)
+                        crashed
                     },
                 )
             }

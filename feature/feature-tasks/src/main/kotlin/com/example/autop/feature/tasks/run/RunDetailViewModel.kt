@@ -82,7 +82,8 @@ public class RunDetailViewModel
                     .distinctUntilChanged()
                     .flatMapLatest { current ->
                         // thread 事件作时间线刷新信号（N184）：记录变化或任一事件落盘都重读时间线。
-                        val ticks = current?.let { threadStore.observe(it.threadId).map {} } ?: emptyFlow()
+                        val ticks =
+                            current?.let { threadStore.observeFrom(it.threadId, afterSeq = 0).map {} } ?: emptyFlow()
                         ticks.onStart { emit(Unit) }.map { current }
                     }.collectLatest { current ->
                         record.value = current

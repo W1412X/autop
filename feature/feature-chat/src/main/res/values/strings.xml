@@ -16,6 +16,7 @@
     <string name="chat_outcome_budget">超出预算</string>
     <string name="chat_outcome_breaker">熔断停止</string>
     <string name="chat_outcome_interrupted">已中断</string>
+    <string name="chat_outcome_expired">已过期</string>
     <string name="chat_age_now">刚刚</string>
     <string name="chat_age_minutes">%1$d 分钟前</string>
     <string name="chat_age_hours">%1$d 小时前</string>
@@ -46,11 +47,13 @@
     <string name="thread_notice_export">已导出日志，正在调起分享</string>
     <string name="thread_notice_copied">已复制</string>
     <string name="thread_notice_image_failed">有图片无法读取，已跳过</string>
+    <string name="thread_notice_steer_failed">补充指令失败：任务已结束，输入内容已保留</string>
     <string name="thread_steer_tag">补充指令</string>
     <string name="thread_thinking">思考 · %1$d 字</string>
     <string name="thread_plan_title">计划</string>
     <string name="thread_group">查看屏幕 ×%1$d</string>
     <string name="thread_fork_marker">从第 %1$d 步分叉</string>
+    <string name="thread_fork_inherited">继承了 %1$d 条消息</string>
     <string name="thread_result_stats">%1$d 步 · %2$s · %3$d token</string>
     <string name="thread_meta_copy">复制回复</string>
     <string name="thread_meta_more">更多</string>

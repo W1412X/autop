@@ -133,7 +133,6 @@ internal class TurnLoop(
                 config = req.config,
                 goal = req.goal,
                 vars = req.vars,
-                isFirstRunOfThread = controller.toolStore.events(req.threadId).none { it.payload is RunStarted },
             )
         val assembled = parts.assembler.assemble(contextRequest, req.config, sampler.staticToolList(allSchemas))
         this.assembled = assembled

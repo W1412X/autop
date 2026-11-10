@@ -60,7 +60,10 @@ public object AgentRuntimeModule {
 
     @Provides
     @IntoSet
-    public fun provideHistoryRecallTool(recall: ThreadRecall): Tool = HistoryRecallTool(recall)
+    public fun provideHistoryRecallTool(
+        recall: ThreadRecall,
+        prompts: PromptRepository,
+    ): Tool = HistoryRecallTool(recall, prompts)
 
     @Provides
     @IntoSet

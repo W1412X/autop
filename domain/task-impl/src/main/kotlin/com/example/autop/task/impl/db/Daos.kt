@@ -64,9 +64,9 @@ public interface RunDao {
     @Query("SELECT * FROM runs WHERE status IN ('QUEUED','WAITING_SCREEN','WAITING_USER','RUNNING','PAUSED')")
     public fun observeUnfinished(): Flow<List<RunEntity>>
 
-    /** 进程被杀残留的 RUNNING（docs/tech/04 §3.11 中断恢复用）。 */
-    @Query("SELECT * FROM runs WHERE status = 'RUNNING'")
-    public suspend fun stuckRunning(): List<RunEntity>
+    /** 进程被杀留下的未收口 Run（WP8.4 启动收口用；无表结构变化）。 */
+    @Query("SELECT * FROM runs WHERE status IN ('QUEUED','WAITING_SCREEN','WAITING_USER','RUNNING','PAUSED')")
+    public suspend fun unfinished(): List<RunEntity>
 }
 
 /** 审计日志表访问。 */

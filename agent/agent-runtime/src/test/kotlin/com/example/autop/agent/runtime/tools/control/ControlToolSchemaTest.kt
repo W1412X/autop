@@ -22,7 +22,7 @@ class ControlToolSchemaTest {
             FinishTool(TestPromptRepository()),
             NoteTool(prompts),
             RuntimeStateTool(),
-            HistoryRecallTool(EmptyRecall),
+            HistoryRecallTool(EmptyRecall, TestPromptRepository()),
         )
 
     @Test

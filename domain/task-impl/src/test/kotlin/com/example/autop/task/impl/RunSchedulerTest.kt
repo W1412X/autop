@@ -8,12 +8,15 @@ import android.app.NotificationManager
 import android.content.Context
 import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
+import com.example.autop.agent.RunFinished
+import com.example.autop.agent.RunOutcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.config.TaskQueueSection
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
+import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.DeviceState
 import com.example.autop.task.LockedBehavior
 import com.example.autop.task.RunOrigin
@@ -45,6 +48,7 @@ import kotlinx.coroutines.test.advanceTimeBy
 import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -155,6 +159,40 @@ public class RunSchedulerTest {
             assertEquals(1, fixture.session.requests.size)
             assertEquals(0, fixture.screenLease.leaseCalls)
         }
+
+    @Test
+    public fun `cancel waiting run appends RunFinished cancelled`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            val record = fixture.enqueueRun("run-1", RunOrigin.SCHEDULE, taskOf("t1"))
+
+            fixture.scheduler.cancelWaitingRun(record.id)
+
+            val finished =
+                fixture.threads.appended
+                    .single()
+                    .payload as RunFinished
+            assertEquals(RunOutcome.CANCELLED, finished.status)
+            assertNotNull(finished.liveNote)
+            assertEquals(RunStatus.CANCELLED, fixture.runStore.get(record.id)?.status)
+        }
+
+    @Test
+    public fun `expiry appends RunFinished expired`() =
+        runTest {
+            val fixture = Fixture(backgroundScope)
+            val record = fixture.enqueueRun("run-1", RunOrigin.SCHEDULE, taskOf("t1"))
+
+            fixture.scheduler.cancelWaitingRun(record.id, RunStatus.EXPIRED)
+
+            val finished =
+                fixture.threads.appended
+                    .single()
+                    .payload as RunFinished
+            assertEquals(RunOutcome.EXPIRED, finished.status)
+            assertNotNull(finished.liveNote)
+            assertEquals(RunStatus.EXPIRED, fixture.runStore.get(record.id)?.status)
+        }
 }
 
 /** 测试装配：真实 RunStore/RunRunner/LockReminder + fake 设备端口（docs/tech/07 §9）。 */
@@ -168,6 +206,7 @@ private class Fixture(
         Room.inMemoryDatabaseBuilder(context, TasksDb::class.java).allowMainThreadQueries().build()
     val runStore = RunStore(db)
     val pending = PendingRuns()
+    val threads = FakeThreadStore()
     val queue = RunQueue(TaskQueueSection.DEFAULT_ORIGIN_WEIGHTS)
     val screenLease = FakeScreenLease()
     val accessibility = FakeAccessibilityStatus()
@@ -192,9 +231,10 @@ private class Fixture(
             appLauncher = launcher,
             notifier = notifier,
             taskStore = FakeTaskRepository(),
-            threadStore = FakeThreadStore(),
+            threadStore = threads,
             experience = FakeExperienceExtractor(),
             configProvider = config,
+            prompts = FakePromptRepository(),
             clock = clock,
             scope = scope,
             logger = FakeLogger,
@@ -212,6 +252,8 @@ private class Fixture(
             lockReminder = LockReminder(context, config, clock),
             notifier = notifier,
             configProvider = config,
+            threadStore = threads,
+            prompts = FakePromptRepository(),
             clock = clock,
             scope = scope,
             logger = FakeLogger,
@@ -239,7 +281,7 @@ private class Fixture(
                 waitingQuestion = null,
             )
         runStore.save(record)
-        pending.put(record.id, PendingEntry(input = emptyList(), vars = emptyMap(), task = task))
+        pending.put(record.id, PendingEntry(vars = emptyMap(), task = task))
         scheduler.enqueue(record)
         return record
     }

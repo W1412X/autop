@@ -51,6 +51,5 @@ class ToolGuideContributorTest {
             config = provider.current(),
             goal = null,
             vars = emptyMap(),
-            isFirstRunOfThread = false,
         )
 }

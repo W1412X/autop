@@ -238,18 +238,19 @@ public class FakeRunHandle(
     override suspend fun await(): RunFinished = finished
 }
 
-/** fake 线程存储：只提供预置事件列表；[append] 记录写入的事件。 */
+/** fake 线程存储：只提供预置事件列表；[append] 记录写入的事件，[createThread] 生成顺序 id。 */
 public class FakeThreadStore(
     /** [events] 返回的事件。 */
     public val items: List<ThreadEvent> = emptyList(),
 ) : ThreadStore {
     /** append 写入的事件（供断言）。 */
     public val appended: MutableList<ThreadEvent> = mutableListOf()
+    private var nextThread = 1
 
     override suspend fun createThread(
         title: String?,
         parent: Pair<ThreadId, Long>?,
-    ): ThreadId = error("not used")
+    ): ThreadId = ThreadId("thread-${nextThread++}")
 
     override suspend fun append(
         threadId: ThreadId,

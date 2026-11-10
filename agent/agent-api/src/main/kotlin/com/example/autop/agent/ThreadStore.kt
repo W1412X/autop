@@ -6,6 +6,8 @@ package com.example.autop.agent
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.map
 
 /**
  * 用户从相册选取的图片的文件名前缀。历史渲染的「图片保留」规则据此区分用户图片与
@@ -50,7 +52,19 @@ public interface ThreadStore {
     /** 从最近一条 Baseline 起（含 Baseline 本身）的全部事件。 */
     public suspend fun eventsSinceLatestBaseline(threadId: ThreadId): List<ThreadEvent>
 
-    /** 新事件推送，给 UI。 */
+    /**
+     * 订阅线程事件：先一次性发出 seq > [afterSeq] 的已有事件（一个列表），之后每条新事件发一个单元素列表。
+     * 不丢事件、不重复（按 seq 去重），顺序按 seq 递增。
+     *
+     * 默认实现只转发 [observe] 的新事件（不回放 backlog），供未迁移的测试替身兼容；
+     * 正式实现（ThreadStoreImpl）覆写为“先回放后实时”。
+     */
+    public fun observeFrom(
+        threadId: ThreadId,
+        afterSeq: Long,
+    ): Flow<List<ThreadEvent>> = observe(threadId).filter { it.seq > afterSeq }.map { listOf(it) }
+
+    /** 新事件推送（热流：订阅前的已有事件拿不到）。新代码一律用 [observeFrom]（不丢事件）。 */
     public fun observe(threadId: ThreadId): Flow<ThreadEvent>
 
     /** 线程级任何变更时发出（建线程 / append / 改名 / 删除）：对话列表等元数据视图刷新用（N184）。 */

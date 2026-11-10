@@ -36,11 +36,14 @@ public interface RunService {
         text: String?,
     ): Outcome<RunRecord>
 
-    /** 运行中补充指令：不打断当前采样或工具，在本轮工具结果写完后注入。 */
-    public fun steer(
+    /**
+     * 运行中补充指令：不打断当前采样或工具，在本轮工具结果写完后注入。
+     * 排队中（未启动）的 Run 直接落盘为 STEER 用户消息；已结束的 Run 返回 `task.invalid`。
+     */
+    public suspend fun steer(
         runId: RunId,
         text: String,
-    )
+    ): Outcome<Unit>
 
     public fun pause(runId: RunId)
 
@@ -93,6 +96,12 @@ public interface RunService {
 
     /** Run 记录流（对话页状态条与问题卡片使用）。 */
     public fun observeRun(runId: RunId): Flow<RunRecord>
+
+    /**
+     * 线程当前未收口的 Run（WP8.5）：该线程最近创建的一个处于
+     * QUEUED/WAITING_SCREEN/WAITING_USER/RUNNING/PAUSED 的 Run，没有则 null。
+     */
+    public fun observeOpenRun(threadId: ThreadId): Flow<RunRecord?>
 
     /** 运行中的实时事件。 */
     public fun liveEvents(runId: RunId): Flow<AgentEvent>

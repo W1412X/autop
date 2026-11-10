@@ -17,7 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 public data class RunRequest(
     val runId: RunId,
     val threadId: ThreadId,
-    /** 本次用户输入（对话）或任务目标渲染结果（后台）。 */
+    /** 尚未写入事件日志的输入；调度层已落盘时传空（WP8.1：输入在入队时写入事件日志）。 */
     val input: List<Block>,
     val goal: String?,
     /** 触发上下文等，供 ContextContributor 使用。 */

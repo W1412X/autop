@@ -90,7 +90,6 @@ class ContextContributorsTest {
             config = FakeConfigProvider().current(),
             goal = goal,
             vars = vars,
-            isFirstRunOfThread = true,
         )
 
     /** 渲染总是失败的 PromptRepository。 */

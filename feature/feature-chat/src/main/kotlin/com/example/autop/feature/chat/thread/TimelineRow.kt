@@ -341,7 +341,7 @@ private fun PlanLine(plan: PlanItem) {
     }
 }
 
-/** 分叉来源标记（docs/tech/08 §4.2 ForkMarker）：点击回源对话。 */
+/** 分叉来源标记（docs/tech/08 §4.2 ForkMarker）：点击回源对话；标注继承条数（WP8.6）。 */
 @Composable
 private fun ForkRow(
     item: TimelineItem.ForkMarker,
@@ -349,7 +349,10 @@ private fun ForkRow(
     modifier: Modifier = Modifier,
 ) {
     Text(
-        text = stringResource(R.string.thread_fork_marker, item.parentSeq),
+        text =
+            stringResource(R.string.thread_fork_marker, item.parentSeq) +
+                " " +
+                stringResource(R.string.thread_fork_inherited, item.inheritedCount),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier =

@@ -7,12 +7,15 @@ package com.example.autop.agent.runtime
 import com.example.autop.agent.AgentErrorCodes
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.ToolResultEvent
+import com.example.autop.agent.UserMessage
+import com.example.autop.agent.UserMessageKind
 import com.example.autop.agent.runtime.testing.FakeTool
 import com.example.autop.agent.runtime.testing.RuntimeHarness
 import com.example.autop.agent.runtime.testing.ScriptedLlmProvider
 import com.example.autop.agent.runtime.testing.overridesOf
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.ThreadId
+import com.example.autop.llm.Block
 import com.example.autop.llm.ModelCapabilities
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
@@ -146,6 +149,29 @@ class TurnLoopBasicsTest {
             assertThat(finished.status).isEqualTo(RunOutcome.FAILED)
             assertThat(finished.errorCode).isEqualTo(AgentErrorCodes.FALLBACK_PARSE_FAILED)
             assertThat(finished.summary).isNull()
+        }
+
+    @Test
+    fun `调度层已落盘时 INPUT 只出现一次`() =
+        runTest {
+            val h = RuntimeHarness()
+            h.llm.say("好")
+            val thread = h.newThread()
+            // 调度层入队即落盘（WP8.1）：INPUT 已在事件日志里，TurnLoop 传 input=emptyList() 不再重复写。
+            h.store.append(
+                thread,
+                null,
+                UserMessage(blocks = listOf(Block.Text("帮我发消息")), kind = UserMessageKind.INPUT),
+            )
+
+            h.start(this, threadId = thread, input = emptyList()).await()
+
+            val inputs =
+                h.store
+                    .payloadsOf(thread)
+                    .filterIsInstance<UserMessage>()
+                    .filter { it.kind == UserMessageKind.INPUT }
+            assertThat(inputs).hasSize(1)
         }
 
     private fun eventKinds(

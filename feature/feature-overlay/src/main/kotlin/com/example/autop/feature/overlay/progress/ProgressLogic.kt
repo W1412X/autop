@@ -76,6 +76,7 @@ public fun outcomeTextOf(outcome: RunOutcome): Int =
         RunOutcome.BUDGET_EXHAUSTED -> R.string.progress_outcome_budget
         RunOutcome.BREAKER_STOPPED -> R.string.progress_outcome_breaker
         RunOutcome.INTERRUPTED -> R.string.progress_outcome_interrupted
+        RunOutcome.EXPIRED -> R.string.progress_outcome_expired
     }
 
 /**

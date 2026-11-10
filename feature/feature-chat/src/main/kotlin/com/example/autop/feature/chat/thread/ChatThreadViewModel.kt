@@ -1,10 +1,10 @@
 /**
  * 对话页 ViewModel（docs/tech/08 §4.2，docs/standards/coding-standards §8）。
  *
- * 读：[ThreadStore.events] / [ThreadStore.observe]（历史）+ [RunService.liveEvents]
- * （实时增量）→ [mergeTimeline]；[RunService.observeActive]（本线程活跃 Run、
- * ask_user 问题）；写：[RunService.startChat] / [steer] / [cancel] / [resume] /
- * [answer]、[AgentSession.fork]（从这里分叉）、[ThreadStore.delete]。
+ * 读：[ThreadStore.observeFrom]（历史，WP8.3 先回放后实时、不丢事件）+ [RunService.liveEvents]
+ * （实时增量）→ [mergeTimeline]；[RunService.observeOpenRun]（本线程未收口 Run，WP8.5）
+ * 与 [RunService.observeActive]（ask_user 问题）；写：[RunService.startChat] / [steer] /
+ * [cancel] / [resume] / [answer]、[AgentSession.fork]（从这里分叉）、[ThreadStore.delete]。
  */
 package com.example.autop.feature.chat.thread
 
@@ -22,7 +22,7 @@ import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.LogFiles
-import com.example.autop.core.common.RunId
+import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.ConfigProvider
@@ -31,12 +31,14 @@ import com.example.autop.device.AccessibilityStatus
 import com.example.autop.feature.chat.NEW_THREAD
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.ImageAttachment
+import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -47,6 +49,8 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -85,10 +89,19 @@ public class ChatThreadViewModel
     ) : ViewModel() {
         private val timeline = MutableStateFlow(TimelineInput())
         private val meta = MutableStateFlow(ChatMeta())
-        private val sentRunId = MutableStateFlow<RunId?>(null)
         private val threadTitle = MutableStateFlow<String?>(null)
+        private val threadFlow = MutableStateFlow<String?>(null)
         private var threadId: String = NEW_THREAD
         private var bound = false
+
+        /** 历史订阅（WP8.3）：切线程（fork/换对话）时 cancel 停掉旧订阅。 */
+        private var collectJob: Job? = null
+
+        /** 本线程当前未收口的 Run（WP8.5）：Stop/Resume/Answer/steer 都只作用于它。 */
+        public val openRun: StateFlow<RunRecord?> =
+            threadFlow
+                .flatMapLatest { id -> if (id == null) flowOf(null) else runService.observeOpenRun(ThreadId(id)) }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, null)
 
         private val navChannel = Channel<ChatNavEvent>(Channel.BUFFERED)
 
@@ -100,10 +113,10 @@ public class ChatThreadViewModel
                 timeline,
                 runService.observeActive(),
                 meta,
-                sentRunId,
+                openRun,
                 accessibility.connected,
-            ) { input, active, metaState, sent, connected ->
-                buildState(input, activeOf(active, sent), metaState, connected)
+            ) { input, active, metaState, open, connected ->
+                buildState(input, active, open, metaState, connected)
             }.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -133,7 +146,8 @@ public class ChatThreadViewModel
                     }
             }
             viewModelScope.launch {
-                combine(runService.observeActive(), sentRunId) { active, sent -> activeOf(active, sent)?.run?.id }
+                openRun
+                    .map { it?.id }
                     .distinctUntilChanged()
                     .flatMapLatest { runId ->
                         if (runId == null) emptyFlow() else runService.liveEvents(runId)
@@ -176,9 +190,9 @@ public class ChatThreadViewModel
                 -> handleAttachments(action)
                 ChatThreadAction.Send -> send()
                 ChatThreadAction.Stop ->
-                    runService.observeActive().value?.let { runService.cancel(it.run.id) }
+                    openRun.value?.let { runService.cancel(it.id) }
                 ChatThreadAction.Resume ->
-                    runService.observeActive().value?.let { runService.resume(it.run.id, note = null) }
+                    openRun.value?.let { runService.resume(it.id, note = null) }
                 is ChatThreadAction.Answer -> answer(action.text)
                 is ChatThreadAction.ForkFrom -> forkFrom(action.seq)
                 ChatThreadAction.ConfirmDelete -> deleteThread()
@@ -261,22 +275,28 @@ public class ChatThreadViewModel
         private fun send() {
             val text = meta.value.input.trim()
             val images = meta.value.images
-            val active = runService.observeActive().value
+            val open = openRun.value
             // 运行中只能补充文字指令（图片随新一轮对话发送）。
-            if (text.isEmpty() && (active != null || images.isEmpty())) return
+            if (text.isEmpty() && (open != null || images.isEmpty())) return
             val attach = meta.value.attachScreen
-            meta.update { it.copy(input = "", images = if (active == null) emptyList() else it.images) }
             val background = configProvider.current()[UiConfig.CHAT].backgroundOnSend
-            if (active != null) {
-                runService.steer(active.run.id, text)
-                if (background) viewModelScope.launch { navChannel.send(ChatNavEvent.Background) }
+            if (open != null) {
+                // steer 失败不清输入框（WP8.5）：成功后才清，失败提示 STEER_FAILED。
+                viewModelScope.launch {
+                    if (runService.steer(open.id, text) is Outcome.Ok) {
+                        meta.update { it.copy(input = "", notice = null) }
+                        if (background) navChannel.send(ChatNavEvent.Background)
+                    } else {
+                        meta.update { it.copy(notice = ThreadNotice.STEER_FAILED) }
+                    }
+                }
                 return
             }
+            meta.update { it.copy(input = "", images = emptyList()) }
             viewModelScope.launch {
                 val fresh = threadId == NEW_THREAD
                 val outcome = runService.startChat(if (fresh) null else ThreadId(threadId), text, attach, images)
                 outcome.getOrNull()?.let { record ->
-                    sentRunId.value = record.id
                     if (fresh) {
                         threadId = record.threadId.value
                         startCollecting(record.threadId.value)
@@ -288,12 +308,7 @@ public class ChatThreadViewModel
         }
 
         private fun answer(text: String) {
-            val runId =
-                runService
-                    .observeActive()
-                    .value
-                    ?.run
-                    ?.id ?: return
+            val runId = openRun.value?.id ?: return
             meta.update { it.copy(input = "") }
             viewModelScope.launch { runService.answer(runId, text) }
         }
@@ -303,8 +318,6 @@ public class ChatThreadViewModel
             viewModelScope.launch {
                 agentSession.fork(ThreadId(threadId), seq, title = null).getOrNull()?.let { forked ->
                     threadId = forked.value
-                    sentRunId.value = null
-                    timeline.value = TimelineInput()
                     startCollecting(forked.value)
                     navChannel.send(ChatNavEvent.ReplaceThread(forked.value))
                 }
@@ -323,30 +336,35 @@ public class ChatThreadViewModel
 
         private fun startCollecting(threadId: String) {
             val id = ThreadId(threadId)
-            viewModelScope.launch {
-                threadTitle.value = threadStore.titleOf(id)
-                timeline.update { it.copy(history = threadStore.events(id)) }
-                threadStore.observe(id).collect { event ->
-                    timeline.update { input ->
-                        val live =
-                            if (
-                                event.payload is AssistantMessage ||
-                                event.payload is ToolResultEvent ||
-                                event.payload is RunFinished
-                            ) {
-                                emptyList()
-                            } else {
-                                input.live
-                            }
-                        input.copy(history = input.history + event, live = live)
+            threadFlow.value = threadId
+            collectJob?.cancel()
+            collectJob =
+                viewModelScope.launch {
+                    threadTitle.value = threadStore.titleOf(id)
+                    timeline.value = TimelineInput()
+                    // observeFrom 先回放已有事件再转实时（WP8.3）：新对话的用户输入事件
+                    // 在入队时已落盘（WP8.1），backlog 一定包含它，不再丢。
+                    threadStore.observeFrom(id, afterSeq = 0).collect { batch ->
+                        timeline.update { input ->
+                            val clearsLive =
+                                batch.any {
+                                    it.payload is AssistantMessage ||
+                                        it.payload is ToolResultEvent ||
+                                        it.payload is RunFinished
+                                }
+                            input.copy(
+                                history = input.history + batch,
+                                live = if (clearsLive) emptyList() else input.live,
+                            )
+                        }
                     }
                 }
-            }
         }
 
         private fun buildState(
             input: TimelineInput,
             active: ActiveRunInfo?,
+            open: RunRecord?,
             metaState: ChatMeta,
             connected: Boolean,
         ): ChatThreadUiState {
@@ -357,7 +375,7 @@ public class ChatThreadViewModel
                 threadId = threadId,
                 title = input.history.firstNotNullOfOrNull { (it.payload as? ThreadCreated)?.title },
                 entries = mergeTimeline(input.history, input.live, chatConfig.stepGroupThreshold),
-                running = active != null,
+                running = open != null,
                 accessibilityConnected = connected,
                 input = metaState.input,
                 images = metaState.images,
@@ -365,9 +383,9 @@ public class ChatThreadViewModel
                 attachScreen = metaState.attachScreen,
                 inputMaxLines = chatConfig.inputMaxLines,
                 waitingQuestion =
-                    active?.takeIf { it.run.status == RunStatus.WAITING_USER }?.let {
-                        WaitingQuestion(it.run.waitingQuestion ?: "", it.run.waitingOptions)
-                    },
+                    active
+                        ?.takeIf { open != null && it.run.id == open.id && it.run.status == RunStatus.WAITING_USER }
+                        ?.let { WaitingQuestion(it.run.waitingQuestion ?: "", it.run.waitingOptions) },
                 notice = metaState.notice,
                 sheet = metaState.sheet,
                 rawJson =
@@ -378,11 +396,6 @@ public class ChatThreadViewModel
                     },
             )
         }
-
-        private fun activeOf(
-            active: ActiveRunInfo?,
-            sent: RunId?,
-        ): ActiveRunInfo? = active?.takeIf { it.run.threadId.value == threadId || it.run.id == sent }
     }
 
 /** 标题刷新去抖（事件连发时合并成一次库查询，同对话列表 N184 口径）。 */

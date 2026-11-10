@@ -102,6 +102,7 @@ public object AgentSessionModule {
         policy: PolicyEngine,
         platform: PlatformCapabilities,
         audit: ToolAuditSink,
+        logger: Logger,
     ): ToolInvokerFactory =
         RuntimeToolInvokerFactory(
             RouterBuilder(
@@ -113,6 +114,7 @@ public object AgentSessionModule {
                 policy = policy,
                 platform = platform,
                 audit = audit,
+                logger = logger,
             ),
         )
 

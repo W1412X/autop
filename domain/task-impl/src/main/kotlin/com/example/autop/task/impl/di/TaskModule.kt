@@ -153,6 +153,7 @@ public object TaskModule {
         threadStore: ThreadStore,
         experience: ExperienceExtractor,
         configProvider: ConfigProvider,
+        prompts: PromptRepository,
         clock: Clock,
         @AppScope scope: CoroutineScope,
         logger: Logger,
@@ -174,6 +175,7 @@ public object TaskModule {
             threadStore = threadStore,
             experience = experience,
             configProvider = configProvider,
+            prompts = prompts,
             clock = clock,
             scope = scope,
             logger = logger,
@@ -194,6 +196,8 @@ public object TaskModule {
         lockReminder: LockReminder,
         notifier: UserNotifierImpl,
         configProvider: ConfigProvider,
+        threadStore: ThreadStore,
+        prompts: PromptRepository,
         clock: Clock,
         @AppScope scope: CoroutineScope,
         logger: Logger,
@@ -210,6 +214,8 @@ public object TaskModule {
             lockReminder = lockReminder,
             notifier = notifier,
             configProvider = configProvider,
+            threadStore = threadStore,
+            prompts = prompts,
             clock = clock,
             scope = scope,
             logger = logger,
@@ -297,6 +303,8 @@ public object TaskModule {
         logger: Logger,
         flowStore: FlowStore,
         flowValidation: FlowValidationService,
+        runStore: RunStore,
+        threadStore: ThreadStore,
     ): RunCoordinator =
         RunCoordinator(
             executor,
@@ -309,5 +317,7 @@ public object TaskModule {
             logger,
             flowStore,
             flowValidation,
+            runStore,
+            threadStore,
         )
 }

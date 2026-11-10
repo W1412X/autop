@@ -4,11 +4,15 @@
  */
 package com.example.autop.task.impl
 
+import com.example.autop.agent.RunFinished
+import com.example.autop.agent.RunOutcome
+import com.example.autop.agent.ThreadStore
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.RunId
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.TaskConfig
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.ScreenLease
@@ -43,6 +47,8 @@ public class RunScheduler(
     private val lockReminder: LockReminder,
     private val notifier: UserNotifierImpl,
     private val configProvider: ConfigProvider,
+    private val threadStore: ThreadStore,
+    private val prompts: PromptRepository,
     private val clock: Clock,
     private val scope: CoroutineScope,
     private val logger: Logger,
@@ -129,7 +135,11 @@ public class RunScheduler(
         scope.launch { cancelWaitingRun(runId) }
     }
 
-    /** 跳过/过期收口（Run → CANCELLED/EXPIRED）。 */
+    /**
+     * 跳过/过期收口（Run → CANCELLED/EXPIRED）：改 runStore 后补写
+     * `RunFinished`（带 liveNote），同线程后续 Run 的模型能看到上一个任务没有完成（WP8.2）。
+     */
+    @Suppress("TooGenericExceptionCaught") // 补写失败只记日志，收口不被单条事件写入阻断
     public suspend fun cancelWaitingRun(
         runId: RunId,
         status: RunStatus = RunStatus.CANCELLED,
@@ -140,6 +150,28 @@ public class RunScheduler(
         pending.remove(runId)
         runStore.mutate(runId) {
             it.copy(status = status, endedAt = clock.nowMillis(), errorCode = errorCode ?: it.errorCode)
+        }
+        val record = runStore.get(runId)
+        if (record != null) {
+            val outcome =
+                when (status) {
+                    RunStatus.EXPIRED -> RunOutcome.EXPIRED
+                    else -> RunOutcome.CANCELLED
+                }
+            try {
+                threadStore.append(
+                    record.threadId,
+                    runId,
+                    RunFinished(
+                        status = outcome,
+                        summary = null,
+                        errorCode = errorCode,
+                        liveNote = prompts.runEndedNote(outcome),
+                    ),
+                )
+            } catch (e: Exception) {
+                logger.w(TAG, "append_waiting_finish_failed", "runId" to runId.value, error = e)
+            }
         }
         logger.d(TAG, "waiting_run_closed", "runId" to runId.value, "status" to status.name)
     }

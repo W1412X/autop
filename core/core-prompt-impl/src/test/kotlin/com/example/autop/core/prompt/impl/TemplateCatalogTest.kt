@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(47)
+        assertThat(toolTemplates).hasSize(49)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -96,6 +96,7 @@ class TemplateCatalogTest {
                 "agent.budget.dimension.tokens",
                 "agent.history.empty_tool_result",
                 "agent.history.image_unsupported",
+                "agent.tool.arg_clamped",
                 "agent.tool.skipped_hint.after_control",
                 "agent.tool.skipped_hint.previous_failed",
                 "agent.turn.empty_reply",
@@ -132,6 +133,8 @@ class TemplateCatalogTest {
                 "agent.state.tools.reason.vision",
                 "tool.note.saved",
                 "tool.finish.received",
+                "tool.history_recall.none",
+                "tool.history_recall.truncated",
                 "agent.breaker.repeat_warn",
                 "agent.breaker.repeat_stop",
                 "agent.breaker.same_error_stop",
@@ -158,6 +161,12 @@ class TemplateCatalogTest {
                 "agent.plan.unfinished_items",
                 "agent.policy.blocked_hint",
                 "agent.replay.completed",
+                "agent.run.ended.breaker_stopped",
+                "agent.run.ended.budget_exhausted",
+                "agent.run.ended.cancelled",
+                "agent.run.ended.expired",
+                "agent.run.ended.failed",
+                "agent.run.ended.interrupted",
                 "agent.replay.diverged",
                 "agent.resume.after_interrupt",
                 "agent.resume.reobserve",
@@ -185,6 +194,11 @@ class TemplateCatalogTest {
                 "device.llm_parser.system",
                 "device.llm_parser.user",
                 "device.a11y.tree_empty_hint",
+                "device.input.refresh_failed_hint",
+                "device.launch.denied_hint",
+                "device.launch.not_found_hint",
+                "device.notifications.truncated",
+                "device.visual.not_ready",
                 "device.effect.basis.content",
                 "device.effect.basis.frame",
                 "device.effect.basis.mode_switch",
@@ -221,6 +235,7 @@ class TemplateCatalogTest {
                 "device.screenshot.region_note",
                 "device.scroll.summary",
                 "device.stabilize.not_settled",
+                "device.visual.ocr_disabled",
                 "device.trace.channel.accessibility",
                 "device.trace.channel.none",
                 "device.trace.channel.shell",

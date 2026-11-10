@@ -23,6 +23,9 @@ public enum class ThreadNotice {
 
     /** 选中的图片读取失败（格式不支持或文件不可读）。 */
     IMAGE_FAILED,
+
+    /** 补充指令（steer）失败：目标 Run 已结束或不存在，输入框保留原文（WP8.5）。 */
+    STEER_FAILED,
 }
 
 /** 对话页弹层状态。 */

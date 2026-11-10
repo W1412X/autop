@@ -72,8 +72,8 @@ public class RunStore(
     public fun observeUnfinished(): Flow<List<RunRecord>> =
         db.runDao().observeUnfinished().map { list -> list.map { it.toRecord() } }
 
-    /** 进程被杀残留的 RUNNING（docs/tech/04 §3.11 中断恢复用）。 */
-    public suspend fun stuckRunning(): List<RunRecord> = db.runDao().stuckRunning().map { it.toRecord() }
+    /** 进程被杀留下的未收口 Run（WP8.4 启动收口用）。 */
+    public suspend fun unfinished(): List<RunRecord> = db.runDao().unfinished().map { it.toRecord() }
 
     /** 按任务查运行记录（taskId=null 查全部，07 §4.3 运行记录列表）。 */
     public fun observeRuns(

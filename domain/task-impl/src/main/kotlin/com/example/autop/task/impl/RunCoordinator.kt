@@ -7,6 +7,9 @@ package com.example.autop.task.impl
 
 import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.PauseReason
+import com.example.autop.agent.ThreadStore
+import com.example.autop.agent.UserMessage
+import com.example.autop.agent.UserMessageKind
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.FlowId
 import com.example.autop.core.common.Logger
@@ -21,17 +24,22 @@ import com.example.autop.flow.FlowRunHandle
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.flow.FlowStore
 import com.example.autop.flow.FlowValidationService
+import com.example.autop.llm.Block
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.ImageAttachment
 import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
+import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
+import com.example.autop.task.TaskErrorCodes
 import com.example.autop.task.impl.host.AgentHostStarter
 import com.example.autop.task.impl.schedule.TriggerRunner
+import com.example.autop.task.impl.store.RunStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
 import kotlinx.serialization.json.JsonObject
 
 /** 运行协调器：实现 [RunService] 与 [TriggerRunner]。 */
@@ -47,6 +55,8 @@ public class RunCoordinator(
     private val logger: Logger,
     private val flowStore: FlowStore,
     private val flowValidation: FlowValidationService,
+    private val runStore: RunStore,
+    private val threadStore: ThreadStore,
 ) : RunService,
     TriggerRunner {
     override suspend fun startChat(
@@ -126,16 +136,35 @@ public class RunCoordinator(
         host.ensureRunning()
     }
 
-    override fun steer(
+    /**
+     * 补充指令（WP8.5）：运行中的 Run 走 SteerQueue（不插进未配对的 ToolCall/ToolResult
+     * 之间）；排队中（未启动）的 Run 直接落盘为 STEER 用户消息，Run 开始后渲染 live 时
+     * 自然可见（顺序在 INPUT 之后）；已结束的 Run 报 `task.invalid`。
+     */
+    override suspend fun steer(
         runId: RunId,
         text: String,
-    ) {
+    ): Outcome<Unit> {
         val handle = observer.handleOf(runId)
-        if (handle == null) {
-            logger.w(TAG, "steer_no_active_run", "runId" to runId.value)
-            return
+        if (handle != null) {
+            handle.steer(text)
+            return Outcome.Ok(Unit)
         }
-        handle.steer(text)
+        val record =
+            runStore.get(runId)
+                ?: return Outcome.Err(
+                    AppError(code = TaskErrorCodes.NOT_FOUND, message = "run not found: ${runId.value}"),
+                )
+        return if (record.status in QUEUED_STEERABLE) {
+            threadStore.append(
+                record.threadId,
+                runId,
+                UserMessage(blocks = listOf(Block.Text(text)), kind = UserMessageKind.STEER),
+            )
+            Outcome.Ok(Unit)
+        } else {
+            Outcome.Err(AppError(code = TaskErrorCodes.INVALID, message = "run is not active"))
+        }
     }
 
     override fun pause(runId: RunId) {
@@ -187,9 +216,28 @@ public class RunCoordinator(
 
     override fun observeRun(runId: RunId): Flow<RunRecord> = observer.observeRun(runId)
 
+    /** 线程未收口的 Run（WP8.5）：最近创建的一个开放状态 Run，没有则 null。 */
+    override fun observeOpenRun(threadId: ThreadId): Flow<RunRecord?> =
+        runStore.observeThread(threadId).map { records ->
+            records.filter { it.status in OPEN_STATUSES }.maxByOrNull { it.createdAt }
+        }
+
     override fun liveEvents(runId: RunId): SharedFlow<AgentEvent> = observer.eventsOf(runId)
 
     private companion object {
         const val TAG = "RunCoordinator"
+
+        /** 可直接落盘 steer 的未启动状态（WP8.5）。 */
+        val QUEUED_STEERABLE: Set<RunStatus> = setOf(RunStatus.QUEUED, RunStatus.WAITING_SCREEN, RunStatus.WAITING_USER)
+
+        /** 未收口（开放）状态（WP8.5 observeOpenRun）。 */
+        val OPEN_STATUSES: Set<RunStatus> =
+            setOf(
+                RunStatus.QUEUED,
+                RunStatus.WAITING_SCREEN,
+                RunStatus.WAITING_USER,
+                RunStatus.RUNNING,
+                RunStatus.PAUSED,
+            )
     }
 }

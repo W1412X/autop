@@ -11,10 +11,19 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
+import com.example.autop.agent.runEndedNoteId
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
+
+/** Run 结束 liveNote 文字（附录 A.9 模板；SUCCEEDED 不写，模板缺失给 null）。 */
+internal suspend fun PromptRepository.runEndedNote(status: RunOutcome): String? =
+    if (status == RunOutcome.SUCCEEDED) {
+        null
+    } else {
+        render(runEndedNoteId(status), emptyMap()).getOrNull()?.text
+    }
 
 /** Run 级事件写入扩展（threadId/runId 由句柄派生；RunController 的 pause/resume 同样经此写入）。 */
 internal suspend fun RunController.append(payload: EventPayload): ThreadEvent =
@@ -57,14 +66,21 @@ internal class LoopJournal(
         controller.append(event)
     }
 
-    /** 写 RunFinished 并返回（收口唯一入口）。 */
+    /** 写 RunFinished 并返回（收口唯一入口）；非成功结束渲染 `agent.run.ended.<outcome>` liveNote（WP8.2）。 */
     suspend fun finishEvent(
         status: RunOutcome,
         summary: String?,
         outputs: JsonObject?,
         errorCode: String?,
     ): RunFinished {
-        val event = RunFinished(status = status, summary = summary, outputs = outputs, errorCode = errorCode)
+        val event =
+            RunFinished(
+                status = status,
+                summary = summary,
+                outputs = outputs,
+                errorCode = errorCode,
+                liveNote = prompts.runEndedNote(status),
+            )
         controller.append(event)
         return event
     }

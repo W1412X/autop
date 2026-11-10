@@ -61,10 +61,10 @@ internal class FakeRunService(
         text: String?,
     ): Outcome<RunRecord> = error("unused")
 
-    override fun steer(
+    override suspend fun steer(
         runId: RunId,
         text: String,
-    ) = Unit
+    ): Outcome<Unit> = Outcome.Ok(Unit)
 
     override fun pause(runId: RunId) = Unit
 
@@ -106,6 +106,8 @@ internal class FakeRunService(
     override fun observeActive(): StateFlow<ActiveRunInfo?> = active
 
     override fun observeRun(runId: RunId): Flow<RunRecord> = emptyFlow()
+
+    override fun observeOpenRun(threadId: ThreadId): Flow<RunRecord?> = emptyFlow()
 
     override fun liveEvents(runId: RunId): Flow<AgentEvent> = emptyFlow()
 }

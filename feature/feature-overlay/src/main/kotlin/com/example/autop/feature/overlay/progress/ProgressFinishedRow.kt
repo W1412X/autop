@@ -79,6 +79,7 @@ private fun outcomeMetaColor(outcome: RunOutcome): Color =
         RunOutcome.BUDGET_EXHAUSTED,
         RunOutcome.BREAKER_STOPPED,
         RunOutcome.INTERRUPTED,
+        RunOutcome.EXPIRED,
         -> MaterialTheme.colorScheme.onSurfaceVariant
     }
 

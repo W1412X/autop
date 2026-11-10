@@ -17,6 +17,7 @@ import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
+import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.DeviceState
 import com.example.autop.llm.Block
 import com.example.autop.task.RunOrigin
@@ -126,6 +127,7 @@ private class ExperienceFixture(
             threadStore = FakeThreadStore(items = events),
             experience = experience,
             configProvider = config,
+            prompts = FakePromptRepository(),
             clock = clock,
             scope = scope,
             logger = FakeLogger,
@@ -150,7 +152,7 @@ private class ExperienceFixture(
                 waitingQuestion = null,
             )
         runStore.save(record)
-        pending.put(record.id, PendingEntry(input = emptyList(), vars = emptyMap(), task = null))
+        pending.put(record.id, PendingEntry(vars = emptyMap(), task = null))
         runner.execute(record, null)
     }
 }

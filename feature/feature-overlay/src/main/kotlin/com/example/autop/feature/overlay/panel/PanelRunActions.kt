@@ -56,9 +56,10 @@ public class PanelRunActions
             }
         }
 
-        /** 运行面板补充指令（steer，不打断当前采样）。 */
+        /** 运行面板补充指令（steer，不打断当前采样）；失败留给对话页提示（WP8.5）。 */
         public fun steer(text: String) {
-            activeId()?.let { runService.steer(it, text) }
+            val id = activeId() ?: return
+            scope.launch { runService.steer(id, text) }
         }
 
         /** 问题面板回答。 */
