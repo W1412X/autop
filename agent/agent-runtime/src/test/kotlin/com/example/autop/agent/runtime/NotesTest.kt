@@ -80,9 +80,9 @@ class NotesTest {
             )
             store.append(thread, null, RunNoteAdded(text = "新增笔记"))
             val notes = RunNotes(store, TestPromptRepository()) { text -> text.length }
-            val coordinator = CompactionCoordinator(store, setOf(StubCompactor()), notes, RunId("run-9"))
+            val coordinator = CompactionCoordinator(store, setOf(StubCompactor()), RunId("run-9"))
 
-            val outcome = coordinator.compact(compactionInput(thread))
+            val outcome = coordinator.compact(compactionInput(thread).copy(notes = notes.current(thread)))
 
             assertThat(outcome).isInstanceOf(CompactionOutcome.Done::class.java)
             val baseline = store.payloadsOf(thread).filterIsInstance<Baseline>().last()

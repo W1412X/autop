@@ -6,7 +6,11 @@ package com.example.autop.llm
 
 import kotlinx.serialization.Serializable
 
-/** 用量统计（tokens）；随 AssistantMessage 持久化（docs/tech/04 §2.1）。 */
+/**
+ * 用量统计（tokens）；随 AssistantMessage 持久化（docs/tech/04 §2.1）。
+ * `inputTokens` = 本次请求的全部输入 token，**包含**缓存命中（[cacheReadTokens]）与
+ * 缓存写入（[cacheWriteTokens]）；后两者是其中的组成部分，仅供统计（WP4.4）。
+ */
 @Serializable
 public data class Usage(
     val inputTokens: Int,

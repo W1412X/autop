@@ -55,19 +55,26 @@ internal class Budget(
     /** 任一维度触顶。 */
     fun exhausted(): Boolean = reason() != null
 
-    /** 触顶的维度（steps/tokens/duration/screenshots），未触顶返回 null。配置值 ≤ 0 的维度不限。 */
+    /** 触顶的维度（[DIM_STEPS]/[DIM_TOKENS]/[DIM_DURATION]/[DIM_SCREENSHOTS]），未触顶返回 null。配置值 ≤ 0 的维度不限。 */
     fun reason(): String? =
         when {
-            cfg.maxSteps > 0 && toolRounds >= cfg.maxSteps -> "steps"
-            cfg.maxTotalTokens > 0 && totalTokens >= cfg.maxTotalTokens -> "tokens"
-            cfg.maxDurationMs > 0 && clock.nowMillis() - startMillis >= cfg.maxDurationMs -> "duration"
-            cfg.maxScreenshots > 0 && screenshots >= cfg.maxScreenshots -> "screenshots"
+            cfg.maxSteps > 0 && toolRounds >= cfg.maxSteps -> DIM_STEPS
+            cfg.maxTotalTokens > 0 && totalTokens >= cfg.maxTotalTokens -> DIM_TOKENS
+            cfg.maxDurationMs > 0 && clock.nowMillis() - startMillis >= cfg.maxDurationMs -> DIM_DURATION
+            cfg.maxScreenshots > 0 && screenshots >= cfg.maxScreenshots -> DIM_SCREENSHOTS
             else -> null
         }
 
     /** 截图工具在结构化结果里自报 `screenshot=true`（docs/tech/04 §3.7）。 */
     private fun isScreenshot(output: ToolOutput): Boolean =
         (output.data as? JsonObject)?.get("screenshot")?.jsonPrimitive?.booleanOrNull ?: false
+
+    internal companion object {
+        const val DIM_STEPS: String = "steps"
+        const val DIM_TOKENS: String = "tokens"
+        const val DIM_DURATION: String = "duration"
+        const val DIM_SCREENSHOTS: String = "screenshots"
+    }
 }
 
 /** 预算用量快照（WP3）。 */

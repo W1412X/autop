@@ -1,6 +1,6 @@
 /**
  * 交接压缩（docs/tech/04 §3.6，参考 codex compact.rs）：调轻量模型写交接摘要，
- * 请求超长时从 live 开头删旧重试；Baseline = 预算内用户消息 + 摘要 + 最后观测。
+ * 请求超长时从 live 开头删旧重试。基线顺序（WP4.2）：initialContextMsg → 用户消息 → 摘要 → 笔记 → 最后观测。
  */
 package com.example.autop.agent.runtime.compaction
 
@@ -101,9 +101,13 @@ internal class HandoffCompactor(
                 ?.text
                 ?: ""
         val middle = Msg(Role.USER, listOf(Block.Text(wrapper)))
+        // 基线顺序（WP4.2）：initialContextMsg → userMessages → 摘要包装 → notesMsg → lastObservationMsg。
         return CompactionResult(
             baselineMessages =
-                assembler.userMessages(input) + middle + listOfNotNull(assembler.lastObservationMsg(input)),
+                listOfNotNull(assembler.initialContextMsg(input)) +
+                    assembler.userMessages(input) +
+                    middle +
+                    listOfNotNull(assembler.notesMsg(input), assembler.lastObservationMsg(input)),
             summaryText = summary,
             coveredFromSeq = from,
             coveredToSeq = to,

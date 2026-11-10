@@ -15,6 +15,19 @@ import org.junit.Test
 
 class AnthropicStreamParserTest {
     @Test
+    fun `input tokens include cache read and write`() {
+        val parser = AnthropicStreamParser(listOf("ctx"))
+        val events = mutableListOf<LlmStreamEvent>()
+        events += parser.feed("message_start", obj(USAGE_START))
+        events +=
+            parser.feed("message_delta", obj("""{"delta":{"stop_reason":"end_turn"},"usage":{"output_tokens":7}}"""))
+        events += parser.finishIfNeeded()
+
+        val completed = events.filterIsInstance<LlmStreamEvent.Completed>().single()
+        assertThat(checkNotNull(completed.usage).inputTokens).isEqualTo(5 + 2 + 1)
+    }
+
+    @Test
     fun `text stream assembles assistant message with usage`() {
         val parser = AnthropicStreamParser(listOf("ctx"))
         val events = mutableListOf<LlmStreamEvent>()
@@ -34,7 +47,7 @@ class AnthropicStreamParserTest {
             .inOrder()
         assertThat(completed.message.blocks).containsExactly(Block.Text("hello"))
         assertThat(completed.stopReason).isEqualTo(StopReason.END_TURN)
-        assertThat(completed.usage).isEqualTo(Usage(5, 7, 2, 1))
+        assertThat(completed.usage).isEqualTo(Usage(8, 7, 2, 1))
     }
 
     @Test

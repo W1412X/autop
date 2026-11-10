@@ -58,8 +58,10 @@ class ForkTest {
             val idx = sourceEvents.indexOfLast { it.payload is Baseline }
             val slice = if (idx < 0) sourceEvents else sourceEvents.drop(idx)
             val expected = renderer.renderEvents(slice, cfg).map { it.msg }
-            assertThat(baseline.messages).isEqualTo(expected)
-            assertThat(renderer.messages(newId!!, cfg)).isEqualTo(expected)
+            // 笔记以一条 USER 消息追加在基线末尾（WP4.2）。
+            assertThat(baseline.messages.dropLast(1)).isEqualTo(expected)
+            assertThat(baseline.messages.last().toString()).contains("用户名是小明")
+            assertThat(renderer.messages(newId!!, cfg)).isEqualTo(baseline.messages)
         }
 
     @Test

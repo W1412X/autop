@@ -135,7 +135,14 @@ public class AnthropicStreamParser(
     private fun onComplete(): List<LlmStreamEvent> {
         stopped = true
         val message = Msg(Role.ASSISTANT, blocks.values.map { it.toBlock() })
-        val currentUsage = Usage(inputTokens, outputTokens, cacheReadTokens, cacheWriteTokens)
+        // inputTokens 统一口径（WP4.4）：本次请求全部输入 = 基础输入 + 缓存命中 + 缓存写入。
+        val currentUsage =
+            Usage(
+                inputTokens + cacheReadTokens + cacheWriteTokens,
+                outputTokens,
+                cacheReadTokens,
+                cacheWriteTokens,
+            )
         val reason =
             stopReason ?: if (blocks.values.any { it is PendingBlock.ToolCall }) {
                 StopReason.TOOL_USE

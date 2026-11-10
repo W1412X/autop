@@ -55,6 +55,10 @@ public data class CompactionInput(
     val runVars: Map<String, String>,
     val lastObservation: RenderItem?,
     val config: ConfigSnapshot,
+    /** 首轮注入上下文（goal、触发上下文、触发预取的记忆等；无则 null），压缩后必须原样放回基线。 */
+    val initialContext: String? = null,
+    /** 当前运行笔记（压缩后以一条消息放回基线）。 */
+    val notes: List<String> = emptyList(),
 )
 
 /** 压缩结果：新 Baseline 的消息与覆盖区间。 */

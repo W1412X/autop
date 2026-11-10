@@ -8,6 +8,7 @@ import com.example.autop.agent.CompactionInput
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.RenderItem
 import com.example.autop.agent.runtime.TokenEstimator
+import com.example.autop.agent.runtime.notes.renderNotesBlock
 import com.example.autop.agent.runtime.planText
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentConfig
@@ -21,6 +22,19 @@ import com.example.autop.llm.Role
 internal class BaselineAssembler(
     private val prompts: PromptRepository,
 ) {
+    /** 首轮注入上下文消息（null 时不输出，WP4.2）。 */
+    fun initialContextMsg(input: CompactionInput): Msg? =
+        input.initialContext?.takeIf { it.isNotBlank() }?.let { Msg(Role.USER, listOf(Block.Text(it))) }
+
+    /** 笔记消息（与 RunNotes.blockMessage 同一渲染，WP4.2）。 */
+    fun notesMsg(input: CompactionInput): Msg? =
+        renderNotesBlock(
+            input.notes,
+            input.config[AgentConfig.NOTES],
+            prompts,
+            TokenEstimator(input.config[AgentConfig.TOKENS])::estimateText,
+        )
+
     /**
      * 最近的真实用户消息（INPUT/STEER，不含 INJECTED）：从新到旧选取，
      * 总估算不超过 `keepUserMessageTokens`，超出的那条截断后停止，再恢复时间顺序。

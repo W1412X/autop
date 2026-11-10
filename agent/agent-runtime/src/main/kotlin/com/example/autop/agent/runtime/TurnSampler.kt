@@ -39,7 +39,6 @@ internal sealed interface Sampled {
 internal class TurnSampler(
     private val req: RunRequest,
     private val controller: RunController,
-    private val guards: RunGuards,
     private val prompts: PromptRepository,
 ) {
     private var turn = 0
@@ -71,20 +70,24 @@ internal class TurnSampler(
     /** 解析本轮工具调用（原生 ToolCall 或 JSON 回退）。 */
     fun resolveCalls(message: Msg): ResolvedCalls = fallback.resolveCalls(message, turn)
 
-    /** 采样一次；`llm.context_exceeded` 时强制压缩后重试本轮（每轮最多 1 次，docs/tech/04 §3.2）。 */
+    /**
+     * 采样一次；`llm.context_exceeded` 时强制压缩后重试本轮（每轮最多 1 次，docs/tech/04 §3.2）。
+     * [system] 取最新 system（压缩后可能已重新组装）；[compact] 是 TurnLoop 的唯一压缩入口（WP4.1）。
+     */
     suspend fun sample(
         provider: LlmProvider,
-        sys: List<SystemPart>,
         schemas: List<ToolSchema>,
         finalRound: Boolean,
+        system: () -> List<SystemPart>,
         render: suspend () -> List<Msg>,
+        compact: suspend () -> CompactResult,
     ): Sampled {
         turn++
-        val first = stream(provider, requestBuilder.build(sys, render(), schemas, finalRound))
+        val first = stream(provider, requestBuilder.build(system(), render(), schemas, finalRound))
         if (first !is Sampled.Failed || first.error.code != LlmErrorCodes.CONTEXT_EXCEEDED) return first
-        return when (val compacted = guards.compact(sys)) {
+        return when (val compacted = compact()) {
             is CompactResult.End -> Sampled.Failed(compacted.error)
-            CompactResult.Continue -> stream(provider, requestBuilder.build(sys, render(), schemas, finalRound))
+            CompactResult.Continue -> stream(provider, requestBuilder.build(system(), render(), schemas, finalRound))
         }
     }
 

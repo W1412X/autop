@@ -88,8 +88,15 @@ internal class RunGuards(
         return effective > contextWindow * req.config[AgentConfig.COMPACTION].thresholdRatio
     }
 
+    /** 最近一次压缩是否成功（Done）；压缩成功后 system 需要重新组装（WP4.1）。 */
+    var lastCompactionSucceeded: Boolean = false
+        private set
+
     /** 压缩一次：成功写 Baseline；失败按连续次数容忍或结束 Run（docs/tech/04 §3.6）。 */
-    suspend fun compact(system: List<SystemPart>): CompactResult {
+    suspend fun compact(
+        system: List<SystemPart>,
+        initialContext: String?,
+    ): CompactResult {
         controller.setState(RunState.COMPACTING)
         val events = controller.toolStore.eventsSinceLatestBaseline(req.threadId)
         val live = renderer.live(req.threadId, req.config)
@@ -103,8 +110,17 @@ internal class RunGuards(
                 runVars = req.vars,
                 lastObservation = live.lastOrNull { it.observation != null },
                 config = req.config,
+                initialContext = initialContext,
+                notes = engines.notes.current(req.threadId),
             )
-        return when (val outcome = engines.compaction.compact(input)) {
+        val outcome = engines.compaction.compact(input)
+        lastCompactionSucceeded = outcome is CompactionOutcome.Done
+        if (lastCompactionSucceeded) {
+            // Done 时清零上报 token：压缩后阈值判断只看本地估算，直到下一次服务端上报（WP4.3）。
+            lastReportedInputTokens = 0
+            addedTokens = 0
+        }
+        return when (outcome) {
             is CompactionOutcome.Done -> CompactResult.Continue
             CompactionOutcome.Tolerated -> CompactResult.Continue
             is CompactionOutcome.Failed -> CompactResult.End(outcome.error)

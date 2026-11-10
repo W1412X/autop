@@ -9,12 +9,9 @@ import com.example.autop.agent.RunNoteAdded
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.core.common.ThreadId
-import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentNotesSection
 import com.example.autop.core.prompt.PromptRepository
-import com.example.autop.llm.Block
 import com.example.autop.llm.Msg
-import com.example.autop.llm.Role
 
 /** 笔记汇总与渲染。 */
 internal class RunNotes(
@@ -37,33 +34,11 @@ internal class RunNotes(
     fun blockMessage(
         notes: List<String>,
         cfg: AgentNotesSection,
-    ): Msg? {
-        val kept = trimmed(notes, cfg).ifEmpty { return null }
-        val text =
-            prompts
-                .render(ID, mapOf(VAR_NOTES to kept.joinToString("\n") { "- $it" }))
-                .getOrNull()
-                ?.text ?: return null
-        return Msg(Role.USER, listOf(Block.Text(text)))
-    }
-
-    /** 压缩与 fork 写入新 Baseline 的笔记（原文照搬）。 */
-    suspend fun snapshot(threadId: ThreadId): List<String> = current(threadId)
+    ): Msg? = renderNotesBlock(notes, cfg, prompts, estimateText)
 
     /** 超出 maxItems / maxTokens 丢最旧。 */
     internal fun trimmed(
         notes: List<String>,
         cfg: AgentNotesSection,
-    ): List<String> {
-        var kept = notes.takeLast(cfg.maxItems)
-        while (kept.isNotEmpty() && kept.sumOf(estimateText) > cfg.maxTokens) {
-            kept = kept.drop(1)
-        }
-        return kept
-    }
-
-    private companion object {
-        const val ID = "agent.notes.block"
-        const val VAR_NOTES = "notes"
-    }
+    ): List<String> = trimmedNotes(notes, cfg, estimateText)
 }

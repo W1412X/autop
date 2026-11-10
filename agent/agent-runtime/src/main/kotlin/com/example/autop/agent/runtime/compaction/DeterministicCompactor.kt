@@ -1,6 +1,6 @@
 /**
- * 确定性压缩（docs/tech/04 §3.6）：不调模型，Baseline = 预算内用户消息 +
- * 确定性说明（含计划与最近工具调用）+ 最后观测。
+ * 确定性压缩（docs/tech/04 §3.6）：不调模型。基线顺序（WP4.2）：
+ * initialContextMsg → 用户消息 → 确定性说明（含计划与最近工具调用）→ 笔记 → 最后观测。
  */
 package com.example.autop.agent.runtime.compaction
 
@@ -44,12 +44,14 @@ internal class DeterministicCompactor(
                 )
         val plan = assembler.planText(input.plan)
         val middleText = if (plan.isBlank()) note else "$note\n\n$plan"
+        // 基线顺序（WP4.2）：initialContextMsg → userMessages → 确定性说明 → notesMsg → lastObservationMsg。
         return Outcome.Ok(
             CompactionResult(
                 baselineMessages =
-                    assembler.userMessages(input) +
+                    listOfNotNull(assembler.initialContextMsg(input)) +
+                        assembler.userMessages(input) +
                         Msg(Role.USER, listOf(Block.Text(middleText))) +
-                        listOfNotNull(assembler.lastObservationMsg(input)),
+                        listOfNotNull(assembler.notesMsg(input), assembler.lastObservationMsg(input)),
                 summaryText = null,
                 coveredFromSeq = from,
                 coveredToSeq = to,

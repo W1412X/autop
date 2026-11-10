@@ -11,7 +11,6 @@ import com.example.autop.agent.CompactionInput
 import com.example.autop.agent.CompactionResult
 import com.example.autop.agent.Compactor
 import com.example.autop.agent.ThreadStore
-import com.example.autop.agent.runtime.notes.RunNotes
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
@@ -37,7 +36,6 @@ internal sealed interface CompactionOutcome {
 internal class CompactionCoordinator(
     private val store: ThreadStore,
     private val compactors: Set<Compactor>,
-    private val notes: RunNotes,
     private val runId: RunId,
 ) {
     private val byId: Map<String, Compactor> = compactors.associateBy { it.id }
@@ -69,7 +67,7 @@ internal class CompactionCoordinator(
                 coveredFromSeq = result.coveredFromSeq,
                 coveredToSeq = result.coveredToSeq,
                 summaryText = result.summaryText,
-                notes = notes.snapshot(input.threadId),
+                notes = input.notes,
             ),
         )
         return CompactionOutcome.Done(result)

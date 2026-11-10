@@ -40,7 +40,9 @@ internal class TokenEstimator(
         var total = 0
         for (part in system) total += estimateText(part.text)
         for (msg in messages) total += estimateMessage(msg)
-        for (tool in tools) total += estimateText(tool.parameters.toString())
+        for (tool in tools) {
+            total += estimateText(tool.name) + estimateText(tool.description) + estimateText(tool.parameters.toString())
+        }
         return total
     }
 

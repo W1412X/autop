@@ -97,6 +97,8 @@ internal class DefaultAgentSession(
         var items = HistoryRenderer(services.store, extensions.rules).renderEvents(fromBaseline(events), config)
         items = dropTrailingUnpaired(items)
         val notes = RunNotes(services.store, services.prompts, TokenEstimator(config[AgentConfig.TOKENS])::estimateText)
+        // 笔记以一条 USER 消息追加在基线末尾（WP4.2）。
+        val noteMsg = notes.blockMessage(notes.notesOf(events), config[AgentConfig.NOTES])
         // 标题缺省继承源线程（分叉是同一对话的延续，避免落回「未命名对话」）。
         val resolvedTitle = title ?: services.store.titleOf(threadId)
         val newId = services.store.createThread(resolvedTitle, threadId to atSeq)
@@ -108,7 +110,11 @@ internal class DefaultAgentSession(
         services.store.append(
             newId,
             null,
-            Baseline(reason = BaselineReason.FORK, messages = items.map { it.msg }, notes = notes.notesOf(events)),
+            Baseline(
+                reason = BaselineReason.FORK,
+                messages = items.map { it.msg } + listOfNotNull(noteMsg),
+                notes = notes.notesOf(events),
+            ),
         )
         return Outcome.Ok(newId)
     }
@@ -139,7 +145,7 @@ internal class DefaultAgentSession(
             RunEngines(
                 budget = budget,
                 breaker = CircuitBreaker(request.config[AgentConfig.BREAKER]),
-                compaction = CompactionCoordinator(controller.toolStore, extensions.compactors, notes, request.runId),
+                compaction = CompactionCoordinator(controller.toolStore, extensions.compactors, request.runId),
                 notes = notes,
                 state = state,
                 ports =

@@ -136,11 +136,59 @@ class HandoffCompactorTest {
             assertThat(llm.requests).hasSize(1)
         }
 
+    @Test
+    fun `baseline order is initial context, user messages, summary, notes, last observation`() =
+        runTest {
+            val llm = ScriptedLlmProvider().say("交接摘要")
+            val compactor = HandoffCompactor(FakeLlmGateway(llm), TestPromptRepository())
+            val observation =
+                RenderItem(
+                    2,
+                    Msg(Role.USER, listOf(Block.Text("观测文本"))),
+                    null,
+                    null,
+                    fullBlocks = listOf(Block.Text("观测文本")),
+                )
+            val in0 =
+                input(
+                    live = listOf(render(1), observation),
+                    userMessages = listOf(1L to Msg(Role.USER, listOf(Block.Text("用户一")))),
+                    initialContext = "goal: 记账",
+                    notes = listOf("用户名是小明"),
+                    lastObservation = observation,
+                )
+
+            val result = (compactor.compact(in0) as Outcome.Ok).value
+
+            val texts = result.baselineMessages.map { (it.blocks[0] as Block.Text).text }
+            assertThat(texts[0]).contains("goal: 记账")
+            assertThat(texts[1]).isEqualTo("用户一")
+            assertThat(texts[2]).contains("交接摘要")
+            assertThat(texts[3]).contains("用户名是小明")
+            assertThat(texts[4]).contains("观测文本")
+        }
+
+    @Test
+    fun `no initial context omits the message`() =
+        runTest {
+            val llm = ScriptedLlmProvider().say("交接摘要")
+            val compactor = HandoffCompactor(FakeLlmGateway(llm), TestPromptRepository())
+            val in0 = input(live = listOf(render(1)), notes = listOf("笔记"))
+
+            val result = (compactor.compact(in0) as Outcome.Ok).value
+
+            assertThat(result.baselineMessages.first().toString()).doesNotContain("goal")
+            assertThat(result.baselineMessages.last().toString()).contains("笔记")
+        }
+
     private fun input(
         live: List<RenderItem>,
         userMessages: List<Pair<Long, Msg>> = emptyList(),
         plan: List<PlanItem> = emptyList(),
         runVars: Map<String, String> = emptyMap(),
+        initialContext: String? = null,
+        notes: List<String> = emptyList(),
+        lastObservation: RenderItem? = null,
     ): CompactionInput =
         CompactionInput(
             threadId = ThreadId("t1"),
@@ -149,8 +197,10 @@ class HandoffCompactorTest {
             userMessagesNewestFirst = userMessages,
             plan = plan,
             runVars = runVars,
-            lastObservation = null,
+            lastObservation = lastObservation,
             config = FakeConfigProvider().current(),
+            initialContext = initialContext,
+            notes = notes,
         )
 
     private fun render(seq: Long): RenderItem =

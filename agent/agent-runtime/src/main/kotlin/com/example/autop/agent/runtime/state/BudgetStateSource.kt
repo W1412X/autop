@@ -24,15 +24,20 @@ internal class BudgetStateSource(
         val usage = budget.usage()
         val dims =
             listOfNotNull(
-                dimOf(DIM_STEPS, usage.steps.toLong(), cfg.maxSteps.toLong(), cfg.maxSteps > 0),
-                dimOf(DIM_TOKENS, usage.tokens, cfg.maxTotalTokens, cfg.maxTotalTokens > 0),
+                dimOf(Budget.DIM_STEPS, usage.steps.toLong(), cfg.maxSteps.toLong(), cfg.maxSteps > 0),
+                dimOf(Budget.DIM_TOKENS, usage.tokens, cfg.maxTotalTokens, cfg.maxTotalTokens > 0),
                 dimOf(
-                    DIM_DURATION,
+                    Budget.DIM_DURATION,
                     usage.durationMs / MS_PER_SECOND,
                     cfg.maxDurationMs / MS_PER_SECOND,
                     cfg.maxDurationMs > 0,
                 ),
-                dimOf(DIM_SCREENSHOTS, usage.screenshots.toLong(), cfg.maxScreenshots.toLong(), cfg.maxScreenshots > 0),
+                dimOf(
+                    Budget.DIM_SCREENSHOTS,
+                    usage.screenshots.toLong(),
+                    cfg.maxScreenshots.toLong(),
+                    cfg.maxScreenshots > 0,
+                ),
             )
         if (dims.isEmpty()) return emptyList()
         val entries = mutableListOf<StateEntry>()
@@ -93,11 +98,6 @@ internal class BudgetStateSource(
 
         const val KEY_REMAINING = "remaining"
         const val KEY_LOW = "low"
-
-        private const val DIM_STEPS = "steps"
-        private const val DIM_TOKENS = "tokens"
-        private const val DIM_DURATION = "duration"
-        private const val DIM_SCREENSHOTS = "screenshots"
 
         private const val PROMPT_REMAINING = "agent.state.budget.remaining"
         private const val PROMPT_LOW = "agent.state.budget.low"

@@ -60,9 +60,16 @@ internal class TurnLoop(
     private val prompts get() = parts.engines.ports.prompts
     private val guards = RunGuards(req, controller, parts.renderer, parts.engines, parts.router)
     private val journal = LoopJournal(controller, parts.engines.ports.prompts)
-    private val sampler = TurnSampler(req, controller, guards, parts.engines.ports.prompts)
+    private val sampler = TurnSampler(req, controller, parts.engines.ports.prompts)
     private val phase = ToolPhase(req, controller, parts, guards, journal)
     private val allSchemas by lazy { parts.router.schemas(phase.context) }
+
+    private lateinit var contextRequest: ContextRequest
+    private var assembled: AssembledContext? = null
+
+    /** 当前 system（Run 内可变；压缩成功后重新组装，WP4.1）。 */
+    private val system: List<SystemPart>
+        get() = requireNotNull(assembled) { "context assembled in loop()" }.system
 
     private val stateRequest = StateRequest(req.runId, req.threadId, req.config, req.vars)
 
@@ -114,7 +121,7 @@ internal class TurnLoop(
         guards.bindProfile(provider.profile)
         sampler.bindProfile(provider)
         nativeTools = provider.profile.capabilities.tools
-        val context =
+        contextRequest =
             ContextRequest(
                 runId = req.runId,
                 threadId = req.threadId,
@@ -123,7 +130,8 @@ internal class TurnLoop(
                 vars = req.vars,
                 isFirstRunOfThread = controller.toolStore.events(req.threadId).none { it.payload is RunStarted },
             )
-        val assembled = parts.assembler.assemble(context, req.config, sampler.staticToolList(allSchemas))
+        val assembled = parts.assembler.assemble(contextRequest, req.config, sampler.staticToolList(allSchemas))
+        this.assembled = assembled
         controller.append(
             RunStarted(
                 runId = req.runId,
@@ -156,35 +164,41 @@ internal class TurnLoop(
             journal.drainSteers()
             // 运行状态只在变化时以 USER 消息追加；首轮自然是全量（WP3.4）。
             parts.engines.state.reportIfChanged(stateRequest)
-            val step = round(assembled.system, provider)
+            val step = round(provider)
             if (step is LoopStep.End) return step.event
         }
     }
 
-    private suspend fun round(
-        sysBase: List<SystemPart>,
-        provider: LlmProvider,
-    ): LoopStep {
+    private suspend fun round(provider: LlmProvider): LoopStep {
         if (parts.engines.budget.exhausted()) {
             finalRound = true
             finalRoundByBudget = true
         }
         var live = liveView()
-        val sys = sysBase
-        if (guards.overThreshold(sys, live, allSchemas)) {
-            when (val compacted = guards.compact(sys)) {
+        if (guards.overThreshold(system, live, allSchemas)) {
+            when (val compacted = compactNow()) {
                 is CompactResult.End -> return fail(compacted.error)
                 CompactResult.Continue -> live = liveView()
             }
         }
         if (finalRoundByBudget && !budgetPromptInjected) {
             budgetPromptInjected = true
-            journal.inject(ID_FINAL_ROUND, emptyMap())
+            journal.inject(ID_FINAL_ROUND, mapOf(VAR_DIMENSION to budgetDimensionText()))
             live = liveView()
         }
         val schemas = if (finalRound) emptyList() else allSchemas
-        val estimated = guards.estimate(sys, live.map { it.msg }, schemas)
-        return when (val sampled = sampler.sample(provider, sys, schemas, finalRound) { liveView().map { it.msg } }) {
+        val estimated = guards.estimate(system, live.map { it.msg }, schemas)
+        return when (
+            val sampled =
+                sampler.sample(
+                    provider,
+                    schemas,
+                    finalRound,
+                    system = { system },
+                    render = { liveView().map { it.msg } },
+                    compact = ::compactNow,
+                )
+        ) {
             is Sampled.Failed -> fail(sampled.error, sampled.cause)
             is Sampled.Ok -> {
                 val completed = sampled.completed
@@ -199,9 +213,31 @@ internal class TurnLoop(
                     ),
                 )
                 guards.noteAdded(completed.message.blocks)
-                afterSample(sys, completed)
+                afterSample(completed)
             }
         }
+    }
+
+    /** 压缩一次；成功后重新组装 system（记忆索引、流程目录等可能已变化，WP4.1）。 */
+    private suspend fun compactNow(): CompactResult {
+        val result = guards.compact(system, initialContext = requireNotNull(assembled).firstUser)
+        if (result is CompactResult.Continue && guards.lastCompactionSucceeded) {
+            assembled = parts.assembler.assemble(contextRequest, req.config, sampler.staticToolList(allSchemas))
+        }
+        return result
+    }
+
+    /** 预算触顶维度的展示文字（`agent.budget.dimension.<dim>`，WP4.6）。 */
+    private fun budgetDimensionText(): String {
+        val dim =
+            parts.engines.budget
+                .reason()
+                .orEmpty()
+        return prompts
+            .render(ID_BUDGET_DIMENSION_PREFIX + dim, emptyMap())
+            .getOrNull()
+            ?.text
+            .orEmpty()
     }
 
     /**
@@ -237,21 +273,17 @@ internal class TurnLoop(
     }
 
     /** 采样后的走向：工具执行 → 控制 → 熔断 → steer → 自然结束判定。 */
-    private suspend fun afterSample(
-        sys: List<SystemPart>,
-        completed: LlmStreamEvent.Completed,
-    ): LoopStep =
+    private suspend fun afterSample(completed: LlmStreamEvent.Completed): LoopStep =
         when (val resolved = sampler.resolveCalls(completed.message)) {
             is ResolvedCalls.Retry -> {
                 journal.injectBlocks(listOf(Block.Text(resolved.injectText)), UserMessageKind.INJECTED)
                 LoopStep.NextRound
             }
-            else -> afterCalls(sys, completed, resolved)
+            else -> afterCalls(completed, resolved)
         }
 
     /** 工具批次与收尾判定。 */
     private suspend fun afterCalls(
-        sys: List<SystemPart>,
         completed: LlmStreamEvent.Completed,
         resolved: ResolvedCalls,
     ): LoopStep {
@@ -271,7 +303,7 @@ internal class TurnLoop(
         return if (calls.isEmpty() && steers.isEmpty()) {
             naturalEndOf(finalText, completed.message)
         } else {
-            midTurnCompact(sys)
+            midTurnCompact()
         }
     }
 
@@ -352,11 +384,12 @@ internal class TurnLoop(
         }
     }
 
-    /** MID_TURN 压缩（docs/tech/04 §3.2 末行）。 */
-    private suspend fun midTurnCompact(sys: List<SystemPart>): LoopStep {
+    /** MID_TURN 压缩（docs/tech/04 §3.2 末行）；阈值估算带下一轮实际要发的工具（WP4.1）。 */
+    private suspend fun midTurnCompact(): LoopStep {
         val live = liveView()
-        if (!guards.overThreshold(sys, live, emptyList())) return LoopStep.NextRound
-        val compacted = guards.compact(sys)
+        val schemas = if (finalRound) emptyList() else allSchemas
+        if (!guards.overThreshold(system, live, schemas)) return LoopStep.NextRound
+        val compacted = compactNow()
         return if (compacted is CompactResult.End) {
             fail(compacted.error)
         } else {
@@ -384,6 +417,8 @@ internal class TurnLoop(
     private companion object {
         const val TAG = "TurnLoop"
         const val ID_FINAL_ROUND = "agent.budget.final_round"
+        const val ID_BUDGET_DIMENSION_PREFIX = "agent.budget.dimension."
+        const val VAR_DIMENSION = "dimension"
         const val ID_UNFINISHED = "agent.plan.unfinished_items"
         const val ID_DEFERRED = "agent.finish.deferred_by_steer"
         const val ID_CANCELLED = "agent.tool.cancelled_result"

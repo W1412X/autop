@@ -41,7 +41,7 @@ internal class AnthropicContractTest :
             multiToolStream = fx("03-multi-tool.sse"),
             imageStream = fx("04-image-stream.sse"),
             usageStream = fx("05-usage.sse"),
-            expectedUsage = Usage(30, 12, cacheReadTokens = 5, cacheWriteTokens = 2),
+            expectedUsage = Usage(37, 12, cacheReadTokens = 5, cacheWriteTokens = 2),
             rateLimitBody = fx("06-rate-limit.json"),
             truncatedStream = fx("07-truncated.sse"),
             contextExceededBody = fx("08-context-exceeded.json"),
