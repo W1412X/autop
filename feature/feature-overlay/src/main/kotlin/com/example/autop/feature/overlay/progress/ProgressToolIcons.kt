@@ -26,7 +26,7 @@ private val TOOL_ICONS: Map<String, ImageVector> =
         "tool.observe" to AutopIcons.Visibility,
         "tool.wait" to AutopIcons.Schedule,
         "tool.list_apps" to AutopIcons.ListAlt,
-        "tool.device_state" to AutopIcons.PhoneAndroid,
+        "tool.get_device_state" to AutopIcons.PhoneAndroid,
         "tool.clipboard_get" to AutopIcons.ContentPaste,
         "tool.clipboard_set" to AutopIcons.ContentPaste,
     )

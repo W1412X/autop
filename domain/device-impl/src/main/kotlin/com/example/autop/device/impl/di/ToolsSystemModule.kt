@@ -6,7 +6,6 @@ package com.example.autop.device.impl.di
 import com.example.autop.agent.Tool
 import com.example.autop.device.impl.tools.ClipboardGetTool
 import com.example.autop.device.impl.tools.ClipboardSetTool
-import com.example.autop.device.impl.tools.DeviceStateTool
 import com.example.autop.device.impl.tools.DismissPopupTool
 import com.example.autop.device.impl.tools.ListAppsTool
 import com.example.autop.device.impl.tools.OpenAppTool
@@ -41,10 +40,6 @@ public object ToolsSystemModule {
     @Provides
     @IntoSet
     public fun provideListAppsTool(tool: ListAppsTool): Tool = tool
-
-    @Provides
-    @IntoSet
-    public fun provideDeviceStateTool(tool: DeviceStateTool): Tool = tool
 
     @Provides
     @IntoSet

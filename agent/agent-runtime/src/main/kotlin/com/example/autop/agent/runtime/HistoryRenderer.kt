@@ -11,6 +11,7 @@ import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.Baseline
 import com.example.autop.agent.HistoryRenderRule
 import com.example.autop.agent.RenderItem
+import com.example.autop.agent.RuntimeStateReported
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolResultEvent
@@ -75,6 +76,14 @@ internal class HistoryRenderer(
                         RenderItem(
                             seq = seq,
                             msg = Msg(Role.ASSISTANT, payload.blocks),
+                            observation = null,
+                            toolId = null,
+                        )
+                is RuntimeStateReported ->
+                    items +=
+                        RenderItem(
+                            seq = seq,
+                            msg = Msg(Role.USER, listOf(Block.Text(payload.text))),
                             observation = null,
                             toolId = null,
                         )

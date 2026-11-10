@@ -16,11 +16,11 @@ import com.example.autop.agent.runtime.notes.RunNotes
 import com.example.autop.agent.runtime.testing.InMemoryThreadStore
 import com.example.autop.agent.runtime.testing.RuntimeHarness
 import com.example.autop.agent.runtime.testing.TestPromptRepository
-import com.example.autop.agent.runtime.testing.overridesOf
 import com.example.autop.agent.runtime.tools.control.NoteTool
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
+import com.example.autop.core.config.AgentNotesSection
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.llm.Block
@@ -32,9 +32,9 @@ import org.junit.Test
 
 class NotesTest {
     @Test
-    fun `18a note 写入后下一轮 system 末尾出现笔记块`() =
+    fun `18a note 记录不再进 system（WP3 运行笔记）`() =
         runTest {
-            val h = RuntimeHarness(tools = setOf(NoteTool()))
+            val h = RuntimeHarness(tools = setOf(NoteTool(TestPromptRepository())))
             h.llm
                 .call("note" to """{"text":"用户名是小明"}""")
                 .say("好")
@@ -42,49 +42,27 @@ class NotesTest {
 
             h.start(this, threadId = thread).await()
 
-            // 第一轮还没有笔记
-            assertThat(
-                h.llm.requests[0]
-                    .system
-                    .none { it.text.contains("小明") },
-            ).isTrue()
-            // 下一轮 system 末尾是笔记块，且不打断静态缓存
-            val last =
-                h.llm.requests[1]
-                    .system
-                    .last()
-            assertThat(last.text).contains("运行笔记")
-            assertThat(last.text).contains("用户名是小明")
-            assertThat(last.cacheBreakpoint).isFalse()
+            // 运行笔记不再进 system：任何一轮都不出现，且 system 逐轮一致。
+            for (request in h.llm.requests) {
+                assertThat(request.system.none { it.text.contains("小明") }).isTrue()
+            }
+            assertThat(h.llm.requests[1].system).isEqualTo(h.llm.requests[0].system)
         }
 
     @Test
-    fun `18b 超过 maxItems 上限时丢弃最旧的`() =
-        runTest {
-            val h =
-                RuntimeHarness(
-                    tools = setOf(NoteTool()),
-                    configOverrides = overridesOf("agent", "notes", "maxItems" to 2),
-                )
-            h.llm
-                .call("note" to """{"text":"第一条"}""")
-                .call("note" to """{"text":"第二条"}""")
-                .call("note" to """{"text":"第三条"}""")
-                .say("好")
-            val thread = h.newThread()
-
-            h.start(this, threadId = thread).await()
-
-            val text =
-                h.llm.requests
-                    .last()
-                    .system
-                    .last()
-                    .text
-            assertThat(text).contains("第二条")
-            assertThat(text).contains("第三条")
-            assertThat(text).doesNotContain("第一条")
-        }
+    fun `18b 超过 maxItems 上限时丢弃最旧的`() {
+        val notes = RunNotes(InMemoryThreadStore(FakeClock(1_000L)), TestPromptRepository()) { text -> text.length }
+        val msg = notes.blockMessage(listOf("第一条", "第二条", "第三条"), AgentNotesSection(maxItems = 2))
+        val text =
+            msg
+                ?.blocks
+                ?.filterIsInstance<Block.Text>()
+                ?.joinToString("\n") { it.text }
+                .orEmpty()
+        assertThat(text).contains("第二条")
+        assertThat(text).contains("第三条")
+        assertThat(text).doesNotContain("第一条")
+    }
 
     @Test
     fun `18c 压缩后笔记仍在`() =

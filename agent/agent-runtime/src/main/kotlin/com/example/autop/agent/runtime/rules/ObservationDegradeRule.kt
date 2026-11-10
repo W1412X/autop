@@ -77,7 +77,7 @@ internal class ObservationDegradeRule(
         }
     }
 
-    private companion object {
+    internal companion object {
         const val ID = "history.observation_degrade"
         const val ID_STUB = "agent.history.observation_stub"
         const val ID_DIFF_MISSING = "agent.history.diff_base_missing"

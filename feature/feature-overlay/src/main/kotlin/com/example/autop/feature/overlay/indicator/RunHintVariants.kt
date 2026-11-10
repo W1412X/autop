@@ -67,7 +67,7 @@ private val TOOLS: Map<String, ToolVariants> =
                 withTarget = listOf("正在找「$TARGET_SLOT」"),
                 noTarget = listOf("查找应用中…", "找找应用…"),
             ),
-        "tool.device_state" to ToolVariants(noTarget = listOf("读取设备状态中…", "看看设备状态…")),
+        "tool.get_device_state" to ToolVariants(noTarget = listOf("读取设备状态中…", "看看设备状态…")),
         "tool.get_device_state" to ToolVariants(noTarget = listOf("读取设备状态中…", "看看设备状态…")),
         "tool.clipboard_get" to ToolVariants(noTarget = listOf("读取剪贴板中…", "看看剪贴板…")),
         "tool.clipboard_set" to ToolVariants(noTarget = listOf("写入剪贴板中…", "存进剪贴板…")),

@@ -26,13 +26,22 @@ class DiModulesTest {
                     AgentRuntimeModule.provideUpdatePlanTool(),
                     AgentRuntimeModule.provideFinishTool(),
                     AgentRuntimeModule.provideAskUserTool(prompts),
-                    AgentRuntimeModule.provideNoteTool(),
+                    AgentRuntimeModule.provideNoteTool(prompts),
                     AgentRuntimeModule.provideHistoryRecallTool(recall),
+                    AgentRuntimeModule.provideRuntimeStateTool(),
                 )
 
             assertThat(tools.map { it.id })
-                .containsExactly("tool.update_plan", "tool.finish", "tool.ask_user", "tool.note", "tool.history_recall")
+                .containsExactly(
+                    "tool.update_plan",
+                    "tool.finish",
+                    "tool.ask_user",
+                    "tool.note",
+                    "tool.history_recall",
+                    "tool.get_device_state",
+                )
             assertThat(AgentRuntimeModule.provideNoRetrievers()).isEmpty()
+            assertThat(AgentRuntimeModule.provideNoStateSources()).isEmpty()
             // 无检索器时融合结果为空（不报错）
             assertThat(recall.search(ThreadId("t1"), "关键词", 3)).isEmpty()
         }

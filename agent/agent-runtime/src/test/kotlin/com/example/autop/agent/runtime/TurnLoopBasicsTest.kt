@@ -31,7 +31,7 @@ class TurnLoopBasicsTest {
             assertThat(finished.status).isEqualTo(RunOutcome.SUCCEEDED)
             assertThat(finished.summary).isEqualTo("你好！")
             assertThat(eventKinds(h, thread))
-                .containsExactly("RunStarted", "UserMessage", "AssistantMessage", "RunFinished")
+                .containsExactly("RunStarted", "UserMessage", "RuntimeStateReported", "AssistantMessage", "RunFinished")
                 .inOrder()
         }
 
@@ -54,11 +54,27 @@ class TurnLoopBasicsTest {
                 .containsExactly(
                     "RunStarted",
                     "UserMessage",
+                    "RuntimeStateReported",
                     "AssistantMessage",
                     "ToolResultEvent",
                     "AssistantMessage",
                     "RunFinished",
                 ).inOrder()
+        }
+
+    @Test
+    fun `运行状态只在首轮全量上报 之后无变化不再上报`() =
+        runTest {
+            val tool = FakeTool()
+            val h = RuntimeHarness(tools = setOf(tool))
+            h.llm
+                .call(FakeTool.FAKE_NAME to "{}")
+                .say("好")
+            val thread = h.newThread()
+
+            h.start(this, threadId = thread).await()
+
+            assertThat(eventKinds(h, thread).count { it == "RuntimeStateReported" }).isEqualTo(1)
         }
 
     @Test

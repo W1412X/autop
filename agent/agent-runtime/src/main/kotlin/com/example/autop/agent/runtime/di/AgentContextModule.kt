@@ -12,7 +12,6 @@ import com.example.autop.agent.runtime.RunModeContributor
 import com.example.autop.agent.runtime.SafetyContributor
 import com.example.autop.agent.runtime.ToolGuideContributor
 import com.example.autop.agent.runtime.TriggerContributor
-import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.prompt.PromptRepository
 import dagger.Module
 import dagger.Provides
@@ -40,10 +39,7 @@ public object AgentContextModule {
     /** 输出要求（语言 + 简洁，`ui.appearance.language` 驱动）。 */
     @Provides
     @IntoSet
-    public fun provideOutputContributor(
-        prompts: PromptRepository,
-        configProvider: ConfigProvider,
-    ): ContextContributor = OutputContributor(prompts, configProvider)
+    public fun provideOutputContributor(prompts: PromptRepository): ContextContributor = OutputContributor(prompts)
 
     @Provides
     @IntoSet

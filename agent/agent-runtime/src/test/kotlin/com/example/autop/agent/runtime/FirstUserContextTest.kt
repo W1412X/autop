@@ -50,15 +50,15 @@ class FirstUserContextTest {
         }
 
     private fun harness(): RuntimeHarness =
-        RuntimeHarness(fakes = HarnessFakes(contributors = setOf(FakeEnvironmentContributor())))
+        RuntimeHarness(fakes = HarnessFakes(contributors = setOf(FakeOutputContributor())))
 
     private fun textOf(message: UserMessage): String =
         message.blocks.filterIsInstance<Block.Text>().joinToString("\n") { it.text }
 }
 
-/** 假环境贡献者（形状同 `context.environment`：FIRST_USER 系统上下文）；id 必须在默认启用清单内才会被调用。 */
-private class FakeEnvironmentContributor : ContextContributor {
-    override val id: String = "context.environment"
+/** 假输出贡献者（形状同 `context.output`：FIRST_USER 系统上下文）；id 必须在默认启用清单内才会被调用。 */
+private class FakeOutputContributor : ContextContributor {
+    override val id: String = "context.output"
 
     override suspend fun contribute(req: ContextRequest): ContextPart =
         ContextPart(placement = Placement.FIRST_USER, text = "当前环境：电量 80%", promptIds = emptyMap())

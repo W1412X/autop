@@ -5,6 +5,7 @@
 package com.example.autop.agent.runtime.tools.control
 
 import com.example.autop.agent.AssistantMessage
+import com.example.autop.agent.RuntimeStateReported
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadRecall
 import com.example.autop.agent.Tool
@@ -131,6 +132,7 @@ internal class HistoryRecallTool(
             is UserMessage -> TYPE_USER
             is AssistantMessage -> TYPE_ASSISTANT
             is ToolResultEvent -> TYPE_TOOL
+            is RuntimeStateReported -> TYPE_RUNTIME_STATE
             else -> TYPE_EVENT
         }
 
@@ -141,6 +143,8 @@ internal class HistoryRecallTool(
                 is UserMessage -> payload.blocks
                 is AssistantMessage -> payload.blocks
                 is ToolResultEvent -> payload.blocks
+                is RuntimeStateReported ->
+                    return Section("#${event.seq} $TYPE_RUNTIME_STATE\n${payload.text}\n", emptyList())
                 else -> return null
             }
         val text = blocks.filterIsInstance<Block.Text>().joinToString("\n") { it.text }
@@ -155,6 +159,7 @@ internal class HistoryRecallTool(
 
     private companion object {
         const val TYPE_USER = "user_message"
+        const val TYPE_RUNTIME_STATE = "runtime_state"
         const val TYPE_ASSISTANT = "assistant_message"
         const val TYPE_TOOL = "tool_result"
         const val TYPE_EVENT = "event"

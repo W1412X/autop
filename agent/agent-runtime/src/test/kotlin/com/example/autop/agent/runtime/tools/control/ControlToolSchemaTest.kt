@@ -19,7 +19,8 @@ class ControlToolSchemaTest {
             AskUserTool(prompts),
             UpdatePlanTool(),
             FinishTool(),
-            NoteTool(),
+            NoteTool(prompts),
+            RuntimeStateTool(),
             HistoryRecallTool(EmptyRecall),
         )
 

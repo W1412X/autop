@@ -13,7 +13,6 @@ import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.ToolResultEnricher
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.ToolSchemaBuilder
-import com.example.autop.core.common.Capability
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.Block
 import com.example.autop.llm.ToolSchema
@@ -167,22 +166,5 @@ internal class ToolRouter(
             replay = output.replay,
             screenDelta = output.screenDelta,
         )
-    }
-
-    companion object {
-        /** 过滤可用工具（docs/tech/04 §3.2）：配置启用、Run 过滤、设备能力、模型视觉能力。 */
-        fun visibleTools(
-            tools: List<Tool>,
-            enabled: Set<String>,
-            toolFilter: Set<String>?,
-            capabilities: Set<Capability>,
-            modelVision: Boolean,
-        ): List<Tool> =
-            tools.filter { tool ->
-                tool.id in enabled &&
-                    (toolFilter == null || tool.id in toolFilter) &&
-                    tool.requiredCapabilities.all { it in capabilities } &&
-                    (!tool.requiresModelVision || modelVision)
-            }
     }
 }

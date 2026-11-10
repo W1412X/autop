@@ -147,7 +147,7 @@ internal class TaskAuthorTools(
 
         /**
          * 只放行只读工具：创作会话不执行任何写屏/写记忆动作。
-         * 这里是**工具 id**（ToolRouter.visibleTools 按 id 过滤；invoke 用模型可见名）。
+         * 这里是**工具 id**（路由器按 id 过滤；invoke 用模型可见名）。
          */
         val TOOL_FILTER: Set<String> = setOf("tool.observe", "tool.memory_search", "tool.list_flows")
     }

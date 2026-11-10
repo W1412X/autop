@@ -12,6 +12,7 @@ import com.example.autop.agent.HistoryRenderRule
 import com.example.autop.agent.ReplayStateProbe
 import com.example.autop.agent.ReplayTargetResolver
 import com.example.autop.agent.RunLineage
+import com.example.autop.agent.RuntimeStateSource
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolAuditSink
@@ -54,6 +55,7 @@ public object AgentSessionModule {
         tools: Set<@JvmSuppressWildcards Tool>,
         enrichers: Set<@JvmSuppressWildcards ToolResultEnricher>,
         contributors: Set<@JvmSuppressWildcards ContextContributor>,
+        stateSources: Set<@JvmSuppressWildcards RuntimeStateSource>,
         rules: Set<@JvmSuppressWildcards HistoryRenderRule>,
         compactors: Set<@JvmSuppressWildcards Compactor>,
         policy: PolicyEngine,
@@ -71,6 +73,7 @@ public object AgentSessionModule {
                     tools = tools,
                     enrichers = enrichers,
                     contributors = contributors,
+                    stateSources = stateSources,
                     rules = rules,
                     compactors = compactors,
                 ),

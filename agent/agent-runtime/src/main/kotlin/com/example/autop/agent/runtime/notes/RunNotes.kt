@@ -1,6 +1,6 @@
 /**
- * 运行笔记（docs/tech/04 §3.13，R1/B3）：当前笔记 = 最近 Baseline.notes + 其后的 RunNoteAdded。
- * 渲染为 system 最后一个 SystemPart，每轮重新生成、不打缓存标记；只影响渲染，事件日志保留。
+ * 运行笔记（agent-harness-overhaul WP3.7）：当前笔记 = 最近 Baseline.notes + 其后的 RunNoteAdded；
+ * 只在压缩与 fork 基线里以一条 USER 消息出现；运行中模型通过自己的 note 调用记录可见。
  */
 package com.example.autop.agent.runtime.notes
 
@@ -12,7 +12,9 @@ import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentNotesSection
 import com.example.autop.core.prompt.PromptRepository
-import com.example.autop.llm.SystemPart
+import com.example.autop.llm.Block
+import com.example.autop.llm.Msg
+import com.example.autop.llm.Role
 
 /** 笔记汇总与渲染。 */
 internal class RunNotes(
@@ -31,36 +33,37 @@ internal class RunNotes(
         return baselineNotes + added
     }
 
-    /** 笔记块（无笔记返回 null）；超出 maxItems / maxTokens 丢最旧。 */
-    suspend fun systemPart(
-        threadId: ThreadId,
+    /** 基线里的笔记消息（无笔记返回 null）：只在压缩与 fork 基线里以一条 USER 消息出现（WP3.7）。 */
+    fun blockMessage(
+        notes: List<String>,
         cfg: AgentNotesSection,
-    ): SystemPart? {
-        val kept = trim(current(threadId), cfg) ?: return null
+    ): Msg? {
+        val kept = trimmed(notes, cfg).ifEmpty { return null }
         val text =
             prompts
-                .render(ID, mapOf("notes" to kept.joinToString("\n") { "- $it" }))
+                .render(ID, mapOf(VAR_NOTES to kept.joinToString("\n") { "- $it" }))
                 .getOrNull()
-                ?.text
-        return text?.let { SystemPart(text = it, cacheBreakpoint = false) }
+                ?.text ?: return null
+        return Msg(Role.USER, listOf(Block.Text(text)))
     }
 
     /** 压缩与 fork 写入新 Baseline 的笔记（原文照搬）。 */
     suspend fun snapshot(threadId: ThreadId): List<String> = current(threadId)
 
-    /** 超出上限丢最旧；全部丢完返回 null。 */
-    private fun trim(
+    /** 超出 maxItems / maxTokens 丢最旧。 */
+    internal fun trimmed(
         notes: List<String>,
         cfg: AgentNotesSection,
-    ): List<String>? {
+    ): List<String> {
         var kept = notes.takeLast(cfg.maxItems)
         while (kept.isNotEmpty() && kept.sumOf(estimateText) > cfg.maxTokens) {
             kept = kept.drop(1)
         }
-        return kept.ifEmpty { null }
+        return kept
     }
 
     private companion object {
         const val ID = "agent.notes.block"
+        const val VAR_NOTES = "notes"
     }
 }

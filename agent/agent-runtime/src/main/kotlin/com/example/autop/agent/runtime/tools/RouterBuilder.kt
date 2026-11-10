@@ -44,27 +44,68 @@ internal class RouterBuilder(
             ?.capabilities
             ?.vision ?: false
 
-    /** 过滤本次可见工具后建路由器。 */
+    /** 过滤本次可见工具后建路由器，附带被过滤掉的工具及原因（WP3 运行状态）。 */
     fun build(
         request: RunRequest,
         toolFilter: Set<String>?,
         modelVision: Boolean,
-    ): ToolRouter {
+    ): RouterBuild {
         val capabilities = Capability.entries.filterTo(mutableSetOf()) { platform.has(it) }
+        val enabled = request.config[AgentConfig.TOOLS].enabled.toSet()
+        val hidden = mutableListOf<HiddenTool>()
         val visible =
-            ToolRouter.visibleTools(
-                tools = tools.toList(),
-                enabled = request.config[AgentConfig.TOOLS].enabled.toSet(),
-                toolFilter = toolFilter,
-                capabilities = capabilities,
-                modelVision = modelVision,
+            tools.filter { tool ->
+                val reason = hiddenReasonOf(tool, enabled, toolFilter, capabilities, modelVision)
+                if (reason == null) {
+                    true
+                } else {
+                    hidden += HiddenTool(tool.spec.name, reason)
+                    false
+                }
+            }
+        val router =
+            ToolRouter(
+                tools = visible,
+                executor = ToolExecutor(visible, policy, audit, prompts, clock),
+                enrichers = enrichers.toList(),
+                prompts = prompts,
             )
-        return ToolRouter(
-            tools = visible,
-            executor = ToolExecutor(visible, policy, audit, prompts, clock),
-            enrichers = enrichers.toList(),
-            prompts = prompts,
-        )
+        return RouterBuild(router, hidden)
+    }
+
+    /** 首个不可见原因；null = 可见（与 [ToolRouter.visibleTools] 同一判定顺序）。 */
+    private fun hiddenReasonOf(
+        tool: Tool,
+        enabled: Set<String>,
+        toolFilter: Set<String>?,
+        capabilities: Set<Capability>,
+        modelVision: Boolean,
+    ): String? =
+        when {
+            tool.id !in enabled -> HiddenTool.DISABLED
+            toolFilter != null && tool.id !in toolFilter -> HiddenTool.FILTERED
+            !tool.requiredCapabilities.all { it in capabilities } -> HiddenTool.CAPABILITY
+            tool.requiresModelVision && !modelVision -> HiddenTool.VISION
+            else -> null
+        }
+}
+
+/** 过滤结果：可见路由器 + 被过滤掉的工具及原因（WP3）。 */
+internal data class RouterBuild(
+    val router: ToolRouter,
+    val hidden: List<HiddenTool>,
+)
+
+/** 本次不可用的一个工具。[reason] 见伴生常量。 */
+internal data class HiddenTool(
+    val name: String,
+    val reason: String,
+) {
+    internal companion object {
+        const val DISABLED = "disabled"
+        const val FILTERED = "filtered"
+        const val CAPABILITY = "capability"
+        const val VISION = "vision"
     }
 }
 
@@ -88,5 +129,5 @@ internal class RuntimeToolInvokerFactory(
     override fun create(
         request: RunRequest,
         toolFilter: Set<String>?,
-    ): ToolInvoker = RouterToolInvoker(builder.build(request, toolFilter, builder.modelVisionOf(request)))
+    ): ToolInvoker = RouterToolInvoker(builder.build(request, toolFilter, builder.modelVisionOf(request)).router)
 }

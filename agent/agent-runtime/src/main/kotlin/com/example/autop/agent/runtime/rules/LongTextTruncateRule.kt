@@ -49,7 +49,7 @@ internal class LongTextTruncateRule(
         }
     }
 
-    private companion object {
+    internal companion object {
         const val ID = "history.long_text_truncate"
         const val ID_STUB = "agent.history.truncated"
     }

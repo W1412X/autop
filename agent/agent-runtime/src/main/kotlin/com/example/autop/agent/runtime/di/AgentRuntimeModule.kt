@@ -9,6 +9,7 @@
  */
 package com.example.autop.agent.runtime.di
 
+import com.example.autop.agent.RuntimeStateSource
 import com.example.autop.agent.ThreadRecall
 import com.example.autop.agent.ThreadRecallRetriever
 import com.example.autop.agent.ThreadStore
@@ -21,6 +22,7 @@ import com.example.autop.agent.runtime.tools.control.AskUserTool
 import com.example.autop.agent.runtime.tools.control.FinishTool
 import com.example.autop.agent.runtime.tools.control.HistoryRecallTool
 import com.example.autop.agent.runtime.tools.control.NoteTool
+import com.example.autop.agent.runtime.tools.control.RuntimeStateTool
 import com.example.autop.agent.runtime.tools.control.UpdatePlanTool
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.LogFiles
@@ -54,11 +56,15 @@ public object AgentRuntimeModule {
 
     @Provides
     @IntoSet
-    public fun provideNoteTool(): Tool = NoteTool()
+    public fun provideNoteTool(prompts: PromptRepository): Tool = NoteTool(prompts)
 
     @Provides
     @IntoSet
     public fun provideHistoryRecallTool(recall: ThreadRecall): Tool = HistoryRecallTool(recall)
+
+    @Provides
+    @IntoSet
+    public fun provideRuntimeStateTool(): Tool = RuntimeStateTool()
 
     // ---- 历史检索（docs/tech/04 §2.5） ----
 
@@ -66,6 +72,11 @@ public object AgentRuntimeModule {
     @Provides
     @ElementsIntoSet
     public fun provideNoRetrievers(): Set<@JvmSuppressWildcards ThreadRecallRetriever> = emptySet()
+
+    /** 无运行状态来源时的空多绑定兜底（实现由 device-impl 提供）。 */
+    @Provides
+    @ElementsIntoSet
+    public fun provideNoStateSources(): Set<@JvmSuppressWildcards RuntimeStateSource> = emptySet()
 
     /** 无工具结果后处理器时的空多绑定兜底。 */
     @Provides

@@ -68,7 +68,15 @@ internal class RuntimeHarness(
     val session: AgentSession =
         DefaultAgentSession(
             services = RuntimeServices(store, FakeLlmGateway(llm), TestPromptRepository(), config, clock),
-            extensions = RuntimeExtensions(tools, emptySet(), fakes.contributors, fakes.rules, fakes.compactors),
+            extensions =
+                RuntimeExtensions(
+                    tools = tools,
+                    enrichers = emptySet(),
+                    contributors = fakes.contributors,
+                    stateSources = emptySet(),
+                    rules = fakes.rules,
+                    compactors = fakes.compactors,
+                ),
             ports =
                 RuntimePorts(
                     fakes.policy,

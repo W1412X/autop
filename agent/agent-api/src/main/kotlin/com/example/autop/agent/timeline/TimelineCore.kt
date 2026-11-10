@@ -19,6 +19,7 @@ import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.RunPaused
 import com.example.autop.agent.RunResumed
 import com.example.autop.agent.RunStarted
+import com.example.autop.agent.RuntimeStateReported
 import com.example.autop.agent.ThreadCreated
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ToolResultEvent
@@ -239,6 +240,7 @@ private fun appendPayload(
         is RunFinished,
         is Baseline,
         is RunNoteAdded,
+        is RuntimeStateReported,
         -> unpaired
     }
 

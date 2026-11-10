@@ -27,7 +27,6 @@ private val VERBS: Map<String, String> =
         "tool.open_uri" to "打开链接",
         "tool.wait" to "等待",
         "tool.list_apps" to "查找应用",
-        "tool.device_state" to "读取设备状态",
         "tool.get_device_state" to "读取设备状态",
         "tool.clipboard_get" to "读取剪贴板",
         "tool.clipboard_set" to "写入剪贴板",

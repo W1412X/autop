@@ -34,7 +34,7 @@ public data class ContextPart(
 
 /** 上下文贡献者（扩展点：接口 + DI 多绑定 + 稳定 id）。 */
 public interface ContextContributor {
-    /** 稳定 id（如 `context.environment`），对应配置中的启用顺序。 */
+    /** 稳定 id（如 `context.goal`），对应配置中的启用顺序。 */
     public val id: String
 
     /** 产出片段；返回 null 表示本次不贡献。 */

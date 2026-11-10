@@ -19,6 +19,9 @@ import com.example.autop.agent.runtime.compaction.CompactionCoordinator
 import com.example.autop.agent.runtime.guard.Budget
 import com.example.autop.agent.runtime.guard.CircuitBreaker
 import com.example.autop.agent.runtime.notes.RunNotes
+import com.example.autop.agent.runtime.state.BudgetStateSource
+import com.example.autop.agent.runtime.state.RuntimeStateTracker
+import com.example.autop.agent.runtime.state.ToolVisibilityStateSource
 import com.example.autop.agent.runtime.tools.RouterBuilder
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
@@ -116,12 +119,29 @@ internal class DefaultAgentSession(
     ): RunFinished {
         val estimator = TokenEstimator(request.config[AgentConfig.TOKENS])
         val notes = RunNotes(controller.toolStore, services.prompts, estimator::estimateText)
+        val modelVision = routerBuilder.modelVisionOf(request)
+        val routerBuild = routerBuilder.build(request, request.toolFilter, modelVision)
+        val budget = Budget(request.config[AgentConfig.BUDGET], services.clock)
+        val state =
+            RuntimeStateTracker(
+                sources =
+                    extensions.stateSources.associateBy { it.id } +
+                        mapOf(
+                            BudgetStateSource.ID to BudgetStateSource(budget, services.prompts),
+                            ToolVisibilityStateSource.ID to
+                                ToolVisibilityStateSource(routerBuild.hidden, services.prompts),
+                        ),
+                store = controller.toolStore,
+                prompts = services.prompts,
+                logger = ports.logger,
+            )
         val engines =
             RunEngines(
-                budget = Budget(request.config[AgentConfig.BUDGET], services.clock),
+                budget = budget,
                 breaker = CircuitBreaker(request.config[AgentConfig.BREAKER]),
                 compaction = CompactionCoordinator(controller.toolStore, extensions.compactors, notes, request.runId),
                 notes = notes,
+                state = state,
                 ports =
                     RunPorts(
                         services.llm,
@@ -132,7 +152,6 @@ internal class DefaultAgentSession(
                         ports.replayTargets,
                     ),
             )
-        val modelVision = routerBuilder.modelVisionOf(request)
         val loop =
             TurnLoop(
                 req = request,
@@ -141,7 +160,7 @@ internal class DefaultAgentSession(
                     RunParts(
                         renderer = HistoryRenderer(controller.toolStore, extensions.rules),
                         assembler = ContextAssembler(extensions.contributors),
-                        router = routerBuilder.build(request, request.toolFilter, modelVision),
+                        router = routerBuild.router,
                         engines = engines,
                         modelVision = modelVision,
                     ),

@@ -43,6 +43,15 @@ internal class Budget(
         screenshots += outputs.count(::isScreenshot)
     }
 
+    /** 当前用量只读快照（运行状态上报用，WP3）。 */
+    fun usage(): BudgetUsage =
+        BudgetUsage(
+            steps = toolRounds,
+            tokens = totalTokens,
+            durationMs = clock.nowMillis() - startMillis,
+            screenshots = screenshots,
+        )
+
     /** 任一维度触顶。 */
     fun exhausted(): Boolean = reason() != null
 
@@ -60,3 +69,11 @@ internal class Budget(
     private fun isScreenshot(output: ToolOutput): Boolean =
         (output.data as? JsonObject)?.get("screenshot")?.jsonPrimitive?.booleanOrNull ?: false
 }
+
+/** 预算用量快照（WP3）。 */
+internal data class BudgetUsage(
+    val steps: Int,
+    val tokens: Long,
+    val durationMs: Long,
+    val screenshots: Int,
+)

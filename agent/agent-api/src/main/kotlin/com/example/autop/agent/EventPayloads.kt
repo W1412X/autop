@@ -184,6 +184,21 @@ public data class RunNoteAdded(
     val text: String,
 ) : EventPayload
 
+/** 运行状态上报（agent-harness-overhaul WP3）：渲染为一条 USER 消息进入 live。 */
+@Serializable
+@SerialName("runtime_state")
+public data class RuntimeStateReported(
+    override val v: Int = 1,
+    /** 完整键值（键 = `<sourceId>/<entryKey>`，值 = 行文字），下一次比较用。 */
+    val entries: Map<String, String>,
+    /** entries 中易变的键。 */
+    val volatileKeys: Set<String>,
+    /** 是否全量上报。 */
+    val full: Boolean,
+    /** 进入 live 的消息文字（已渲染）。 */
+    val text: String,
+) : EventPayload
+
 /** 计划更新。 */
 @Serializable
 @SerialName("plan_updated")

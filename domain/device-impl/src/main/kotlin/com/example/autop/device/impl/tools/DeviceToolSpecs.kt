@@ -144,10 +144,6 @@ public object DeviceToolSpecs {
             integer("limit", min = 1)
         }
 
-    /** `tool.device_state`（name 为 `get_device_state`）。 */
-    public val deviceState: ToolSpec =
-        toolSpec(name = "get_device_state", descriptionPromptId = "tool.get_device_state") {}
-
     /** `tool.clipboard_get`。 */
     public val clipboardGet: ToolSpec =
         toolSpec(name = "clipboard_get", descriptionPromptId = "tool.clipboard_get") {}
@@ -182,7 +178,6 @@ public object DeviceToolSpecs {
             openUri,
             wait,
             listApps,
-            deviceState,
             clipboardGet,
             clipboardSet,
             readNotifications,

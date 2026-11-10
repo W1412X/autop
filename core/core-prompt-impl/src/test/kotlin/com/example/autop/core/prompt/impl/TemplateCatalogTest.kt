@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(45)
+        assertThat(toolTemplates).hasSize(46)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -35,17 +35,8 @@ class TemplateCatalogTest {
 
     @Test
     fun `key templates match the vars documented in the plan`() {
-        assertThat(templates.getValue("agent.context.environment").vars)
-            .containsExactly(
-                "localTime",
-                "weekday",
-                "timezone",
-                "battery",
-                "charging",
-                "network",
-                "foregroundApp",
-                "locked",
-            )
+        assertThat(templates.getValue("agent.state.env.time").vars)
+            .containsExactly("localTime", "weekday", "timezone")
         assertThat(templates.getValue("agent.tool.error_result").vars).containsExactly("code", "message", "hint")
         assertThat(templates.getValue("agent.tool.error_result").optionalVars).containsExactly("hint")
         assertThat(templates.getValue("agent.compaction.summary_wrapper").vars)
@@ -99,6 +90,40 @@ class TemplateCatalogTest {
                 "tool.patch_flow_node",
                 "tool.create_flow",
                 "tool.edit_flow",
+                "agent.budget.dimension.duration",
+                "agent.budget.dimension.screenshots",
+                "agent.budget.dimension.steps",
+                "agent.budget.dimension.tokens",
+                "agent.state.budget.dim.duration",
+                "agent.state.budget.dim.screenshots",
+                "agent.state.budget.dim.steps",
+                "agent.state.budget.dim.tokens",
+                "agent.state.budget.low",
+                "agent.state.budget.remaining",
+                "agent.state.delta",
+                "agent.state.env.battery",
+                "agent.state.env.foreground",
+                "agent.state.env.network",
+                "agent.state.env.screen",
+                "agent.state.env.time",
+                "agent.state.full",
+                "agent.state.input.accessibility",
+                "agent.state.input.node_action_blocked",
+                "agent.state.input.shell",
+                "agent.state.input.shield",
+                "agent.state.observe.coord",
+                "agent.state.observe.modes",
+                "agent.state.observe.unavailable",
+                "agent.state.perm.notification_listener",
+                "agent.state.perm.overlay",
+                "agent.state.perm.post_notifications",
+                "agent.state.removed",
+                "agent.state.tools.hidden",
+                "agent.state.tools.reason.capability",
+                "agent.state.tools.reason.disabled",
+                "agent.state.tools.reason.filtered",
+                "agent.state.tools.reason.vision",
+                "tool.note.saved",
                 "agent.breaker.repeat_warn",
                 "agent.breaker.repeat_stop",
                 "agent.breaker.same_error_stop",
@@ -111,7 +136,6 @@ class TemplateCatalogTest {
                 "agent.compaction.handoff",
                 "agent.compaction.last_observation",
                 "agent.compaction.summary_wrapper",
-                "agent.context.environment",
                 "agent.context.goal",
                 "agent.context.trigger",
                 "agent.fallback.json_protocol",

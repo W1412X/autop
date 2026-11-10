@@ -21,7 +21,7 @@ public data class AgentContextSection(
                 "context.run_mode",
                 "context.memory_index",
                 "context.user_profile",
-                "context.environment",
+                "context.output",
                 "context.flow_directory",
                 "context.trigger",
                 "context.trigger_memory",
@@ -54,7 +54,7 @@ public data class AgentToolsSection(
                 "tool.restart_app",
                 "tool.list_apps",
                 "tool.read_notifications",
-                "tool.device_state",
+                "tool.get_device_state",
                 "tool.clipboard_get",
                 "tool.clipboard_set",
                 "tool.notify_user",
@@ -205,6 +205,34 @@ public data class AgentBreakerSection(
         }
 }
 
+/** `agent.state`：运行状态消息（WP3）。 */
+@Serializable
+public data class AgentStateSection(
+    /** 来源 id 的采集与展示顺序；未列出的来源不采集。 */
+    @SerialName("sources") val sources: List<String> = DEFAULT_SOURCES,
+    /** 预算剩余比例不高于此值时产出“预算即将用完”。 */
+    @SerialName("budgetLowRatio") val budgetLowRatio: Double = 0.2,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        if (budgetLowRatio in 0.0..1.0) {
+            emptyList()
+        } else {
+            listOf("budgetLowRatio must be within 0..1, was $budgetLowRatio")
+        }
+
+    public companion object {
+        public val DEFAULT_SOURCES: List<String> =
+            listOf(
+                "state.environment",
+                "state.input",
+                "state.observe",
+                "state.permissions",
+                "state.budget",
+                "state.tools",
+            )
+    }
+}
+
 /** `agent.plan`：计划行为。 */
 @Serializable
 public data class AgentPlanSection(
@@ -299,6 +327,8 @@ public object AgentConfig {
         ConfigKey("agent.store", AgentStoreSection.serializer()) { AgentStoreSection() }
     public val NOTES: ConfigKey<AgentNotesSection> =
         ConfigKey("agent.notes", AgentNotesSection.serializer()) { AgentNotesSection() }
+    public val STATE: ConfigKey<AgentStateSection> =
+        ConfigKey("agent.state", AgentStateSection.serializer()) { AgentStateSection() }
 
     public val ALL: List<ConfigKey<*>> =
         listOf(
@@ -316,5 +346,6 @@ public object AgentConfig {
             UI,
             STORE,
             NOTES,
+            STATE,
         )
 }

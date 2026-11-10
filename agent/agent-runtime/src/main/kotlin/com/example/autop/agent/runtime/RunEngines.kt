@@ -11,6 +11,7 @@ import com.example.autop.agent.runtime.compaction.CompactionCoordinator
 import com.example.autop.agent.runtime.guard.Budget
 import com.example.autop.agent.runtime.guard.CircuitBreaker
 import com.example.autop.agent.runtime.notes.RunNotes
+import com.example.autop.agent.runtime.state.RuntimeStateTracker
 import com.example.autop.core.common.Logger
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.LlmGateway
@@ -34,5 +35,6 @@ internal class RunEngines(
     val breaker: CircuitBreaker,
     val compaction: CompactionCoordinator,
     val notes: RunNotes,
+    val state: RuntimeStateTracker,
     val ports: RunPorts,
 )

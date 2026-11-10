@@ -9,7 +9,7 @@
         "context.run_mode",
         "context.memory_index",
         "context.user_profile",
-        "context.environment",
+        "context.output",
         "context.flow_directory",
         "context.trigger",
         "context.trigger_memory",
@@ -32,7 +32,7 @@
         "tool.restart_app",
         "tool.list_apps",
         "tool.read_notifications",
-        "tool.device_state",
+        "tool.get_device_state",
         "tool.clipboard_get",
         "tool.clipboard_set",
         "tool.notify_user",
@@ -153,6 +153,10 @@
       "maxItems": 20,
       "maxTokens": 800,
       "maxCharsPerNote": 400
+    },
+    "state": {
+      "sources": ["state.environment", "state.input", "state.observe", "state.permissions", "state.budget", "state.tools"],
+      "budgetLowRatio": 0.2
     }
   }
 }

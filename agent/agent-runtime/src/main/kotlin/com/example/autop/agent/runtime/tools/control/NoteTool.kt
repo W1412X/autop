@@ -10,13 +10,17 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.ToolSpec
 import com.example.autop.agent.toolSpec
+import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentConfig
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 
 /** 运行笔记工具。 */
-internal class NoteTool : Tool {
+internal class NoteTool(
+    private val prompts: PromptRepository,
+) : Tool {
     override val id: String = "tool.note"
 
     override val spec: ToolSpec =
@@ -31,8 +35,19 @@ internal class NoteTool : Tool {
         ctx: ToolContext,
     ): ToolOutput {
         val maxChars = ctx.config[AgentConfig.NOTES].maxCharsPerNote
-        val text = args["text"]!!.jsonPrimitive.content.take(maxChars)
+        val text = requireNotNull(args[ARG_TEXT]?.jsonPrimitive?.content) { "schema guarantees text" }.take(maxChars)
         ctx.threadStore.append(ctx.threadId, ctx.runId, RunNoteAdded(text = text))
-        return ToolOutput(ok = true, content = listOf(Block.Text("已记下。")))
+        val saved =
+            prompts
+                .render(ID_SAVED, emptyMap())
+                .getOrNull()
+                ?.text
+                .orEmpty()
+        return ToolOutput(ok = true, content = listOf(Block.Text(saved)))
+    }
+
+    private companion object {
+        const val ARG_TEXT = "text"
+        const val ID_SAVED = "tool.note.saved"
     }
 }

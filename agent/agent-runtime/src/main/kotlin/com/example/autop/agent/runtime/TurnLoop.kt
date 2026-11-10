@@ -15,6 +15,7 @@ import com.example.autop.agent.RunFinished
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.RunRequest
 import com.example.autop.agent.RunStarted
+import com.example.autop.agent.StateRequest
 import com.example.autop.agent.ToolControl
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.UserMessage
@@ -24,10 +25,10 @@ import com.example.autop.agent.protocol.finalSummaryOf
 import com.example.autop.agent.protocol.lastTextOf
 import com.example.autop.agent.runtime.guard.BreakerVerdict
 import com.example.autop.agent.runtime.replay.ReplayRunner
+import com.example.autop.agent.runtime.state.RuntimeStateTracker
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.getOrNull
-import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.prompt.PromptSource
 import com.example.autop.llm.Block
 import com.example.autop.llm.LlmProvider
@@ -62,6 +63,8 @@ internal class TurnLoop(
     private val sampler = TurnSampler(req, controller, guards, parts.engines.ports.prompts)
     private val phase = ToolPhase(req, controller, parts, guards, journal)
     private val allSchemas by lazy { parts.router.schemas(phase.context) }
+
+    private val stateRequest = StateRequest(req.runId, req.threadId, req.config, req.vars)
 
     private var finalRound = false
     private var finalRoundByBudget = false
@@ -144,11 +147,15 @@ internal class TurnLoop(
             controller.append(UserMessage(blocks = req.input, kind = UserMessageKind.INPUT))
         }
         req.replay?.let { runReplayPrefix(it) }
+        // 运行状态 tracker 放进 runScope 供 get_device_state 使用（WP3.8）。
+        phase.context.runScope.getOrPut(RuntimeStateTracker.SCOPE_KEY) { parts.engines.state }
         while (true) {
             controller.awaitOpen()
             // N192：resume/steer 排队消息在每轮采样前落盘（上一批次 ToolResult 已落盘，
             // 序列合法且本轮可见；afterCalls 的 drain 仍在批次后兜底）。
             journal.drainSteers()
+            // 运行状态只在变化时以 USER 消息追加；首轮自然是全量（WP3.4）。
+            parts.engines.state.reportIfChanged(stateRequest)
             val step = round(assembled.system, provider)
             if (step is LoopStep.End) return step.event
         }
@@ -163,7 +170,7 @@ internal class TurnLoop(
             finalRoundByBudget = true
         }
         var live = liveView()
-        val sys = sysBase + listOfNotNull(parts.engines.notes.systemPart(req.threadId, req.config[AgentConfig.NOTES]))
+        val sys = sysBase
         if (guards.overThreshold(sys, live, allSchemas)) {
             when (val compacted = guards.compact(sys)) {
                 is CompactResult.End -> return fail(compacted.error)

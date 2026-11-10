@@ -9,6 +9,7 @@ import com.example.autop.agent.ContextContributor
 import com.example.autop.agent.HistoryRenderRule
 import com.example.autop.agent.ReplayStateProbe
 import com.example.autop.agent.ReplayTargetResolver
+import com.example.autop.agent.RuntimeStateSource
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolAuditSink
@@ -36,6 +37,7 @@ internal class RuntimeExtensions(
     val tools: Set<Tool>,
     val enrichers: Set<ToolResultEnricher>,
     val contributors: Set<ContextContributor>,
+    val stateSources: Set<RuntimeStateSource>,
     val rules: Set<HistoryRenderRule>,
     val compactors: Set<Compactor>,
 )

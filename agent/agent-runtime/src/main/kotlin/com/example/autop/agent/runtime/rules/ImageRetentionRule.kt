@@ -57,7 +57,7 @@ internal class ImageRetentionRule(
             ?.text
             ?.let { Block.Text(it) }
 
-    private companion object {
+    internal companion object {
         const val ID = "history.image_retention"
         const val ID_STUB = "agent.history.image_stub"
     }

@@ -9,8 +9,11 @@ import com.example.autop.agent.ContextContributor
 import com.example.autop.agent.ContextPart
 import com.example.autop.agent.ContextRequest
 import com.example.autop.agent.Placement
+import com.example.autop.agent.runtime.rules.ImageRetentionRule
+import com.example.autop.agent.runtime.rules.LongTextTruncateRule
+import com.example.autop.agent.runtime.rules.ObservationDegradeRule
 import com.example.autop.core.common.getOrNull
-import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.prompt.PromptRepository
 import java.util.Locale
@@ -63,21 +66,33 @@ internal class ToolGuideContributor(
     override val id: String = "context.tool_guide"
     override val templateId: String = "agent.system.tool_guide"
     override val placement: Placement = Placement.SYSTEM_STATIC
+
+    /** 省略/截断说明随配置渲染（WP3.9）：规则未启用或参数关闭时不输出对应段落。 */
+    override fun vars(req: ContextRequest): Map<String, String> {
+        val history = req.config[AgentConfig.HISTORY]
+        val rules = history.rules
+        return mapOf(
+            "observationOmitted" to flag(history.observation.keepFull > 0 && ObservationDegradeRule.ID in rules),
+            "textTruncated" to flag(history.truncate.maxChars > 0 && LongTextTruncateRule.ID in rules),
+            "imagesOmitted" to flag(history.image.keep >= 0 && ImageRetentionRule.ID in rules),
+        )
+    }
+
+    private fun flag(enabled: Boolean): String = if (enabled) "1" else ""
 }
 
 /** `context.output`：输出要求（语言 + 简洁；语言取 `ui.appearance.language`，system 跟随系统）。 */
 internal class OutputContributor(
     prompts: PromptRepository,
-    private val configProvider: ConfigProvider,
 ) : TemplateContributor(prompts) {
     override val id: String = "context.output"
     override val templateId: String = "agent.system.output"
     override val placement: Placement = Placement.SYSTEM_STATIC
 
-    override fun vars(req: ContextRequest): Map<String, String> = mapOf("lang" to languageLabel())
+    override fun vars(req: ContextRequest): Map<String, String> = mapOf("lang" to languageLabel(req))
 
-    private fun languageLabel(): String =
-        when (configProvider.current()[UiConfig.APPEARANCE].language) {
+    private fun languageLabel(req: ContextRequest): String =
+        when (req.config[UiConfig.APPEARANCE].language) {
             LANG_EN -> "English"
             LANG_ZH -> "中文"
             else -> if (Locale.getDefault().language == LANG_EN) "English" else "中文"

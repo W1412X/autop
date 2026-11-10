@@ -61,7 +61,6 @@ class ToolSchemaTest {
                 "open_uri",
                 "wait",
                 "list_apps",
-                "get_device_state",
                 "clipboard_get",
                 "clipboard_set",
                 "read_notifications",

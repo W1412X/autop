@@ -11,6 +11,7 @@ import com.example.autop.agent.ThreadCreated
 import com.example.autop.agent.runtime.testing.FakeTool
 import com.example.autop.agent.runtime.testing.HarnessFakes
 import com.example.autop.agent.runtime.testing.RuntimeHarness
+import com.example.autop.agent.runtime.testing.TestPromptRepository
 import com.example.autop.agent.runtime.testing.defaultRenderRules
 import com.example.autop.agent.runtime.tools.control.NoteTool
 import com.example.autop.core.common.CommonErrorCodes
@@ -88,7 +89,7 @@ class ForkTest {
 
     private fun harness(): RuntimeHarness =
         RuntimeHarness(
-            tools = setOf(NoteTool(), FakeTool()),
+            tools = setOf(NoteTool(TestPromptRepository()), FakeTool()),
             fakes = HarnessFakes(rules = defaultRenderRules()),
         )
 }
