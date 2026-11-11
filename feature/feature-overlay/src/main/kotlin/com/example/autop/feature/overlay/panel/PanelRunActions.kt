@@ -77,18 +77,21 @@ public class PanelRunActions
 
         /** 运行面板补充指令（steer，不打断当前采样）；失败留给对话页提示（WP8.5）。 */
         public fun steer(text: String) {
+            if (ignoreWhileInjecting(ACTION_STEER)) return
             val id = activeId() ?: return
             scope.launch { runService.steer(id, text) }
         }
 
         /** 问题面板回答。 */
         public fun answer(answer: String) {
+            if (ignoreWhileInjecting(ACTION_ANSWER)) return
             val id = activeId() ?: return
             scope.launch { runService.answer(id, answer) }
         }
 
         /** 暂停 / 继续（按当前状态切换）；过渡态立即置起防连点翻转。 */
         public fun pauseResume() {
+            if (ignoreWhileInjecting(ACTION_PAUSE_RESUME)) return
             val id = activeId() ?: return
             if (active.value?.run?.status == RunStatus.PAUSED) {
                 publish(ControlIntentKind.RESUME, id)
@@ -104,6 +107,7 @@ public class PanelRunActions
          * 立刻操作手机，即使取消链路异常或 Run 卡死未收口。
          */
         public fun stop() {
+            if (ignoreWhileInjecting(ACTION_STOP)) return
             shield.forceRelease()
             val id = activeId() ?: return
             publish(ControlIntentKind.STOP, id)
@@ -112,6 +116,7 @@ public class PanelRunActions
 
         /** 拦截面板「我已手动完成，继续」。 */
         public fun continueBlocked() {
+            if (ignoreWhileInjecting(ACTION_CONTINUE_BLOCKED)) return
             val id = activeId() ?: return
             publish(ControlIntentKind.RESUME, id)
             runService.resume(id, RESUME_NOTE)
@@ -119,6 +124,7 @@ public class PanelRunActions
 
         /** 拦截面板「结束」（同 [stop]：先强制解除屏蔽）。 */
         public fun finishBlocked() {
+            if (ignoreWhileInjecting(ACTION_FINISH_BLOCKED)) return
             shield.forceRelease()
             val id = activeId() ?: return
             publish(ControlIntentKind.STOP, id)
@@ -152,6 +158,18 @@ public class PanelRunActions
 
         private fun activeId(): RunId? = active.value?.run?.id
 
+        /**
+         * 注入进行中忽略控制入口点击（N222）：注入的点击可能刚好落在自家按钮上——
+         * 实测顶部控制条的「中止」被工具注入的 tap 命中，Run 被误取消。
+         * 注入只有毫秒级，忽略不影响用户主动操作。
+         * 公开给控制条/进度窗的「停止流程」等直连入口复用（这些入口不走本类方法）。
+         */
+        public fun ignoreWhileInjecting(action: String): Boolean {
+            if (!shield.injecting.value) return false
+            logger.i(TAG, "panel_click_ignored", "action" to action, "reason" to "injecting")
+            return true
+        }
+
         /** 置过渡态并起超时兜底（状态迟迟不落地时恢复按钮可用）。 */
         private fun publish(
             kind: ControlIntentKind,
@@ -166,6 +184,9 @@ public class PanelRunActions
         }
 
         public companion object {
+            /** 日志 tag。 */
+            private const val TAG: String = "PanelRunActions"
+
             /** 「打开对话」跳转 extra 键（app 导航消费）。 */
             public const val EXTRA_THREAD_ID: String = "autop.threadId"
 
@@ -174,5 +195,16 @@ public class PanelRunActions
 
             /** 「我已手动完成，继续」附带的恢复备注。 */
             private const val RESUME_NOTE: String = "user_marked_done"
+
+            /** 注入期忽略的入口（日志留痕用，N222）。 */
+            private const val ACTION_STEER: String = "steer"
+            private const val ACTION_ANSWER: String = "answer"
+            private const val ACTION_PAUSE_RESUME: String = "pause_resume"
+            private const val ACTION_STOP: String = "stop"
+            private const val ACTION_CONTINUE_BLOCKED: String = "continue_blocked"
+            private const val ACTION_FINISH_BLOCKED: String = "finish_blocked"
+
+            /** 控制条/进度窗的「停止流程」入口（直连 flowFeed，守卫在本类之外，N222）。 */
+            public const val ACTION_STOP_FLOW: String = "stop_flow"
         }
     }

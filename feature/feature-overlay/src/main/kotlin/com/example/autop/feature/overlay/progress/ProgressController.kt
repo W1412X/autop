@@ -205,9 +205,11 @@ public class ProgressController
                         onStop = actions::stop,
                         onStopFlow = {
                             // 只停流程、对话继续（P1-3）；停的是根 Run 名下登记的流程句柄。
-                            val active = runService.observeActive()
-                            val rootRunId = active.value?.run?.id
-                            if (rootRunId != null) flowFeed.cancel(rootRunId)
+                            if (!actions.ignoreWhileInjecting(PanelRunActions.ACTION_STOP_FLOW)) {
+                                val active = runService.observeActive()
+                                val rootRunId = active.value?.run?.id
+                                if (rootRunId != null) flowFeed.cancel(rootRunId)
+                            }
                         },
                         onOpenThread = { actions.openThread(lastThreadState.value) },
                         onSteer = actions::steer,

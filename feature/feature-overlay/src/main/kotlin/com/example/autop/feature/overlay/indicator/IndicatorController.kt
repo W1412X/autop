@@ -5,7 +5,8 @@
  *   等待也有操作出口），点操作信息展开详情、按钮执行暂停/继续/中止。
  * - 运行详情（[OverlayWindowIds.RUN_DETAIL]）：条下的消息流观测面板，展开时显示、再点收起。
  * 悬浮球在控制条可见时由组装层隐藏（[barVisible] 同源），Run 收口自动回显；控制条窗口
- * 不可聚焦、只包内容，不挡注入（注入期封锁由 `blockInput` 统一覆盖全部自家窗口）。
+ * 不可聚焦、只包内容（N222：注入落点压到控制条时按占位让它路，见 device-impl 的
+ * `OverlayWindowRegistry.addFootprint`，注入结束即恢复）。
  */
 package com.example.autop.feature.overlay.indicator
 
@@ -247,9 +248,11 @@ public class IndicatorController
                         onPauseResume = actions::pauseResume,
                         onStop = actions::stop,
                         onStopFlow = {
-                            val activeNow = runService.observeActive().value
-                            val rootRunId = activeNow?.run?.id
-                            if (rootRunId != null) flowFeed.cancel(rootRunId)
+                            if (!actions.ignoreWhileInjecting(PanelRunActions.ACTION_STOP_FLOW)) {
+                                val activeNow = runService.observeActive().value
+                                val rootRunId = activeNow?.run?.id
+                                if (rootRunId != null) flowFeed.cancel(rootRunId)
+                            }
                         },
                         onOpenThread = {},
                         onSteer = actions::steer,
