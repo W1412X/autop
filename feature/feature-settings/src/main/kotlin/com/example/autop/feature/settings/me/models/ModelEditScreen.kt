@@ -11,10 +11,12 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.ActionRow
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopTextButton
@@ -124,12 +127,15 @@ private fun ModelForm(
                 )
             }
         }
-        items(state.remoteModels.models.orEmpty()) { model ->
-            ModelSuggestionRow(
-                model = model,
-                selected = model == draft.model,
-                onPick = { onAction(ModelsAction.SetField(DraftField.MODEL, model)) },
-            )
+        val models = state.remoteModels.models.orEmpty()
+        if (models.isNotEmpty()) {
+            item {
+                ModelSuggestions(
+                    models = models,
+                    selected = draft.model,
+                    onPick = { onAction(ModelsAction.SetField(DraftField.MODEL, it)) },
+                )
+            }
         }
         item { LimitsFields(draft = draft, onAction = onAction) }
         item { QuirksSection(draft = draft, onAction = onAction) }
@@ -204,6 +210,30 @@ private fun ModelField(
         onFocus = { if (draft.baseUrl.isNotBlank()) onFocus() },
     ) {
         onAction(ModelsAction.SetField(DraftField.MODEL, it))
+    }
+}
+
+/** 模型建议列表：限高内部滚动，长列表不把下方字段区顶出屏幕。 */
+@Composable
+private fun ModelSuggestions(
+    models: List<String>,
+    selected: String,
+    onPick: (String) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .heightIn(max = MODEL_SUGGEST_MAX_HEIGHT)
+                .verticalScroll(rememberScrollState()),
+    ) {
+        models.forEach { model ->
+            ModelSuggestionRow(
+                model = model,
+                selected = model == selected,
+                onPick = { onPick(model) },
+            )
+        }
     }
 }
 
@@ -341,5 +371,8 @@ private const val KEY_MAX_TOKENS_FIELD: String = "maxTokensField"
 private const val KEY_REASONING_FIELD: String = "reasoningField"
 private const val KEY_MESSAGES_PATH: String = "messagesPath"
 private const val KEY_TOOL_CHOICE_NONE: String = "toolChoiceNone"
+
+/** 模型建议列表限高（约 6 行），超出在列表内部滚动。 */
+private val MODEL_SUGGEST_MAX_HEIGHT = 240.dp
 private const val KEY_CONTEXT_PATTERNS: String = "contextExceededPatterns"
 private const val KEY_IMAGE_MAX_EDGE: String = "imageMaxEdge"
