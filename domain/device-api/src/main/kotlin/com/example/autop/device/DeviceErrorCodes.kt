@@ -21,6 +21,12 @@ public object DeviceErrorCodes {
     /** 定位器找不到节点。 */
     public const val NODE_NOT_FOUND: String = "device.node_not_found"
 
+    /** 节点工具的目标在实时树里已失效（界面可能已变化；重新 observe 后重试）。 */
+    public const val NODE_STALE: String = "device.node_stale"
+
+    /** 应用拒绝了节点动作（动作未执行；错误附节点 at，可改用坐标工具）。 */
+    public const val NODE_REJECTED: String = "device.node_rejected"
+
     /** 定位器命中多个节点且无法消歧。 */
     public const val NODE_AMBIGUOUS: String = "device.node_ambiguous"
 

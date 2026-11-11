@@ -49,6 +49,13 @@ public data class ScreenNode(
     /** 列表折叠提示原文（不含前导“…”）。 */
     val more: String? = null,
     val kids: List<ScreenNode> = emptyList(),
+    /**
+     * 节点 id（仅 a11y 观测的可操作节点；Run 内单调递增不复用）。
+     * 只对最近一次观测有效，供 `tap_node`/`scroll_node` 使用；visual、llm 观测没有 id。
+     */
+    val id: Int? = null,
+    /** 内部引用：该节点在采集快照里的 `NodeSnapshot.idx`（不输出、不进指纹、不参与配对）。 */
+    val ref: Int? = null,
     /** 内部稳定键（差量配对用，不对外输出）。 */
     val key: String = "",
 )

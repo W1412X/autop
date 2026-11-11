@@ -94,6 +94,36 @@ class HitResolverTest {
         assertThat(HitResolver.describe(Point(900, 900), model(outer))).isNull()
     }
 
+    @Test
+    fun `node receipt carries id tag bounds and at`() {
+        val node = outer.kids.single().copy(id = 12, at = Point(150, 125))
+        val receipt =
+            Json
+                .parseToJsonElement(HitResolver.nodeReceipt(node))
+                .jsonObject
+                .getValue("node")
+                .jsonObject
+        assertThat(receipt.getValue("id").jsonPrimitive.content).isEqualTo("12")
+        assertThat(receipt.getValue("tag").jsonPrimitive.content).isEqualTo("btn")
+        assertThat(receipt.getValue("text").jsonPrimitive.content).isEqualTo("确认付款")
+        assertThat(
+            receipt.getValue("bounds").jsonArray.map { it.jsonPrimitive.content },
+        ).containsExactly("100", "100", "200", "150").inOrder()
+        assertThat(
+            receipt.getValue("at").jsonArray.map { it.jsonPrimitive.content },
+        ).containsExactly("150", "125").inOrder()
+    }
+
+    @Test
+    fun `describeNode matches describe shape`() {
+        val node = outer.kids.single()
+        val description = HitResolver.describeNode(node)
+        assertThat(description.getValue("tag").jsonPrimitive.content).isEqualTo("btn")
+        assertThat(description.getValue("text").jsonPrimitive.content).isEqualTo("确认付款")
+        assertThat(description).doesNotContainKey("icon")
+        assertThat(description).doesNotContainKey("id")
+    }
+
     private fun model(node: ScreenNode): ScreenModel =
         ScreenModel(
             mode = ObserveMode.A11Y,

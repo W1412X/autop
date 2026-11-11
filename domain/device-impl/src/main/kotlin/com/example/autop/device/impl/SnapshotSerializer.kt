@@ -9,6 +9,7 @@ import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.ScreenSnapshot
+import com.example.autop.device.core.NodeIdAssigner
 import com.example.autop.device.core.ScreenSerializer
 import com.example.autop.device.core.SerializedScreen
 import com.example.autop.device.core.SerializerConfig
@@ -32,7 +33,7 @@ public class SnapshotSerializer
         /** 序列化配置（含 prompt 渲染），差量生成也要用。 */
         public fun configOf(config: ConfigSnapshot): SerializerConfig = rulesLoader.configOf(config, prompts)
 
-        /** 按配置快照与观测模式序列化 [snap]；[noAppWindow] 只有 a11y 可能为真。 */
+        /** 按配置快照与观测模式序列化 [snap]；[noAppWindow] 只有 a11y 可能为真；[idAssigner] 供观测入口分配节点 id。 */
         public fun serialize(
             snap: ScreenSnapshot,
             mode: ObserveMode,
@@ -40,6 +41,7 @@ public class SnapshotSerializer
             effectiveModes: List<ObserveMode>,
             noAppWindow: Boolean = false,
             cached: Boolean = false,
+            idAssigner: NodeIdAssigner? = null,
         ): SerializedScreen =
             ScreenSerializer(rulesLoader.get(), configOf(config))
                 .serialize(
@@ -50,5 +52,6 @@ public class SnapshotSerializer
                     effectiveModes,
                     noAppWindow,
                     cached,
+                    idAssigner,
                 )
     }

@@ -26,7 +26,8 @@ public class ScreenSerializer(
     /**
      * 序列化 [snapshot]：[mode] 决定 a11y/visual 字段与节点选取；[redaction] 决定窗口脱敏；
      * [ownPackage] 为自身包名（窗口过滤）；[effectiveModes] 用于 `quality.suggest`；
-     * [noAppWindow] 只有 a11y 可能为真（快照里没有任何应用窗口）。
+     * [noAppWindow] 只有 a11y 可能为真（快照里没有任何应用窗口）；
+     * [idAssigner] 非空时给 a11y 可操作节点分配 id（观测入口传，回放探针等不传）。
      */
     public fun serialize(
         snapshot: ScreenSnapshot,
@@ -36,6 +37,7 @@ public class ScreenSerializer(
         effectiveModes: List<ObserveMode> = listOf(mode),
         noAppWindow: Boolean = false,
         cached: Boolean = false,
+        idAssigner: NodeIdAssigner? = null,
     ): SerializedScreen {
         val index = SnapshotIndex(snapshot)
         val geometry = TapPointResolver.Geometry(snapshot)
@@ -58,7 +60,7 @@ public class ScreenSerializer(
                 draftOf(window, DraftContext(snapshot, index, area, screen, focused, builder), redaction, mode)
             }
         val poor = semanticPoor(snapshot)
-        val model =
+        val built =
             ScreenModelBuilder.fromDrafts(
                 mode = mode,
                 drafts = drafts,
@@ -69,6 +71,7 @@ public class ScreenSerializer(
                 truncated = snapshot.truncated,
                 cached = cached,
             )
+        val model = idAssigner?.assign(built, snapshot.foregroundPackage, snapshot.activity) ?: built
         val suggestion = suggestionOf(model, config)
         val text =
             ScreenJsonRenderer.render(

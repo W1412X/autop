@@ -44,4 +44,16 @@ class ScreenFingerprintTest {
         assertThat(ScreenFingerprint.of("other", "Act", rows)).isNotEqualTo(base)
         assertThat(ScreenFingerprint.of("pkg", "Other", rows)).isNotEqualTo(base)
     }
+
+    @Test
+    fun idAndRefDoNotAffectFingerprint() {
+        val plain = listOf(row("A"), row("B"))
+        val withIds =
+            listOf(
+                row("A").copy(id = 5, ref = 9),
+                row("B").copy(id = 6, ref = 10),
+            )
+        assertThat(ScreenFingerprint.of("pkg", "Act", withIds))
+            .isEqualTo(ScreenFingerprint.of("pkg", "Act", plain))
+    }
 }

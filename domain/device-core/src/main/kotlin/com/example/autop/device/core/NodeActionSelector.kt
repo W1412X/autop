@@ -48,26 +48,7 @@ public object NodeActionSelector {
                 .filter { matches(it, point, query) }
                 .maxWithOrNull { a, b -> compareZ(zKey(index, a), zKey(index, b)) }
                 ?: return null
-        return NodeTarget(best, window.windowId, liveChildPath(index, best))
-    }
-
-    /**
-     * 窗口根到节点的实时子序号路径。用采集时记录的 [NodeSnapshot.childIndex]（真实子序号），
-     * 不用 [SnapshotIndex.pathOf]（它是快照 children 列表位置，采集时跳过的 null 子节点会让两者错位）。
-     */
-    private fun liveChildPath(
-        index: SnapshotIndex,
-        node: NodeSnapshot,
-    ): List<Int> {
-        val path = ArrayList<Int>()
-        var current: NodeSnapshot = node
-        while (true) {
-            val parent = current.parent?.let { index.node(it) } ?: break
-            path += current.childIndex
-            current = parent
-        }
-        path.reverse()
-        return path
+        return NodeTarget(best, window.windowId, NodeTargets.of(index, best).path)
     }
 
     /** 包含落点的最上层窗口。无障碍悬浮窗（本应用的盾、指示器）不拦截触摸，跳过。 */

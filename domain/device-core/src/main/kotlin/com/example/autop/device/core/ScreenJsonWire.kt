@@ -30,6 +30,7 @@ public object ScreenJsonWire {
 
     // 节点
     public const val FIELD_TAG: String = "tag"
+    public const val FIELD_ID: String = "id"
     public const val FIELD_TEXT: String = "text"
     public const val FIELD_ICON: String = "icon"
     public const val FIELD_DESC: String = "desc"
@@ -79,6 +80,7 @@ public object ScreenJsonWire {
 
     // 命中回执
     public const val ROOT_HIT: String = "hit"
+    public const val ROOT_NODE: String = "node"
     public const val FIELD_FROM: String = "from"
     public const val FIELD_NONE: String = "none"
 
@@ -94,7 +96,17 @@ public object ScreenJsonWire {
     public fun fieldsOf(mode: com.example.autop.device.ObserveMode): List<String> =
         when (mode) {
             com.example.autop.device.ObserveMode.A11Y ->
-                listOf(FIELD_TEXT, FIELD_DESC, FIELD_HINT, FIELD_STATE, FIELD_CLS, FIELD_VID, FIELD_ACT, FIELD_ST)
+                listOf(
+                    FIELD_ID,
+                    FIELD_TEXT,
+                    FIELD_DESC,
+                    FIELD_HINT,
+                    FIELD_STATE,
+                    FIELD_CLS,
+                    FIELD_VID,
+                    FIELD_ACT,
+                    FIELD_ST,
+                )
             com.example.autop.device.ObserveMode.VISUAL ->
                 listOf(FIELD_TEXT, FIELD_ICON, FIELD_HINT, FIELD_STATE, FIELD_ACT, FIELD_ST)
             com.example.autop.device.ObserveMode.LLM ->

@@ -24,6 +24,8 @@ import com.example.autop.device.VisualScreenParser
 import com.example.autop.device.VisualTree
 import com.example.autop.device.WindowSnapshot
 import com.example.autop.device.WindowType
+import com.example.autop.device.core.NodeIdAssigner
+import com.example.autop.device.core.NodeIds
 import com.example.autop.device.core.ScreenFingerprint
 import com.example.autop.device.core.ScreenJsonRenderer
 import com.example.autop.device.core.ScreenJsonWire
@@ -31,6 +33,7 @@ import com.example.autop.device.core.SerializedScreen
 import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.SnapshotCapturer
 import com.example.autop.device.impl.SnapshotSerializer
+import com.example.autop.device.impl.deviceHistory
 import com.example.autop.device.impl.vision.FrameSignature
 import com.example.autop.device.impl.vision.frameSignatureOf
 import com.example.autop.device.impl.vision.llm.LlmScreenParser
@@ -68,15 +71,45 @@ public class ScreenPreparer
             effective: List<ObserveMode>,
         ): Outcome<Prepared> =
             when (mode) {
-                ObserveMode.A11Y -> a11y(ctx.config, effective)
+                ObserveMode.A11Y -> a11y(ctx.config, effective, idAssignerOf(ctx, ctx.config))
                 ObserveMode.VISUAL -> visual(ctx.config, effective)
                 ObserveMode.LLM -> llm(ctx, region, effective)
             }
+
+        /**
+         * a11y 节点 id 分配器（coordinate-node-action-split §3.2）：取 `history.last` 作 prev，
+         * 仅当其为 a11y 且包名、Activity 与当前相同时配对沿用 id；计数器在 Run 内单调递增。
+         * 只有观测入口传分配器；回放探针等直接调 [a11y] 的调用点不传。
+         */
+        private fun idAssignerOf(
+            ctx: ToolContext,
+            config: ConfigSnapshot,
+        ): NodeIdAssigner {
+            val history = ctx.deviceHistory()
+            val prevRecorded = history.last
+            val serializerConfig = serializer.configOf(config)
+            return NodeIdAssigner { model, packageName, activity ->
+                val prevComparable =
+                    prevRecorded != null &&
+                        prevRecorded.mode == ObserveMode.A11Y &&
+                        prevRecorded.screen.observation.packageName == packageName &&
+                        prevRecorded.screen.observation.activity == activity
+                NodeIds.assign(
+                    model = model,
+                    prev = prevRecorded?.screen?.model,
+                    prevComparable = prevComparable,
+                    tolerance = serializerConfig.positionTolerance,
+                    volatilePatterns = serializerConfig.volatilePatterns,
+                    next = { history.allocateNodeId() },
+                )
+            }
+        }
 
         /** 无障碍观测：应用窗口缺失/空树照常返回（是否换方式由自动选择决定）。 */
         internal suspend fun a11y(
             config: ConfigSnapshot,
             effective: List<ObserveMode>,
+            ids: NodeIdAssigner? = null,
         ): Outcome<Prepared> =
             when (val got = screenReader.snapshot()) {
                 is Outcome.Err -> got
@@ -94,6 +127,7 @@ public class ScreenPreparer
                                     config,
                                     effective,
                                     noAppWindow = noAppWindow,
+                                    idAssigner = ids,
                                 ),
                             frame = null,
                         ),

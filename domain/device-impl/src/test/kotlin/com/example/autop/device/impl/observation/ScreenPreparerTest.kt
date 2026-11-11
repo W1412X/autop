@@ -21,23 +21,31 @@ import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.NodeFlags
+import com.example.autop.device.NodeSnapshot
 import com.example.autop.device.ObserveMode
+import com.example.autop.device.Rect
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.Screenshot
 import com.example.autop.device.VisualFrame
 import com.example.autop.device.VisualScreenParser
 import com.example.autop.device.VisualTree
+import com.example.autop.device.WindowSnapshot
+import com.example.autop.device.WindowType
 import com.example.autop.device.core.RedactionMode
 import com.example.autop.device.impl.AppIdentity
 import com.example.autop.device.impl.AutopAccessibilityService
 import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.ForegroundTracker
+import com.example.autop.device.impl.ObserveSelection
+import com.example.autop.device.impl.RecordedObservation
 import com.example.autop.device.impl.SerializerRulesLoader
 import com.example.autop.device.impl.ServiceHolder
 import com.example.autop.device.impl.SnapshotCapturer
 import com.example.autop.device.impl.SnapshotSerializer
 import com.example.autop.device.impl.WindowRedactor
+import com.example.autop.device.impl.deviceHistory
 import com.example.autop.device.impl.vision.llm.LlmScreenParser
 import com.example.autop.llm.LlmErrorCodes
 import com.example.autop.llm.LlmGateway
@@ -57,6 +65,9 @@ import org.robolectric.RobolectricTestRunner
 import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.ConscryptMode
+
+/** AccessibilityNodeInfo.ACTION_CLICK（节点动作 id）。 */
+private const val ACTION_ID_CLICK = 16
 
 @RunWith(RobolectricTestRunner::class)
 @Config(sdk = [34])
@@ -92,6 +103,108 @@ class ScreenPreparerTest {
             assertThat(got.error.code).isEqualTo(DeviceErrorCodes.VISUAL_PARSE_FAILED)
             assertThat(got.error.message).isEqualTo("boom")
         }
+
+    @Test
+    fun `node ids persist across observations and reset on page change`() =
+        runTest {
+            val ctx = ctx()
+            val reader = FakeReader(Outcome.Err(AppError("test.unused", "shot")))
+            val preparer = fixture(reader, FakeVisual())
+            val snap = a11ySnapshot(activity = "com.example.app.MainActivity")
+
+            reader.snap = Outcome.Ok(snap)
+            val first = preparer.prepare(ctx, ObserveMode.A11Y, null, listOf(ObserveMode.A11Y))
+            check(first is Outcome.Ok)
+            val firstModel = first.value.serialized.model
+            val firstIds = firstModel.flatten().map { it.id }
+            assertThat(firstIds).containsExactly(1, 2).inOrder()
+
+            // 记录上次观测后再次观测（内容不变）：id 沿用。
+            record(ctx, first.value, snap)
+            val second = preparer.prepare(ctx, ObserveMode.A11Y, null, listOf(ObserveMode.A11Y))
+            check(second is Outcome.Ok)
+            val secondModel = second.value.serialized.model
+            val secondIds = secondModel.flatten().map { it.id }
+            assertThat(secondIds).containsExactly(1, 2).inOrder()
+
+            // 换页后不配对：全新 id（计数器继续走，不复用）。
+            record(ctx, second.value, snap)
+            reader.snap = Outcome.Ok(a11ySnapshot(activity = "com.example.app.OtherActivity"))
+            val third = preparer.prepare(ctx, ObserveMode.A11Y, null, listOf(ObserveMode.A11Y))
+            check(third is Outcome.Ok)
+            val thirdModel = third.value.serialized.model
+            val thirdIds = thirdModel.flatten().map { it.id }
+            assertThat(thirdIds).containsExactly(3, 4).inOrder()
+        }
+
+    /** 记录一次观测到 Run 历史（ScreenObserver.record 的最小等价）。 */
+    private fun record(
+        ctx: ToolContext,
+        prepared: Prepared,
+        snapshot: ScreenSnapshot,
+    ) {
+        ctx.deviceHistory().last =
+            RecordedObservation(
+                mode = prepared.mode,
+                selection = ObserveSelection.Auto,
+                screen = prepared.serialized,
+                snapshot = snapshot,
+                frame = null,
+            )
+    }
+
+    /** 两个可点击叶子的 a11y 快照。 */
+    private fun a11ySnapshot(activity: String): ScreenSnapshot {
+        val leaf = { idx: Int, text: String, top: Int ->
+            NodeSnapshot(
+                idx = idx,
+                parent = 1,
+                children = emptyList(),
+                childIndex = idx - 2,
+                className = "android.widget.Button",
+                text = text,
+                bounds = Rect(0, top, 200, top + 80),
+                flags = NodeFlags.VISIBLE or NodeFlags.ENABLED or NodeFlags.CLICKABLE,
+                actions = listOf(ACTION_ID_CLICK),
+                packageName = "com.example.app",
+            )
+        }
+        val root =
+            NodeSnapshot(
+                idx = 1,
+                parent = null,
+                children = listOf(2, 3),
+                childIndex = 0,
+                className = "android.widget.FrameLayout",
+                bounds = Rect(0, 0, 1080, 1920),
+                flags = NodeFlags.VISIBLE or NodeFlags.ENABLED,
+                packageName = "com.example.app",
+            )
+        val window =
+            WindowSnapshot(
+                windowId = 1,
+                type = WindowType.APPLICATION,
+                layer = 0,
+                packageName = "com.example.app",
+                title = null,
+                bounds = Rect(0, 0, 1080, 1920),
+                active = true,
+                focused = true,
+                rootIdx = 1,
+            )
+        return ScreenSnapshot(
+            capturedAt = 0L,
+            windows = listOf(window),
+            nodes = listOf(root, leaf(2, "确定", 100), leaf(3, "取消", 300)),
+            foregroundPackage = "com.example.app",
+            activity = activity,
+            screenWidth = 1080,
+            screenHeight = 1920,
+            rotation = 0,
+            keyguardLocked = false,
+            truncated = false,
+        )
+    }
 
     private fun fixture(
         reader: FakeReader,
@@ -130,11 +243,13 @@ class ScreenPreparerTest {
 
     private fun ctx(): ToolContext = TestContext(provider)
 
-    /** 截图替身：按脚本返回 [Outcome]。 */
+    /** 截图替身：按脚本返回 [Outcome]；[snap] 可在测试中途更换（id 跨观测用例）。 */
     private class FakeReader(
         private val shot: Outcome<Screenshot>,
     ) : ScreenReader {
-        override suspend fun snapshot(): Outcome<ScreenSnapshot> = error("snapshot is not used")
+        var snap: Outcome<ScreenSnapshot> = Outcome.Err(AppError("test.unused", "snapshot is not used"))
+
+        override suspend fun snapshot(): Outcome<ScreenSnapshot> = snap
 
         override suspend fun screenshot(): Outcome<Screenshot> = shot
     }

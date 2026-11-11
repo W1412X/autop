@@ -47,6 +47,12 @@ public class DeviceRunHistory {
     /** 节点动作学习的本 Run 疑点（WP2.6）。 */
     internal val nodeActionSuspects: MutableMap<String, Long> = mutableMapOf()
 
+    /** 节点 id 计数器（a11y 观测分配 id 用，coordinate-node-action-split §3.2）。 */
+    internal var nextNodeId: Int = 1
+
+    /** 领一个新节点 id（Run 内单调递增、永不复用）。 */
+    internal fun allocateNodeId(): Int = nextNodeId++
+
     public companion object {
         /** runScope 中观测历史的键。 */
         public const val HISTORY_KEY: String = "device.history"

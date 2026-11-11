@@ -14,7 +14,7 @@ public interface GestureController {
 
     /**
      * 对快照里选中的节点执行无障碍动作：按 [windowId] 与根到节点的子序号路径 [path] 在实时树里定位，
-     * 只做过期校验（类名与 [expectedBounds] 必须与快照一致），不做别的匹配。不走输入管道。
+     * 只做 bounds 过期校验（[expectedBounds] 必须与实时节点一致），不做别的匹配。不走输入管道。
      */
     public suspend fun performAtPath(
         windowId: Int,

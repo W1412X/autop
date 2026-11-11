@@ -103,6 +103,23 @@ class ScreenJsonDifferTest {
     }
 
     /** 两个位置不同、内容不同的按钮；[first] 决定节点顺序（模拟视觉识别顺序变化）。 */
+    @Test
+    fun `unchanged nodes keep ids and ids do not affect diff`() {
+        val patterns = listOf(Regex("\\d+"))
+        var counter = 1
+        val prev = TestScreens.serialize(screen("确定"))
+        val prevWithIds = NodeIds.assign(prev.model, null, false, 12, patterns) { counter++ }
+        val cur = TestScreens.serialize(screen("确定"))
+        val curWithIds = NodeIds.assign(cur.model, prevWithIds, true, 12, patterns) { counter++ }
+
+        // 未变化节点的 id 跨观测沿用（coordinate-node-action-split §3.2）。
+        assertThat(curWithIds.flatten().single().id).isEqualTo(prevWithIds.flatten().single().id)
+        // id 不参与配对与差量判断（§3.4）：带 id 的模型差量结论仍是“没有变化”。
+        val outcome =
+            ScreenJsonDiffer.diff(prev.copy(model = prevWithIds), cur.copy(model = curWithIds), config)
+        assertThat(outcome.match?.empty).isTrue()
+    }
+
     private fun twoButtons(first: Boolean): ScreenSnapshot {
         val a =
             TestScreens.node(2) {

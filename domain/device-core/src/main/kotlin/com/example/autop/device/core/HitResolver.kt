@@ -73,6 +73,31 @@ public object HitResolver {
         }
     }
 
+    /** 节点回执 JSON 一行（节点工具结果用）：`{"node":{"id":12,"tag":…,"text":…,"bounds":[…],"at":[…]}}`。 */
+    public fun nodeReceipt(node: ScreenNode): String {
+        val obj =
+            buildJsonObject {
+                node.id?.let { put(ScreenJsonWire.FIELD_ID, it) }
+                put(ScreenJsonWire.FIELD_TAG, node.tag)
+                node.text?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_TEXT, it) }
+                node.icon?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_ICON, it) }
+                node.desc?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_DESC, it) }
+                put(ScreenJsonWire.FIELD_BOUNDS, ScreenJsonRenderer.rectArray(node.bounds))
+                node.at?.let { put(ScreenJsonWire.FIELD_AT, ScreenJsonRenderer.pointArray(it)) }
+            }
+        return buildJsonObject { put(ScreenJsonWire.ROOT_NODE, obj) }.toString()
+    }
+
+    /** 节点描述（回放 `_hit` 用，与 [describe] 同形）：`tag`、文字/图标/描述与 `bounds`。 */
+    public fun describeNode(node: ScreenNode): kotlinx.serialization.json.JsonObject =
+        buildJsonObject {
+            put(ScreenJsonWire.FIELD_TAG, node.tag)
+            node.text?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_TEXT, it) }
+            node.icon?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_ICON, it) }
+            node.desc?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_DESC, it) }
+            put(ScreenJsonWire.FIELD_BOUNDS, ScreenJsonRenderer.rectArray(node.bounds))
+        }
+
     private fun flatten(node: ScreenNode): List<ScreenNode> = listOf(node) + node.kids.flatMap { flatten(it) }
 
     private fun contains(

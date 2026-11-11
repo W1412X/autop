@@ -68,6 +68,16 @@ class ScreenNodeMatcherTest {
         assertThat(result.changed.single().st).containsExactly("checked")
     }
 
+    @Test
+    fun `pairs records matched index pairs`() {
+        val prev = listOf(node("btn", "确定"), node("text", "标题", top = 100))
+        val cur = listOf(node("text", "标题", top = 100), node("btn", "确定"))
+        val result = ScreenNodeMatcher.match(prev, cur, TOLERANCE, volatile)
+        assertThat(result.pairs).containsExactly(0 to 1, 1 to 0)
+        assertThat(result.added).isEmpty()
+        assertThat(result.removed).isEmpty()
+    }
+
     private fun node(
         tag: String,
         label: String,

@@ -34,16 +34,18 @@ class ScreenJsonRendererTest {
                 st = listOf("disabled"),
                 bounds = Rect(100, 200, 300, 400),
                 at = Point(200, 300),
+                id = 7,
             )
         val model = model(ObserveMode.A11Y, listOf(node))
-        val screen = screenOf(ScreenJsonRenderer.render(model, coordText, null))
+        val text = ScreenJsonRenderer.render(model, coordText, null)
+        val screen = screenOf(text)
 
         assertThat(screen.str("v")).isEqualTo("1")
         assertThat(screen.str("mode")).isEqualTo("a11y")
         assertThat(screen.getValue("untrusted").jsonPrimitive.content).isEqualTo("true")
         assertThat(screen.str("coord")).isEqualTo(coordText)
         assertThat(screen.getValue("fields").jsonArray.map { it.jsonPrimitive.content })
-            .containsExactly("text", "desc", "hint", "state", "cls", "vid", "act", "st")
+            .containsExactly("id", "text", "desc", "hint", "state", "cls", "vid", "act", "st")
             .inOrder()
         val quality = screen.getValue("quality").jsonObject
         assertThat(quality.getValue("nodes").jsonPrimitive.content).isEqualTo("1")
@@ -62,6 +64,9 @@ class ScreenJsonRendererTest {
                 .single()
                 .jsonObject
         assertThat(out.str("tag")).isEqualTo("btn")
+        assertThat(out.str("id")).isEqualTo("7")
+        // id 紧跟 tag 之后输出（§3.1 字段顺序）。
+        assertThat(text.indexOf("\"id\":7")).isLessThan(text.indexOf("\"text\":\"确定\""))
         assertThat(out.getValue("bounds").jsonArray.map { it.jsonPrimitive.content })
             .containsExactly("100", "200", "300", "400")
             .inOrder()
@@ -81,6 +86,10 @@ class ScreenJsonRendererTest {
         assertThat(screen.getValue("fields").jsonArray.map { it.jsonPrimitive.content })
             .containsExactly("text", "icon", "hint", "state", "act", "st")
             .inOrder()
+        val node =
+            screen.getValue("windows").jsonArray.single().jsonObject.getValue("kids")
+                .jsonArray.single().jsonObject
+        assertThat(node).doesNotContainKey("id")
         val quality = screen.getValue("quality").jsonObject
         assertThat(quality).doesNotContainKey("uncertain")
         assertThat(quality).doesNotContainKey("degenerate")
@@ -122,22 +131,23 @@ class ScreenJsonRendererTest {
 
     @Test
     fun `diff only renders non empty sections`() {
-        val added = ScreenNode(tag = "btn", text = "新", bounds = Rect(0, 0, 10, 10))
-        val removed = ScreenNode(tag = "text", desc = "旧", bounds = Rect(20, 20, 30, 30))
+        val added = ScreenNode(tag = "btn", text = "新", bounds = Rect(0, 0, 10, 10), id = 3)
+        val removed = ScreenNode(tag = "text", desc = "旧", bounds = Rect(20, 20, 30, 30), id = 2)
         val json =
             Json.parseToJsonElement(
                 ScreenJsonRenderer.renderDiff(ObserveMode.A11Y, listOf(added), emptyList(), listOf(removed)),
             )
         val diff = json.jsonObject.getValue("diff").jsonObject
         assertThat(diff.str("mode")).isEqualTo("a11y")
-        assertThat(
+        val addedNode =
             diff
                 .getValue("added")
                 .jsonArray
                 .single()
                 .jsonObject
-                .str("text"),
-        ).isEqualTo("新")
+        assertThat(addedNode.str("text")).isEqualTo("新")
+        // added/changed 带 id（复用 nodeObject）；removed 不带（§3.1）。
+        assertThat(addedNode.str("id")).isEqualTo("3")
         assertThat(diff).doesNotContainKey("changed")
         val removedNode =
             diff
@@ -147,6 +157,7 @@ class ScreenJsonRendererTest {
                 .jsonObject
         assertThat(removedNode.str("desc")).isEqualTo("旧")
         assertThat(removedNode).doesNotContainKey("text")
+        assertThat(removedNode).doesNotContainKey("id")
     }
 
     private fun model(

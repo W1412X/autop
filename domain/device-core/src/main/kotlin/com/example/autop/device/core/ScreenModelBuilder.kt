@@ -114,7 +114,7 @@ public object ScreenModelBuilder {
     ): List<ScreenNode> {
         val builders = buildRows(rows)
         val promoted = if (mode == ObserveMode.VISUAL) promoteSingles(builders) else builders
-        return promoted.map { it.toNode() }
+        return promoted.map { it.toNode(mode) }
     }
 
     private fun buildRows(rows: List<KeptNode>): List<NodeBuilder> {
@@ -169,7 +169,7 @@ public object ScreenModelBuilder {
         var kids: List<NodeBuilder> = emptyList()
         var more: String? = row.more
 
-        fun toNode(): ScreenNode =
+        fun toNode(mode: ObserveMode): ScreenNode =
             ScreenNode(
                 tag = row.tag,
                 text = text,
@@ -184,7 +184,8 @@ public object ScreenModelBuilder {
                 bounds = row.bounds ?: EMPTY_BOUNDS,
                 at = row.at,
                 more = more,
-                kids = kids.map { it.toNode() },
+                kids = kids.map { it.toNode(mode) },
+                ref = if (mode == ObserveMode.A11Y && row.act.isNotEmpty()) row.idx else null,
                 key = row.key,
             )
     }

@@ -14,6 +14,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -107,13 +108,8 @@ public object ScreenJsonRenderer {
     ): JsonObject =
         buildJsonObject {
             put(ScreenJsonWire.FIELD_TAG, node.tag)
-            node.text?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_TEXT, it) }
-            node.icon?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_ICON, it) }
-            node.desc?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_DESC, it) }
-            node.hint?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_HINT, it) }
-            node.state?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_STATE, it) }
-            node.cls?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_CLS, it) }
-            node.vid?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_VID, it) }
+            node.id?.let { put(ScreenJsonWire.FIELD_ID, it) }
+            putTextFields(node)
             if (node.act.isNotEmpty()) put(ScreenJsonWire.FIELD_ACT, jsonArray(node.act))
             if (node.st.isNotEmpty()) put(ScreenJsonWire.FIELD_ST, jsonArray(node.st))
             put(ScreenJsonWire.FIELD_BOUNDS, rectArray(node.bounds))
@@ -123,6 +119,17 @@ public object ScreenJsonRenderer {
                 put(ScreenJsonWire.FIELD_KIDS, JsonArray(node.kids.map { nodeObject(it, includeKids = true) }))
             }
         }
+
+    /** 节点的文字类可选字段（空值不输出）。 */
+    private fun JsonObjectBuilder.putTextFields(node: ScreenNode) {
+        node.text?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_TEXT, it) }
+        node.icon?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_ICON, it) }
+        node.desc?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_DESC, it) }
+        node.hint?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_HINT, it) }
+        node.state?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_STATE, it) }
+        node.cls?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_CLS, it) }
+        node.vid?.takeIf { it.isNotEmpty() }?.let { put(ScreenJsonWire.FIELD_VID, it) }
+    }
 
     /** 差量观测（§3.4）：`added`/`changed` 为完整节点，`removed` 只留 tag + 文字 + bounds。 */
     public fun renderDiff(

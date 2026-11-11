@@ -15,6 +15,8 @@ public object ScreenNodeMatcher {
         val added: List<ScreenNode>,
         val removed: List<ScreenNode>,
         val changed: List<ScreenNode>,
+        /** 全部配对（prev 下标 to cur 下标，相对入参列表；含 stateChanged 的配对）。 */
+        val pairs: List<Pair<Int, Int>> = emptyList(),
     ) {
         public val empty: Boolean get() = added.isEmpty() && removed.isEmpty() && changed.isEmpty()
         public val count: Int get() = added.size + removed.size + changed.size
@@ -38,6 +40,7 @@ public object ScreenNodeMatcher {
         val prevUsed = BooleanArray(prev.size)
         val curUsed = BooleanArray(cur.size)
         val changed = mutableListOf<ScreenNode>()
+        val pairs = mutableListOf<Pair<Int, Int>>()
         val prevCenters = prev.map(::centerOf)
         val curCenters = cur.map(::centerOf)
         val prevLabels = prev.map { labelOf(it, volatilePatterns) }
@@ -50,6 +53,7 @@ public object ScreenNodeMatcher {
             if (pi >= 0) {
                 prevUsed[pi] = true
                 curUsed[ci] = true
+                pairs += pi to ci
                 if (stateChanged(prev[pi], cur[ci])) changed += cur[ci]
             }
         }
@@ -60,6 +64,7 @@ public object ScreenNodeMatcher {
             if (pi >= 0) {
                 prevUsed[pi] = true
                 curUsed[ci] = true
+                pairs += pi to ci
                 changed += cur[ci]
             }
         }
@@ -68,6 +73,7 @@ public object ScreenNodeMatcher {
             added = cur.filterIndexed { i, _ -> !curUsed[i] },
             removed = prev.filterIndexed { i, _ -> !prevUsed[i] },
             changed = changed,
+            pairs = pairs,
         )
     }
 
