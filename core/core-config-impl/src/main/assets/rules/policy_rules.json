@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "categories": {
     "payment":   {"overridable": false, "reasonKey": "policy_reason_payment"},
     "password":  {"overridable": false, "reasonKey": "policy_reason_password"},

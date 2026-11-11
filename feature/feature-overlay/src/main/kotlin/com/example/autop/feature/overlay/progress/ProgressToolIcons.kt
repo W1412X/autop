@@ -16,8 +16,10 @@ internal fun toolNameOf(toolId: String): String = toolId.removePrefix("tool.")
 private val TOOL_ICONS: Map<String, ImageVector> =
     mapOf(
         "tool.tap" to AutopIcons.TouchApp,
+        "tool.tap_node" to AutopIcons.TouchApp,
         "tool.input_text" to AutopIcons.Keyboard,
         "tool.scroll" to AutopIcons.Swipe,
+        "tool.scroll_node" to AutopIcons.Swipe,
         "tool.swipe" to AutopIcons.Swipe,
         "tool.global_action" to AutopIcons.OpenWith,
         "tool.open_app" to AutopIcons.Launch,

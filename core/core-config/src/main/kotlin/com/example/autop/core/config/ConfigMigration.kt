@@ -22,7 +22,7 @@ public data class ConfigMigration(
 )
 
 /** 配置（用户覆盖）文件的当前 schemaVersion。 */
-public const val CURRENT_SCHEMA_VERSION: Int = 4
+public const val CURRENT_SCHEMA_VERSION: Int = 5
 
 /**
  * 内置迁移链：v2 删除屏幕观测 v4 不再使用的配置键（docs/design/
@@ -38,6 +38,11 @@ public fun builtinConfigMigrations(): List<ConfigMigration> =
         ConfigMigration(from = 2, to = 3) { doc -> doc },
         // agent-harness-overhaul：仅增删键，无数据变换（旧键由 ignoreUnknownKeys 忽略）。
         ConfigMigration(from = 3, to = 4) { doc -> doc },
+        // coordinate-node-action-split：补注册 tap_node/scroll_node，删除 device.nodeAction（§5.7）。
+        ConfigMigration(from = 4, to = 5) { doc ->
+            val cleaned = removePath(doc, "device.nodeAction")
+            insertAgentTools(cleaned)
+        },
     )
 
 /** v2 删除的配置路径。 */
@@ -75,6 +80,23 @@ private fun filterAgentTools(doc: JsonObject): JsonObject {
             },
         )
     return doc.withChild("agent", agent.withChild("tools", JsonObject(tools + ("enabled" to filtered))))
+}
+
+/** `agent.tools.enabled` 在 tool.tap / tool.scroll 之后补上节点工具 id（v5；已存在则不重复）。 */
+private fun insertAgentTools(doc: JsonObject): JsonObject {
+    val agent = doc["agent"] as? JsonObject ?: return doc
+    val tools = agent["tools"] as? JsonObject ?: return doc
+    val enabled = tools["enabled"] as? JsonArray ?: return doc
+    val ids = enabled.map { (it as? JsonPrimitive)?.contentOrNull }
+    val rebuilt = mutableListOf<JsonElement>()
+    for (item in enabled) {
+        rebuilt += item
+        when ((item as? JsonPrimitive)?.contentOrNull) {
+            "tool.tap" -> if ("tool.tap_node" !in ids) rebuilt += JsonPrimitive("tool.tap_node")
+            "tool.scroll" -> if ("tool.scroll_node" !in ids) rebuilt += JsonPrimitive("tool.scroll_node")
+        }
+    }
+    return doc.withChild("agent", agent.withChild("tools", JsonObject(tools + ("enabled" to JsonArray(rebuilt)))))
 }
 
 /** 按点分路径删除键（不存在时原样返回）。 */

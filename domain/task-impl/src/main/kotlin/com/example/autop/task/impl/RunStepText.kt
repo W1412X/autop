@@ -17,8 +17,10 @@ private const val TARGET_MAX: Int = 12
 private val VERBS: Map<String, String> =
     mapOf(
         "tool.tap" to "点击",
+        "tool.tap_node" to "点击",
         "tool.input_text" to "输入",
         "tool.scroll" to "滚动",
+        "tool.scroll_node" to "滚动",
         "tool.swipe" to "滑动",
         "tool.global_action" to "执行",
         "tool.dismiss_popup" to "关闭弹窗",

@@ -328,8 +328,10 @@ private class ProbeRunScope : RunScopedValues {
 private val ACTS_ON_SCREEN: Set<String> =
     setOf(
         "tap",
+        "tap_node",
         "input_text",
         "scroll",
+        "scroll_node",
         "swipe",
         "global_action",
         "open_app",

@@ -108,6 +108,8 @@ class BallLogicTest {
     @Test
     fun `tool categories map by semantics`() {
         assertThat(categoryOfTool("tool.tap")).isEqualTo(ToolCategory.GESTURE)
+        assertThat(categoryOfTool("tool.tap_node")).isEqualTo(ToolCategory.GESTURE)
+        assertThat(categoryOfTool("tool.scroll_node")).isEqualTo(ToolCategory.GESTURE)
         assertThat(categoryOfTool("tool.input_text")).isEqualTo(ToolCategory.TEXT)
         assertThat(categoryOfTool("tool.screenshot")).isEqualTo(ToolCategory.VISION)
         assertThat(categoryOfTool("tool.open_app")).isEqualTo(ToolCategory.APP)

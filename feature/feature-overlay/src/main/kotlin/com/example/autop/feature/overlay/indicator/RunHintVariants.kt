@@ -34,12 +34,18 @@ private val TOOLS: Map<String, ToolVariants> =
                 withTarget = listOf("正在点击「$TARGET_SLOT」", "点按「$TARGET_SLOT」", "去点「$TARGET_SLOT」"),
                 noTarget = listOf("点击中…", "正在点击…", "点按中…"),
             ),
+        "tool.tap_node" to
+            ToolVariants(
+                withTarget = listOf("正在点击「$TARGET_SLOT」", "点按「$TARGET_SLOT」"),
+                noTarget = listOf("点击中…", "正在点击…"),
+            ),
         "tool.input_text" to
             ToolVariants(
                 withTarget = listOf("正在输入「$TARGET_SLOT」", "给它填上「$TARGET_SLOT」"),
                 noTarget = listOf("输入中…", "正在打字…", "敲字中…"),
             ),
         "tool.scroll" to ToolVariants(noTarget = listOf("滚动中…", "正在翻页…", "翻一翻…")),
+        "tool.scroll_node" to ToolVariants(noTarget = listOf("滚动中…", "正在翻页…")),
         "tool.swipe" to ToolVariants(noTarget = listOf("滑动中…", "正在滑动…", "划一下…")),
         "tool.observe" to
             ToolVariants(noTarget = listOf("观察页面中…", "正在看屏幕…", "读取界面中…", "看看现在什么样")),

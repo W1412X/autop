@@ -48,8 +48,10 @@ private fun JsonObject.text(key: String): String? = this[key]?.jsonPrimitive?.co
 private val LABEL_BY_TOOL: Map<String, StepLabel> =
     mapOf(
         "tap" to StepLabel.TAP,
+        "tap_node" to StepLabel.TAP,
         "input_text" to StepLabel.INPUT_TEXT,
         "scroll" to StepLabel.SCROLL,
+        "scroll_node" to StepLabel.SCROLL,
         "swipe" to StepLabel.SWIPE,
         "global_action" to StepLabel.GLOBAL_ACTION,
         "open_app" to StepLabel.OPEN_APP,
@@ -70,9 +72,11 @@ private val LABEL_BY_TOOL: Map<String, StepLabel> =
 private val ARG_KEYS_BY_TOOL: Map<String, List<String>> =
     mapOf(
         "tap" to listOf("x", "y"),
+        "tap_node" to listOf("id"),
         "observe" to listOf("mode"),
         "input_text" to listOf("text"),
         "scroll" to listOf("direction"),
+        "scroll_node" to listOf("id", "direction"),
         "global_action" to listOf("action"),
         "open_app" to listOf("name", "package"),
         "open_uri" to listOf("uri"),

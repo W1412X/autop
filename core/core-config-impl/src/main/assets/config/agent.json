@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 4,
+  "schemaVersion": 5,
   "agent": {
     "context": {
       "contributors": [
@@ -21,8 +21,10 @@
         "tool.observe",
         "tool.screenshot",
         "tool.tap",
+        "tool.tap_node",
         "tool.input_text",
         "tool.scroll",
+        "tool.scroll_node",
         "tool.swipe",
         "tool.global_action",
         "tool.open_app",

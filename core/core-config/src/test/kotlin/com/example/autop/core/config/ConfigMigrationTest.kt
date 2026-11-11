@@ -2,8 +2,12 @@ package com.example.autop.core.config
 
 import com.example.autop.core.common.Outcome
 import com.google.common.truth.Truth.assertThat
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import org.junit.Test
 
@@ -70,4 +74,63 @@ class ConfigMigrationTest {
         val result = migrateConfig(doc, migrations, targetVersion = 2)
         assertThat((result as Outcome.Err).error.code).isEqualTo(ConfigErrorCodes.MIGRATION_FAILED)
     }
+
+    @Test
+    fun `v5 inserts node tools after tap and scroll`() {
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 4)
+                put("agent", toolsDoc(listOf("tool.tap", "tool.scroll")))
+            }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(enabledIds(migrated))
+            .containsExactly("tool.tap", "tool.tap_node", "tool.scroll", "tool.scroll_node")
+            .inOrder()
+    }
+
+    @Test
+    fun `v5 does not duplicate existing node tools`() {
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 4)
+                put("agent", toolsDoc(listOf("tool.tap", "tool.tap_node", "tool.scroll", "tool.scroll_node")))
+            }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(enabledIds(migrated))
+            .containsExactly("tool.tap", "tool.tap_node", "tool.scroll", "tool.scroll_node")
+            .inOrder()
+    }
+
+    @Test
+    fun `v5 removes device nodeAction and keeps docs without agent tools`() {
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 4)
+                put("device", buildJsonObject { put("nodeAction", buildJsonObject { put("enabled", true) }) })
+            }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(migrated["device"]!!.jsonObject).doesNotContainKey("nodeAction")
+        assertThat(schemaVersionOf(migrated)).isEqualTo(5)
+    }
+
+    private fun toolsDoc(ids: List<String>): JsonObject =
+        buildJsonObject {
+            put(
+                "tools",
+                buildJsonObject {
+                    put("enabled", JsonArray(ids.map { JsonPrimitive(it) }))
+                },
+            )
+        }
+
+    private fun enabledIds(doc: JsonObject): List<String> {
+        val enabled = resolvePath(doc, "agent.tools.enabled") as JsonArray
+        return enabled.map { it.jsonPrimitive.content }
+    }
+
+    private fun okOf(result: Outcome<JsonObject>): JsonObject =
+        when (result) {
+            is Outcome.Ok -> result.value
+            is Outcome.Err -> error("expected ok, was ${result.error.code}")
+        }
 }

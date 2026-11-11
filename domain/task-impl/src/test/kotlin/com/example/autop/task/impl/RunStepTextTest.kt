@@ -12,6 +12,8 @@ class RunStepTextTest {
         assertThat(stepTextOf("tool.tap", """{"x":1,"y":2}""")).isEqualTo("点击")
         assertThat(stepTextOf("tool.tap", """{"long":true}""")).isEqualTo("长按")
         assertThat(stepTextOf("tool.tap", """{"long":"yes"}""")).isEqualTo("长按")
+        assertThat(stepTextOf("tool.tap_node", """{"id":3}""")).isEqualTo("点击")
+        assertThat(stepTextOf("tool.scroll_node", """{"id":3,"direction":"down"}""")).isEqualTo("滚动")
     }
 
     @Test
