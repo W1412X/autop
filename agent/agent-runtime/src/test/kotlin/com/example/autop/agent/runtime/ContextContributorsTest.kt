@@ -30,10 +30,10 @@ class ContextContributorsTest {
             val guide = ToolGuideContributor(prompts).contribute(req())
 
             assertThat(role?.placement).isEqualTo(Placement.SYSTEM_STATIC)
-            assertThat(role?.promptIds).containsExactly("agent.system.role", 2)
+            assertThat(role?.promptIds).containsExactly("agent.system.role", 3)
             assertThat(role?.text).isNotEmpty()
             assertThat(safety?.promptIds).containsExactly("agent.system.safety", 1)
-            assertThat(guide?.promptIds).containsExactly("agent.system.tool_guide", 12)
+            assertThat(guide?.promptIds).containsExactly("agent.system.tool_guide", 13)
         }
 
     @Test

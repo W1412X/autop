@@ -58,6 +58,7 @@ public object NodeIds {
         ids: Array<Int?>,
     ): ScreenModel {
         var pos = 0
+
         fun rebuildNode(node: ScreenNode): ScreenNode {
             val id = ids[pos++]
             return node.copy(id = id ?: node.id, kids = node.kids.map { rebuildNode(it) })

@@ -26,13 +26,14 @@ public object LiveNodeMatcher {
             when {
                 candidates.isEmpty() -> return null
                 candidates.size == 1 -> candidates.single()
-                else ->
-                    candidates
-                        .filter {
+                else -> {
+                    val pathMatched =
+                        candidates.filter {
                             index.windowIdOf(it.idx) == recorded.windowId &&
                                 NodeTargets.of(index, it).path == recorded.path
                         }
-                        .singleOrNull() ?: return null
+                    pathMatched.singleOrNull() ?: return null
+                }
             }
         return NodeTargets.of(index, best)
     }

@@ -86,9 +86,10 @@ class ScreenJsonRendererTest {
         assertThat(screen.getValue("fields").jsonArray.map { it.jsonPrimitive.content })
             .containsExactly("text", "icon", "hint", "state", "act", "st")
             .inOrder()
-        val node =
-            screen.getValue("windows").jsonArray.single().jsonObject.getValue("kids")
-                .jsonArray.single().jsonObject
+        val windows = screen.getValue("windows").jsonArray
+        val firstWindow = windows.single().jsonObject
+        val kids = firstWindow.getValue("kids").jsonArray
+        val node = kids.single().jsonObject
         assertThat(node).doesNotContainKey("id")
         val quality = screen.getValue("quality").jsonObject
         assertThat(quality).doesNotContainKey("uncertain")
