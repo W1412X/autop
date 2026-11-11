@@ -17,8 +17,11 @@ public object ToolProbeFixtures {
             "observe" to jsonObjectOf("mode" to "a11y", "full" to true),
             "screenshot" to jsonObjectOf("reason" to "工具自测（N198）"),
             "tap" to jsonObjectOf("x" to 500, "y" to 500),
+            // 运行时没有 a11y 观测会返回 mode_unavailable，这是正常的自测结果。
+            "tap_node" to jsonObjectOf("id" to 1),
             "input_text" to jsonObjectOf("text" to "autop 自测"),
             "scroll" to jsonObjectOf("direction" to "down"),
+            "scroll_node" to jsonObjectOf("id" to 1, "direction" to "down"),
             "swipe" to jsonObjectOf("x1" to 500, "y1" to 700, "x2" to 500, "y2" to 300, "duration_ms" to 300),
             "global_action" to jsonObjectOf("action" to "notifications"),
             "open_app" to jsonObjectOf("package" to "com.android.settings"),

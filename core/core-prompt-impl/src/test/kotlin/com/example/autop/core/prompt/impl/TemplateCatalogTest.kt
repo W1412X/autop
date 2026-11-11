@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(49)
+        assertThat(toolTemplates).hasSize(51)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -209,13 +209,23 @@ class TemplateCatalogTest {
                 "device.effect.unchanged_hint.default",
                 "device.effect.unchanged_hint.input_text",
                 "device.effect.unchanged_hint.scroll",
+                "device.effect.unchanged_hint.scroll_node",
                 "device.effect.unchanged_hint.swipe",
                 "device.effect.unchanged_hint.tap",
+                "device.effect.unchanged_hint.tap_node",
                 "device.effect.unknown",
                 "device.effect.unknown.no_baseline",
                 "device.effect.unknown.observe_failed",
+                "device.hint.node_mode_unavailable",
+                "device.hint.node_no_observation",
+                "device.hint.node_not_actionable",
+                "device.hint.node_not_found",
+                "device.hint.node_rejected",
+                "device.hint.node_stale",
                 "device.hit.no_tree",
                 "device.hit.none",
+                "device.node.result",
+                "device.node.scroll_result",
                 "device.node_action.newly_blocked",
                 "device.observe.all_failed",
                 "device.observe.auto_all_insufficient",
@@ -296,8 +306,10 @@ class TemplateCatalogTest {
                 "tool.restart_app",
                 "tool.screenshot",
                 "tool.scroll",
+                "tool.scroll_node",
                 "tool.swipe",
                 "tool.tap",
+                "tool.tap_node",
                 "tool.update_plan",
                 "tool.update_task",
                 "tool.wait",

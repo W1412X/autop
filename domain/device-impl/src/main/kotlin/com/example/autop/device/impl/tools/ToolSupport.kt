@@ -17,6 +17,8 @@ import com.example.autop.device.Rect
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.core.TapJitter
 import com.example.autop.device.impl.CoordSpaceResolver
+import com.example.autop.device.impl.observation.FrameMotion
+import com.example.autop.device.impl.vision.FrameSignature
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -153,6 +155,17 @@ internal fun nodeAt(
     snapshot.nodes
         .filter { it.has(NodeFlags.VISIBLE) && contains(it, x, y) }
         .minByOrNull { it.bounds.area }
+
+/** 画面帧签名比较（WP2.6，scroll 与 scroll_node 共用）：任一帧缺失返回 null（不可判断）。 */
+internal fun movedOf(
+    frameMotion: FrameMotion,
+    ctx: ToolContext,
+    before: FrameSignature?,
+    after: FrameSignature?,
+): Boolean? {
+    if (before == null || after == null) return null
+    return !frameMotion.same(before, after, ctx.config[DeviceConfig.CHANGE])
+}
 
 /** 位标志判断。 */
 internal fun NodeSnapshot.has(flag: Int): Boolean = flags and flag != 0

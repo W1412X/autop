@@ -6,6 +6,8 @@
 package com.example.autop.device.impl.tools
 
 import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.Color
 import com.example.autop.agent.EventPayload
 import com.example.autop.agent.ReplayStateProbe
 import com.example.autop.agent.ReplayStateSample
@@ -57,6 +59,7 @@ import com.example.autop.device.impl.ServiceHolder
 import com.example.autop.device.impl.SnapshotCapturer
 import com.example.autop.device.impl.SnapshotSerializer
 import com.example.autop.device.impl.WindowRedactor
+import com.example.autop.device.impl.nodeaction.NodeActionIds
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.FrameMotion
 import com.example.autop.device.impl.observation.ScreenObserver
@@ -76,6 +79,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.robolectric.Robolectric
 import org.robolectric.RuntimeEnvironment
+import java.io.ByteArrayOutputStream
 
 /** 屏幕尺寸（像素）。 */
 internal const val ENV_SCREEN_WIDTH = 1080
@@ -124,6 +128,13 @@ internal class ToolTestEnv {
 
     private val subjects = PolicySubjectBuilder(SecureWindowCache(FakeClock(0L)))
     private val trace = ExecutionTraceRenderer(prompts)
+    private val sharedCtx = TestContext(provider)
+    private val resolver = NodeTargetResolver(reader, prompts)
+
+    fun tapNodeTool(): TapNodeTool = TapNodeTool(resolver, gestures, subjects, epilogue, trace, prompts)
+
+    fun scrollNodeTool(): ScrollNodeTool =
+        ScrollNodeTool(resolver, gestures, subjects, epilogue, frameMotion, trace, prompts)
 
     fun tapTool(): TapTool =
         TapTool(
@@ -155,7 +166,8 @@ internal class ToolTestEnv {
     fun dismissPopupTool(): DismissPopupTool =
         DismissPopupTool(gestures, subjects, epilogue, PopupRulesLoader(context), observer, trace, prompts)
 
-    fun ctx(): ToolContext = TestContext(provider)
+    /** 同一个 Run 上下文（历史与计数跨调用保持）。 */
+    fun ctx(): ToolContext = sharedCtx
 
     /** 排队一次 a11y 快照（每次 snapshot() 消费一个）。 */
     fun queue(snapshot: ScreenSnapshot) {
@@ -195,7 +207,7 @@ internal fun a11yScreenOf(nodes: List<NodeSnapshot>): ScreenSnapshot =
         truncated = false,
     )
 
-/** 可点击按钮节点。 */
+/** 可点击按钮节点（带 ACTION_CLICK）。 */
 internal fun clickableNode(
     idx: Int,
     text: String,
@@ -210,15 +222,17 @@ internal fun clickableNode(
         text = text,
         bounds = bounds,
         flags = NodeFlags.VISIBLE or NodeFlags.ENABLED or NodeFlags.CLICKABLE,
+        actions = listOf(NodeActionIds.CLICK),
         packageName = "com.example.app",
     )
 
-/** 手势替身：记录 tap/swipe/节点动作调用。 */
+/** 手势替身：记录 tap/swipe/节点动作调用；[pathOutcome] 可脚本化 performAtPath 结果。 */
 internal class FakeGestures : GestureController {
     val taps = mutableListOf<Pair<Int, Int>>()
     val swipes = mutableListOf<List<Int>>()
     val nodeActions = mutableListOf<Int>()
     var tapOk = true
+    var pathOutcome: NodeActionOutcome = NodeActionOutcome.DONE
 
     override suspend fun performNodeAction(
         target: ResolvedNode,
@@ -236,7 +250,7 @@ internal class FakeGestures : GestureController {
         actionId: Int,
     ): NodeActionOutcome {
         nodeActions += actionId
-        return NodeActionOutcome.DONE
+        return pathOutcome
     }
 
     override suspend fun tap(
@@ -270,17 +284,28 @@ internal class FakeGestures : GestureController {
     override suspend fun shellKeyCombination(codes: List<Int>): Boolean = false
 }
 
-/** 读屏替身：排队消费快照。 */
+/** 读屏替身：排队消费快照；截图可切换“静止/变化”帧（帧签名移动判断用）。 */
 internal class FakeReader : ScreenReader {
     val snapshots = ArrayDeque<Outcome<ScreenSnapshot>>()
+    var animate = false
+
+    private var tick = 0
 
     override suspend fun snapshot(): Outcome<ScreenSnapshot> {
         check(snapshots.isNotEmpty()) { "no snapshot queued" }
         return snapshots.removeFirst()
     }
 
-    override suspend fun screenshot(): Outcome<Screenshot> =
-        Outcome.Ok(Screenshot(width = 64, height = 64, jpegBytes = ByteArray(0), handle = Any()))
+    override suspend fun screenshot(): Outcome<Screenshot> {
+        val color = if (animate && tick % 2 == 1) 0x80 else 0xC0
+        tick += 1
+        val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
+        bitmap.eraseColor(Color.rgb(color, color, color))
+        val out = ByteArrayOutputStream()
+        bitmap.compress(Bitmap.CompressFormat.JPEG, 90, out)
+        bitmap.recycle()
+        return Outcome.Ok(Screenshot(width = 64, height = 64, jpegBytes = out.toByteArray(), handle = Any()))
+    }
 }
 
 private class FakeVisual : VisualScreenParser {
@@ -315,7 +340,16 @@ private object FakeProbe : ReplayStateProbe {
     override suspend fun sample(
         observeMode: String,
         config: ConfigSnapshot,
-    ): Outcome<ReplayStateSample> = Outcome.Err(AppError("test.unused", "probe is not used"))
+    ): Outcome<ReplayStateSample> =
+        Outcome.Ok(
+            ReplayStateSample(
+                packageName = "com.example.app",
+                activity = "com.example.app.MainActivity",
+                fingerprint = "fp",
+                keys = emptyList(),
+                observeMode = "a11y",
+            ),
+        )
 }
 
 private object UnusedGateway : LlmGateway {

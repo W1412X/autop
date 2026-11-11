@@ -19,9 +19,12 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
-/** 流程内 `tool` 节点与 `agent` 节点不得使用的工具（docs/design/flows.md §8.2）。 */
+/** 流程内 `tool` 节点与 `agent` 节点不得使用的工具（docs/design/flows.md §8.2）。
+ * 节点工具（tap_node/scroll_node）也在禁列：id 只对单次观测有效，不能写进流程。
+ */
 public object FlowToolRules {
-    public val FORBIDDEN: Set<String> = setOf("finish", "update_plan", "note", "history_recall", "observe", "run_flow")
+    public val FORBIDDEN: Set<String> =
+        setOf("finish", "update_plan", "note", "history_recall", "observe", "run_flow", "tap_node", "scroll_node")
 }
 
 /** 对外调用类节点：tool / llm / api / agent。 */

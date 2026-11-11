@@ -57,6 +57,22 @@ public object DeviceToolSpecs {
             integer("wait_ms")
         }
 
+    /** `tool.tap_node`：对 a11y 观测里带 id 的节点执行无障碍点击动作。 */
+    public val tapNode: ToolSpec =
+        toolSpec(name = "tap_node", descriptionPromptId = "tool.tap_node") {
+            integer("id", required = true, min = 1)
+            boolean("long")
+            integer("wait_ms")
+        }
+
+    /** `tool.scroll_node`：对可滚动节点执行无障碍滚动动作。 */
+    public val scrollNode: ToolSpec =
+        toolSpec(name = "scroll_node", descriptionPromptId = "tool.scroll_node") {
+            integer("id", required = true, min = 1)
+            string("direction", required = true, enum = listOf("up", "down", "left", "right"))
+            integer("steps", min = 1)
+        }
+
     /** `tool.input_text`：写入焦点输入框，可选先点击输入框坐标。 */
     public val inputText: ToolSpec =
         toolSpec(name = "input_text", descriptionPromptId = "tool.input_text") {
@@ -168,8 +184,10 @@ public object DeviceToolSpecs {
             observe,
             screenshot,
             tap,
+            tapNode,
             inputText,
             scroll,
+            scrollNode,
             swipe,
             globalAction,
             dismissPopup,

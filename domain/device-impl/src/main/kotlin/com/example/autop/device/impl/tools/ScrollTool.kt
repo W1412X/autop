@@ -199,7 +199,7 @@ public class ScrollTool
                     )
             epilogue.awaitStable(ctx)
             val after = frameMotion.capture()
-            val moved = movedOf(ctx, before, after)
+            val moved = movedOf(frameMotion, ctx, before, after)
             val line =
                 trace.executionLine(
                     ExecMethod.GESTURE,
@@ -216,16 +216,6 @@ public class ScrollTool
         ): Rect? {
             val target = NodeActionSelector.select(snap, anchor, NodeQuery(requiredFlag = NodeFlags.SCROLLABLE))
             return target?.node?.bounds
-        }
-
-        /** 画面帧签名比较（WP2.6）：任一帧缺失返回 null（不可判断）。 */
-        private fun movedOf(
-            ctx: ToolContext,
-            before: FrameSignature?,
-            after: FrameSignature?,
-        ): Boolean? {
-            if (before == null || after == null) return null
-            return !frameMotion.same(before, after, ctx.config[DeviceConfig.CHANGE])
         }
 
         /** 执行容器内的单步手势；返回实际通道与回放参数，注入未送达返回 null。 */
