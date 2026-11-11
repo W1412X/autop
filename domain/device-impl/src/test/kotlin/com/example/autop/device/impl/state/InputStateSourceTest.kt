@@ -30,17 +30,19 @@ class InputStateSourceTest {
         runTest {
             val cases =
                 listOf(
-                    ShellState.Connected to "shell 已连接",
+                    ShellState.Connected to "shell 注入（等同真实触摸）",
                     ShellState.Connecting to "shell 正在连接",
                     ShellState.Disconnected to "shell 未配对",
                 )
             for ((state, fragment) in cases) {
                 val shell = FakeShell(state = state, paired = false)
                 val texts = shellTexts(shell)
+                // coordinate-node-action-split §4.1：四种状态都写明“坐标操作当前模式”。
+                assertThat(texts).contains("坐标操作（tap、swipe、scroll、global_action）当前模式")
                 assertThat(texts).contains(fragment)
             }
             val paired = FakeShell(state = ShellState.Disconnected, paired = true)
-            assertThat(shellTexts(paired)).contains("shell 未连接（已配对过）")
+            assertThat(shellTexts(paired)).contains("shell 未连接，已配对过")
         }
 
     private suspend fun shellTexts(shell: FakeShell): String {

@@ -8,7 +8,6 @@
  */
 package com.example.autop.device.impl.nodeaction
 
-import android.view.accessibility.AccessibilityNodeInfo.AccessibilityAction
 import com.example.autop.agent.ToolContext
 import com.example.autop.core.common.Clock
 import com.example.autop.core.config.DeviceConfig
@@ -22,7 +21,6 @@ import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.core.NodeActionSelector
 import com.example.autop.device.core.NodeQuery
 import com.example.autop.device.core.NodeTarget
-import com.example.autop.device.core.ScrollDirection
 import com.example.autop.device.impl.deviceHistory
 import java.util.concurrent.ConcurrentHashMap
 import javax.inject.Inject
@@ -99,34 +97,7 @@ internal enum class SkipReason {
         }
 }
 
-/** 无障碍动作 id 与方向映射。 */
-internal object NodeActionIds {
-    val CLICK: Int = AccessibilityAction.ACTION_CLICK.id
-    val LONG_CLICK: Int = AccessibilityAction.ACTION_LONG_CLICK.id
-
-    /**
-     * 手指方向 → 滚动动作。`up`（手指上滑，看下方内容）对应“向下滚动内容”动作，其余同理。
-     * 与 RecyclerView/ScrollView 的无障碍实现一致，真机验证项见 ADR-0015。
-     */
-    fun scrollActionOf(direction: ScrollDirection): Int =
-        when (direction) {
-            ScrollDirection.UP -> AccessibilityAction.ACTION_SCROLL_DOWN.id
-            ScrollDirection.DOWN -> AccessibilityAction.ACTION_SCROLL_UP.id
-            ScrollDirection.LEFT -> AccessibilityAction.ACTION_SCROLL_RIGHT.id
-            ScrollDirection.RIGHT -> AccessibilityAction.ACTION_SCROLL_LEFT.id
-        }
-
-    /** 滚动动作名（回执展示用）。 */
-    fun scrollLabelOf(direction: ScrollDirection): String =
-        when (direction) {
-            ScrollDirection.UP -> "ACTION_SCROLL_DOWN"
-            ScrollDirection.DOWN -> "ACTION_SCROLL_UP"
-            ScrollDirection.LEFT -> "ACTION_SCROLL_RIGHT"
-            ScrollDirection.RIGHT -> "ACTION_SCROLL_LEFT"
-        }
-}
-
-/** 节点动作路由器。 */
+/** 节点动作路由器（coordinate-node-action-split 后已无调用方，清理见 WP7）。 */
 @Singleton
 public class NodeActionRouter
     @Inject

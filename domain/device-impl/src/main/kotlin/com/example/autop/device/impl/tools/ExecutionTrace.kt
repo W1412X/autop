@@ -9,7 +9,6 @@ import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.InjectionChannel
 import com.example.autop.device.InjectionResult
 import com.example.autop.device.ShellSkip
-import com.example.autop.device.impl.nodeaction.NodeRoute
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -62,17 +61,6 @@ public class ExecutionTraceRenderer
             return how + why
         }
 
-        /** 节点路由被跳过/被拒时，给模型解释为什么最终用了手势；Done 返回 null。 */
-        internal fun routeFallback(
-            route: NodeRoute,
-            actionLabel: String,
-        ): String? =
-            when (route) {
-                is NodeRoute.Done -> null
-                is NodeRoute.Rejected -> prompts.text(PROMPT_ROUTE_REJECTED, mapOf(VAR_ACTION to actionLabel))
-                is NodeRoute.Skipped -> prompts.text(PROMPT_ROUTE_SKIPPED, mapOf(VAR_REASON to route.reason.describe()))
-            }
-
         private fun gestureLike(
             id: String,
             channel: InjectionChannel,
@@ -102,13 +90,10 @@ public class ExecutionTraceRenderer
             const val PROMPT_CHANNEL_ACCESSIBILITY = "device.trace.channel.accessibility"
             const val PROMPT_CHANNEL_NONE = "device.trace.channel.none"
             const val PROMPT_SHELL_SKIP_PREFIX = "device.trace.shell_skip."
-            const val PROMPT_ROUTE_REJECTED = "device.trace.route.rejected"
-            const val PROMPT_ROUTE_SKIPPED = "device.trace.route.skipped"
 
             const val VAR_ACTION = "action"
             const val VAR_CHANNEL = "channel"
             const val VAR_EXTRA = "extra"
-            const val VAR_REASON = "reason"
         }
     }
 

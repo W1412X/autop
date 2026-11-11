@@ -15,19 +15,12 @@ import com.example.autop.core.common.Outcome
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.GestureController
-import com.example.autop.device.InjectionChannel
 import com.example.autop.device.ObserveMode
-import com.example.autop.device.Point
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.core.popup.PopupFinder
 import com.example.autop.device.impl.ObserveSelection
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.deviceHistory
-import com.example.autop.device.impl.nodeaction.NodeActionIds
-import com.example.autop.device.impl.nodeaction.NodeActionRouter
-import com.example.autop.device.impl.nodeaction.NodeKind
-import com.example.autop.device.impl.nodeaction.NodeRoute
-import com.example.autop.device.impl.nodeaction.NodeRouteRequest
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
 import com.example.autop.device.impl.observation.ScreenObserver
@@ -56,7 +49,6 @@ public class DismissPopupTool
         private val subjects: PolicySubjectBuilder,
         private val epilogue: ActionEpilogue,
         private val rules: PopupRulesLoader,
-        private val router: NodeActionRouter,
         private val observer: ScreenObserver,
         private val trace: ExecutionTraceRenderer,
         private val prompts: PromptRepository,
@@ -105,36 +97,15 @@ public class DismissPopupTool
             ctx: ToolContext,
         ): ToolOutput {
             val popup = action.payload as PopupAction
-            val route =
-                router.attempt(
-                    NodeRouteRequest(
-                        ctx = ctx,
-                        snapshot = popup.snapshot,
-                        point = Point(popup.x, popup.y),
-                        kind = NodeKind.CLICK,
-                        actionId = NodeActionIds.CLICK,
-                    ),
-                )
-            val injected =
-                if (route is NodeRoute.Done) {
-                    null
-                } else {
-                    val result = gestures.tap(popup.x, popup.y)
-                    if (!result.ok) return errorOutput(injectFailed("关闭弹窗的点击"))
-                    result
-                }
+            val injected = gestures.tap(popup.x, popup.y)
+            if (!injected.ok) return errorOutput(injectFailed("关闭弹窗的点击"))
             val execution =
-                if (route is NodeRoute.Done) {
-                    trace.executionLine(ExecMethod.NODE_ACTION, ACTION_CLICK)
-                } else {
-                    trace.executionLine(
-                        ExecMethod.GESTURE,
-                        channel = injected?.channel ?: InjectionChannel.NONE,
-                        fallback = trace.routeFallback(route, ACTION_CLICK),
-                        shellSkip = injected?.shellSkip,
-                    )
-                }
-            // 手势坐标点击：回放记录标 execution=gesture 并带实际落点（docs/tech/05 §13）。
+                trace.executionLine(
+                    ExecMethod.GESTURE,
+                    channel = injected.channel,
+                    shellSkip = injected.shellSkip,
+                )
+            // 坐标手势点击：回放记录标 execution=gesture 并带实际落点（docs/tech/05 §13）。
             val result =
                 epilogue.finishWithObservation(
                     ctx,
@@ -143,7 +114,7 @@ public class DismissPopupTool
                     ReplayInput(
                         ID,
                         JsonObject(emptyMap()),
-                        gesture = if (injected != null) gestureJson(popup.x, popup.y, TAP_DURATION_MS) else null,
+                        gesture = gestureJson(popup.x, popup.y, TAP_DURATION_MS),
                     ),
                 )
             val verify =
@@ -157,7 +128,6 @@ public class DismissPopupTool
         private companion object {
             const val ID = "tool.dismiss_popup"
             const val EXTRA_REASON = "popupReason"
-            const val ACTION_CLICK = "ACTION_CLICK"
             const val TAP_DURATION_MS = 0L
             const val PROMPT_NOT_FOUND_HINT = "device.popup.not_found_hint"
             const val PROMPT_CLOSED = "device.popup.closed"
