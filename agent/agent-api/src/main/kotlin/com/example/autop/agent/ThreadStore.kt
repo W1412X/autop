@@ -89,6 +89,15 @@ public interface ThreadStore {
         title: String,
     )
 
+    /** 会话级模型覆盖（ModelProfile id）；null 表示跟随全局默认（ADR-0021 模型切换）。 */
+    public suspend fun modelProfileOf(threadId: ThreadId): String?
+
+    /** 设置会话级模型覆盖；null 恢复为跟随全局默认。 */
+    public suspend fun setModelProfile(
+        threadId: ThreadId,
+        profileId: String?,
+    )
+
     /** 单个线程的标题（线程不存在给 null）；顶栏与标题精炼的覆盖判定用。 */
     public suspend fun titleOf(threadId: ThreadId): String?
 

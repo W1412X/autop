@@ -62,10 +62,10 @@ public class RunCoordinator(
     override suspend fun startChat(
         threadId: ThreadId?,
         text: String,
-        attachCurrentScreen: Boolean,
         images: List<ImageAttachment>,
+        modelProfileId: String?,
     ): Outcome<RunRecord> {
-        val result = executor.launchChat(threadId, text, attachCurrentScreen, images)
+        val result = executor.launchChat(threadId, text, images, modelProfileId)
         host.ensureRunning()
         return result
     }

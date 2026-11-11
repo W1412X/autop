@@ -52,8 +52,7 @@
     <string name="thread_thinking">思考 · %1$d 字</string>
     <string name="thread_plan_title">计划</string>
     <string name="thread_group">查看屏幕 ×%1$d</string>
-    <string name="thread_fork_marker">从第 %1$d 步分叉</string>
-    <string name="thread_fork_inherited">继承了 %1$d 条消息</string>
+    <string name="thread_fork_marker">已从「%1$s」分出</string>
     <string name="thread_result_stats">%1$d 步 · %2$s · %3$d token</string>
     <string name="thread_meta_copy">复制回复</string>
     <string name="thread_meta_more">更多</string>
@@ -66,7 +65,6 @@
     <string name="thread_action_continue">继续</string>
     <string name="thread_action_end">结束</string>
     <string name="thread_ask_self">自己输入</string>
-    <string name="thread_attach_screen">附带当前屏幕</string>
     <string name="thread_add_image">添加图片</string>
     <string name="thread_remove_image">移除图片</string>
     <string name="thread_image_description">图片</string>

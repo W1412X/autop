@@ -179,11 +179,13 @@ internal class TaskAuthorSessionImpl(
     private val mutex = Mutex()
     private var answerGate: CompletableDeferred<String>? = null
     private var cancelled = false
+    private var activeModelProfileId: String? = null
     private val tools = TaskAuthorTools(d.invokerFactory, d.configProvider, d.prompts, d.ids, d.threads)
     private val sourceIds: Set<String> = d.sources.map { it.id }.toSet()
 
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // 发送边界兜底，见下方 catch 注释
-    override suspend fun send(text: String) {
+    override suspend fun send(text: String, modelProfileId: String?) {
+        activeModelProfileId = modelProfileId
         mutex.withLock {
             cancelled = false
             _state.update { it.copy(busy = true, errorCode = null, messages = it.messages + AuthorMessage.User(text)) }
@@ -230,9 +232,13 @@ internal class TaskAuthorSessionImpl(
 
     // ---- 循环 ---------------------------------------------------------------------------------
 
+    /** 会话级模型覆盖优先，否则取主模型（ADR-0022）。 */
+    private fun resolveProvider(): Outcome<LlmProvider> =
+        activeModelProfileId?.let { d.gateway.forProfile(it) } ?: d.gateway.forRole(ModelRole.MAIN)
+
     private suspend fun loop() {
         val config = d.configProvider.current()
-        val provider = (d.gateway.forRole(ModelRole.MAIN) as? Outcome.Ok)?.value
+        val provider = (resolveProvider() as? Outcome.Ok)?.value
         if (provider == null) {
             _state.update { it.copy(errorCode = ERROR_LLM_UNAVAILABLE) }
             return

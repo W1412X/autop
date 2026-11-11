@@ -71,6 +71,13 @@ internal class ObservedThreadStore(
         title: String,
     ) = delegate.rename(threadId, title)
 
+    override suspend fun modelProfileOf(threadId: ThreadId): String? = delegate.modelProfileOf(threadId)
+
+    override suspend fun setModelProfile(
+        threadId: ThreadId,
+        profileId: String?,
+    ) = delegate.setModelProfile(threadId, profileId)
+
     override suspend fun titleOf(threadId: ThreadId): String? = delegate.titleOf(threadId)
 
     override suspend fun delete(threadId: ThreadId) = delegate.delete(threadId)

@@ -19,9 +19,6 @@ import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.DeviceState
-import com.example.autop.device.ScreenReader
-import com.example.autop.device.ScreenSnapshot
-import com.example.autop.device.Screenshot
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowIssue
 import com.example.autop.flow.FlowValidationService
@@ -154,7 +151,6 @@ private class CoordinatorFixture(
             runStore = runStore,
             pending = pending,
             scheduler = scheduler,
-            screenReader = SteerScreenReader(),
             titleGenerator = NoopSteerTitleGenerator,
             ids = UuidV7IdGenerator(clock),
             clock = clock,
@@ -215,13 +211,6 @@ private class CoordinatorFixture(
 /** 标题生成空实现。 */
 private object NoopSteerTitleGenerator : ChatTitleGenerator {
     override suspend fun generate(firstMessage: String): String? = null
-}
-
-/** 测试用屏幕读取（steer 不截屏）。 */
-private class SteerScreenReader : ScreenReader {
-    override suspend fun snapshot(): Outcome<ScreenSnapshot> = error("not used")
-
-    override suspend fun screenshot(): Outcome<Screenshot> = error("not used")
 }
 
 /** 不拉起前台服务。 */

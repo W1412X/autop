@@ -56,7 +56,11 @@ public interface TaskAuthorSession {
     public val state: StateFlow<TaskAuthorState>
 
     /** 发送一条用户消息并驱动一轮（或多轮工具调用）创作。 */
-    public suspend fun send(text: String)
+    public suspend fun send(
+        text: String,
+        /** 本轮使用的会话级模型（ModelProfile id）；null 表示跟随角色默认。 */
+        modelProfileId: String? = null,
+    )
 
     /** 回答 [TaskAuthorState.pendingQuestion]。 */
     public fun answer(text: String)

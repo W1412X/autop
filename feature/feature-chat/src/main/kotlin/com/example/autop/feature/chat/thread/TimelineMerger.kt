@@ -45,7 +45,7 @@ private fun CoreRow.toItem(): TimelineItem =
         is CoreRow.Plan -> TimelineItem.PlanCard(items, explanation)
         is CoreRow.RunMeta -> toMeta()
         is CoreRow.Banner -> TimelineItem.Banner(kind, detail)
-        is CoreRow.ForkMarker -> TimelineItem.ForkMarker(parentThreadId, parentSeq, inheritedCount)
+        is CoreRow.ForkMarker -> TimelineItem.ForkMarker(parentThreadId, parentSeq, title)
     }
 
 private fun CoreRow.RunMeta.toMeta(): TimelineItem.RunMeta =

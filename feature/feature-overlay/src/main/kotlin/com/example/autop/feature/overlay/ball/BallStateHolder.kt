@@ -80,7 +80,6 @@ public class BallStateHolder
                     breathMs = bits.breathMs,
                     motionEnabled = bits.motionEnabled,
                     doubleTapStops = bits.doubleTapStops,
-                    attachScreenDefault = bits.attachScreenDefault,
                     opacity = bits.opacity,
                 )
             }.stateIn(scope, SharingStarted.Eagerly, BallUiState())
@@ -240,7 +239,6 @@ public class BallStateHolder
                 breathMs = snapshot[UiConfig.OVERLAY].breathMs,
                 motionEnabled = snapshot[UiConfig.APPEARANCE].motionEnabled,
                 doubleTapStops = snapshot[UiConfig.OVERLAY].doubleTapStops,
-                attachScreenDefault = snapshot[UiConfig.OVERLAY].attachScreenDefault,
                 opacity = snapshot[UiConfig.OVERLAY].opacity.toFloat(),
             )
 
@@ -266,6 +264,5 @@ private data class ConfigBits(
     val breathMs: Long,
     val motionEnabled: Boolean,
     val doubleTapStops: Boolean,
-    val attachScreenDefault: Boolean,
     val opacity: Float,
 )

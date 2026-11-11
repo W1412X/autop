@@ -23,8 +23,10 @@ public sealed interface ChatThreadAction {
         val index: Int,
     ) : ChatThreadAction
 
-    /** 切换"附带当前屏幕"。 */
-    public data object ToggleAttachScreen : ChatThreadAction
+    /** 切换本会话的模型（null = 跟随默认）。 */
+    public data class SetModel(
+        val profileId: String?,
+    ) : ChatThreadAction
 
     /** 发送：空闲=发起对话；运行中=补充指令（steer）。 */
     public data object Send : ChatThreadAction

@@ -51,8 +51,8 @@ internal class FakeRunService(
     override suspend fun startChat(
         threadId: ThreadId?,
         text: String,
-        attachCurrentScreen: Boolean,
         images: List<com.example.autop.task.ImageAttachment>,
+        modelProfileId: String?,
     ): Outcome<RunRecord> = error("unused")
 
     override suspend fun forkAndRun(

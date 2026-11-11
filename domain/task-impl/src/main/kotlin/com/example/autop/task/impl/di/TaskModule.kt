@@ -20,7 +20,6 @@ import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.ScreenLease
-import com.example.autop.device.ScreenReader
 import com.example.autop.device.TouchShield
 import com.example.autop.device.UserActivityMonitor
 import com.example.autop.flow.FlowProgressFeed
@@ -230,7 +229,6 @@ public object TaskModule {
         runStore: RunStore,
         pending: PendingRuns,
         scheduler: RunScheduler,
-        screenReader: ScreenReader,
         titleGenerator: ChatTitleGenerator,
         ids: IdGenerator,
         clock: Clock,
@@ -243,7 +241,6 @@ public object TaskModule {
             runStore = runStore,
             pending = pending,
             scheduler = scheduler,
-            screenReader = screenReader,
             titleGenerator = titleGenerator,
             ids = ids,
             clock = clock,

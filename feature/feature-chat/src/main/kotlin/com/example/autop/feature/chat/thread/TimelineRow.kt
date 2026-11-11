@@ -350,9 +350,7 @@ private fun ForkRow(
 ) {
     Text(
         text =
-            stringResource(R.string.thread_fork_marker, item.parentSeq) +
-                " " +
-                stringResource(R.string.thread_fork_inherited, item.inheritedCount),
+            stringResource(R.string.thread_fork_marker, item.title.orEmpty()),
         style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier =

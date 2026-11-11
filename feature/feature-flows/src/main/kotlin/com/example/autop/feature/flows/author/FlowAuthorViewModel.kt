@@ -7,6 +7,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.feature.flows.AUTHOR_DRAFT_ARG
 import com.example.autop.feature.flows.AUTHOR_EDIT_ARG
 import com.example.autop.feature.flows.FlowsNavigator
@@ -14,6 +15,7 @@ import com.example.autop.feature.flows.NO_ARG
 import com.example.autop.flow.AuthorState
 import com.example.autop.flow.FlowAuthor
 import com.example.autop.flow.FlowAuthorSession
+import com.example.autop.llm.ModelProfileStore
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -24,6 +26,9 @@ import javax.inject.Inject
 
 /** 创作页状态。 */
 public data class FlowAuthorUiState(
+    /** 会话级模型覆盖（null = 跟随默认）与可选模型。 */
+    val modelProfileId: String? = null,
+    val modelOptions: List<OptionItem> = emptyList(),
     val ready: Boolean = false,
     val author: AuthorState = AuthorState(),
     val input: String = "",
@@ -52,6 +57,10 @@ public sealed interface FlowAuthorAction {
 
     public data object Save : FlowAuthorAction
 
+    public data class SetModel(
+        val profileId: String?,
+    ) : FlowAuthorAction
+
     public data object OpenAdvanced : FlowAuthorAction
 }
 
@@ -62,6 +71,7 @@ public class FlowAuthorViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val author: FlowAuthor,
+        private val modelProfiles: ModelProfileStore,
     ) : ViewModel() {
         private val draftId: String? = savedStateHandle.get<String>(AUTHOR_DRAFT_ARG)?.takeIf { it != NO_ARG }
         private val editId: String? = savedStateHandle.get<String>(AUTHOR_EDIT_ARG)?.takeIf { it != NO_ARG }
@@ -71,6 +81,13 @@ public class FlowAuthorViewModel
         private var sendJob: Job? = null
 
         init {
+            viewModelScope.launch {
+                modelProfiles.profiles.collect { profiles ->
+                    _uiState.update {
+                        it.copy(modelOptions = profiles.map { p -> OptionItem(id = p.id, label = p.displayName) })
+                    }
+                }
+            }
             viewModelScope.launch {
                 val s = author.open(draftId, editId)
                 session = s
@@ -95,6 +112,7 @@ public class FlowAuthorViewModel
                     sendJob?.cancel()
                 }
                 FlowAuthorAction.Save -> save(s, navigator)
+                is FlowAuthorAction.SetModel -> _uiState.update { it.copy(modelProfileId = action.profileId) }
                 FlowAuthorAction.OpenAdvanced -> save(s, navigator, openEditor = true)
             }
         }
@@ -110,7 +128,7 @@ public class FlowAuthorViewModel
             }
             if (_uiState.value.author.busy) return
             _uiState.update { it.copy(input = "") }
-            sendJob = viewModelScope.launch { s.send(text) }
+            sendJob = viewModelScope.launch { s.send(text, _uiState.value.modelProfileId) }
         }
 
         private fun save(

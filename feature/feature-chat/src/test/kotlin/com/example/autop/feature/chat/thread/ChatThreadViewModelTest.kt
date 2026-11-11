@@ -136,6 +136,7 @@ public class ChatThreadViewModelTest {
     ): ChatThreadViewModel =
         ChatThreadViewModel(
             threadStore = threads,
+            modelProfiles = FakeChatModelProfiles,
             runService = runService,
             agentSession = session,
             configProvider = FakeConfigProvider(),
@@ -247,6 +248,13 @@ private class FakeChatThreadStore : ThreadStore {
         title: String,
     ): Unit = Unit
 
+    override suspend fun modelProfileOf(threadId: ThreadId): String? = null
+
+    override suspend fun setModelProfile(
+        threadId: ThreadId,
+        profileId: String?,
+    ) = Unit
+
     override suspend fun titleOf(threadId: ThreadId): String? = null
 
     override suspend fun delete(threadId: ThreadId): Unit = Unit
@@ -296,8 +304,8 @@ private class FakeChatRunService : RunService {
     override suspend fun startChat(
         threadId: ThreadId?,
         text: String,
-        attachCurrentScreen: Boolean,
         images: List<ImageAttachment>,
+        modelProfileId: String?,
     ): Outcome<RunRecord> = Outcome.Ok(record("r-new", threadId ?: ThreadId("thread-new")))
 
     override suspend fun forkAndRun(
@@ -360,4 +368,23 @@ private object FakeChatLogFiles : LogFiles {
     override fun readAll(): String = ""
 
     override fun clear(): Long = 0
+}
+
+/** 模型配置假实现：没有任何模型配置（会话仍可正常发送，覆盖为空）。 */
+private object FakeChatModelProfiles : com.example.autop.llm.ModelProfileStore {
+    override val profiles: kotlinx.coroutines.flow.Flow<List<com.example.autop.llm.ModelProfile>> =
+        kotlinx.coroutines.flow.flowOf(emptyList())
+    override val roles: kotlinx.coroutines.flow.Flow<com.example.autop.llm.ModelRoles> =
+        kotlinx.coroutines.flow.flowOf(
+            com.example.autop.llm
+                .ModelRoles(),
+        )
+
+    override suspend fun get(id: String): com.example.autop.llm.ModelProfile? = null
+
+    override suspend fun upsert(profile: com.example.autop.llm.ModelProfile) = Unit
+
+    override suspend fun delete(id: String) = Unit
+
+    override suspend fun setRoles(roles: com.example.autop.llm.ModelRoles) = Unit
 }

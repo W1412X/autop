@@ -1,18 +1,17 @@
 /**
- * `threads.db` 数据库（docs/tech/04 §4）：`exportSchema = true`，schema 导出到
- * `schemas/` 并入库；每次变更写 Migration 与测试（版本 1 起）。
+ * `threads.db` 数据库（docs/tech/04 §4）：`exportSchema = true`，schema 导出到 `schemas/` 并入库。
+ * 当前为全新安装的单一 schema（ADR-0021），不保留旧版本的迁移。
  */
 package com.example.autop.agent.store.db
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
 
-/** 线程存储数据库（版本 1）。 */
+/** 线程存储数据库：分支、事件树与检索索引。 */
 @Database(
     entities = [
         ThreadEntity::class,
         ThreadEventEntity::class,
-        LatestBaselineEntity::class,
         ThreadEventFtsEntity::class,
         ThreadEventVectorEntity::class,
     ],
@@ -23,8 +22,6 @@ public abstract class ThreadsDb : RoomDatabase() {
     public abstract fun threadDao(): ThreadDao
 
     public abstract fun eventDao(): EventDao
-
-    public abstract fun baselineDao(): BaselineDao
 
     public abstract fun ftsDao(): FtsDao
 

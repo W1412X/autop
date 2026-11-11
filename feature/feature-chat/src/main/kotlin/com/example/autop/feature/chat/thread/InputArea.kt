@@ -1,5 +1,5 @@
 /**
- * 输入区（docs/tech/08 §4.2 InputArea）："附带当前屏幕"Chip + 输入栏。
+ * 输入区（docs/tech/08 §4.2 InputArea）：附图入口 + 输入栏。
  * 尾部只有一个按钮（与 AI 创建流程页一致的无底色图标按钮）：空闲或输入了内容时是发送，
  * 运行中且输入为空时换成停止图标；运行中输入了补充指令则回到发送（steer），不会两个按钮并排。
  * `ui.chat.backgroundOnSend` 的让屏行为由 ViewModel 经 navEvents 交给 app。
@@ -36,10 +36,10 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.res.stringResource
-import com.example.autop.core.ui.component.AutopChip
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
+import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.AutopDimens
@@ -79,10 +79,11 @@ internal fun InputArea(
     ) {
         PendingImages(images = state.images, onAction = onAction)
         Row(verticalAlignment = Alignment.CenterVertically) {
-            AutopChip(
-                text = stringResource(R.string.thread_attach_screen),
-                selected = state.attachScreen,
-                onClick = { onAction(ChatThreadAction.ToggleAttachScreen) },
+            AutopModelSelector(
+                selectedId = state.modelProfileId,
+                profiles = state.modelOptions,
+                enabled = !state.running,
+                onSelect = { onAction(ChatThreadAction.SetModel(it)) },
             )
             Spacer(modifier = Modifier.weight(1f))
             if (!state.running && state.images.size < state.maxImages) AddImageButton(onAction)

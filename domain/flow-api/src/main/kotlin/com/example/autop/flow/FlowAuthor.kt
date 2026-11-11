@@ -83,7 +83,11 @@ public interface FlowAuthorSession {
     public val state: StateFlow<AuthorState>
 
     /** 用户发送一条消息，驱动 AI 继续；返回时本轮结束。 */
-    public suspend fun send(text: String)
+    public suspend fun send(
+        text: String,
+        /** 本轮使用的会话级模型（ModelProfile id）；null 表示跟随角色默认。 */
+        modelProfileId: String? = null,
+    )
 
     /** 回答 AI 的提问（[AuthorMessage.Question]）。 */
     public fun answer(text: String)

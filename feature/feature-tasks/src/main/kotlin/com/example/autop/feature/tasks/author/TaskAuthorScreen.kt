@@ -42,6 +42,7 @@ import com.example.autop.core.ui.component.AutopChip
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
+import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.AutopOptionRow
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.InputBarSpec
@@ -151,6 +152,12 @@ public fun TaskAuthorScreen(
             author.errorCode?.let { item { ErrorBanner(it) } }
             state.saveError?.let { item { ErrorBanner(it) } }
         }
+        AutopModelSelector(
+            selectedId = state.modelProfileId,
+            profiles = state.modelOptions,
+            enabled = !state.author.busy,
+            onSelect = { onAction(TaskAuthorAction.SetModel(it)) },
+        )
         AutopInputBar(
             value = state.input,
             onValueChange = { onAction(TaskAuthorAction.SetInput(it)) },

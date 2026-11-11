@@ -153,6 +153,7 @@ internal class FlowAuthorSessionImpl(
     private var answerGate: CompletableDeferred<String>? = null
     private var demoGate: CompletableDeferred<Boolean>? = null
     private var cancelled = false
+    private var activeModelProfileId: String? = null
 
     /** 非交互分析模式：ask_user / demonstrate 不可用，系统提示换 analysis 模板（§4.1）。 */
     private var analysisMode = false
@@ -178,7 +179,8 @@ internal class FlowAuthorSessionImpl(
     private var pendingDraftContext = false
 
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // 发送边界兜底，见下方 catch 注释
-    override suspend fun send(text: String) {
+    override suspend fun send(text: String, modelProfileId: String?) {
+        activeModelProfileId = modelProfileId
         mutex.withLock {
             cancelled = false
             _state.update { it.copy(busy = true, errorCode = null, messages = it.messages + AuthorMessage.User(text)) }
@@ -310,7 +312,7 @@ internal class FlowAuthorSessionImpl(
         systemId: String,
     ) {
         val config = d.configProvider.current()
-        val provider = (d.gateway.forRole(role) as? Outcome.Ok)?.value
+        val provider = (resolveProvider(role) as? Outcome.Ok)?.value
         if (provider == null) {
             _state.update { it.copy(errorCode = FlowErrorCodes.LLM_UNAVAILABLE) }
             return
@@ -576,6 +578,10 @@ internal class FlowAuthorSessionImpl(
         id: String,
         vars: Map<String, String>,
     ): String = (d.prompts.render(id, vars) as? Outcome.Ok)?.value?.text.orEmpty()
+
+    /** 会话级模型覆盖优先，否则取角色默认（ADR-0022）。 */
+    private fun resolveProvider(role: ModelRole): Outcome<LlmProvider> =
+        activeModelProfileId?.let { d.gateway.forProfile(it) } ?: d.gateway.forRole(role)
 
     private suspend fun persist() {
         // REPLACE upsert 会整行覆盖：草稿自带的 reason（工具生成的修订来由）要保留到确认生效。

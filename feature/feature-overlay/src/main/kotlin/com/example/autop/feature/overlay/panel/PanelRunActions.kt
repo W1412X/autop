@@ -62,16 +62,16 @@ public class PanelRunActions
         }
 
         /**
-         * 输入面板发送：新建对话发起任务（attachCurrentScreen=「针对当前屏幕」chip）。
+         * 输入面板发送：新建对话发起任务。
          * [onStarted] 发起成功后回调（N182：发送后转任务进度悬浮窗）。
          */
         public fun send(
             text: String,
-            attachScreen: Boolean,
+            modelProfileId: String? = null,
             onStarted: (RunRecord) -> Unit = {},
         ) {
             scope.launch {
-                runService.startChat(null, text, attachScreen).getOrNull()?.let(onStarted)
+                runService.startChat(null, text, modelProfileId = modelProfileId).getOrNull()?.let(onStarted)
             }
         }
 

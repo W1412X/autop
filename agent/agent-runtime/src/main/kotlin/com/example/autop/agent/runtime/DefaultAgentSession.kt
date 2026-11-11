@@ -109,9 +109,9 @@ internal class DefaultAgentSession(
         val notes = RunNotes(services.store, services.prompts, TokenEstimator(config[AgentConfig.TOKENS])::estimateText)
         // 笔记以一条 USER 消息追加在基线末尾（WP4.2）。
         val noteMsg = notes.blockMessage(notes.notesOf(events), config[AgentConfig.NOTES])
-        // 标题缺省继承源线程（分叉是同一对话的延续，避免落回「未命名对话」）。
-        val resolvedTitle = title ?: services.store.titleOf(threadId)
-        val newId = services.store.createThread(resolvedTitle, threadId to atSeq)
+        // 新分支头节点即分叉点，不复制事件；标签与标题（根标题加序号）由存储层在事务内计算（ADR-0021）。
+        val newId = services.store.createThread(title, threadId to atSeq)
+        val resolvedTitle = services.store.titleOf(newId)
         services.store.append(
             newId,
             null,

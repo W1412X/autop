@@ -15,7 +15,7 @@ public suspend fun ThreadStore.rebuildIndexes(
     indexQueue: IndexQueue,
     threadId: ThreadId,
 ) {
-    indexQueue.rebuild(threadId, events(threadId, 0, Long.MAX_VALUE))
+    indexQueue.rebuild(threadId, events(threadId, 0, Long.MAX_VALUE).filter { it.threadId == threadId })
 }
 
 /**

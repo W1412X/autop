@@ -1,6 +1,5 @@
 /**
- * 输入面板（docs/tech/08 §5.2）：`AutopInputBar` 单行起最多 3 行 + 发送 +
- * 「针对当前屏幕」chip（默认 `ui.overlay.attachScreenDefault`）。语音输入暂不提供，入口已隐藏。
+ * 输入面板（docs/tech/08 §5.2）：`AutopInputBar` 单行起最多 3 行 + 发送。语音输入暂不提供，入口已隐藏。
  */
 package com.example.autop.feature.overlay.panel
 
@@ -18,10 +17,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import com.example.autop.core.ui.component.AutopChip
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopInputBar
+import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.InputBarSpec
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.overlay.R
 
@@ -32,11 +32,11 @@ private const val INPUT_MAX_LINES: Int = 3
 @Composable
 internal fun InputPanel(
     callbacks: PanelCallbacks,
-    attachScreenDefault: Boolean,
+    modelOptions: List<OptionItem> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     var text by remember { mutableStateOf("") }
-    var attachScreen by remember { mutableStateOf(attachScreenDefault) }
+    var modelProfileId by remember { mutableStateOf<String?>(null) }
     val spacing = LocalSpacing.current
     AutopInputBar(
         value = text,
@@ -53,10 +53,11 @@ internal fun InputPanel(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        AutopChip(
-            text = stringResource(R.string.panel_attach_screen),
-            selected = attachScreen,
-            onClick = { attachScreen = !attachScreen },
+        AutopModelSelector(
+            selectedId = modelProfileId,
+            profiles = modelOptions,
+            enabled = true,
+            onSelect = { modelProfileId = it },
         )
         Spacer(modifier = Modifier.weight(1f))
         AutopIconButton(
@@ -64,7 +65,7 @@ internal fun InputPanel(
             contentDescription = stringResource(R.string.panel_send),
             onClick = {
                 if (text.isNotBlank()) {
-                    callbacks.onSend(text.trim(), attachScreen)
+                    callbacks.onSend(text.trim(), modelProfileId)
                     text = ""
                 }
             },

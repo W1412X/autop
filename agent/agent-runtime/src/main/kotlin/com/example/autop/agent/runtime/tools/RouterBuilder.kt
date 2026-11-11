@@ -13,6 +13,7 @@ import com.example.autop.agent.ToolInvoker
 import com.example.autop.agent.ToolInvokerFactory
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.ToolResultEnricher
+import com.example.autop.agent.forRequest
 import com.example.autop.core.common.Capability
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.Logger
@@ -40,7 +41,7 @@ internal class RouterBuilder(
     /** 当前 modelRole 的模型是否支持图片输入。 */
     fun modelVisionOf(request: RunRequest): Boolean =
         llm
-            .forRole(request.modelRole)
+            .forRequest(request)
             .getOrNull()
             ?.profile
             ?.capabilities

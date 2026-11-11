@@ -27,8 +27,10 @@ import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.UiConfig
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.feature.chat.NEW_THREAD
+import com.example.autop.llm.ModelProfileStore
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.ImageAttachment
 import com.example.autop.task.RunRecord
@@ -68,7 +70,8 @@ private data class TimelineInput(
 private data class ChatMeta(
     val input: String = "",
     val images: List<ImageAttachment> = emptyList(),
-    val attachScreen: Boolean = true,
+    /** 会话级模型覆盖（null = 跟随默认）。 */
+    val modelProfileId: String? = null,
     val sheet: ChatThreadSheet = ChatThreadSheet(),
     val notice: ThreadNotice? = null,
 )
@@ -80,6 +83,7 @@ public class ChatThreadViewModel
     @Inject
     constructor(
         private val threadStore: ThreadStore,
+        private val modelProfiles: ModelProfileStore,
         private val runService: RunService,
         private val agentSession: AgentSession,
         private val configProvider: ConfigProvider,
@@ -127,9 +131,14 @@ public class ChatThreadViewModel
          * 标题以线程库为准（占位/LLM 精炼/列表改名都走 rename，事件流不带标题变更），
          * 事件流状态之上再叠一层。
          */
+        private val modelOptions: StateFlow<List<OptionItem>> =
+            modelProfiles.profiles
+                .map { profiles -> profiles.map { OptionItem(id = it.id, label = it.displayName) } }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
+
         public val uiState: StateFlow<ChatThreadUiState> =
-            combine(baseState, threadTitle) { state, title ->
-                state.copy(title = title ?: state.title)
+            combine(baseState, threadTitle, modelOptions) { state, title, options ->
+                state.copy(title = title ?: state.title, modelOptions = options)
             }.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -186,7 +195,7 @@ public class ChatThreadViewModel
                 is ChatThreadAction.SetInput -> meta.update { it.copy(input = action.text) }
                 is ChatThreadAction.AddImages,
                 is ChatThreadAction.RemoveImage,
-                ChatThreadAction.ToggleAttachScreen,
+                is ChatThreadAction.SetModel,
                 -> handleAttachments(action)
                 ChatThreadAction.Send -> send()
                 ChatThreadAction.Stop ->
@@ -209,7 +218,7 @@ public class ChatThreadViewModel
                 is ChatThreadAction.AddImages -> addImages(action.uris)
                 is ChatThreadAction.RemoveImage ->
                     meta.update { it.copy(images = it.images.filterIndexed { index, _ -> index != action.index }) }
-                ChatThreadAction.ToggleAttachScreen -> meta.update { it.copy(attachScreen = !it.attachScreen) }
+                is ChatThreadAction.SetModel -> setModel(action.profileId)
                 else -> Unit
             }
         }
@@ -278,7 +287,6 @@ public class ChatThreadViewModel
             val open = openRun.value
             // 运行中只能补充文字指令（图片随新一轮对话发送）。
             if (text.isEmpty() && (open != null || images.isEmpty())) return
-            val attach = meta.value.attachScreen
             val background = configProvider.current()[UiConfig.CHAT].backgroundOnSend
             if (open != null) {
                 // steer 失败不清输入框（WP8.5）：成功后才清，失败提示 STEER_FAILED。
@@ -295,7 +303,13 @@ public class ChatThreadViewModel
             meta.update { it.copy(input = "", images = emptyList()) }
             viewModelScope.launch {
                 val fresh = threadId == NEW_THREAD
-                val outcome = runService.startChat(if (fresh) null else ThreadId(threadId), text, attach, images)
+                val outcome =
+                    runService.startChat(
+                        threadId = if (fresh) null else ThreadId(threadId),
+                        text = text,
+                        images = images,
+                        modelProfileId = meta.value.modelProfileId,
+                    )
                 outcome.getOrNull()?.let { record ->
                     if (fresh) {
                         threadId = record.threadId.value
@@ -311,6 +325,14 @@ public class ChatThreadViewModel
             val runId = openRun.value?.id ?: return
             meta.update { it.copy(input = "") }
             viewModelScope.launch { runService.answer(runId, text) }
+        }
+
+        /** 切换会话级模型：已有会话立即持久化，新对话随首条消息持久化（ADR-0022）。 */
+        private fun setModel(profileId: String?) {
+            meta.update { it.copy(modelProfileId = profileId) }
+            if (threadId != NEW_THREAD) {
+                viewModelScope.launch { threadStore.setModelProfile(ThreadId(threadId), profileId) }
+            }
         }
 
         private fun forkFrom(seq: Long) {
@@ -341,6 +363,7 @@ public class ChatThreadViewModel
             collectJob =
                 viewModelScope.launch {
                     threadTitle.value = threadStore.titleOf(id)
+                    meta.update { it.copy(modelProfileId = threadStore.modelProfileOf(id)) }
                     timeline.value = TimelineInput()
                     // observeFrom 先回放已有事件再转实时（WP8.3）：新对话的用户输入事件
                     // 在入队时已落盘（WP8.1），backlog 一定包含它，不再丢。
@@ -378,9 +401,9 @@ public class ChatThreadViewModel
                 running = open != null,
                 accessibilityConnected = connected,
                 input = metaState.input,
+                modelProfileId = metaState.modelProfileId,
                 images = metaState.images,
                 maxImages = chatConfig.attachMaxImages,
-                attachScreen = metaState.attachScreen,
                 inputMaxLines = chatConfig.inputMaxLines,
                 waitingQuestion =
                     active

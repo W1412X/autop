@@ -99,14 +99,14 @@ class TimelineMergerTest {
     @Test
     fun `fork points appear where assistant batch ends without unpaired tool call`() {
         val message = assistant(Block.Text("好的"))
-        val withMessage = mergeTimeline(listOf(event(1, message)), emptyList(), GROUP_THRESHOLD)
+        val withMessage = mergeTimeline(listOf(event(1, message, forkable = true)), emptyList(), GROUP_THRESHOLD)
         assertThat(withMessage.single().forkable).isTrue()
         val call = assistant(toolCall("c1", "tap"))
         val unpaired = mergeTimeline(listOf(event(1, call)), emptyList(), GROUP_THRESHOLD)
         assertThat(unpaired.single().forkable).isFalse()
         val paired =
             mergeTimeline(
-                listOf(event(1, call), event(2, toolResult("c1", "tap"))),
+                listOf(event(1, call), event(2, toolResult("c1", "tap"), forkable = true)),
                 emptyList(),
                 GROUP_THRESHOLD,
             )
@@ -363,7 +363,16 @@ private val THREAD = ThreadId("t1")
 private fun event(
     seq: Long,
     payload: EventPayload,
-): ThreadEvent = ThreadEvent(threadId = THREAD, seq = seq, runId = null, createdAt = seq * 1000, payload = payload)
+    forkable: Boolean = false,
+): ThreadEvent =
+    ThreadEvent(
+        threadId = THREAD,
+        seq = seq,
+        runId = null,
+        createdAt = seq * 1000,
+        payload = payload,
+        forkable = forkable,
+    )
 
 private fun assistant(
     vararg blocks: Block,

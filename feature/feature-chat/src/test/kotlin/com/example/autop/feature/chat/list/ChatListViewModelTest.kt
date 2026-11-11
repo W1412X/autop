@@ -217,6 +217,13 @@ private class FakeThreadStore(
         title: String,
     ): Unit = Unit
 
+    override suspend fun modelProfileOf(threadId: ThreadId): String? = null
+
+    override suspend fun setModelProfile(
+        threadId: ThreadId,
+        profileId: String?,
+    ) = Unit
+
     override suspend fun titleOf(threadId: ThreadId): String? = null
 
     override suspend fun delete(threadId: ThreadId) {
@@ -236,8 +243,8 @@ private class FakeRunService : RunService {
     override suspend fun startChat(
         threadId: ThreadId?,
         text: String,
-        attachCurrentScreen: Boolean,
         images: List<com.example.autop.task.ImageAttachment>,
+        modelProfileId: String?,
     ): com.example.autop.core.common.Outcome<RunRecord> = error("unused")
 
     override suspend fun forkAndRun(

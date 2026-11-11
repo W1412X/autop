@@ -21,9 +21,6 @@ import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.DeviceState
-import com.example.autop.device.ScreenReader
-import com.example.autop.device.ScreenSnapshot
-import com.example.autop.device.Screenshot
 import com.example.autop.task.ChatTitleGenerator
 import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
@@ -225,7 +222,6 @@ private class RecoveryFixture(
             runStore = runStore,
             pending = pending,
             scheduler = scheduler,
-            screenReader = RecoveryScreenReader(),
             titleGenerator = NoopTitleGenerator,
             ids = UuidV7IdGenerator(clock),
             clock = clock,
@@ -267,13 +263,6 @@ private class RecoveryFixture(
         runStore.save(record)
         return record
     }
-}
-
-/** 测试用屏幕读取（中断恢复流程不截屏，方法不会被调用）。 */
-private class RecoveryScreenReader : ScreenReader {
-    override suspend fun snapshot(): Outcome<ScreenSnapshot> = error("not used")
-
-    override suspend fun screenshot(): Outcome<Screenshot> = error("not used")
 }
 
 /** 未锁屏的设备状态。 */

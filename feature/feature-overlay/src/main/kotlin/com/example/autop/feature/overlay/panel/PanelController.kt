@@ -12,14 +12,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayHost
 import com.example.autop.feature.overlay.OverlayWindowIds
 import com.example.autop.feature.overlay.ball.BallStateHolder
 import com.example.autop.feature.overlay.composeOverlayView
 import com.example.autop.feature.overlay.progress.ProgressController
+import com.example.autop.llm.ModelProfileStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -28,6 +31,7 @@ import javax.inject.Singleton
 public class PanelController
     @Inject
     constructor(
+        private val modelProfiles: ModelProfileStore,
         @ApplicationContext private val context: Context,
         private val host: OverlayHost,
         private val holder: BallStateHolder,
@@ -65,11 +69,14 @@ public class PanelController
         @Composable
         private fun PanelContent() {
             val uiState by holder.uiState.collectAsState()
+            val modelOptions by remember(this) {
+                modelProfiles.profiles.map { list -> list.map { OptionItem(id = it.id, label = it.displayName) } }
+            }.collectAsState(emptyList())
             val callbacks =
                 remember(this) {
                     PanelCallbacks(
-                        onSend = { text, attachScreen ->
-                            actions.send(text, attachScreen) {
+                        onSend = { text, modelProfileId ->
+                            actions.send(text, modelProfileId) {
                                 dismiss()
                                 progressController.show()
                             }
@@ -79,7 +86,7 @@ public class PanelController
                 }
             PanelScreen(
                 callbacks = callbacks,
-                attachScreenDefault = uiState.attachScreenDefault,
+                modelOptions = modelOptions,
             )
         }
     }

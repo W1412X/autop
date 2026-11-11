@@ -4,13 +4,11 @@
  */
 package com.example.autop.agent.store
 
-import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.EventPayload
 import com.example.autop.agent.RunFinished
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadSummary
-import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
 import com.example.autop.agent.store.db.ThreadEntity
@@ -58,6 +56,7 @@ public class ThreadMappers(
             seq = entity.seq,
             runId = entity.runId?.let(::RunId),
             createdAt = entity.createdAt,
+            forkable = entity.forkable,
             payload = PayloadCodec.decode(entity.type, entity.v, readPayload(entity.payload)),
         )
 
@@ -98,26 +97,6 @@ public class ThreadMappers(
     }
 
     fun runStatusOf(payload: EventPayload): String? = (payload as? RunFinished)?.status?.let { it.name }
-
-    /** 可分叉的事件点：无未配对 ToolCall 的 ASSISTANT / TOOL 批次结束处（docs/tech/04 §3.11）。 */
-    fun forkablePoints(events: List<ThreadEvent>): List<Long> {
-        val open = mutableSetOf<String>()
-        val points = mutableListOf<Long>()
-        events.forEachIndexed { i, event ->
-            when (val payload = event.payload) {
-                is AssistantMessage ->
-                    payload.blocks.filterIsInstance<Block.ToolCall>().forEach { open += it.id }
-                is ToolResultEvent -> open -= payload.callId
-                else -> Unit
-            }
-            if (event.payload is AssistantMessage || event.payload is ToolResultEvent) {
-                val next = events.getOrNull(i + 1)?.payload
-                val batchEnd = next !is AssistantMessage && next !is ToolResultEvent
-                if (batchEnd && open.isEmpty()) points += event.seq
-            }
-        }
-        return points
-    }
 
     private companion object {
         /** 列表预览字数（docs/tech/04 §4）。 */

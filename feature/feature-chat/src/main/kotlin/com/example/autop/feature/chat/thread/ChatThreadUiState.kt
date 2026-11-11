@@ -5,6 +5,7 @@
 package com.example.autop.feature.chat.thread
 
 import com.example.autop.core.config.UiChatSection
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.task.ImageAttachment
 
 /** 等待回答的问题（docs/tech/08 §4.2 AskCard）。 */
@@ -52,12 +53,13 @@ public data class ChatThreadUiState(
     /** 无障碍已连接（false 时输入禁用并显示提示，docs/tech/08 §4.1）。 */
     val accessibilityConnected: Boolean = true,
     val input: String = "",
+    /** 会话级模型覆盖（null = 跟随默认）与可选模型。 */
+    val modelProfileId: String? = null,
+    val modelOptions: List<OptionItem> = emptyList(),
     /** 待发送的图片（已压缩，发送后清空）。 */
     val images: List<ImageAttachment> = emptyList(),
     /** 单条消息可附图片数上限（`ui.chat.attachMaxImages`）。 */
     val maxImages: Int = UiChatSection().attachMaxImages,
-    /** "附带当前屏幕"开关（发送时 `attachCurrentScreen`）。 */
-    val attachScreen: Boolean = true,
     /** 输入框最大行数（`ui.chat.inputMaxLines`）。 */
     val inputMaxLines: Int = UiChatSection().inputMaxLines,
     val waitingQuestion: WaitingQuestion? = null,
@@ -65,4 +67,7 @@ public data class ChatThreadUiState(
     val sheet: ChatThreadSheet = ChatThreadSheet(),
     /** `sheet.rawSeq` 对应事件的原始 JSON（mono 展示、可复制）。 */
     val rawJson: String? = null,
-)
+) {
+    /** 本会话是否为分叉分支：路径上有分叉标记（分支自身的 ThreadCreated 总在路径末段）。 */
+    val isBranch: Boolean get() = entries.any { it.item is TimelineItem.ForkMarker }
+}

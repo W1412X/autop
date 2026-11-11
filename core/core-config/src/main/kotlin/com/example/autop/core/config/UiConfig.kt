@@ -88,7 +88,6 @@ public data class UiOverlaySection(
     @SerialName("edgeHideRatio") val edgeHideRatio: Double = 0.8,
     @SerialName("breathMs") val breathMs: Long = 1600,
     @SerialName("doubleTapStops") val doubleTapStops: Boolean = true,
-    @SerialName("attachScreenDefault") val attachScreenDefault: Boolean = true,
 ) : ConfigSection {
     override fun validate(): List<String> =
         buildList {

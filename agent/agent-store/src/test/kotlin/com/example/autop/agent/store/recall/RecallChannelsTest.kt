@@ -105,7 +105,7 @@ public class RecallChannelsTest {
         runBlocking {
             val thread = seed("唯一内容")
 
-            db.ftsDao().deleteThread(thread.value)
+            db.ftsDao().deleteOwned(thread.value)
             val hits = ftsRetriever.search(thread, "唯一", 10)
 
             assertThat(hits).isEmpty()
@@ -137,7 +137,7 @@ public class RecallChannelsTest {
             )
             val thread = seed("abcdefgh") // 8 字 → 2 块
 
-            val rows = db.vectorDao().allOfThread(thread.value)
+            val rows = db.vectorDao().allOwned(thread.value)
 
             assertThat(rows.map { it.chunk }).containsExactly(0, 1)
             assertThat(rows.map { it.modelId }.toSet()).containsExactly("test-model")
@@ -162,7 +162,7 @@ public class RecallChannelsTest {
             queue.flush()
 
             assertThat(vectorRetriever.isAvailable()).isFalse()
-            assertThat(db.vectorDao().allOfThread("t6")).isEmpty()
+            assertThat(db.vectorDao().allOwned("t6")).isEmpty()
         }
 
     @Test
@@ -170,7 +170,7 @@ public class RecallChannelsTest {
         runBlocking {
             val thread = seed("重建索引文本")
 
-            db.ftsDao().deleteThread(thread.value)
+            db.ftsDao().deleteOwned(thread.value)
             assertThat(db.ftsDao().match(thread.value, "重建", 5)).isEmpty()
 
             val events =

@@ -25,14 +25,10 @@ public class SnippetReader(
     fun extract(event: ThreadEvent): String? =
         RecallTextExtractor.extract(event, config.current()[AgentConfig.STORE].ftsToolResultChars)
 
-    suspend fun snippet(
-        threadId: ThreadId,
-        seq: Long,
-        runId: RunId? = null,
-    ): String? {
-        val row = events.bySeq(threadId.value, seq) ?: return null
+    suspend fun snippet(seq: Long): String? {
+        val row = events.bySeq(seq) ?: return null
         val payload = PayloadCodec.decode(row.type, row.v, readPayload(row.payload))
-        val event = ThreadEvent(threadId, seq, runId, row.createdAt, payload)
+        val event = ThreadEvent(ThreadId(row.threadId), seq, row.runId?.let(::RunId), row.createdAt, payload)
         val cfg = config.current()
         return extract(event)?.take(cfg[AgentConfig.RECALL].snippetChars)
     }

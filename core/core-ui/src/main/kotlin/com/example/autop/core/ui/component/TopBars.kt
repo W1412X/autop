@@ -8,11 +8,13 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.autop.core.ui.R
@@ -23,6 +25,7 @@ import com.example.autop.core.ui.theme.LocalSpacing
 @Composable
 public fun SubPageTopBar(
     title: String,
+    titleIcon: ImageVector? = null,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
     actions: (@Composable RowScope.() -> Unit)? = null,
@@ -39,6 +42,14 @@ public fun SubPageTopBar(
             contentDescription = stringResource(R.string.core_ui_back),
             onClick = onBack,
         )
+        titleIcon?.let { icon ->
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.padding(start = LocalSpacing.current.sm),
+            )
+        }
         Text(
             text = title,
             style = MaterialTheme.typography.titleLarge,

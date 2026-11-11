@@ -43,6 +43,8 @@ internal class InMemoryThreadStore(
     }
 
     private val threads = linkedMapOf<String, ThreadRow>()
+
+    private val modelOverrides: MutableMap<String, String?> = mutableMapOf()
     private val blobs = linkedMapOf<String, ByteArray>()
     private val eventFlow = MutableSharedFlow<ThreadEvent>(extraBufferCapacity = 256)
     private val changesFlow = MutableSharedFlow<Unit>(extraBufferCapacity = 256)
@@ -137,6 +139,15 @@ internal class InMemoryThreadStore(
     ) {
         row(threadId).name = title
         changesFlow.tryEmit(Unit)
+    }
+
+    override suspend fun modelProfileOf(threadId: ThreadId): String? = modelOverrides[threadId.value]
+
+    override suspend fun setModelProfile(
+        threadId: ThreadId,
+        profileId: String?,
+    ) {
+        modelOverrides[threadId.value] = profileId
     }
 
     override suspend fun titleOf(threadId: ThreadId): String? = threads[threadId.value]?.name

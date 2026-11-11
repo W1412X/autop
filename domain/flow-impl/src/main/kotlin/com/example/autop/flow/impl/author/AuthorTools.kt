@@ -225,7 +225,7 @@ internal class AuthorTools(
         activity(ACTIVITY_DEMONSTRATE)
         val service = d.runService()
         val record: RunRecord =
-            when (val started = service.startChat(null, goal, false)) {
+            when (val started = service.startChat(null, goal)) {
                 is Outcome.Ok -> started.value
                 is Outcome.Err -> return """{"error":${JsonPrimitive(started.error.message)}}"""
             }

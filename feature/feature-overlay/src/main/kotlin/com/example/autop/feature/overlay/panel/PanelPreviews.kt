@@ -15,7 +15,6 @@ internal fun InputPanelPreview() =
     PreviewTheme {
         PanelScreen(
             callbacks = PreviewCallbacks,
-            attachScreenDefault = true,
         )
     }
 
@@ -25,7 +24,6 @@ internal fun InputPanelDarkPreview() =
     PreviewTheme(dark = true) {
         PanelScreen(
             callbacks = PreviewCallbacks,
-            attachScreenDefault = false,
         )
     }
 

@@ -180,6 +180,13 @@ class TaskAuthorToolsTest {
             title: String,
         ) = TODO()
 
+        override suspend fun modelProfileOf(threadId: ThreadId): String? = null
+
+        override suspend fun setModelProfile(
+            threadId: ThreadId,
+            profileId: String?,
+        ) = Unit
+
         override suspend fun titleOf(threadId: ThreadId): String? = null
 
         override suspend fun delete(threadId: ThreadId) = TODO()

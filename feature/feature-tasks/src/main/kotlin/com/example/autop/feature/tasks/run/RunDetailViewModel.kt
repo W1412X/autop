@@ -30,6 +30,7 @@ import com.example.autop.llm.Block
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
+import com.example.autop.task.TaskErrorCodes
 import com.example.autop.task.TaskRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -133,8 +134,12 @@ public class RunDetailViewModel
                         .onFailure { logger.w(TAG, "forkable_points_failed", "runId" to runId, error = it) }
                         .getOrDefault(emptyList())
                         .lastOrNull()
-                        ?: FIRST_SEQ
-                feedback.value = forkFrom(run.threadId, atSeq)
+                feedback.value =
+                    if (atSeq == null) {
+                        RunDetailFeedback(continued = false, errorCode = TaskErrorCodes.NO_FORK_POINT)
+                    } else {
+                        forkFrom(run.threadId, atSeq)
+                    }
             }
         }
 

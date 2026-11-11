@@ -10,7 +10,6 @@ package com.example.autop.agent.timeline
 import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.Baseline
-import com.example.autop.agent.BaselineReason
 import com.example.autop.agent.PauseReason
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.PlanUpdated
@@ -149,8 +148,8 @@ public sealed interface CoreRow {
     public data class ForkMarker(
         val parentThreadId: String,
         val parentSeq: Long,
-        /** 继承的消息条数（紧随其后的 Baseline(FORK) 的 messages.size 回填，WP8.6）。 */
-        val inheritedCount: Int = 0,
+        /** 分支标题（ThreadCreated.title，如 买票(1.2)）；旧数据无标题时为 null。 */
+        val title: String? = null,
     ) : CoreRow
 }
 
@@ -239,10 +238,7 @@ private fun appendPayload(
             }
             unpaired
         }
-        is Baseline -> {
-            backfillInherited(entries, payload)
-            unpaired
-        }
+        is Baseline -> unpaired
         is RunStarted,
         is RunFinished,
         is RunNoteAdded,
@@ -259,22 +255,11 @@ private fun appendForkMarker(
     val parent = payload.parentThreadId ?: return
     entries.add(
         CoreEntry(
-            CoreRow.ForkMarker(parent.value, payload.parentSeq ?: 0),
+            CoreRow.ForkMarker(parent.value, payload.parentSeq ?: 0, payload.title),
             event.seq,
             forkable = false,
         ),
     )
-}
-
-/** Baseline(FORK) 遍历到时把继承条数回填到最近的 ForkMarker（WP8.6）。 */
-private fun backfillInherited(
-    entries: MutableList<CoreEntry>,
-    payload: Baseline,
-) {
-    if (payload.reason != BaselineReason.FORK) return
-    val index = entries.indexOfLast { it.row is CoreRow.ForkMarker }
-    val marker = entries.getOrNull(index)?.row as? CoreRow.ForkMarker ?: return
-    entries[index] = entries[index].copy(row = marker.copy(inheritedCount = payload.messages.size))
 }
 
 /** 用户消息 → User（INJECTED 的注入上下文不进时间线）。 */
@@ -309,7 +294,7 @@ private fun appendMessage(
                 // 回退协议/工具标记文本不冒充正文（displayTextOf 过滤，落盘原文不改）。
                 displayTextOf(block.text).takeIf { it.isNotBlank() }?.let { shown ->
                     entries.add(
-                        CoreEntry(CoreRow.Assistant(shown), event.seq, forkable = false),
+                        CoreEntry(CoreRow.Assistant(shown), event.seq, forkable = event.forkable),
                     )
                 }
             is Block.Thinking ->
@@ -345,12 +330,6 @@ private fun appendMessage(
             -> Unit
         }
     }
-    if (pairs == unpaired && entries.isNotEmpty()) {
-        val last = entries.last()
-        if (last.seq == event.seq) {
-            entries[entries.lastIndex] = last.copy(forkable = true)
-        }
-    }
     return pairs
 }
 
@@ -384,7 +363,7 @@ private fun applyToolResult(
             errorCode = payload.errorCode,
             links = linksOf(payload.data),
         )
-    val entry = CoreEntry(row, event.seq, forkable = unpaired <= 1)
+    val entry = CoreEntry(row, event.seq, forkable = event.forkable)
     if (index >= 0) {
         entries[index] = entry
     } else {

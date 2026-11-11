@@ -16,8 +16,6 @@ import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.flatMap
-import com.example.autop.core.common.getOrNull
-import com.example.autop.device.ScreenReader
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.llm.Block
@@ -40,7 +38,6 @@ public class RunExecutor(
     private val runStore: RunStore,
     private val pending: PendingRuns,
     private val scheduler: RunScheduler,
-    private val screenReader: ScreenReader,
     private val titleGenerator: ChatTitleGenerator,
     private val ids: IdGenerator,
     private val clock: Clock,
@@ -54,16 +51,20 @@ public class RunExecutor(
     suspend fun launchChat(
         threadId: ThreadId?,
         text: String,
-        attachCurrentScreen: Boolean,
         images: List<ImageAttachment>,
+        modelProfileId: String? = null,
     ): Outcome<RunRecord> {
         val placeholder = if (threadId == null) placeholderTitle(text) else null
         val thread = threadId ?: threadStore.createThread(title = placeholder, parent = null)
+        // 发送即持久化会话级模型选择（null = 跟随默认），之后该会话的每一轮都用它。
+        threadStore.setModelProfile(thread, modelProfileId)
+        if (modelProfileId != null) {
+            logger.i(TAG, "chat_model_selected", "threadId" to thread.value, "profileId" to modelProfileId)
+        }
         // 纯图片消息没有文本块：部分协议拒绝空 text 块。
         val blocks = mutableListOf<Block>()
         if (text.isNotBlank()) blocks += Block.Text(text)
         saveImages(thread, images, blocks)
-        if (attachCurrentScreen) attachScreen(thread, blocks)
         val enqueued = enqueue(RunOrigin.CHAT, thread, blocks, UserMessageKind.INPUT, emptyMap(), null)
         if (placeholder != null && enqueued is Outcome.Ok) {
             refineTitle(thread = thread, message = text, placeholder = placeholder)
@@ -192,28 +193,6 @@ public class RunExecutor(
             val fileRef = threadStore.saveBlob(thread, "$USER_IMAGE_NAME_PREFIX$stamp-$index.$ext", image.bytes)
             blocks += Block.Image(fileRef = fileRef, mime = image.mime, width = image.width, height = image.height)
         }
-    }
-
-    /** 附当前屏幕截图（失败时只记日志，不阻塞发送）。 */
-    private suspend fun attachScreen(
-        thread: ThreadId,
-        blocks: MutableList<Block>,
-    ) {
-        val result = screenReader.screenshot()
-        val shot = result.getOrNull()
-        val bytes = shot?.jpegBytes
-        if (shot == null || bytes == null) {
-            val error = (result as? Outcome.Err)?.error
-            logger.w(
-                TAG,
-                "attach_screen_failed",
-                "code" to (error?.code ?: "no_jpeg"),
-                "detail" to (error?.message ?: "screenshot ok but no jpeg bytes"),
-            )
-            return
-        }
-        val fileRef = threadStore.saveBlob(thread, "screen-${clock.nowMillis()}.jpg", bytes)
-        blocks += Block.Image(fileRef = fileRef, mime = "image/jpeg", width = shot.width, height = shot.height)
     }
 
     public companion object {

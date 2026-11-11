@@ -72,7 +72,11 @@ public class VectorIndexer(
     }
 
     override suspend fun deleteThread(threadId: ThreadId) {
-        vectors.deleteThread(threadId.value)
+        vectors.deleteOwned(threadId.value)
+    }
+
+    override suspend fun deleteEvents(seqs: List<Long>) {
+        vectors.deleteBySeqs(seqs)
     }
 
     override suspend fun rebuild(
@@ -121,7 +125,7 @@ public class VectorRetriever(
         limit: Int,
     ): List<RecallCandidate> =
         vectors
-            .allOfThread(threadId.value)
+            .allOnPath(threadId.value)
             .asSequence()
             .map { it to cosine(queryVector, VectorCodec.decode(it.vector)) }
             .groupBy({ it.first.seq }, { it.second })
@@ -129,7 +133,7 @@ public class VectorRetriever(
             .sortedWith(compareByDescending<Pair<Long, Double>> { it.second }.thenByDescending { it.first })
             .take(limit)
             .mapIndexed { i, (seq, _) ->
-                RecallCandidate(seq = seq, rank = i, snippet = snippets.snippet(threadId, seq))
+                RecallCandidate(seq = seq, rank = i, snippet = snippets.snippet(seq))
             }
 
     private fun cosine(

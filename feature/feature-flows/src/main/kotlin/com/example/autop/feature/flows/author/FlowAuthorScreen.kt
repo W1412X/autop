@@ -43,6 +43,7 @@ import com.example.autop.core.ui.component.AutopChip
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
+import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.AutopOptionRow
 import com.example.autop.core.ui.component.AutopOutlinedButton
 import com.example.autop.core.ui.component.AutopTonalButton
@@ -160,6 +161,12 @@ public fun FlowAuthorScreen(
             state.saveError?.let { item { ErrorBanner(it) } }
         }
         author.pendingDemonstration?.let { goal -> DemoConfirm(goal = goal, onAction = onAction) }
+        AutopModelSelector(
+            selectedId = state.modelProfileId,
+            profiles = state.modelOptions,
+            enabled = !author.busy,
+            onSelect = { onAction(FlowAuthorAction.SetModel(it)) },
+        )
         AutopInputBar(
             value = state.input,
             onValueChange = { onAction(FlowAuthorAction.SetInput(it)) },

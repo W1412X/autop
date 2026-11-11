@@ -36,8 +36,7 @@
       "opacity": 1.0,
       "edgeHideRatio": 0.8,
       "breathMs": 1600,
-      "doubleTapStops": true,
-      "attachScreenDefault": true
+      "doubleTapStops": true
     },
     "indicator": {
       "enabled": true,

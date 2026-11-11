@@ -23,6 +23,9 @@ public interface ThreadEventIndexer {
 
     public suspend fun deleteThread(threadId: ThreadId)
 
+    /** 删除这些事件（seq 全局唯一）的索引行；分支删除时用于清理不再被引用的事件。 */
+    public suspend fun deleteEvents(seqs: List<Long>)
+
     /** 重建整个线程的索引（如 embedding 模型变化后）。 */
     public suspend fun rebuild(
         threadId: ThreadId,

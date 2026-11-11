@@ -254,7 +254,7 @@ public class RunRunner(
         return JsonObject(top)
     }
 
-    private fun buildRequest(
+    private suspend fun buildRequest(
         record: RunRecord,
         task: Task?,
         entry: PendingEntry?,
@@ -268,6 +268,7 @@ public class RunRunner(
             vars = (entry?.vars ?: emptyMap()) + mapOf(RUN_MODE_KEY to runMode(record.origin)),
             config = configFor(task),
             toolFilter = task?.allowedTools,
+            modelProfileId = threadStore.modelProfileOf(record.threadId),
             replay = replayPlan(record, task),
         )
 

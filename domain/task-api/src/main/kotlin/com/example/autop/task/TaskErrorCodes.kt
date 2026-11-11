@@ -6,6 +6,9 @@ package com.example.autop.task
 public object TaskErrorCodes {
     public const val INVALID: String = "task.invalid"
     public const val NOT_FOUND: String = "task.not_found"
+
+    /** 继续执行时源会话没有可分叉的事件点（ADR-0021）。 */
+    public const val NO_FORK_POINT: String = "task.no_fork_point"
     public const val CRON_INVALID: String = "task.cron_invalid"
     public const val SOURCE_UNKNOWN: String = "task.source_unknown"
     public const val PERMISSION_MISSING: String = "task.permission_missing"

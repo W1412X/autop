@@ -8,10 +8,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.TaskId
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.TASK_HINT_ARG
 import com.example.autop.feature.tasks.TASK_ID_ARG
 import com.example.autop.feature.tasks.TasksNavigator
+import com.example.autop.llm.ModelProfileStore
 import com.example.autop.task.TaskAuthor
 import com.example.autop.task.TaskAuthorSession
 import com.example.autop.task.TaskAuthorState
@@ -25,6 +27,9 @@ import javax.inject.Inject
 
 /** 创作页状态。 */
 public data class TaskAuthorUiState(
+    /** 会话级模型覆盖（null = 跟随默认）与可选模型。 */
+    val modelProfileId: String? = null,
+    val modelOptions: List<com.example.autop.core.ui.component.OptionItem> = emptyList(),
     val author: TaskAuthorState = TaskAuthorState(),
     val input: String = "",
     val saveError: String? = null,
@@ -46,6 +51,10 @@ public sealed interface TaskAuthorAction {
 
     public data object Stop : TaskAuthorAction
 
+    public data class SetModel(
+        val profileId: String?,
+    ) : TaskAuthorAction
+
     public data object Save : TaskAuthorAction
 }
 
@@ -56,6 +65,7 @@ public class TaskAuthorViewModel
     constructor(
         savedStateHandle: SavedStateHandle,
         private val author: TaskAuthor,
+        private val modelProfiles: ModelProfileStore,
     ) : ViewModel() {
         private val taskId: String? = savedStateHandle.get<String>(TASK_ID_ARG)?.takeIf { it != NEW_TASK_ID }
         private val _uiState = MutableStateFlow(TaskAuthorUiState())
@@ -64,6 +74,13 @@ public class TaskAuthorViewModel
         private var sendJob: Job? = null
 
         init {
+            viewModelScope.launch {
+                modelProfiles.profiles.collect { profiles ->
+                    _uiState.update {
+                        it.copy(modelOptions = profiles.map { p -> OptionItem(id = p.id, label = p.displayName) })
+                    }
+                }
+            }
             // 「保存为任务」带入的会话摘录：消费一次即清，进程重建不重复自动发送。
             val hint = savedStateHandle.get<String>(TASK_HINT_ARG)?.takeIf { it.isNotBlank() }
             savedStateHandle[TASK_HINT_ARG] = null
@@ -89,6 +106,7 @@ public class TaskAuthorViewModel
                     s?.cancel()
                     sendJob?.cancel()
                 }
+                is TaskAuthorAction.SetModel -> _uiState.update { it.copy(modelProfileId = action.profileId) }
                 TaskAuthorAction.Save -> save(s, navigator)
             }
         }
@@ -104,7 +122,7 @@ public class TaskAuthorViewModel
             }
             if (_uiState.value.author.busy) return
             _uiState.update { it.copy(input = "") }
-            sendJob = viewModelScope.launch { s.send(text) }
+            sendJob = viewModelScope.launch { s.send(text, _uiState.value.modelProfileId) }
         }
 
         private fun save(

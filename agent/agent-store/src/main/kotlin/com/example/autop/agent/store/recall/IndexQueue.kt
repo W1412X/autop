@@ -69,8 +69,8 @@ public class IndexQueue(
     }
 
     /** 删除线程的全部索引。 */
-    suspend fun deleteThread(threadId: ThreadId) {
-        indexers.forEach { runSafely(it.id) { it.deleteThread(threadId) } }
+    suspend fun deleteEvents(seqs: List<Long>) {
+        indexers.forEach { runSafely(it.id) { it.deleteEvents(seqs) } }
     }
 
     /** 重建线程索引（如 embedding 模型变化后）。 */

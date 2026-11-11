@@ -12,13 +12,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.theme.LocalSpacing
 
 /** 面板内容：输入面板（即时创建任务）。 */
 @Composable
 internal fun PanelScreen(
     callbacks: PanelCallbacks,
-    attachScreenDefault: Boolean,
+    modelOptions: List<OptionItem> = emptyList(),
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
@@ -32,6 +33,6 @@ internal fun PanelScreen(
                 ).padding(all = spacing.md),
         verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        InputPanel(callbacks = callbacks, attachScreenDefault = attachScreenDefault)
+        InputPanel(callbacks = callbacks, modelOptions = modelOptions)
     }
 }

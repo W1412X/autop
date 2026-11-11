@@ -20,9 +20,6 @@ import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.DeviceState
-import com.example.autop.device.ScreenReader
-import com.example.autop.device.ScreenSnapshot
-import com.example.autop.device.Screenshot
 import com.example.autop.llm.Block
 import com.example.autop.task.ChatTitleGenerator
 import com.example.autop.task.RunOrigin
@@ -67,7 +64,7 @@ public class RunExecutorTest {
         runTest {
             val fixture = ExecutorFixture(backgroundScope)
 
-            val result = fixture.executor.launchChat(null, "帮我发消息", attachCurrentScreen = false, images = emptyList())
+            val result = fixture.executor.launchChat(null, "帮我发消息", images = emptyList())
 
             val record = (result as Outcome.Ok).value
             val messages = fixture.threads.payloads().filterIsInstance<UserMessage>()
@@ -191,7 +188,6 @@ private class ExecutorFixture(
             runStore = runStore,
             pending = pending,
             scheduler = scheduler,
-            screenReader = ExecScreenReader(),
             titleGenerator = NoopExecTitleGenerator,
             ids = UuidV7IdGenerator(clock),
             clock = clock,
@@ -203,13 +199,6 @@ private class ExecutorFixture(
 /** 标题生成空实现。 */
 private object NoopExecTitleGenerator : ChatTitleGenerator {
     override suspend fun generate(firstMessage: String): String? = null
-}
-
-/** 测试用屏幕读取（入队不截屏）。 */
-private class ExecScreenReader : ScreenReader {
-    override suspend fun snapshot(): Outcome<ScreenSnapshot> = error("not used")
-
-    override suspend fun screenshot(): Outcome<Screenshot> = error("not used")
 }
 
 /** 调度用任务。 */

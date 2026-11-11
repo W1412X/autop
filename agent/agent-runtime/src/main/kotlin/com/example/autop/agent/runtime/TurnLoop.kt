@@ -20,6 +20,7 @@ import com.example.autop.agent.ToolControl
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
+import com.example.autop.agent.forRequest
 import com.example.autop.agent.protocol.ResolvedCalls
 import com.example.autop.agent.protocol.finalSummaryOf
 import com.example.autop.agent.protocol.lastTextOf
@@ -118,7 +119,7 @@ internal class TurnLoop(
             when (
                 val resolved =
                     parts.engines.ports.llm
-                        .forRole(req.modelRole)
+                        .let { gateway -> gateway.forRequest(req) }
             ) {
                 is Outcome.Ok -> resolved.value
                 is Outcome.Err -> return fail(resolved.error).event

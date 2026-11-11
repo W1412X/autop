@@ -95,6 +95,7 @@ private fun ThreadHeader(
 ) {
     SubPageTopBar(
         title = state.title?.takeIf { it.isNotBlank() } ?: stringResource(R.string.thread_new_title),
+        titleIcon = if (state.isBranch) AutopIcons.Branch else null,
         onBack = onBack,
         actions = {
             AutopIconButton(

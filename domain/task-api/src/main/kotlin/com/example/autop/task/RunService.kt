@@ -25,8 +25,9 @@ public interface RunService {
     public suspend fun startChat(
         threadId: ThreadId?,
         text: String,
-        attachCurrentScreen: Boolean,
         images: List<ImageAttachment> = emptyList(),
+        /** 会话级模型覆盖（ModelProfile id）；null 表示跟随全局默认。发送即持久化到该会话。 */
+        modelProfileId: String? = null,
     ): Outcome<RunRecord>
 
     /** 从 [atSeq] 处分叉源线程并发起对话（[text] 为 null 时沿用源消息继续）。 */

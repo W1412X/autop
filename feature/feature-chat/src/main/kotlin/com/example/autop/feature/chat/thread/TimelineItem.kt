@@ -101,8 +101,8 @@ public sealed interface TimelineItem {
     public data class ForkMarker(
         val parentThreadId: String,
         val parentSeq: Long,
-        /** 继承的消息条数（WP8.6，由 Baseline(FORK) 回填）。 */
-        val inheritedCount: Int = 0,
+        /** 分支标题（如 买票(1.2)）。 */
+        val title: String? = null,
     ) : TimelineItem
 }
 

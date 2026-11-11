@@ -12,7 +12,7 @@ import com.example.autop.agent.RunOutcome
 internal fun previewRunningEntries(): List<TimelineEntry> =
     listOf(
         TimelineEntry(
-            item = TimelineItem.ForkMarker(parentThreadId = "t0", parentSeq = 3),
+            item = TimelineItem.ForkMarker(parentThreadId = "t0", parentSeq = 3, title = "买票(1)"),
             seq = null,
             forkable = false,
         ),

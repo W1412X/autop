@@ -20,6 +20,7 @@ import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.CallSplit
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
@@ -67,6 +68,9 @@ import androidx.compose.ui.unit.dp
 /** 图标统一入口。 */
 public object AutopIcons {
     // ── 导航（Outlined 未选中 / Filled 选中）────────────────────
+
+    /** 分支会话标记（分叉出来的对话）。 */
+    public val Branch: ImageVector = Icons.Outlined.CallSplit
     public val ChatBubbleOutline: ImageVector = Icons.Outlined.ChatBubbleOutline
     public val ChatBubble: ImageVector = Icons.Filled.ChatBubble
     public val EventRepeat: ImageVector = Icons.Outlined.EventRepeat

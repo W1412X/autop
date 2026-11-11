@@ -36,7 +36,11 @@ public class FtsIndexer(
     }
 
     override suspend fun deleteThread(threadId: ThreadId) {
-        fts.deleteThread(threadId.value)
+        fts.deleteOwned(threadId.value)
+    }
+
+    override suspend fun deleteEvents(seqs: List<Long>) {
+        fts.deleteBySeqs(seqs)
     }
 
     override suspend fun rebuild(
@@ -74,7 +78,7 @@ public class FtsRetriever(
             rows = fts.match(threadId.value, terms.joinToString(" OR "), limit)
         }
         return rows.mapIndexed { i, row ->
-            RecallCandidate(seq = row.seq, rank = i, snippet = snippets.snippet(threadId, row.seq))
+            RecallCandidate(seq = row.seq, rank = i, snippet = snippets.snippet(row.seq))
         }
     }
 }
