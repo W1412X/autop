@@ -6,8 +6,17 @@
  */
 package com.example.autop.device
 
+import kotlinx.coroutines.flow.StateFlow
+
 /** 触摸盾。 */
 public interface TouchShield {
+    /**
+     * 是否正在注入（N222）：盾放行 + 自家浮层让路期间为 true。
+     * UI 控制入口据此忽略这期间收到的点击——注入到落点上的点击可能刚好落在
+     * 自己的按钮上（实测控制条「中止」被注入的 tap 命中导致任务被误取消）。
+     */
+    public val injecting: StateFlow<Boolean>
+
     /** 设置屏幕触摸屏蔽的开（Run 执行态）/关（暂停、等待回答、结束后）。 */
     public fun setActive(active: Boolean)
 

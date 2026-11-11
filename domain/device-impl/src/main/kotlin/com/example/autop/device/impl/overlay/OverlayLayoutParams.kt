@@ -11,13 +11,14 @@ import com.example.autop.device.OverlaySpec
 
 /**
  * 按通道与 spec 构建窗口参数；[hidden] 时窗口透明且不可触摸（截图隐藏），
- * [inputBlocked] 时不可触摸但保持可见（注入期间避免自家浮层吞掉注入动作）。
+ * [occluded] 时透明、不可触摸且不可聚焦（注入让路，N222：只用于与本次注入占位冲突的窗口，
+ * 注入结束即恢复；不冲突的窗口保持原样，避免整屏浮层闪烁）。
  */
 internal fun buildOverlayParams(
     channel: OverlayChannel,
     spec: OverlaySpec,
     hidden: Boolean,
-    inputBlocked: Boolean,
+    occluded: Boolean,
 ): WindowManager.LayoutParams {
     val type =
         when (channel) {
@@ -25,9 +26,9 @@ internal fun buildOverlayParams(
             OverlayChannel.APPLICATION -> WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         }
     var flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL
-    // 注入期间（inputBlocked）自家窗口同时不可聚焦，避免抢走返回键与输入法焦点（ADR-0014）。
-    if (!spec.focusable || inputBlocked) flags = flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
-    if (!spec.touchable || hidden || inputBlocked) flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+    // 注入让路（occluded）时自家窗口同时不可聚焦，避免抢走返回键与输入法焦点（ADR-0014）。
+    if (!spec.focusable || occluded) flags = flags or WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE
+    if (!spec.touchable || hidden || occluded) flags = flags or WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
     if (spec.watchOutsideTouch) flags = flags or WindowManager.LayoutParams.FLAG_WATCH_OUTSIDE_TOUCH
     if (spec.fullScreen) {
         flags =
@@ -38,7 +39,7 @@ internal fun buildOverlayParams(
         gravity = gravityOf(spec.gravity)
         x = spec.x
         y = spec.y
-        alpha = if (hidden) HIDDEN_ALPHA else VISIBLE_ALPHA
+        alpha = if (hidden || occluded) HIDDEN_ALPHA else VISIBLE_ALPHA
         if (spec.fullScreen) {
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
         }

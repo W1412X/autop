@@ -13,6 +13,7 @@ import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.exceptionHandler
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
+import com.example.autop.device.InjectionFootprint
 import com.example.autop.device.OverlayHost
 import com.example.autop.device.OverlaySpec
 import kotlinx.coroutines.CoroutineScope
@@ -109,21 +110,30 @@ public class OverlayWindowManager
             }
 
         /**
-         * 封锁自家浮层输入（注入期间用，N216）：期间悬浮球 / 进度窗 / 圆弧菜单 / 面板 /
-         * 工具测试面板一律不可触摸（保持可见，不闪烁），避免它们把注入的点击吞掉
-         * （实测进度窗遮挡导致点击不生效）。全部窗口封锁，不做注入区域收窄
-         * （收窄的相交判定盖不住 z 序遮挡与矩形失真，2026-11-10 控制条进度窗复发）。
-         * 返回是否等到重排落地。
+         * 自家浮层按注入占位让路（N222）：只有与本次动作冲突的可触摸窗口变透明且不可触摸
+         * （手势看落点是否在窗口矩形内、按键看窗口是否可聚焦），不冲突的窗口保持原样。
+         * 提交参数后等重排落地；落地后仍冲突（新窗口恰好附着等）则重算一次再等一帧。
+         * 返回是否自检通过（没有仍可能吞掉本次注入的自家窗口）。
          */
-        public suspend fun blockInput(timeoutMs: Long): Boolean {
-            withContext(main) { registry.setInputBlocked(true) }
-            return awaitRelayoutApplied(timeoutMs)
+        public suspend fun occlude(
+            footprint: InjectionFootprint,
+            timeoutMs: Long,
+        ): Boolean {
+            withContext(main) { registry.addFootprint(footprint) }
+            val firstLanded = awaitRelayoutApplied(timeoutMs)
+            if (firstLanded && hasNoConflict()) return true
+            withContext(main) { registry.refreshOcclusion() }
+            val retryLanded = awaitRelayoutApplied(timeoutMs)
+            return retryLanded && hasNoConflict()
         }
 
-        /** 解除自家浮层输入封锁（各窗口按自身 spec 恢复可触摸）。 */
-        public fun unblockInput() {
-            scope.launch { registry.setInputBlocked(false) }
+        /** 解除一次注入占位（各窗口按剩余占位重算恢复；允许异步落地）。 */
+        public fun restoreOcclusion(footprint: InjectionFootprint) {
+            scope.launch { registry.removeFootprint(footprint) }
         }
+
+        private suspend fun hasNoConflict(): Boolean =
+            withContext(main) { registry.conflictingTouchableWindows().isEmpty() }
 
         /** 等 [count] 帧（Choreographer 每帧回调一次）。 */
         private suspend fun awaitFrames(count: Int) {
@@ -141,8 +151,15 @@ public class OverlayWindowManager
         /** 触摸探针排除自家窗口用：显示中的 touchable 窗口规格（docs/tech/05 §8、questions.md N139）。 */
         public fun touchableSpecs(): List<OverlaySpec> = registry.touchableSpecs()
 
-        /** 仍可触摸的自家窗口 id（封锁自检留痕用；注入期应为空）。 */
+        /** 仍可触摸的自家窗口 id（注入自检留痕用；注入期应为空）。 */
         public fun touchableWindowIds(): List<String> = registry.touchableWindowIds()
+
+        /** 仍在让路的窗口与矩形（`id[l,t,r,b]`，注入留痕用；主线程求值）。 */
+        public suspend fun occludingRects(): List<String> = withContext(main) { registry.occludingRects() }
+
+        /** 仍可能收到本次注入的可触摸窗口（`id[l,t,r,b]`，自检用；主线程求值）。 */
+        public suspend fun conflictingTouchableWindows(): List<String> =
+            withContext(main) { registry.conflictingTouchableWindows() }
 
         override suspend fun <T> hiddenDuring(block: suspend () -> T): T {
             withContext(main) { registry.setHidden(true) }

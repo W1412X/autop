@@ -155,6 +155,9 @@ public class FakeUserActivity : UserActivityMonitor {
 
 /** fake 触摸盾（N186/N191）：记录屏蔽开关与强制解除调用。 */
 public class FakeTouchShield : TouchShield {
+    /** 注入进行中（N222：控制入口防误触用）。 */
+    override val injecting: StateFlow<Boolean> = MutableStateFlow(false)
+
     /** 最近一次 setActive 的入参。 */
     public var lastActive: Boolean = false
 

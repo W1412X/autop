@@ -5,15 +5,19 @@
  *   悬浮球 / 菜单 / 面板 / 进度窗永远在盾之上；通道重建按登记序重附，顺序不变。
  * - **开关**：不 show/hide，而是 `spec.touchable` 切换 `FLAG_NOT_TOUCHABLE`
  *   （`OverlayWindowRegistry.update` 全量重建 LayoutParams），窗口常驻保 z 序。
- * - **动作放行**：`GestureControllerImpl` 的注入手势（`dispatchGesture`）与全局动作
- *   （`performGlobalAction(GLOBAL_ACTION_BACK)` 注入 KEYCODE_BACK）走输入管道，会被
- *   touchable 的盾截获，动作期间 `beginAction()/endAction()` 临时放行（可重入）；
- *   `performNodeAction` 不走输入管道，无需放行。
+ * - **注入让路**（N216 → N222 收窄）：`GestureControllerImpl` 的注入手势（`dispatchGesture`）与
+ *   全局动作（`performGlobalAction` 注入 KEYCODE_BACK）走输入管道，会被 touchable 的盾截获，
+ *   动作期间 `beginAction(footprint)/endAction(footprint)` 临时放行（可重入）；
+ *   `performNodeAction` 不走输入管道，无需放行。让路不再一刀切封锁全部窗口：
+ *   按本次注入的占位（[InjectionFootprint]）只让冲突窗口让路——手势看落点是否在其矩形内
+ *   （触摸的窗口归属在 DOWN 时确定），按键只看可聚焦窗口（按键只送焦点窗口）。
  *   N191：`beginAction` 等放行落地后才返回（放行与注入之间无竞态窗口）；状态落地在
  *   主线程执行时重新求值，过期排队任务不会用旧值覆盖新状态。
  *   N214：只提交 LayoutParams 不算放行生效——`FLAG_NOT_TOUCHABLE` 要等 WMS 重算
  *   touchable region 并同步 InputDispatcher 才不拦触摸，`beginAction` 额外等布局落地
  *   （`OverlayWindowManager.awaitRelayoutApplied`）后才允许注入。
+ *   N222：落地后自检仍可能吞掉本次注入的自家窗口（新窗口恰在注入期附着/矩形变化），
+ *   自检不过则拒绝本次注入并留痕（`inject_blocked_by_own_overlay`），不再盲点自家 UI。
  * - **强制解除**（N191，安全关键）：用户中止任务 `forceRelease()` 立即解除并抑制后续
  *   激活（Run 卡死也保证用户能操作手机），新 Run 开始 `reset()` 恢复。
  * - **安全阀**：`ui.overlay.enabled` 关闭（悬浮球不显示，无停止入口）时不屏蔽。
@@ -25,10 +29,14 @@ import com.example.autop.core.common.Logger
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.UiConfig
+import com.example.autop.device.InjectionFootprint
 import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlaySpec
 import com.example.autop.device.TouchShield
 import com.example.autop.device.impl.overlay.OverlayWindowManager
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import java.util.concurrent.atomic.AtomicInteger
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -48,6 +56,12 @@ public class TouchShieldController
 
         /** 进行中的注入动作数（可重入；0 = 无动作）。 */
         private val actionDepth: AtomicInteger = AtomicInteger(0)
+
+        /** 注入进行中（N222）：盾放行 + 浮层让路期间为 true，UI 控制入口据此防误触。 */
+        private val _injecting = MutableStateFlow(false)
+
+        /** 注入进行中（N222）：控制条/面板按钮在这期间忽略点击（见 [TouchShield.injecting]）。 */
+        override val injecting: StateFlow<Boolean> = _injecting.asStateFlow()
 
         /** 强制解除（用户中止）抑制标志（N191）。 */
         @Volatile
@@ -79,47 +93,80 @@ public class TouchShieldController
         }
 
         /**
-         * 注入动作开始：放行触摸并等落地（N191：落地前注入会被盾截获）。
+         * 注入动作开始：放行触摸、按占位让冲突浮层让路，并等落地（N191：落地前注入会被盾截获）。
          * N214：参数提交 ≠ 盾已不拦触摸——`FLAG_NOT_TOUCHABLE` 要等 WMS 重算
          * touchable region 并同步 InputDispatcher 才生效，等落地再注入，否则注入仍被盾吞。
-         * N216：同时封锁自家其它浮层（悬浮球 / 进度窗 / 圆弧菜单 / 面板 / 工具测试面板）
-         * 的触摸——它们可触摸时会把注入的点击吞掉（实测进度窗遮挡导致点击不生效）；
-         * 封锁期间保持可见，不做隐藏闪烁。
-         * 失败/取消时回退深度并恢复拦截，防永久放行。
+         * N222：只让与 [footprint] 冲突的可触摸窗口让路（见 [InjectionFootprint]），
+         * 不冲突的窗口保持可见可触摸；重排未落地或落地后自检仍冲突则拒绝本次注入
+         * （返回 false），由调用方报注入失败，而不是盲点自家 UI。
+         * 失败/取消时回退深度并解除本次占位，防永久放行。
          */
-        public suspend fun beginAction() {
+        public suspend fun beginAction(footprint: InjectionFootprint): Boolean {
             actionDepth.incrementAndGet()
-            var released = false
+            _injecting.value = true
+            var committed = false
+            val timeoutMs = relayoutTimeoutMs()
             try {
                 overlay.updateNow(SHIELD_ID, ::shieldSpecOf)
-                val landed = overlay.blockInput(relayoutTimeoutMs())
-                released = true
-                val stillTouchable = overlay.touchableWindowIds()
+                val landed = overlay.occlude(footprint, timeoutMs)
+                val stillTouchable = overlay.conflictingTouchableWindows()
+                val occluded = overlay.occludingRects()
                 logger.i(
                     TAG,
                     "shield_release",
                     "depth" to actionDepth.get(),
                     "shielding" to shielding(),
                     "landed" to landed,
+                    "footprint" to footprintLabel(footprint),
+                    "occluded" to occluded.joinToString(","),
                     "stillTouchable" to stillTouchable.joinToString(","),
                 )
-                if (stillTouchable.isNotEmpty()) {
-                    logger.w(TAG, "shield_block_leak", "ids" to stillTouchable.joinToString(","))
+                if (!landed) {
+                    logger.e(
+                        TAG,
+                        "inject_blocked_relayout_timeout",
+                        "footprint" to footprintLabel(footprint),
+                        "timeoutMs" to timeoutMs,
+                    )
+                    return false
                 }
+                if (stillTouchable.isNotEmpty()) {
+                    logger.e(
+                        TAG,
+                        "inject_blocked_by_own_overlay",
+                        "footprint" to footprintLabel(footprint),
+                        "ids" to stillTouchable.joinToString(","),
+                    )
+                    return false
+                }
+                committed = true
+                return true
             } finally {
-                if (!released) {
-                    actionDepth.decrementAndGet()
-                    overlay.unblockInput()
+                if (!committed) {
+                    // 拒绝注入 / 取消异常：回退深度与本次占位，调用方不再 endAction。
+                    val depth = actionDepth.updateAndGet { current -> (current - 1).coerceAtLeast(0) }
+                    _injecting.value = depth > 0
+                    overlay.restoreOcclusion(footprint)
                     apply()
                 }
             }
         }
 
-        /** 注入动作结束：恢复拦截（落地允许异步——漏拦截仅毫秒级，且落地时取实时值）。 */
-        public fun endAction() {
-            actionDepth.decrementAndGet()
-            logger.i(TAG, "shield_restore", "depth" to actionDepth.get(), "shielding" to shielding())
-            overlay.unblockInput()
+        /**
+         * 注入动作结束：解除本次占位并恢复拦截（落地允许异步——漏拦截仅毫秒级，且落地时取实时值）。
+         * N222：只有最后一个动作结束（深度回 0）才恢复盾的拦截与 `injecting=false`。
+         */
+        public fun endAction(footprint: InjectionFootprint) {
+            val depth = actionDepth.updateAndGet { current -> (current - 1).coerceAtLeast(0) }
+            if (depth == 0) _injecting.value = false
+            logger.i(
+                TAG,
+                "shield_restore",
+                "depth" to depth,
+                "shielding" to shielding(),
+                "footprint" to footprintLabel(footprint),
+            )
+            overlay.restoreOcclusion(footprint)
             apply()
         }
 
@@ -181,3 +228,11 @@ private fun shieldSpec(touchable: Boolean): OverlaySpec =
 
 /** 盾窗口 id（`OverlayWindowManager.register/show/update` 的键）。 */
 internal const val SHIELD_ID: String = "overlay.touch_shield"
+
+/** 注入占位的日志文案（N222）。 */
+private fun footprintLabel(footprint: InjectionFootprint): String =
+    when (footprint) {
+        InjectionFootprint.All -> "all"
+        InjectionFootprint.Focus -> "focus"
+        is InjectionFootprint.TouchPoint -> "point(${footprint.x},${footprint.y}±${footprint.marginPx})"
+    }
