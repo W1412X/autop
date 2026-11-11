@@ -38,8 +38,6 @@ import com.example.autop.feature.settings.me.logs.LogsScreen
 import com.example.autop.feature.settings.me.logs.LogsViewModel
 import com.example.autop.feature.settings.me.models.ModelsScreen
 import com.example.autop.feature.settings.me.models.ModelsViewModel
-import com.example.autop.feature.settings.me.nodeaction.NodeActionScreen
-import com.example.autop.feature.settings.me.nodeaction.NodeActionViewModel
 import com.example.autop.feature.settings.me.observe.ObserveAction
 import com.example.autop.feature.settings.me.observe.ObserveScreen
 import com.example.autop.feature.settings.me.observe.ObserveViewModel
@@ -90,7 +88,6 @@ private val SECTION_PAGES: Map<String, @Composable (SettingsNavigator) -> Unit> 
         SettingsSection.SHELL.id to { navigator -> ShellChannelRoute(navigator = navigator) },
         SettingsSection.RULES.id to { navigator -> RulesRoute(navigator = navigator) },
         SettingsSection.BLOCKED_APPS.id to { navigator -> BlockedAppsRoute(navigator = navigator) },
-        SettingsSection.NODE_ACTION.id to { navigator -> NodeActionRoute(navigator = navigator) },
         SettingsSection.AUDIT.id to { navigator -> AuditRoute(navigator = navigator) },
         SettingsSection.BUDGET.id to { navigator -> BudgetRoute(navigator = navigator) },
         SettingsSection.ADVANCED.id to { navigator -> AdvancedRoute(navigator = navigator) },
@@ -184,19 +181,6 @@ private fun ObserveRoute(
             }
             viewModel.onAction(action)
         },
-    )
-}
-
-@Composable
-private fun NodeActionRoute(
-    navigator: SettingsNavigator,
-    viewModel: NodeActionViewModel = hiltViewModel(),
-) {
-    val state by viewModel.uiState.collectAsStateWithLifecycle()
-    NodeActionScreen(
-        state = state,
-        onBack = navigator::navigateBack,
-        onAction = viewModel::onAction,
     )
 }
 

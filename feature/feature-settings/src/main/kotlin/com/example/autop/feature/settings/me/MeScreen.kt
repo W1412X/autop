@@ -261,11 +261,6 @@ private fun SecuritySection(onOpen: (SettingsSection) -> Unit) {
             onClick = { onOpen(SettingsSection.BLOCKED_APPS) },
         )
         NavRow(
-            title = stringResource(R.string.me_nav_node_action),
-            subtitle = stringResource(R.string.me_sub_node_action),
-            onClick = { onOpen(SettingsSection.NODE_ACTION) },
-        )
-        NavRow(
             title = stringResource(R.string.me_nav_audit),
             subtitle = null,
             onClick = { onOpen(SettingsSection.AUDIT) },

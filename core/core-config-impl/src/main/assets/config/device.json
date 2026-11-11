@@ -100,14 +100,6 @@
       "endpointJitterPx": 12,
       "trajectoryJitterPx": 8
     },
-    "nodeAction": {
-      "enabled": true,
-      "actions": ["click", "long_click", "scroll"],
-      "maxAreaRatio": 0.6,
-      "retryWindowMs": 8000,
-      "blockAfterEvidence": 2,
-      "blockTtlDays": 30
-    },
     "wait": {
       "pollMs": 500,
       "defaultTimeoutMs": 10000

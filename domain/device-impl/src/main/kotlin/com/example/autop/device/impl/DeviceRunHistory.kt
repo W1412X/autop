@@ -44,9 +44,6 @@ public class DeviceRunHistory {
     /** LLM 观测缓存。 */
     internal var llmCache: LlmObservationCache = LlmObservationCache()
 
-    /** 节点动作学习的本 Run 疑点（WP2.6）。 */
-    internal val nodeActionSuspects: MutableMap<String, Long> = mutableMapOf()
-
     /** 节点 id 计数器（a11y 观测分配 id 用，coordinate-node-action-split §3.2）。 */
     internal var nextNodeId: Int = 1
 

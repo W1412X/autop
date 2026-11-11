@@ -1,6 +1,6 @@
 /**
  * 运行状态来源 `state.input`（agent-harness-overhaul WP3.5.2）：
- * 无障碍服务、shell 注入通道、节点动作屏蔽名单与触摸盾。
+ * 无障碍服务、shell 注入通道与触摸盾。
  */
 package com.example.autop.device.impl.state
 
@@ -12,8 +12,6 @@ import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AccessibilityStatus
-import com.example.autop.device.DeviceStateProvider
-import com.example.autop.device.NodeActionBlockStore
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import javax.inject.Inject
@@ -26,8 +24,6 @@ public class InputStateSource
     constructor(
         private val accessibility: AccessibilityStatus,
         private val shell: ShellInput,
-        private val deviceStates: DeviceStateProvider,
-        private val blocks: NodeActionBlockStore,
         private val prompts: PromptRepository,
     ) : RuntimeStateSource {
         override val id: String = ID
@@ -41,10 +37,6 @@ public class InputStateSource
                     render(PROMPT_ACCESSIBILITY, mapOf(VAR_ON to flag(connected), VAR_OFF to flag(!connected))),
                 )
             entries += StateEntry(KEY_SHELL, render(PROMPT_SHELL, shellVars()))
-            val foreground = deviceStates.current().foregroundPackage
-            if (foreground != null && blocks.blocked().any { it.packageName == foreground }) {
-                entries += StateEntry(KEY_NODE_ACTION_BLOCKED, render(PROMPT_BLOCKED, mapOf(VAR_APP to foreground)))
-            }
             val shieldOn = req.config[DeviceConfig.TOUCH].shieldEnabled && req.config[UiConfig.OVERLAY].enabled
             entries +=
                 StateEntry(
@@ -84,12 +76,10 @@ public class InputStateSource
 
             const val KEY_ACCESSIBILITY = "accessibility"
             const val KEY_SHELL = "shell"
-            const val KEY_NODE_ACTION_BLOCKED = "node_action_blocked"
             const val KEY_SHIELD = "shield"
 
             private const val PROMPT_ACCESSIBILITY = "agent.state.input.accessibility"
             private const val PROMPT_SHELL = "agent.state.input.shell"
-            private const val PROMPT_BLOCKED = "agent.state.input.node_action_blocked"
             private const val PROMPT_SHIELD = "agent.state.input.shield"
 
             private const val VAR_ON = "on"
@@ -98,6 +88,5 @@ public class InputStateSource
             private const val VAR_CONNECTING = "connecting"
             private const val VAR_OFF_PAIRED = "offPaired"
             private const val VAR_OFF_UNPAIRED = "offUnpaired"
-            private const val VAR_APP = "app"
         }
     }

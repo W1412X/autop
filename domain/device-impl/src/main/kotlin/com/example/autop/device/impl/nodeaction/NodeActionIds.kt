@@ -1,6 +1,6 @@
 /**
- * 无障碍动作 id 与方向映射（coordinate-node-action-split：从 NodeActionRouter 抽出，
- * 节点工具（tap_node/scroll_node）与滚动几何共用；路由机制本身随后清理）。
+ * 无障碍动作 id 与方向映射（coordinate-node-action-split：原 NodeActionRouter 的公共部分，
+ * 节点工具（tap_node/scroll_node）与滚动几何共用）。
  */
 package com.example.autop.device.impl.nodeaction
 

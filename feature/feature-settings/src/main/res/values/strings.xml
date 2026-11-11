@@ -43,7 +43,6 @@
     <string name="me_sub_display_mode">静置自动收成贴边小条，可改为常开或即收</string>
     <string name="me_sub_conditions_enabled">满足条件（时间、电量等）自动跑流程</string>
     <string name="me_sub_observe">无障碍 / 视觉 / 大模型的优先级</string>
-    <string name="me_sub_node_action">点击/滚动优先走无障碍节点动作</string>
     <string name="me_nav_shell">注入通道（无线调试）</string>
     <string name="me_shell_title">注入通道（无线调试）</string>
     <string name="me_shell_status_off">未连接（手势注入回落无障碍通道）</string>
@@ -266,16 +265,6 @@
     <string name="blocked_add_manual">手动添加包名</string>
     <string name="blocked_package_hint">包名，如 com.example.app</string>
     <string name="blocked_package_invalid">请填写合法的包名</string>
-
-    <!-- 节点操作页（ADR-0015 me/node-action） -->
-    <string name="me_nav_node_action">节点操作</string>
-    <string name="node_action_title">节点操作</string>
-    <string name="node_action_note">点击、长按、滚动在能读到界面节点时，会优先用系统的无障碍节点动作，比坐标手势更稳。个别应用不响应节点动作，AutoP 发现后会自动记下，之后对它改用手势</string>
-    <string name="node_action_switch_title">优先使用节点操作</string>
-    <string name="node_action_switch_subtitle">关闭后一律使用坐标手势</string>
-    <string name="node_action_blocked_count">不响应节点操作的应用（%1$d）</string>
-    <string name="node_action_row_subtitle">%1$s · 记录于 %2$s · 点按恢复</string>
-    <string name="node_action_empty">还没有发现不响应节点操作的应用</string>
 
     <!-- 调试页（docs/tech/08 §4.6 me/debug） -->
     <string name="debug_title">调试</string>
