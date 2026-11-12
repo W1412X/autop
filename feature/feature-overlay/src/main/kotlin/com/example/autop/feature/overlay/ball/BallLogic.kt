@@ -156,6 +156,6 @@ public const val DOCK_VISIBLE_RATIO: Double = 0.35
 
 private val TEXT_TOOLS = setOf("tool.input_text", "tool.clipboard_get", "tool.clipboard_set")
 private val VISION_TOOLS = setOf("tool.screenshot", "tool.observe")
-private val APP_TOOLS = setOf("tool.open_app", "tool.open_uri", "tool.list_apps")
+private val APP_TOOLS = setOf("tool.open_app", "tool.open_uri", "tool.intent", "tool.list_apps")
 private val GESTURE_TOOLS =
     setOf("tool.tap", "tool.tap_node", "tool.scroll", "tool.scroll_node", "tool.swipe", "tool.global_action")

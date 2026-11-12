@@ -17,6 +17,13 @@ class RunStepTextTest {
     }
 
     @Test
+    fun `intent 按 kind 说明动作，缺 kind 回落为处理系统事务`() {
+        assertThat(stepTextOf("tool.intent", """{"kind":"alarm"}""")).isEqualTo("设置闹钟")
+        assertThat(stepTextOf("tool.intent", """{"kind":"navigate","destination":"北京站"}""")).isEqualTo("导航")
+        assertThat(stepTextOf("tool.intent", "{}")).isEqualTo("处理系统事务")
+    }
+
+    @Test
     fun `input_text 附带输入文本`() {
         assertThat(stepTextOf("tool.input_text", """{"text":"你好"}""")).isEqualTo("输入「你好」")
     }

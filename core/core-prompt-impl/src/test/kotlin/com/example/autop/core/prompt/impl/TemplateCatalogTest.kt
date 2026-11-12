@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(51)
+        assertThat(toolTemplates).hasSize(52)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -118,6 +118,7 @@ class TemplateCatalogTest {
                 "agent.state.input.accessibility",
                 "agent.state.input.shell",
                 "agent.state.input.shield",
+                "agent.state.navigation",
                 "agent.state.observe.coord",
                 "agent.state.observe.modes",
                 "agent.state.observe.unavailable",
@@ -179,6 +180,9 @@ class TemplateCatalogTest {
                 "agent.tool.error_result",
                 "chat.title.generate",
                 "device.hint.coord_out_of_range",
+                "device.hint.intent_app_candidates",
+                "device.hint.intent_map_not_installed",
+                "device.hint.intent_no_handler",
                 "device.hint.llm_parse_failed",
                 "device.hint.mode_unavailable",
                 "device.llm_parser.coord.normalized_xyxy",
@@ -194,6 +198,12 @@ class TemplateCatalogTest {
                 "device.llm_parser.user",
                 "device.a11y.tree_empty_hint",
                 "device.input.refresh_failed_hint",
+                "device.intent.ask_map",
+                "device.intent.foreground",
+                "device.intent.invalid",
+                "device.intent.navigate_choice",
+                "device.intent.result",
+                "device.intent.settings_fallback",
                 "device.launch.denied_hint",
                 "device.launch.not_found_hint",
                 "device.notifications.truncated",
@@ -207,6 +217,7 @@ class TemplateCatalogTest {
                 "device.effect.unchanged",
                 "device.effect.unchanged_hint.default",
                 "device.effect.unchanged_hint.input_text",
+                "device.effect.unchanged_hint.intent",
                 "device.effect.unchanged_hint.scroll",
                 "device.effect.unchanged_hint.scroll_node",
                 "device.effect.unchanged_hint.swipe",
@@ -279,6 +290,7 @@ class TemplateCatalogTest {
                 "tool.global_action",
                 "tool.history_recall",
                 "tool.input_text",
+                "tool.intent",
                 "tool.list_apps",
                 "tool.list_tasks",
                 "tool.memory_list",

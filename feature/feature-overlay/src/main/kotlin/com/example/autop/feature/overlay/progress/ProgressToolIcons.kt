@@ -24,6 +24,7 @@ private val TOOL_ICONS: Map<String, ImageVector> =
         "tool.global_action" to AutopIcons.OpenWith,
         "tool.open_app" to AutopIcons.Launch,
         "tool.open_uri" to AutopIcons.Link,
+        "tool.intent" to AutopIcons.Launch,
         "tool.screenshot" to AutopIcons.PhotoCamera,
         "tool.observe" to AutopIcons.Visibility,
         "tool.wait" to AutopIcons.Schedule,

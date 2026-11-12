@@ -26,6 +26,7 @@ public object ToolProbeFixtures {
             "global_action" to jsonObjectOf("action" to "notifications"),
             "open_app" to jsonObjectOf("package" to "com.android.settings"),
             "open_uri" to jsonObjectOf("uri" to "https://example.com"),
+            "intent" to jsonObjectOf("kind" to "settings", "page" to "home"),
             "wait" to jsonObjectOf("ms" to 200),
             "list_apps" to jsonObjectOf("query" to "设置"),
             "get_device_state" to jsonObjectOf(),

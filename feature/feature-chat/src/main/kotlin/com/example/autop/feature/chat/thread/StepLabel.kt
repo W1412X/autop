@@ -21,6 +21,7 @@ public enum class StepLabel(
     GLOBAL_ACTION(R.string.step_global_action),
     OPEN_APP(R.string.step_open_app),
     OPEN_URI(R.string.step_open_uri),
+    INTENT(R.string.step_intent),
     SCREENSHOT(R.string.step_screenshot),
     OBSERVE(R.string.step_observe),
     WAIT(R.string.step_wait),

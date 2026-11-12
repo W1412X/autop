@@ -27,6 +27,7 @@ private val VERBS: Map<String, String> =
         "tool.restart_app" to "重启应用",
         "tool.open_app" to "打开应用",
         "tool.open_uri" to "打开链接",
+        "tool.intent" to "处理系统事务",
         "tool.wait" to "等待",
         "tool.list_apps" to "查找应用",
         "tool.get_device_state" to "读取设备状态",
@@ -49,6 +50,19 @@ private val VERBS: Map<String, String> =
         "tool.create_task" to "创建任务",
         "tool.update_task" to "更新任务",
         "tool.notify_user" to "通知你",
+    )
+
+/** `tool.intent` 的 kind → 说法。 */
+private val INTENT_KINDS: Map<String, String> =
+    mapOf(
+        "alarm" to "设置闹钟",
+        "timer" to "设置计时器",
+        "calendar" to "新建日程",
+        "dial" to "打开拨号盘",
+        "sms_draft" to "起草短信",
+        "share" to "分享",
+        "navigate" to "导航",
+        "settings" to "打开设置",
     )
 
 /** `tool.global_action` 的动作 → 说法。 */
@@ -74,6 +88,7 @@ internal fun targetOf(
             "tool.open_app" -> args?.str("name") ?: args?.str("package")
             "tool.list_apps" -> args?.str("query")
             "tool.global_action" -> args?.str("action")?.let { GLOBAL_ACTIONS[it] }
+            "tool.intent" -> args?.str("kind")?.let { INTENT_KINDS[it] }
             else -> null
         }
     return raw?.trim()?.takeIf { it.isNotBlank() }?.abbreviate()
@@ -82,6 +97,18 @@ internal fun targetOf(
 /** 工具 id 规范化：模型可见名（tap）与工具 id（tool.tap）都归一到工具 id。 */
 internal fun canonToolId(toolId: String): String = if (toolId.startsWith("tool.")) toolId else "tool.$toolId"
 
+/** 动词：tap 区分长按、global_action 与 intent 按参数说明；其余查表，未知工具回落去前缀的 id。 */
+private fun verbOf(
+    id: String,
+    args: JsonObject?,
+): String =
+    when (id) {
+        "tool.tap" -> if (args?.bool("long") == true) "长按" else "点击"
+        "tool.global_action" -> args?.str("action")?.let { GLOBAL_ACTIONS[it] } ?: "执行系统动作"
+        "tool.intent" -> args?.str("kind")?.let { INTENT_KINDS[it] } ?: "处理系统事务"
+        else -> VERBS[id] ?: id.removePrefix("tool.")
+    }
+
 /** 当前操作描述：动词 + 可选目标（「目标」过长截断）；未知工具回落去前缀的 id。 */
 internal fun stepTextOf(
     toolId: String,
@@ -89,12 +116,7 @@ internal fun stepTextOf(
 ): String {
     val id = canonToolId(toolId)
     val args = argsOf(argsJson)
-    val verb =
-        when (id) {
-            "tool.tap" -> if (args?.bool("long") == true) "长按" else "点击"
-            "tool.global_action" -> args?.str("action")?.let { GLOBAL_ACTIONS[it] } ?: "执行系统动作"
-            else -> VERBS[id]
-        } ?: id.removePrefix("tool.")
+    val verb = verbOf(id, args)
     val target =
         when (id) {
             "tool.input_text" -> args?.str("text")

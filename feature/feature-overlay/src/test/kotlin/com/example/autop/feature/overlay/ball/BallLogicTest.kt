@@ -113,6 +113,7 @@ class BallLogicTest {
         assertThat(categoryOfTool("tool.input_text")).isEqualTo(ToolCategory.TEXT)
         assertThat(categoryOfTool("tool.screenshot")).isEqualTo(ToolCategory.VISION)
         assertThat(categoryOfTool("tool.open_app")).isEqualTo(ToolCategory.APP)
+        assertThat(categoryOfTool("tool.intent")).isEqualTo(ToolCategory.APP)
         assertThat(categoryOfTool("tool.wait")).isEqualTo(ToolCategory.OTHER)
     }
 

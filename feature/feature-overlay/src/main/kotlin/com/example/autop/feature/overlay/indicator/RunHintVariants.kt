@@ -61,6 +61,7 @@ private val TOOLS: Map<String, ToolVariants> =
                 noTarget = listOf("打开应用中…", "正在启动应用…"),
             ),
         "tool.open_uri" to ToolVariants(noTarget = listOf("打开链接中…", "正在打开链接…")),
+        "tool.intent" to ToolVariants(noTarget = listOf("交给系统处理…", "处理系统事务中…")),
         "tool.global_action" to
             ToolVariants(
                 withTarget = listOf("${TARGET_SLOT}中…", "正在$TARGET_SLOT…"),

@@ -21,6 +21,7 @@ private val TOOL_ICONS: Map<StepLabel, ImageVector> =
         StepLabel.GLOBAL_ACTION to AutopIcons.OpenWith,
         StepLabel.OPEN_APP to AutopIcons.Launch,
         StepLabel.OPEN_URI to AutopIcons.Link,
+        StepLabel.INTENT to AutopIcons.Launch,
         StepLabel.SCREENSHOT to AutopIcons.PhotoCamera,
         StepLabel.OBSERVE to AutopIcons.Visibility,
         StepLabel.WAIT to AutopIcons.Schedule,

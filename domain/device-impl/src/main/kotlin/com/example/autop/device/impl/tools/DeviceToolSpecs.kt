@@ -6,8 +6,14 @@ package com.example.autop.device.impl.tools
 
 import com.example.autop.agent.ToolSpec
 import com.example.autop.agent.toolSpec
+import com.example.autop.device.core.NavMode
+import com.example.autop.device.core.SettingsPage
 
-/** 17 个设备工具的 spec。 */
+/** `intent` 的 kind 枚举（与 [com.example.autop.device.core.kind] 一致）。 */
+private val INTENT_KINDS: List<String> =
+    listOf("alarm", "timer", "calendar", "dial", "sms_draft", "share", "navigate", "settings")
+
+/** 设备类工具的 spec。 */
 public object DeviceToolSpecs {
     /** `tool.observe`：静态形态（全模式枚举）；运行期由 [observeFor] 按生效模式收窄。 */
     public val observe: ToolSpec = observeFor(listOf("a11y", "visual", "llm"), "")
@@ -139,6 +145,45 @@ public object DeviceToolSpecs {
             string("uri", required = true)
         }
 
+    /** `tool.intent` 的静态形态（导航应用枚举为空）；运行期由 [intentFor] 按规则表收窄。 */
+    public val intent: ToolSpec = intentFor(emptyList(), "")
+
+    /**
+     * `tool.intent` 的运行期形态：[mapIds] 为导航规则表里的应用 id（`map` 的枚举），
+     * [mapList] 为说明中的可选项列表（如 `amap=高德地图、…`）。
+     */
+    public fun intentFor(
+        mapIds: List<String>,
+        mapList: String,
+    ): ToolSpec =
+        toolSpec(
+            name = "intent",
+            descriptionPromptId = "tool.intent",
+            descriptionVars = mapOf("mapList" to mapList),
+        ) {
+            string("kind", required = true, enum = INTENT_KINDS)
+            integer("hour")
+            integer("minute")
+            array("days", itemType = "integer")
+            integer("seconds")
+            string("message")
+            string("title")
+            string("begin")
+            string("end")
+            boolean("all_day")
+            string("location")
+            string("description")
+            string("number")
+            string("text")
+            string("app")
+            string("destination")
+            number("lat", min = -90.0, max = 90.0)
+            number("lng", min = -180.0, max = 180.0)
+            string("mode", enum = NavMode.entries.map { it.id })
+            string("map", enum = mapIds.takeIf { it.isNotEmpty() })
+            string("page", enum = SettingsPage.entries.map { it.id })
+        }
+
     /** `tool.wait`：`ms` 或 `until` 条件二选一（同传时按 `ms` 固定等待）。 */
     public val wait: ToolSpec =
         toolSpec(name = "wait", descriptionPromptId = "tool.wait") {
@@ -194,6 +239,7 @@ public object DeviceToolSpecs {
             restartApp,
             openApp,
             openUri,
+            intent,
             wait,
             listApps,
             clipboardGet,

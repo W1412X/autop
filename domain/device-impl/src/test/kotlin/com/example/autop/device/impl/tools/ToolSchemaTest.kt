@@ -61,6 +61,7 @@ class ToolSchemaTest {
                 "restart_app",
                 "open_app",
                 "open_uri",
+                "intent",
                 "wait",
                 "list_apps",
                 "clipboard_get",

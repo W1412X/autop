@@ -336,6 +336,7 @@ private val ACTS_ON_SCREEN: Set<String> =
         "global_action",
         "open_app",
         "open_uri",
+        "intent",
         "restart_app",
         "dismiss_popup",
     )
