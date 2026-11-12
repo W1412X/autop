@@ -14,9 +14,9 @@ import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppInfo
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.impl.intent.ActivityStarter
 import com.example.autop.device.impl.tools.text
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -41,6 +41,7 @@ public class AppLauncherImpl
         private val dispatchers: DispatcherProvider,
         private val logger: Logger,
         private val prompts: PromptRepository,
+        private val starter: ActivityStarter,
     ) : AppLauncher {
         override suspend fun listApps(query: String?): List<AppInfo> =
             withContext(dispatchers.io) {
@@ -101,44 +102,15 @@ public class AppLauncherImpl
                 app.packageName.lowercase().contains(q)
         }
 
-        /**
-         * 启动分流（WP7.5）：找不到应用 / 被系统拒绝 / 其它异常给出各自的错误码与 hint，
-         * 不再只返回“打开失败”；成功返回 null。
-         */
-        @Suppress("TooGenericExceptionCaught") // startActivity 可抛任意运行时异常，统一转通用失败码（WP7.5）
+        /** 启动分流委托给 [ActivityStarter]（intent-tool §7.1）：错误码与 hint 不变。 */
         private fun startSafely(
             intent: Intent,
             target: String,
             genericCode: String,
-        ): AppError? =
-            try {
-                context.startActivity(intent)
-                null
-            } catch (missing: android.content.ActivityNotFoundException) {
-                logger.w(TAG, "activity_not_found", "target" to target, error = missing)
-                AppError(
-                    code = DeviceErrorCodes.APP_NOT_FOUND,
-                    message = "no activity to handle $target",
-                    hint = prompts.text(PROMPT_NOT_FOUND_HINT),
-                )
-            } catch (denied: SecurityException) {
-                // ROM 限制/后台启动拦截（BAL 等）不再直穿成 TOOL_CRASHED（N172）。
-                logger.w(TAG, "start_activity_denied", "target" to target, error = denied)
-                AppError(
-                    code = DeviceErrorCodes.LAUNCH_DENIED,
-                    message = "start activity denied: $target (${denied.message})",
-                    hint = prompts.text(PROMPT_DENIED_HINT),
-                )
-            } catch (cancelled: CancellationException) {
-                throw cancelled
-            } catch (other: Exception) {
-                logger.w(TAG, "start_activity_failed", "target" to target, error = other)
-                AppError(code = genericCode, message = "${other.javaClass.simpleName}: ${other.message}")
-            }
+        ): AppError? = starter.start(intent, target, genericCode)
 
         private companion object {
             const val TAG = "AppLauncher"
             const val PROMPT_NOT_FOUND_HINT = "device.launch.not_found_hint"
-            const val PROMPT_DENIED_HINT = "device.launch.denied_hint"
         }
     }

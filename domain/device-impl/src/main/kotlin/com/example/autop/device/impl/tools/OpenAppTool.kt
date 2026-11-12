@@ -17,6 +17,7 @@ import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ScreenSnapshot
+import com.example.autop.device.core.AppMatcher
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
@@ -66,7 +67,7 @@ public class OpenAppTool
         ): Outcome<PreparedAction> {
             val pkg = args.str("package")
             val name = args.str("name")
-            val candidates = if (name != null) matchApps(apps.listApps(name), name) else emptyList()
+            val candidates = if (name != null) AppMatcher.rank(apps.listApps(name), name) else emptyList()
             val targetPkg = pkg ?: candidates.singleOrNull()?.packageName
             val extra = mapOf(EXTRA_TARGET_PACKAGE to (targetPkg ?: name.orEmpty()))
             return when {
@@ -124,17 +125,6 @@ public class OpenAppTool
             }
             val lines = app.candidates.joinToString("\n") { "${it.label} ${it.packageName}" }
             return textOutput("找到多个应用，请用 package 参数指定：\n$lines")
-        }
-
-        /** 名称匹配：完全相等 > 前缀 > 包含，同级保持原顺序。 */
-        private fun matchApps(
-            all: List<AppInfo>,
-            name: String,
-        ): List<AppInfo> {
-            val exact = all.filter { it.label == name }
-            val prefix = all.filter { it.label.startsWith(name) && it.label != name }
-            val contains = all.filter { it.label.contains(name) && !it.label.startsWith(name) }
-            return exact + prefix + contains
         }
 
         private companion object {
