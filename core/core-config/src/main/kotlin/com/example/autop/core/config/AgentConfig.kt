@@ -51,6 +51,7 @@ public data class AgentToolsSection(
                 "tool.global_action",
                 "tool.open_app",
                 "tool.open_uri",
+                "tool.intent",
                 "tool.wait",
                 "tool.dismiss_popup",
                 "tool.restart_app",
@@ -87,6 +88,8 @@ public data class AgentToolsSection(
                 // 否则路由先超时，agent 拿到的不是 device.llm_parse_failed 而是 agent.tool_timeout。
                 "tool.observe" to 300000,
                 "tool.wait" to 120000,
+                // intent 可能先向用户询问导航应用（askTimeoutMs 默认 60s），预算要盖住询问与启动。
+                "tool.intent" to 120000,
                 "tool.ask_user" to 600000,
                 // 流程执行可能远超默认 30s，预算要盖住整段流程运行（flows.md §14.1），
                 // 否则 withTimeout 会取消整个流程会话并返回 agent.tool_timeout。
@@ -228,6 +231,7 @@ public data class AgentStateSection(
                 "state.environment",
                 "state.input",
                 "state.observe",
+                "state.navigation",
                 "state.permissions",
                 "state.budget",
                 "state.tools",

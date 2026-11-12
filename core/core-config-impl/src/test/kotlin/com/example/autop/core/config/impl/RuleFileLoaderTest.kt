@@ -1,7 +1,6 @@
 package com.example.autop.core.config.impl
 
 import com.example.autop.core.common.AutopJson
-import com.example.autop.core.config.CURRENT_SCHEMA_VERSION
 import com.google.common.truth.Truth.assertThat
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -23,7 +22,7 @@ class RuleFileLoaderTest {
         val file =
             ConfigAssetFile(
                 "policy_rules.json",
-                """{"schemaVersion": ${CURRENT_SCHEMA_VERSION + 1}, "categories": {}, "rules": []}""",
+                """{"schemaVersion": ${RULE_FILE_SCHEMA_VERSION + 1}, "categories": {}, "rules": []}""",
             )
         assertThrows(IllegalStateException::class.java) { loadPolicyRules(file) }
     }
@@ -32,7 +31,7 @@ class RuleFileLoaderTest {
     fun `duplicate rule id is rejected`() {
         val doc =
             """
-            {"schemaVersion": $CURRENT_SCHEMA_VERSION, "categories": {"payment": {"overridable": false, "reasonKey": "k"}},
+            {"schemaVersion": $RULE_FILE_SCHEMA_VERSION, "categories": {"payment": {"overridable": false, "reasonKey": "k"}},
              "rules": [
                {"id": "r1", "type": "text_any", "category": "payment", "scope": "TARGET", "params": {}},
                {"id": "r1", "type": "text_any", "category": "payment", "scope": "TARGET", "params": {}}
@@ -45,7 +44,7 @@ class RuleFileLoaderTest {
     fun `unknown category is rejected`() {
         val doc =
             """
-            {"schemaVersion": $CURRENT_SCHEMA_VERSION, "categories": {"payment": {"overridable": false, "reasonKey": "k"}},
+            {"schemaVersion": $RULE_FILE_SCHEMA_VERSION, "categories": {"payment": {"overridable": false, "reasonKey": "k"}},
              "rules": [{"id": "r1", "type": "text_any", "category": "nope", "scope": "TARGET", "params": {}}]}
             """.trimIndent()
         assertThrows(IllegalStateException::class.java) { loadPolicyRules(ConfigAssetFile("policy_rules.json", doc)) }
@@ -55,7 +54,7 @@ class RuleFileLoaderTest {
     fun `unknown type is rejected when known types are given`() {
         val doc =
             """
-            {"schemaVersion": $CURRENT_SCHEMA_VERSION, "categories": {"payment": {"overridable": false, "reasonKey": "k"}},
+            {"schemaVersion": $RULE_FILE_SCHEMA_VERSION, "categories": {"payment": {"overridable": false, "reasonKey": "k"}},
              "rules": [{"id": "r1", "type": "nope", "category": "payment", "scope": "TARGET", "params": {}}]}
             """.trimIndent()
         assertThrows(IllegalStateException::class.java) {

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "flow": {
     "run": {
       "pollMs": 500,

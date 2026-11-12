@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "device": {
     "capture": {
       "timeoutMs": 1500,
@@ -111,6 +111,13 @@
     },
     "replay": {
       "maxKeys": 200
+    },
+    "intent": {
+      "preferredMap": "auto",
+      "askTimeoutMs": 60000,
+      "timerMaxSeconds": 86400,
+      "calendarDefaultMinutes": 60,
+      "textMaxChars": 4000
     }
   }
 }

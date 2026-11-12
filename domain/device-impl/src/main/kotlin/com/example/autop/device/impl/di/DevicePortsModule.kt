@@ -12,6 +12,7 @@ import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.ElementPicker
 import com.example.autop.device.GestureController
+import com.example.autop.device.NavigationApps
 import com.example.autop.device.ObserveModeAvailability
 import com.example.autop.device.PairingDiscovery
 import com.example.autop.device.ScreenLease
@@ -29,6 +30,7 @@ import com.example.autop.device.impl.ObserveModeResolver
 import com.example.autop.device.impl.ScreenLeaseImpl
 import com.example.autop.device.impl.ScreenReaderImpl
 import com.example.autop.device.impl.UiStabilizerImpl
+import com.example.autop.device.impl.intent.NavigationAppsImpl
 import com.example.autop.device.impl.observation.ReplayStateProbeImpl
 import com.example.autop.device.impl.observation.ReplayTargetResolverImpl
 import com.example.autop.device.impl.record.ElementPickerImpl
@@ -69,6 +71,10 @@ public object DevicePortsModule {
     @Provides
     @Singleton
     public fun provideAppLauncher(impl: AppLauncherImpl): AppLauncher = impl
+
+    @Provides
+    @Singleton
+    public fun provideNavigationApps(impl: NavigationAppsImpl): NavigationApps = impl
 
     @Provides
     @Singleton

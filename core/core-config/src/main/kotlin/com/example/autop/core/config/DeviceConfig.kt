@@ -323,6 +323,44 @@ public data class DeviceReplaySection(
     @SerialName("maxKeys") val maxKeys: Int = 200,
 ) : ConfigSection
 
+/** `device.intent`：intent 工具（系统意图）的参数与导航应用偏好（intent-tool §10.1）。 */
+@Serializable
+public data class DeviceIntentSection(
+    /** 导航应用偏好：`auto`、`ask` 或导航规则表里的应用 id；未知值按 `auto` 处理。 */
+    @SerialName("preferredMap") val preferredMap: String = "auto",
+    /** “每次询问”等待用户回答的时间（毫秒）。 */
+    @SerialName("askTimeoutMs") val askTimeoutMs: Long = 60000,
+    /** timer 的 seconds 上限。 */
+    @SerialName("timerMaxSeconds") val timerMaxSeconds: Int = 86400,
+    /** calendar 缺省时长（分钟）。 */
+    @SerialName("calendarDefaultMinutes") val calendarDefaultMinutes: Int = 60,
+    /** share、sms_draft 的 text 与 calendar 的 description 最大字符数。 */
+    @SerialName("textMaxChars") val textMaxChars: Int = 4000,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (preferredMap.isBlank()) add("preferredMap must not be blank")
+            if (askTimeoutMs !in ASK_TIMEOUT_MS_RANGE) {
+                add("askTimeoutMs must be within $ASK_TIMEOUT_MS_RANGE, was $askTimeoutMs")
+            }
+            if (timerMaxSeconds !in TIMER_MAX_SECONDS_RANGE) {
+                add("timerMaxSeconds must be within $TIMER_MAX_SECONDS_RANGE, was $timerMaxSeconds")
+            }
+            if (calendarDefaultMinutes !in CALENDAR_DEFAULT_MINUTES_RANGE) {
+                add("calendarDefaultMinutes must be within $CALENDAR_DEFAULT_MINUTES_RANGE, was $calendarDefaultMinutes")
+            }
+            if (textMaxChars !in TEXT_MAX_CHARS_RANGE) {
+                add("textMaxChars must be within $TEXT_MAX_CHARS_RANGE, was $textMaxChars")
+            }
+        }
+
+}
+
+private val ASK_TIMEOUT_MS_RANGE: LongRange = 5000L..600000L
+private val TIMER_MAX_SECONDS_RANGE: IntRange = 1..604800
+private val CALENDAR_DEFAULT_MINUTES_RANGE: IntRange = 1..1440
+private val TEXT_MAX_CHARS_RANGE: IntRange = 1..20000
+
 /** `device` 领域全部配置键的登记（DI 多绑定与测试用）。 */
 public object DeviceConfig {
     public val CAPTURE: ConfigKey<DeviceCaptureSection> =
@@ -357,6 +395,8 @@ public object DeviceConfig {
         ConfigKey("device.notifications", DeviceNotificationsSection.serializer()) { DeviceNotificationsSection() }
     public val REPLAY: ConfigKey<DeviceReplaySection> =
         ConfigKey("device.replay", DeviceReplaySection.serializer()) { DeviceReplaySection() }
+    public val INTENT: ConfigKey<DeviceIntentSection> =
+        ConfigKey("device.intent", DeviceIntentSection.serializer()) { DeviceIntentSection() }
 
     public val ALL: List<ConfigKey<*>> =
         listOf(
@@ -376,5 +416,6 @@ public object DeviceConfig {
             WAIT,
             NOTIFICATIONS,
             REPLAY,
+            INTENT,
         )
 }

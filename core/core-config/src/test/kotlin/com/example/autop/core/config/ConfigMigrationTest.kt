@@ -110,7 +110,57 @@ class ConfigMigrationTest {
             }
         val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
         assertThat(migrated["device"]!!.jsonObject).doesNotContainKey("nodeAction")
-        assertThat(schemaVersionOf(migrated)).isEqualTo(5)
+        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+    }
+
+    @Test
+    fun `v6 inserts intent tool after open_uri and navigation state after observe`() {
+        val doc = buildJsonObject { put("schemaVersion", 5); put("agent", agentDoc(TOOLS_V5, SOURCES_V5)) }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(enabledIds(migrated)).containsExactly("tool.open_uri", "tool.intent", "tool.wait").inOrder()
+        assertThat(sourceIds(migrated))
+            .containsExactly("state.environment", "state.observe", "state.navigation", "state.budget")
+            .inOrder()
+        assertThat(schemaVersionOf(migrated)).isEqualTo(6)
+    }
+
+    @Test
+    fun `v6 does not duplicate existing intent entries`() {
+        val tools = listOf("tool.open_uri", "tool.intent", "tool.wait")
+        val sources = listOf("state.observe", "state.navigation")
+        val doc = buildJsonObject { put("schemaVersion", 5); put("agent", agentDoc(tools, sources)) }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(enabledIds(migrated)).isEqualTo(tools)
+        assertThat(sourceIds(migrated)).isEqualTo(sources)
+    }
+
+    @Test
+    fun `v6 keeps arrays without anchors and skips missing arrays`() {
+        val doc = buildJsonObject { put("schemaVersion", 5); put("agent", agentDoc(listOf("tool.wait"), null)) }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(enabledIds(migrated)).containsExactly("tool.wait")
+        assertThat(resolvePath(migrated, "agent.state")).isNull()
+    }
+
+    private fun agentDoc(
+        tools: List<String>?,
+        sources: List<String>?,
+    ): JsonObject =
+        buildJsonObject {
+            if (tools != null) put("tools", buildJsonObject { put("enabled", JsonArray(tools.map { JsonPrimitive(it) })) })
+            if (sources != null) {
+                put("state", buildJsonObject { put("sources", JsonArray(sources.map { JsonPrimitive(it) })) })
+            }
+        }
+
+    private fun sourceIds(doc: JsonObject): List<String> {
+        val sources = resolvePath(doc, "agent.state.sources") as JsonArray
+        return sources.map { it.jsonPrimitive.content }
+    }
+
+    private companion object {
+        val TOOLS_V5 = listOf("tool.open_uri", "tool.wait")
+        val SOURCES_V5 = listOf("state.environment", "state.observe", "state.budget")
     }
 
     private fun toolsDoc(ids: List<String>): JsonObject =

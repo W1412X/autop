@@ -7,7 +7,6 @@ package com.example.autop.core.config.impl
 
 import android.content.Context
 import com.example.autop.core.common.AutopJson
-import com.example.autop.core.config.CURRENT_SCHEMA_VERSION
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -62,11 +61,17 @@ private fun parsePolicyDoc(file: ConfigAssetFile): JsonObject {
         }
     checkNotNull(doc) { "rules file ${file.name} must be a JSON object" }
     val version = (doc[SCHEMA_VERSION_KEY] as? JsonPrimitive)?.intOrNull
-    check(version == CURRENT_SCHEMA_VERSION) {
-        "rules file ${file.name} schemaVersion must be $CURRENT_SCHEMA_VERSION, was $version"
+    check(version == RULE_FILE_SCHEMA_VERSION) {
+        "rules file ${file.name} schemaVersion must be $RULE_FILE_SCHEMA_VERSION, was $version"
     }
     return doc
 }
+
+/**
+ * 规则文件（assets 的 rules 目录下的 json）自己的 schemaVersion，与配置覆盖文件的 CURRENT_SCHEMA_VERSION 独立。
+ * 配置版本升级（如 5→6，intent-tool §10.3）不改规则文件，所以这里不能跟随配置常量。
+ */
+internal const val RULE_FILE_SCHEMA_VERSION: Int = 5
 
 private fun ruleObjects(
     value: JsonElement?,

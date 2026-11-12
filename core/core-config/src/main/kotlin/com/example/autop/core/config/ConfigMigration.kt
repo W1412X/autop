@@ -22,7 +22,7 @@ public data class ConfigMigration(
 )
 
 /** 配置（用户覆盖）文件的当前 schemaVersion。 */
-public const val CURRENT_SCHEMA_VERSION: Int = 5
+public const val CURRENT_SCHEMA_VERSION: Int = 6
 
 /**
  * 内置迁移链：v2 删除屏幕观测 v4 不再使用的配置键（docs/design/
@@ -43,6 +43,8 @@ public fun builtinConfigMigrations(): List<ConfigMigration> =
             val cleaned = removePath(doc, "device.nodeAction")
             insertAgentTools(cleaned)
         },
+        // intent-tool：补注册 tool.intent 与 state.navigation（用户覆盖了对应数组时才改写）。
+        ConfigMigration(from = 5, to = 6) { doc -> insertIntentEntries(doc) },
     )
 
 /** v2 删除的配置路径。 */
@@ -97,6 +99,45 @@ private fun insertAgentTools(doc: JsonObject): JsonObject {
         }
     }
     return doc.withChild("agent", agent.withChild("tools", JsonObject(tools + ("enabled" to JsonArray(rebuilt)))))
+}
+
+/**
+ * v6：`tool.intent` 紧跟 `tool.open_uri`，`state.navigation` 紧跟 `state.observe`（已存在不重复；
+ * 锚点不在数组里则保持原样，尊重用户删掉锚点的选择）。
+ */
+private fun insertIntentEntries(doc: JsonObject): JsonObject {
+    val agent = doc["agent"] as? JsonObject ?: return doc
+    val withTools = replaceArray(agent, "tools", "enabled") { insertIdAfter(it, "tool.open_uri", "tool.intent") }
+    val withState = replaceArray(withTools, "state", "sources") { insertIdAfter(it, "state.observe", "state.navigation") }
+    return doc.withChild("agent", withState)
+}
+
+/** 对 `parent[section][key]` 这个数组做变换；路径上任一层缺失则原样返回。 */
+private fun replaceArray(
+    parent: JsonObject,
+    section: String,
+    key: String,
+    transform: (JsonArray) -> JsonArray,
+): JsonObject {
+    val child = parent[section] as? JsonObject ?: return parent
+    val array = child[key] as? JsonArray ?: return parent
+    return parent.withChild(section, JsonObject(child + (key to transform(array))))
+}
+
+/** 在 [anchor] 之后插入 [newId]；已存在或锚点缺失时原样返回。 */
+private fun insertIdAfter(
+    list: JsonArray,
+    anchor: String,
+    newId: String,
+): JsonArray {
+    val ids = list.map { (it as? JsonPrimitive)?.contentOrNull }
+    if (newId in ids || anchor !in ids) return list
+    val rebuilt = mutableListOf<JsonElement>()
+    for (item in list) {
+        rebuilt += item
+        if ((item as? JsonPrimitive)?.contentOrNull == anchor) rebuilt += JsonPrimitive(newId)
+    }
+    return JsonArray(rebuilt)
 }
 
 /** 按点分路径删除键（不存在时原样返回）。 */

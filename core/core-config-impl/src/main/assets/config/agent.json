@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "agent": {
     "context": {
       "contributors": [
@@ -29,6 +29,7 @@
         "tool.global_action",
         "tool.open_app",
         "tool.open_uri",
+        "tool.intent",
         "tool.wait",
         "tool.dismiss_popup",
         "tool.restart_app",
@@ -62,6 +63,7 @@
       "timeoutMs": {
         "tool.observe": 300000,
         "tool.wait": 120000,
+        "tool.intent": 120000,
         "tool.ask_user": 600000,
         "tool.run_flow": 600000
       }
@@ -166,7 +168,7 @@
       "maxCharsPerNote": 400
     },
     "state": {
-      "sources": ["state.environment", "state.input", "state.observe", "state.permissions", "state.budget", "state.tools"],
+      "sources": ["state.environment", "state.input", "state.observe", "state.navigation", "state.permissions", "state.budget", "state.tools"],
       "budgetLowRatio": 0.2
     }
   }

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 5,
+  "schemaVersion": 6,
   "features": {
     "experienceExtraction": false,
     "subtasks": false,
