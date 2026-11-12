@@ -48,12 +48,15 @@ public object AppMatcher {
         query: String,
         all: List<AppInfo>,
     ): AppMatch {
-        all.firstOrNull { it.packageName == query }?.let { return AppMatch.Found(it) }
+        val byPackage = all.firstOrNull { it.packageName == query }
+        if (byPackage != null) return AppMatch.Found(byPackage)
         val ranked = rank(all, query)
-        if (ranked.isEmpty()) return AppMatch.NotFound
-        if (ranked.size == 1) return AppMatch.Found(ranked.first())
         val exact = ranked.filter { it.label == query }
-        if (exact.size == 1) return AppMatch.Found(exact.first())
-        return AppMatch.Ambiguous(ranked.take(MAX_CANDIDATES))
+        return when {
+            ranked.isEmpty() -> AppMatch.NotFound
+            ranked.size == 1 -> AppMatch.Found(ranked.first())
+            exact.size == 1 -> AppMatch.Found(exact.first())
+            else -> AppMatch.Ambiguous(ranked.take(MAX_CANDIDATES))
+        }
     }
 }

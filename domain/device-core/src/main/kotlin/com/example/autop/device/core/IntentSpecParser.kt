@@ -50,7 +50,9 @@ private class Parser(
         val minuteRaw = args.text("minute")
         val hour = hourRaw.toIntOrNull()
         val minute = if (minuteRaw == null) 0 else minuteRaw.toIntOrNull()
-        if (hour == null || minute == null || hour !in HOUR_RANGE || minute !in MINUTE_RANGE) {
+        val hourOk = hour?.let { it in HOUR_RANGE } == true
+        val minuteOk = minute?.let { it in MINUTE_RANGE } == true
+        if (!hourOk || !minuteOk) {
             return fail(IntentInvalidReason.BAD_TIME, value = "$hourRaw:${minuteRaw.orEmpty()}")
         }
         val days = daysOf(args) ?: return fail(IntentInvalidReason.BAD_DAYS)
@@ -91,7 +93,12 @@ private class Parser(
         allDay: Boolean,
     ): Long =
         if (allDay) {
-            Instant.ofEpochMilli(begin.ms).atZone(zone).plusDays(1).toInstant().toEpochMilli()
+            Instant
+                .ofEpochMilli(begin.ms)
+                .atZone(zone)
+                .plusDays(1)
+                .toInstant()
+                .toEpochMilli()
         } else {
             begin.ms + limits.calendarDefaultMinutes * MILLIS_PER_MINUTE
         }
@@ -122,31 +129,46 @@ private class Parser(
     }
 
     private fun navigate(args: JsonObject): IntentParse {
+        val destination = args.text("destination")
         val latRaw = args.text("lat")
         val lngRaw = args.text("lng")
-        if ((latRaw == null) != (lngRaw == null)) return fail(IntentInvalidReason.COORD_PAIR)
-        val destination = args.text("destination")
-        if (destination == null && latRaw == null) return fail(IntentInvalidReason.NAV_NEEDS_TARGET)
+        val modeRaw = args.text("mode")
+        val map = args.text("map")
         val lat = latRaw?.toDoubleOrNull()
         val lng = lngRaw?.toDoubleOrNull()
-        if (latRaw != null && lngRaw != null) {
-            if (lat == null || lng == null || lat !in LAT_RANGE || lng !in LNG_RANGE) {
-                return fail(IntentInvalidReason.COORD_RANGE, value = "$latRaw,$lngRaw")
-            }
-        }
-        val modeRaw = args.text("mode")
-        val mode =
-            if (modeRaw == null) {
-                NavMode.DRIVE
-            } else {
-                modeOf(modeRaw) ?: return fail(IntentInvalidReason.BAD_MODE, value = modeRaw, detail = MODE_IDS)
-            }
-        val map = args.text("map")
-        if (map != null && map !in knownMapIds) {
-            return fail(IntentInvalidReason.BAD_MAP, value = map, detail = knownMapIds.sorted().joinToString(", "))
-        }
+        navigateProblem(destination, latRaw, lngRaw, modeRaw, map)?.let { return IntentParse.Invalid(it) }
+        val mode = modeRaw?.let { modeOf(it) } ?: NavMode.DRIVE
         return ok(IntentSpec.Navigate(destination, lat, lng, mode, map))
     }
+
+    /** 导航参数的第一条校验失败（按固定顺序）；全部通过返回 null。 */
+    private fun navigateProblem(
+        destination: String?,
+        latRaw: String?,
+        lngRaw: String?,
+        modeRaw: String?,
+        map: String?,
+    ): IntentInvalid? =
+        when {
+            (latRaw == null) != (lngRaw == null) -> IntentInvalid(IntentInvalidReason.COORD_PAIR)
+            destination == null && latRaw == null -> IntentInvalid(IntentInvalidReason.NAV_NEEDS_TARGET)
+            latRaw != null && lngRaw != null && !coordsInRange(latRaw.toDoubleOrNull(), lngRaw.toDoubleOrNull()) ->
+                IntentInvalid(IntentInvalidReason.COORD_RANGE, value = "$latRaw,$lngRaw")
+            modeRaw != null && modeOf(modeRaw) == null ->
+                IntentInvalid(IntentInvalidReason.BAD_MODE, value = modeRaw, detail = MODE_IDS)
+            map != null && map !in knownMapIds ->
+                IntentInvalid(
+                    IntentInvalidReason.BAD_MAP,
+                    value = map,
+                    detail = knownMapIds.sorted().joinToString(", "),
+                )
+            else -> null
+        }
+
+    private fun coordsInRange(
+        lat: Double?,
+        lng: Double?,
+    ): Boolean = lat != null && lng != null && lat in LAT_RANGE && lng in LNG_RANGE
 
     private fun settings(args: JsonObject): IntentParse {
         val pageRaw = args.text("page") ?: return fail(IntentInvalidReason.SETTINGS_NEEDS_PAGE, detail = PAGE_IDS)
@@ -204,7 +226,7 @@ private class Parser(
 
         /** 电话号码：可选 +，首位数字，之后允许空格、括号、连字符；服务码（* #）由调用方另行拒绝。 */
         val PHONE_PATTERN = Regex("^\\+?[0-9][0-9 ()\\-]{1,30}$")
-        val KIND_IDS = "alarm, timer, calendar, dial, sms_draft, share, navigate, settings"
+        const val KIND_IDS = "alarm, timer, calendar, dial, sms_draft, share, navigate, settings"
         val MODE_IDS = NavMode.entries.joinToString(", ") { it.id }
         val PAGE_IDS = SettingsPage.entries.joinToString(", ") { it.id }
     }

@@ -15,9 +15,11 @@ public object NavigationRulesValidator {
                 add("schemaVersion must be $CURRENT_NAVIGATION_RULES_SCHEMA_VERSION, got ${rules.schemaVersion}")
             }
             if (rules.apps.isEmpty()) add("apps must not be empty")
-            duplicatesOf(rules.apps.map { it.id }).takeIf { it.isNotEmpty() }
+            duplicatesOf(rules.apps.map { it.id })
+                .takeIf { it.isNotEmpty() }
                 ?.let { add("duplicate app id: $it") }
-            duplicatesOf(rules.apps.map { it.priority }).takeIf { it.isNotEmpty() }
+            duplicatesOf(rules.apps.map { it.priority })
+                .takeIf { it.isNotEmpty() }
                 ?.let { add("duplicate priority: $it") }
             rules.apps.forEach { addAll(validateApp(it)) }
         }
@@ -59,7 +61,13 @@ public object NavigationRulesValidator {
             .map { "$appId: unknown placeholder {$it} in '$template'" }
             .toList()
 
-    private fun <T> duplicatesOf(values: List<T>): List<T> = values.groupBy { it }.filterValues { it.size > 1 }.keys.toList()
+    private fun <T> duplicatesOf(values: List<T>): List<T> =
+        values
+            .groupBy {
+                it
+            }.filterValues { it.size > 1 }
+            .keys
+            .toList()
 
     private val PLACEHOLDER = Regex("\\{([^{}]*)\\}")
     private val PLACEHOLDERS = setOf("name", "lat", "lng", "mode", "source")

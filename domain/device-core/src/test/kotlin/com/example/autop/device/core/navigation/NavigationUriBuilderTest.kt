@@ -47,7 +47,12 @@ class NavigationUriBuilderTest {
 
     @Test
     fun `baidu with coordinates only uses latlng destination and transit mode`() {
-        val uri = NavigationUriBuilder.build(app("baidu"), nav(lat = 39.9042, lng = 116.4074, mode = NavMode.TRANSIT), source)
+        val uri =
+            NavigationUriBuilder.build(
+                app("baidu"),
+                nav(lat = 39.9042, lng = 116.4074, mode = NavMode.TRANSIT),
+                source,
+            )
         assertThat(uri).isEqualTo(
             "baidumap://map/direction?destination=latlng%3A39.9042%2C116.4074" +
                 "&coord_type=gcj02&mode=transit&src=com.example.autop",
@@ -82,7 +87,12 @@ class NavigationUriBuilderTest {
 
     @Test
     fun `tencent with coordinates only uses tocoord and bus for transit`() {
-        val uri = NavigationUriBuilder.build(app("tencent"), nav(lat = 39.9042, lng = 116.4074, mode = NavMode.TRANSIT), source)
+        val uri =
+            NavigationUriBuilder.build(
+                app("tencent"),
+                nav(lat = 39.9042, lng = 116.4074, mode = NavMode.TRANSIT),
+                source,
+            )
         assertThat(uri).isEqualTo(
             "qqmap://map/routeplan?type=bus&tocoord=39.9042%2C116.4074&referer=com.example.autop",
         )

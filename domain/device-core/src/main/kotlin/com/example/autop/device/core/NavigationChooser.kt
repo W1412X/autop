@@ -90,7 +90,11 @@ public object NavigationChooser {
         mode: NavMode,
         rules: NavigationRules,
     ): List<NavigationApp> {
-        val supported = rules.apps.filter { it.uri.modes.containsKey(mode.id) }.map { it.id }.toSet()
+        val supported =
+            rules.apps
+                .filter { it.uri.modes.containsKey(mode.id) }
+                .map { it.id }
+                .toSet()
         return installed.filter { it.id in supported }
     }
 }

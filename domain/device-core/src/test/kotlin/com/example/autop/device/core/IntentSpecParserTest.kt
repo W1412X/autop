@@ -16,8 +16,7 @@ class IntentSpecParserTest {
     private fun parse(json: String): IntentParse =
         IntentSpecParser.parse(Json.parseToJsonElement(json).jsonObject, limits, maps, zone)
 
-    private fun reasonOf(json: String): IntentInvalidReason =
-        (parse(json) as IntentParse.Invalid).error.reason
+    private fun reasonOf(json: String): IntentInvalidReason = (parse(json) as IntentParse.Invalid).error.reason
 
     private fun specOf(json: String): IntentSpec = (parse(json) as IntentParse.Ok).spec
 
@@ -95,9 +94,13 @@ class IntentSpecParserTest {
 
     @Test
     fun `calendar reports missing and invalid times`() {
-        assertThat(reasonOf("""{"kind":"calendar","begin":"2026-10-24"}""")).isEqualTo(IntentInvalidReason.CALENDAR_NEEDS_TITLE)
+        assertThat(
+            reasonOf("""{"kind":"calendar","begin":"2026-10-24"}"""),
+        ).isEqualTo(IntentInvalidReason.CALENDAR_NEEDS_TITLE)
         assertThat(reasonOf("""{"kind":"calendar","title":"x"}""")).isEqualTo(IntentInvalidReason.CALENDAR_NEEDS_BEGIN)
-        assertThat(reasonOf("""{"kind":"calendar","title":"x","begin":"明天"}""")).isEqualTo(IntentInvalidReason.BAD_BEGIN)
+        assertThat(
+            reasonOf("""{"kind":"calendar","title":"x","begin":"明天"}"""),
+        ).isEqualTo(IntentInvalidReason.BAD_BEGIN)
         assertThat(reasonOf("""{"kind":"calendar","title":"x","begin":"2026-10-24","end":"later"}"""))
             .isEqualTo(IntentInvalidReason.BAD_END)
         assertThat(reasonOf("""{"kind":"calendar","title":"x","begin":"2026-10-24T19:00","end":"2026-10-24T18:00"}"""))
@@ -123,7 +126,9 @@ class IntentSpecParserTest {
     @Test
     fun `sms draft needs text and a valid optional number`() {
         assertThat(reasonOf("""{"kind":"sms_draft","number":"10086"}""")).isEqualTo(IntentInvalidReason.SMS_NEEDS_TEXT)
-        assertThat(reasonOf("""{"kind":"sms_draft","text":"hi","number":"#06#"}""")).isEqualTo(IntentInvalidReason.BAD_NUMBER)
+        assertThat(
+            reasonOf("""{"kind":"sms_draft","text":"hi","number":"#06#"}"""),
+        ).isEqualTo(IntentInvalidReason.BAD_NUMBER)
         assertThat((specOf("""{"kind":"sms_draft","text":"hi"}""") as IntentSpec.SmsDraft).number).isNull()
         assertThat(reasonOf("""{"kind":"sms_draft","text":"${"b".repeat(21)}"}"""))
             .isEqualTo(IntentInvalidReason.TEXT_TOO_LONG)
@@ -147,7 +152,9 @@ class IntentSpecParserTest {
     fun `navigate needs a destination or a coordinate pair`() {
         assertThat(reasonOf("""{"kind":"navigate"}""")).isEqualTo(IntentInvalidReason.NAV_NEEDS_TARGET)
         assertThat(reasonOf("""{"kind":"navigate","lat":39.9}""")).isEqualTo(IntentInvalidReason.COORD_PAIR)
-        assertThat(reasonOf("""{"kind":"navigate","destination":"x","lng":116.4}""")).isEqualTo(IntentInvalidReason.COORD_PAIR)
+        assertThat(
+            reasonOf("""{"kind":"navigate","destination":"x","lng":116.4}"""),
+        ).isEqualTo(IntentInvalidReason.COORD_PAIR)
     }
 
     @Test
@@ -158,16 +165,24 @@ class IntentSpecParserTest {
 
     @Test
     fun `navigate rejects unknown mode and map`() {
-        assertThat(reasonOf("""{"kind":"navigate","destination":"x","mode":"fly"}""")).isEqualTo(IntentInvalidReason.BAD_MODE)
-        assertThat(reasonOf("""{"kind":"navigate","destination":"x","map":"yandex"}""")).isEqualTo(IntentInvalidReason.BAD_MAP)
+        assertThat(
+            reasonOf("""{"kind":"navigate","destination":"x","mode":"fly"}"""),
+        ).isEqualTo(IntentInvalidReason.BAD_MODE)
+        assertThat(
+            reasonOf("""{"kind":"navigate","destination":"x","map":"yandex"}"""),
+        ).isEqualTo(IntentInvalidReason.BAD_MAP)
     }
 
     @Test
     fun `settings needs a listed page and an app for app notifications`() {
         assertThat(reasonOf("""{"kind":"settings"}""")).isEqualTo(IntentInvalidReason.SETTINGS_NEEDS_PAGE)
         assertThat(reasonOf("""{"kind":"settings","page":"accessibility"}""")).isEqualTo(IntentInvalidReason.BAD_PAGE)
-        assertThat(reasonOf("""{"kind":"settings","page":"app_notifications"}""")).isEqualTo(IntentInvalidReason.SETTINGS_NEEDS_APP)
-        assertThat((specOf("""{"kind":"settings","page":"wifi"}""") as IntentSpec.Settings).page).isEqualTo(SettingsPage.WIFI)
+        assertThat(
+            reasonOf("""{"kind":"settings","page":"app_notifications"}"""),
+        ).isEqualTo(IntentInvalidReason.SETTINGS_NEEDS_APP)
+        assertThat(
+            (specOf("""{"kind":"settings","page":"wifi"}""") as IntentSpec.Settings).page,
+        ).isEqualTo(SettingsPage.WIFI)
     }
 
     @Test

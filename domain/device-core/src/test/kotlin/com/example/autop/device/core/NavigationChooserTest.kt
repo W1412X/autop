@@ -78,13 +78,28 @@ class NavigationChooserTest {
 
     @Test
     fun `apps without the requested travel mode are not usable`() {
-        val noRide = rules.copy(apps = rules.apps.map { if (it.id == "amap") it.copy(uri = it.uri.copy(modes = it.uri.modes - "ride")) else it })
+        val noRide =
+            rules.copy(
+                apps =
+                    rules.apps.map {
+                        if (it.id ==
+                            "amap"
+                        ) {
+                            it.copy(uri = it.uri.copy(modes = it.uri.modes - "ride"))
+                        } else {
+                            it
+                        }
+                    },
+            )
         val choice = NavigationChooser.choose(null, "auto", listOf(amap, baidu), NavMode.RIDE, noRide)
         assertThat(choice).isEqualTo(NavChoice.Use(baidu, NavReason.AUTO))
     }
 
     private fun realRules(): NavigationRules {
         val file = File("../device-impl/src/main/assets/rules/navigation_apps.json")
-        return Json { ignoreUnknownKeys = true }.decodeFromString(NavigationRules.serializer(), file.readText(Charsets.UTF_8))
+        return Json { ignoreUnknownKeys = true }.decodeFromString(
+            NavigationRules.serializer(),
+            file.readText(Charsets.UTF_8),
+        )
     }
 }

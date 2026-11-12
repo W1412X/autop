@@ -33,17 +33,28 @@ public object IntentTime {
         text: String,
         zone: ZoneId,
     ): ParsedTime? =
-        attempt { LocalDateTime.parse(text).atZone(zone).toInstant().toEpochMilli() }
-            ?.let { ParsedTime(it, dateOnly = false) }
+        attempt {
+            LocalDateTime
+                .parse(text)
+                .atZone(zone)
+                .toInstant()
+                .toEpochMilli()
+        }?.let { ParsedTime(it, dateOnly = false) }
 
     private fun dateOnly(
         text: String,
         zone: ZoneId,
     ): ParsedTime? =
-        attempt { LocalDate.parse(text).atStartOfDay(zone).toInstant().toEpochMilli() }
-            ?.let { ParsedTime(it, dateOnly = true) }
+        attempt {
+            LocalDate
+                .parse(text)
+                .atStartOfDay(zone)
+                .toInstant()
+                .toEpochMilli()
+        }?.let { ParsedTime(it, dateOnly = true) }
 
-    /** 解析失败是预期中的输入错误，只吞 [DateTimeException]。 */
+    /** 解析失败是预期中的输入错误（调用方给出提示即可），只吞 [DateTimeException]，不需要保留异常。 */
+    @Suppress("SwallowedException")
     private inline fun attempt(block: () -> Long): Long? =
         try {
             block()

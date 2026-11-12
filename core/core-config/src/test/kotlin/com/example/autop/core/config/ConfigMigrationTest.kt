@@ -115,7 +115,11 @@ class ConfigMigrationTest {
 
     @Test
     fun `v6 inserts intent tool after open_uri and navigation state after observe`() {
-        val doc = buildJsonObject { put("schemaVersion", 5); put("agent", agentDoc(TOOLS_V5, SOURCES_V5)) }
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 5)
+                put("agent", agentDoc(TOOLS_V5, SOURCES_V5))
+            }
         val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
         assertThat(enabledIds(migrated)).containsExactly("tool.open_uri", "tool.intent", "tool.wait").inOrder()
         assertThat(sourceIds(migrated))
@@ -128,7 +132,11 @@ class ConfigMigrationTest {
     fun `v6 does not duplicate existing intent entries`() {
         val tools = listOf("tool.open_uri", "tool.intent", "tool.wait")
         val sources = listOf("state.observe", "state.navigation")
-        val doc = buildJsonObject { put("schemaVersion", 5); put("agent", agentDoc(tools, sources)) }
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 5)
+                put("agent", agentDoc(tools, sources))
+            }
         val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
         assertThat(enabledIds(migrated)).isEqualTo(tools)
         assertThat(sourceIds(migrated)).isEqualTo(sources)
@@ -136,7 +144,11 @@ class ConfigMigrationTest {
 
     @Test
     fun `v6 keeps arrays without anchors and skips missing arrays`() {
-        val doc = buildJsonObject { put("schemaVersion", 5); put("agent", agentDoc(listOf("tool.wait"), null)) }
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 5)
+                put("agent", agentDoc(listOf("tool.wait"), null))
+            }
         val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
         assertThat(enabledIds(migrated)).containsExactly("tool.wait")
         assertThat(resolvePath(migrated, "agent.state")).isNull()
@@ -147,7 +159,11 @@ class ConfigMigrationTest {
         sources: List<String>?,
     ): JsonObject =
         buildJsonObject {
-            if (tools != null) put("tools", buildJsonObject { put("enabled", JsonArray(tools.map { JsonPrimitive(it) })) })
+            if (tools !=
+                null
+            ) {
+                put("tools", buildJsonObject { put("enabled", JsonArray(tools.map { JsonPrimitive(it) })) })
+            }
             if (sources != null) {
                 put("state", buildJsonObject { put("sources", JsonArray(sources.map { JsonPrimitive(it) })) })
             }

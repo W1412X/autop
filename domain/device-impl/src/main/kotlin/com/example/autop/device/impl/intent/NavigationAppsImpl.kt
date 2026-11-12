@@ -36,6 +36,8 @@ public class NavigationAppsImpl
                 .sortedBy { it.priority }
                 .map { NavigationApp(id = it.id, label = it.label, packageName = it.packageName) }
 
+        /** 包不存在即未安装，不需要保留 NameNotFoundException。 */
+        @Suppress("SwallowedException")
         private fun isInstalled(
             pm: PackageManager,
             packageName: String,

@@ -108,7 +108,8 @@ private fun insertAgentTools(doc: JsonObject): JsonObject {
 private fun insertIntentEntries(doc: JsonObject): JsonObject {
     val agent = doc["agent"] as? JsonObject ?: return doc
     val withTools = replaceArray(agent, "tools", "enabled") { insertIdAfter(it, "tool.open_uri", "tool.intent") }
-    val withState = replaceArray(withTools, "state", "sources") { insertIdAfter(it, "state.observe", "state.navigation") }
+    val withState =
+        replaceArray(withTools, "state", "sources") { insertIdAfter(it, "state.observe", "state.navigation") }
     return doc.withChild("agent", withState)
 }
 

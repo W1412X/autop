@@ -347,13 +347,15 @@ public data class DeviceIntentSection(
                 add("timerMaxSeconds must be within $TIMER_MAX_SECONDS_RANGE, was $timerMaxSeconds")
             }
             if (calendarDefaultMinutes !in CALENDAR_DEFAULT_MINUTES_RANGE) {
-                add("calendarDefaultMinutes must be within $CALENDAR_DEFAULT_MINUTES_RANGE, was $calendarDefaultMinutes")
+                add(
+                    "calendarDefaultMinutes must be within $CALENDAR_DEFAULT_MINUTES_RANGE, " +
+                        "was $calendarDefaultMinutes",
+                )
             }
             if (textMaxChars !in TEXT_MAX_CHARS_RANGE) {
                 add("textMaxChars must be within $TEXT_MAX_CHARS_RANGE, was $textMaxChars")
             }
         }
-
 }
 
 private val ASK_TIMEOUT_MS_RANGE: LongRange = 5000L..600000L
