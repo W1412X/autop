@@ -29,6 +29,7 @@ internal fun PermissionsSection(
     onOpenWindowTypeSheet: () -> Unit,
     onOpenDisplayModeSheet: () -> Unit,
     onOpenOpacitySheet: () -> Unit,
+    onOpenNavigationSheet: () -> Unit,
     onAction: (MeAction) -> Unit,
 ) {
     Column {
@@ -71,6 +72,12 @@ internal fun PermissionsSection(
             title = stringResource(R.string.me_nav_shell),
             subtitle = stringResource(shellChannelStatusRes(state.shellChannel)),
             onClick = { onOpen(SettingsSection.SHELL) },
+        )
+        OptionRow(
+            title = stringResource(R.string.me_nav_navigation_app),
+            subtitle = stringResource(R.string.me_sub_navigation_app),
+            value = navigationLabel(state.navigationPreferred, state.navigationApps),
+            onClick = onOpenNavigationSheet,
         )
         BehaviorRows(state = state, onAction = onAction)
     }
@@ -226,3 +233,48 @@ private val OPACITY_OPTIONS: List<Double> = listOf(1.0, 0.9, 0.8, 0.7, 0.6)
 
 /** 小数透明度 → 百分比。 */
 private const val PERCENT = 100
+
+/** 导航应用选择弹层：自动 / 每次询问 / 已安装的具体应用（intent-tool §11）。 */
+@Composable
+internal fun NavigationSheet(
+    selectedId: String,
+    options: List<NavigationOption>,
+    onSelect: (String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val items =
+        listOf(
+            OptionItem(id = NAVIGATION_AUTO, label = stringResource(R.string.me_navigation_auto)),
+            OptionItem(id = NAVIGATION_ASK, label = stringResource(R.string.me_navigation_ask)),
+        ) + options.filter { it.installed }.map { OptionItem(id = it.id, label = it.label) }
+    OptionSheet(
+        title = stringResource(R.string.me_nav_navigation_app),
+        options = items,
+        selectedId = selectedId,
+        onSelect = onSelect,
+        onDismiss = onDismiss,
+    )
+}
+
+/** 导航应用行的显示文案；未知值按自动处理，已选但未安装的应用标注“将自动选择”。 */
+@Composable
+private fun navigationLabel(
+    preferred: String,
+    apps: List<NavigationOption>,
+): String =
+    when (preferred) {
+        NAVIGATION_ASK -> stringResource(R.string.me_navigation_ask)
+        NAVIGATION_AUTO -> stringResource(R.string.me_navigation_auto)
+        else -> {
+            val app = apps.firstOrNull { it.id == preferred }
+            when {
+                app == null -> stringResource(R.string.me_navigation_auto)
+                app.installed -> app.label
+                else -> stringResource(R.string.me_navigation_not_installed, app.label)
+            }
+        }
+    }
+
+/** 导航偏好的保留值（与 `device.intent.preferredMap` 一致）。 */
+private const val NAVIGATION_AUTO = "auto"
+private const val NAVIGATION_ASK = "ask"

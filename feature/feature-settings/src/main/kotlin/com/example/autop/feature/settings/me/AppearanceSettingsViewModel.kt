@@ -28,6 +28,7 @@ import com.example.autop.core.config.TaskConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.NavigationApps
 import com.example.autop.device.NotificationFeed
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
@@ -70,6 +71,7 @@ public class AppearanceSettingsViewModel
         private val permissionChecks: PermissionChecks,
         private val hostStatus: AgentHostStatus,
         private val updateChecker: UpdateChecker,
+        private val navigationApps: NavigationApps,
         private val memoryStore: MemoryStore,
         private val taskRepository: TaskRepository,
         @ApplicationContext private val context: Context,
@@ -83,6 +85,13 @@ public class AppearanceSettingsViewModel
 
         /** ON_RESUME 回到前台时 +1，触发权限类同步查询重新评估（N190）。 */
         private val refreshTick = MutableStateFlow(0)
+
+        /** 导航应用选项（规则表 × 安装状态）；进入页面与回到前台时重算（intent-tool §11）。 */
+        private val navigationOptions = MutableStateFlow<List<NavigationOption>>(emptyList())
+
+        init {
+            reloadNavigationApps()
+        }
 
         // 超过 5 路的 combine 只能按 values 下标取值，下标即上方各流的声明顺序。
         @Suppress("MagicNumber")
@@ -104,6 +113,7 @@ public class AppearanceSettingsViewModel
                 },
                 updateChecker.state,
                 updateNotice,
+                navigationOptions,
             ) { values ->
                 val snapshot = values[0] as ConfigSnapshot
 
@@ -114,6 +124,9 @@ public class AppearanceSettingsViewModel
                 val health = values[4] as HealthSignals
                 val update = values[5] as UpdateState
                 val pendingUpdateNotice = values[6] as UpdateNotice?
+
+                @Suppress("UNCHECKED_CAST")
+                val nav = values[7] as List<NavigationOption>
                 val reminder = snapshot[TaskConfig.REMINDER]
                 MeUiState(
                     appearance = snapshot[UiConfig.APPEARANCE],
@@ -140,6 +153,8 @@ public class AppearanceSettingsViewModel
                     mainModelAssigned = roles.main != null,
                     update = update,
                     updateNotice = pendingUpdateNotice,
+                    navigationPreferred = snapshot[DeviceConfig.INTENT].preferredMap,
+                    navigationApps = nav,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -153,6 +168,16 @@ public class AppearanceSettingsViewModel
                 notificationFeed.requestRebind()
             }
             refreshTick.value = refreshTick.value + 1
+            reloadNavigationApps()
+        }
+
+        /** 重算导航应用的安装状态（包管理器查询在 IO 线程）。 */
+        private fun reloadNavigationApps() {
+            viewModelScope.launch(dispatchers.io) {
+                val installed = navigationApps.installed().map { it.id }.toSet()
+                navigationOptions.value =
+                    navigationApps.known().map { NavigationOption(it.id, it.label, it.id in installed) }
+            }
         }
 
         @Suppress("CyclomaticComplexMethod") // MeAction 逐条映射配置写入，拆分反而分散
@@ -182,6 +207,7 @@ public class AppearanceSettingsViewModel
                 is MeAction.SetConditionsEnabled -> write(CONDITIONS_ENABLED_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetShieldEnabled -> write(SHIELD_ENABLED_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetSnoozeMinutes -> write(SNOOZE_MINUTES_PATH, JsonPrimitive(action.value))
+                is MeAction.SetNavigationApp -> write(NAVIGATION_PREFERRED_PATH, JsonPrimitive(action.value))
                 MeAction.ExportData -> export()
                 is MeAction.ImportData -> import(action.uri)
                 is MeAction.OpenSection -> if (!action.section.hasPage) notice.value = NoticeKind.PLACEHOLDER
@@ -316,6 +342,9 @@ public class AppearanceSettingsViewModel
 
             /** 默认稍后写入路径（task.reminder.snoozeMinutes，docs/tech/07 §4.4）。 */
             const val SNOOZE_MINUTES_PATH = "task.reminder.snoozeMinutes"
+
+            /** 导航应用偏好写入路径（device.intent.preferredMap，intent-tool §11）。 */
+            const val NAVIGATION_PREFERRED_PATH = "device.intent.preferredMap"
         }
     }
 

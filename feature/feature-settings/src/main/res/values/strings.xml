@@ -435,4 +435,9 @@
     <string name="budget_invalid_number">请输入 0 或正整数</string>
     <string name="budget_save">保存</string>
     <string name="budget_restore_default">恢复默认</string>
+    <string name="me_nav_navigation_app">导航应用</string>
+    <string name="me_sub_navigation_app">让 AI 用哪个地图应用导航；只列出已安装的</string>
+    <string name="me_navigation_auto">自动（按优先级选择已安装的应用）</string>
+    <string name="me_navigation_ask">每次询问</string>
+    <string name="me_navigation_not_installed">%1$s（未安装，将自动选择）</string>
 </resources>

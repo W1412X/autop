@@ -48,6 +48,7 @@ public fun MeScreen(
     var displayModeSheet by remember { mutableStateOf(false) }
     var opacitySheet by remember { mutableStateOf(false) }
     var snoozeSheet by remember { mutableStateOf(false) }
+    var navigationSheet by remember { mutableStateOf(false) }
     val importLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
             uri?.let { onAction(MeAction.ImportData(it.toString())) }
@@ -84,6 +85,7 @@ public fun MeScreen(
                     onOpenWindowTypeSheet = { windowTypeSheet = true },
                     onOpenDisplayModeSheet = { displayModeSheet = true },
                     onOpenOpacitySheet = { opacitySheet = true },
+                    onOpenNavigationSheet = { navigationSheet = true },
                     onAction = onAction,
                 )
             }
@@ -141,6 +143,17 @@ public fun MeScreen(
                 displayModeSheet = false
             },
             onDismiss = { displayModeSheet = false },
+        )
+    }
+    if (navigationSheet) {
+        NavigationSheet(
+            selectedId = state.navigationPreferred,
+            options = state.navigationApps,
+            onSelect = { id ->
+                onAction(MeAction.SetNavigationApp(id))
+                navigationSheet = false
+            },
+            onDismiss = { navigationSheet = false },
         )
     }
     if (opacitySheet) {

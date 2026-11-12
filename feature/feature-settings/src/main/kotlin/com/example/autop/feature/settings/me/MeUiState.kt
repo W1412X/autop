@@ -75,6 +75,17 @@ public data class MeUiState(
     val update: UpdateState = UpdateState.Idle,
     /** 手动检测结果提示（已是最新/检测失败；null 表示无）。 */
     val updateNotice: UpdateNotice? = null,
+    /** `device.intent.preferredMap`（导航应用偏好：auto / ask / 应用 id）。 */
+    val navigationPreferred: String = "auto",
+    /** 导航规则表里的全部应用及其安装状态（设置行副标题与选项弹层用）。 */
+    val navigationApps: List<NavigationOption> = emptyList(),
+)
+
+/** 导航应用选项：规则表中的一个应用及其是否已安装。 */
+public data class NavigationOption(
+    val id: String,
+    val label: String,
+    val installed: Boolean,
 )
 
 /** 手动检查更新的结果提示。 */

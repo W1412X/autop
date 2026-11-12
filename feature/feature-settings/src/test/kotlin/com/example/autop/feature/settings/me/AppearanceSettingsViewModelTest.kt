@@ -15,6 +15,8 @@ import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakeModelProfileStore
 import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.NavigationApp
+import com.example.autop.device.NavigationApps
 import com.example.autop.device.NotificationFeed
 import com.example.autop.device.NotificationInfo
 import com.example.autop.device.ShellInput
@@ -185,6 +187,42 @@ class AppearanceSettingsViewModelTest {
             assertThat(feed.rebindRequested).isTrue()
         }
 
+    @Test
+    fun `only installed navigation apps are offered as choices`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel()
+            val offered =
+                viewModel.uiState.value.navigationApps
+                    .filter { it.installed }
+                    .map { it.id }
+            assertThat(offered).containsExactly("amap", "baidu").inOrder()
+            assertThat(
+                viewModel.uiState.value.navigationApps
+                    .single { it.id == "tencent" }
+                    .installed,
+            ).isFalse()
+        }
+
+    @Test
+    fun `navigation preference follows device intent config`() =
+        runTest(testDispatcher) {
+            provider.setOverrides(
+                buildJsonObject {
+                    put("device", buildJsonObject { put("intent", buildJsonObject { put("preferredMap", "ask") }) })
+                },
+            )
+            val viewModel = createViewModel()
+            assertThat(viewModel.uiState.value.navigationPreferred).isEqualTo("ask")
+        }
+
+    @Test
+    fun `set navigation app writes the preferred map path`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel()
+            viewModel.onAction(MeAction.SetNavigationApp("baidu"))
+            assertThat(editor.writes).containsExactly("device.intent.preferredMap" to JsonPrimitive("baidu"))
+        }
+
     private fun createViewModel(
         checks: FakePermissionChecks = FakePermissionChecks(),
         feed: FakeNotificationFeed = FakeNotificationFeed(),
@@ -199,6 +237,7 @@ class AppearanceSettingsViewModelTest {
             permissionChecks = checks,
             hostStatus = FakeHostStatus(),
             updateChecker = FakeUpdateChecker(),
+            navigationApps = FakeNavigationApps(),
             memoryStore = UnusedMemoryStore(),
             taskRepository = UnusedTaskRepository(),
             context = ContextWrapper(null),
@@ -206,6 +245,21 @@ class AppearanceSettingsViewModelTest {
             dispatchers = TestDispatcherProvider(testDispatcher),
             logger = logger,
         )
+}
+
+/** 导航应用替身：高德、百度已安装，腾讯未安装。 */
+private class FakeNavigationApps : NavigationApps {
+    private val apps =
+        listOf(
+            NavigationApp("amap", "高德地图", "com.autonavi.minimap"),
+            NavigationApp("baidu", "百度地图", "com.baidu.BaiduMap"),
+            NavigationApp("tencent", "腾讯地图", "com.tencent.map"),
+        )
+    private val installedIds = setOf("amap", "baidu")
+
+    override suspend fun installed(): List<NavigationApp> = apps.filter { it.id in installedIds }
+
+    override fun known(): List<NavigationApp> = apps
 }
 
 private class FakeAccessibility : AccessibilityStatus {

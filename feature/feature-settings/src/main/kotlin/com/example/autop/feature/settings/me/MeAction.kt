@@ -92,6 +92,11 @@ public sealed interface MeAction {
         val value: Int,
     ) : MeAction
 
+    /** 导航应用偏好（`device.intent.preferredMap`：auto / ask / 应用 id）。 */
+    public data class SetNavigationApp(
+        val value: String,
+    ) : MeAction
+
     /** 提醒铃声（路由层转 SettingsNavigator.openReminderSound）。 */
     public data object OpenReminderSound : MeAction
 
