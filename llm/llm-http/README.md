@@ -25,10 +25,9 @@
 - `DefaultLlmGateway.kt`：`LlmGateway` 默认实现（docs/tech/10 WP3）——多绑定注入 `LlmProviderFactory`，
   按 `profile.protocol` 匹配并缓存 provider，`ModelProfileStore` 变化即失效重建；非 suspend 查询首次
   同步加载快照保证确定性（questions.md N34）。
-- `DefaultModelProbe.kt`：`ModelProbe` 实现——依次发 text/tools/vision 三个最小请求（烟测文本是协议
-  载荷常量、不进 prompt 模板，questions.md N35），单项超时 `llm.probe.timeoutMs`→`llm.timeout`，
-  vision 用内置 8×8 PNG。
-- `ProbePng.kt`：手写 PNG 编码器（无 AWT/Bitmap 依赖），`solidRgb8x8()` 供探测图。
+- `DefaultModelProbe.kt`：`ModelProbe` 实现——发两个请求：纯文本请求判定连通；带 echo 工具
+  （toolChoice=AUTO）的请求判定工具调用能力（`ProbeVerdict` 三态，烟测文本是协议载荷常量、
+  不进 prompt 模板，questions.md N35），单项超时 `llm.probe.timeoutMs`→`llm.timeout`。
 - `DefaultEmbeddingGateway.kt`：`EmbeddingGateway` 实现（docs/tech/03 §7）——按 `llm.embedding` 选
   `EmbeddingProviderFactory`，`none`/未知→null，配置变化发新实例（`modelId` 变化供重建索引）。
 - `di/`：`LlmHttpModule`（OkHttpClient/RetryConfig 从配置组装、三端口绑定）+ `ProbeTempDir` 限定符
@@ -42,7 +41,7 @@
 - `HttpErrorMapperTest`（10）：状态码映射全表、context 匹配大小写、Retry-After 秒/日期/非法解析。
 - `DefaultLlmGatewayTest`（6）：角色未分配/未知 id/未知协议→`llm.not_configured`、角色映射、
   provider 缓存复用、配置变化重建。
-- `DefaultModelProbeTest`（5）：三项全 ok、无 factory 三项失败、错误透传、悬挂→`llm.timeout`、
-  vision 请求带本地 8×8 PNG。
+- `DefaultModelProbeTest`（5）：文本与工具判定、无 factory 失败、错误透传、悬挂→`llm.timeout`、
+  echo 工具调用判定。
 - `DefaultEmbeddingGatewayTest`（4）：默认 `none`→null、按配置创建、未知 provider→null、变化发新实例。
-- `ProbePngTest`（2）：PNG 签名、ImageIO 解码 8×8。
+

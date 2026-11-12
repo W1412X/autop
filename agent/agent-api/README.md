@@ -4,7 +4,7 @@
 - 职责（docs/tech/01 第 3 节，docs/tech/04）：`Tool`/`ScreenActionTool`/`ToolSpec` DSL、`ToolContext`、
   `ThreadEvent`/`EventPayload`（payload 带 `v`）、`ThreadStore`（`observeFrom` 先回放后实时订阅）、
   `AgentSession`/`RunHandle`/`RunState`/`AgentEvent`（含 `SampleRetrying`）、`ScreenDelta`/`ScreenDeltaKind`/
-  `ScreenDeltaReasons`（屏幕变化结论）、`RuntimeState`（`RuntimeStateSource`/`StateEntry`/`StateRequest`）、
+  `ScreenDeltaReasons`（已停用，tool_optimize D1，只为读取旧事件保留）、`RuntimeState`（`RuntimeStateSource`/`StateEntry`/`StateRequest`）、
   `protocol/`（`HistorySanitizer`/`RequestBuilder`/`JsonToolProtocol`）、`Replay`、扩展点接口（`ContextContributor`、
   `HistoryRenderRule`、`Compactor`、`ToolResultEnricher`、`ThreadEventIndexer`/`ThreadRecallRetriever`、
   `RuntimeStateSource`）、`AgentErrorCodes`。

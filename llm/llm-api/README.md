@@ -26,14 +26,14 @@
 
 ## 端口
 
-- `LlmProvider.kt`：`ModelRole`（MAIN/VISION/LIGHT）；`LlmProvider`（`profile` + `stream(request)`）；
+- `LlmProvider.kt`：`LlmProvider`（`profile` + `stream(request)`）；
   `LlmProviderFactory`（`protocolId` 匹配扩展点，禁止按 baseUrl 分支）；`LlmGateway`
-  （`forRole`/`forProfile`）；`LlmException`（携带 `AppError`）；
+  （`forDefault`/`forProfile`）；`LlmException`（携带 `AppError`）；
   `LlmProvider.complete(request)` 收敛流为 `Outcome<Completed>`（取消原样传播）。
 - `ModelProfile.kt`：`ModelCapabilities` + `ModelProfile`（protocol/baseUrl/apiKeyRef/model/
   contextWindow/maxOutputTokens/quirks/extraHeaders）。
-- `ModelProfileStore.kt`：`ModelRoles` + 档案仓库端口（`profiles`/`roles` Flow、`get`/`upsert`/`delete`/`setRoles`）。
-- `ModelProbe.kt`：`ProbeResult`/`ProbeReport`（text/tools/vision 三项探测）+ `ModelProbe` 端口。
+- `ModelProfileStore.kt`：`defaultProfileId` + 档案仓库端口（`profiles` Flow、`get`/`upsert`/`delete`/`setDefault`）。
+- `ModelProbe.kt`：`ProbeVerdict` 三态（SUPPORTED/UNSUPPORTED/INCONCLUSIVE）+ `ProbeResult`/`ProbeReport` + `ModelProbe` 端口。
 - `Embedding.kt`：`EmbeddingProvider`/`EmbeddingProviderFactory`/`EmbeddingGateway` + `EmbeddingConfig`。
 - `ImageLoader.kt`：`ImageLoader.load(fileRef, mime, maxEdge)` 图片读取端口（实现方负责长边限制）
   + `LoadedImage`；消息模型只存文件引用，base64 由适配器完成。

@@ -5,18 +5,18 @@
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7F52FF)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4)
 
-**跑在手机上的通用操作 Agent。** 你用一句话下达任务，AutoP 通过无障碍服务读屏、操作，由大模型规划每一步，替你完成点、滑、输入、跨应用的事。
+**跑在手机上的通用操作 Agent。** 你用一句话下达任务，AutoP 自己看屏幕、动手操作，由大模型规划每一步，替你完成点、滑、输入、跨应用的事。屏幕可以从无障碍节点树或端侧视觉模型读取，截图也可以直接交给模型查看；点击和滑动优先走节点动作，也可以通过无线调试配对用 shell 注入，等同真实触摸。不需要 root，Android 11 及以上的手机装上就能用。
 
 它不为任何具体 App 写专门的代码路径：应用相关的知识（操作手册、敏感页面规则）都是可编辑的数据，Agent 在使用中不断补充。
 
-> 这是一个自用项目，不上架应用商店。运行时屏幕内容会发送到**你自己配置的**模型服务，使用前请先阅读[隐私与安全](#隐私与安全)。
+> 仅供开发学习使用。运行时屏幕内容会发送到**你自己配置的**模型服务，使用前请先阅读[隐私与安全](#隐私与安全)。
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="img/chat-running.jpg" width="220" alt="对话中的运行时间线"><br><sub>对话：每一步都可展开查看</sub></td>
-    <td align="center" valign="top"><img src="img/running-glow.jpg" width="220" alt="执行期边缘光"><br><sub>执行期：边缘光 + 步数胶囊</sub></td>
-    <td align="center" valign="top"><img src="img/flow-ai-create.jpg" width="220" alt="AI 创建流程"><br><sub>AI 创建流程：边思考边生成</sub></td>
-    <td align="center" valign="top"><img src="img/memory.jpg" width="220" alt="记忆树"><br><sub>记忆：按目录组织</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/chat-running.jpg" width="220" alt="对话中的运行时间线"><br><sub>对话：每一步都可展开查看</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/running-glow.jpg" width="220" alt="执行期边缘光"><br><sub>执行期：边缘光 + 步数胶囊</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flow-ai-create.jpg" width="220" alt="AI 创建流程"><br><sub>AI 创建流程：边思考边生成</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/memory.jpg" width="220" alt="记忆树"><br><sub>记忆：按目录组织</sub></td>
   </tr>
 </table>
 
@@ -38,23 +38,24 @@
 
 在对话页或悬浮球里下达任务，例如「把屏幕亮度调到 50%」「微信里告诉张三明天的会推迟到 4 点」。Agent 会列出计划、逐步操作，每一步都能在时间线里展开查看动作、观测和耗时。运行中可以随时补充指令（不打断当前动作），也可以一键停止。
 
-### 三种方式看懂屏幕，按需自动切换
+### 看懂屏幕
+
+节点树可用时成本最低；节点被应用屏蔽时，可以换端侧视觉模型，或直接截图交给模型看。操作侧同样有多条路：节点动作优先，坐标手势可走 shell 注入或无障碍注入。
 
 | 观测模式 | 来源 | 适用 |
 |---|---|---|
 | `a11y` | 无障碍节点树，精简序列化为带短 ID 的文本 | 默认，成本最低 |
 | `visual` | 截图 + 端侧 ONNX 模型（目标检测、OCR、图标分类） | 应用屏蔽了节点信息 |
-| `llm` | 截图交给视觉大模型识别元素 | 前两者都不够时 |
 
-三种模式输出同一种 0–1000 归一化坐标，所以操作层不关心画面从哪里来。节点树为空、WebView、游戏这类场景会自动降级。
+两种模式输出同一种 0–1000 归一化坐标，所以操作层不关心画面从哪里来。节点树为空、WebView、游戏这类场景可以改用视觉模式。
 
 ### 稳地点、稳地滑
 
 - **节点动作优先**：观测和行动都来自无障碍时，点击、长按、滚动优先走系统的无障碍节点动作；被应用拒绝时回落为坐标手势。
 - **按应用记忆**：发现某个应用接受节点动作却不响应（节点无效而手势有效），累计证据后自动记录，之后对它直接使用手势。可在「我的 → 节点操作」查看和恢复。
-- **滚动按容器算距离**：一步相当于人手滑一下，起止点落在可滚动区域内，避免越界导致无效；到头会明确告诉模型。
-- **等待界面稳定**：每个动作后等待页面静默再返回新观测，无需模型反复调用观察。
-- **可选的注入通道**：通过无线调试配对，使用 shell 注入点击与按键，对会丢弃无障碍注入事件的应用更稳。
+- **滚动按容器算距离**：一步相当于人手滑一下，起止点落在可滚动区域内，避免越界导致无效。
+- **动作后固定等待**：每个动作等待固定时长（默认 5 秒，可调）后返回事实与执行记录，屏幕状态由模型自己 observe 确认。
+- **无线调试注入**：通过无线调试配对（系统 ADB 协议），点击、滑动和文字输入走 shell 注入，等同真实触摸；对会丢弃无障碍注入事件的应用更稳。未连接时回落到无障碍注入。
 
 ### 任务与触发
 
@@ -68,8 +69,8 @@
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="img/chat-list.jpg" width="220" alt="对话列表"><br><sub>对话列表</sub></td>
-    <td align="center" valign="top"><img src="img/task-new.jpg" width="220" alt="新建任务"><br><sub>新建任务：一句话描述，生成草稿</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/chat-list.jpg" width="220" alt="对话列表"><br><sub>对话列表</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/task-new.jpg" width="220" alt="新建任务"><br><sub>新建任务：一句话描述，生成草稿</sub></td>
   </tr>
 </table>
 
@@ -81,14 +82,14 @@
 2. **悬浮球录制**：切到目标应用正常操作，AutoP 记录并转成步骤；可拾取元素、设置参数、试运行。
 3. **Agent 自动提议**：任务成功后，如果其中的界面操作值得复用，Agent 生成草稿，等你确认后才生效。
 
-流程执行带校验与恢复：动作后核对结果，失败时依次尝试等待、换位置、关闭弹窗、返回、重启应用，仍不行再交回 Agent 接手。
+流程执行带校验与恢复：动作后核对结果，失败时依次尝试等待、换位置、返回、重启应用，仍不行再交回 Agent 接手。
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="img/flows-empty.jpg" width="220" alt="流程列表（空）"><br><sub>流程页：点右上角加号创建</sub></td>
-    <td align="center" valign="top"><img src="img/flows-list.jpg" width="220" alt="流程列表"><br><sub>我的流程</sub></td>
-    <td align="center" valign="top"><img src="img/flow-detail.jpg" width="220" alt="流程详情"><br><sub>详情：运行、调试、统计与参数</sub></td>
-    <td align="center" valign="top"><img src="img/flow-editor.jpg" width="220" alt="流程编辑器"><br><sub>编辑器：简明 / 高级 / JSON</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flows-empty.jpg" width="220" alt="流程列表（空）"><br><sub>流程页：点右上角加号创建</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flows-list.jpg" width="220" alt="流程列表"><br><sub>我的流程</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flow-detail.jpg" width="220" alt="流程详情"><br><sub>详情：运行、调试、统计与参数</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flow-editor.jpg" width="220" alt="流程编辑器"><br><sub>编辑器：简明 / 高级 / JSON</sub></td>
   </tr>
 </table>
 
@@ -107,12 +108,12 @@
 ### 模型
 
 - OpenAI 兼容（chat/completions）与 Anthropic 兼容（Messages）两种协议，不依赖官方 SDK。
-- 可按角色分配：主模型、视觉模型、轻量模型（条件判定、经验提炼、压缩摘要）。Embedding 独立配置，可关闭。
+- 只配置一个默认模型，对话、任务与流程共用。Embedding 独立配置，可关闭。
 - 上下文接近上限时自动压缩，完整事件日志保留，需要时可回取原文。
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="img/settings.jpg" width="220" alt="我的页面"><br><sub>「我的」：外观、模型、观测方式等设置</sub></td>
+    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/settings.jpg" width="220" alt="我的页面"><br><sub>「我的」：外观、模型、观测方式等设置</sub></td>
   </tr>
 </table>
 
@@ -137,7 +138,7 @@ flowchart LR
 - 预算触顶不抛错，而是最后一轮禁用工具，让模型总结做到了哪一步。同一工具同一错误连续出现、屏幕指纹原地不变，会触发熔断提示。
 - 屏幕与通知内容一律作为**不可信数据**交给模型，系统提示明确声明其中的「指令」只是数据。
 
-**内置工具**：观察（`observe` / `screenshot` / `read_notifications` / `get_device_state`）、动作（`tap` / `input_text` / `scroll` / `swipe` / `global_action` / `open_app` / `open_uri` / `wait`）、恢复（`dismiss_popup` / `restart_app`）、记忆（`memory_*`）、流程（`run_flow` / `list_flows` / `create_flow` / `edit_flow` / `save_as_flow` / `update_flow` / `patch_flow_node`）、任务（`list_tasks` / `create_task` / `update_task`）、协作（`ask_user` / `notify_user` / `update_plan` / `finish` 等）。
+**内置工具**：观察（`observe` / `screenshot` / `read_notifications` / `get_device_state`）、动作（`tap` / `tap_node` / `input_text` / `scroll` / `scroll_node` / `swipe` / `global_action` / `open_app` / `intent` / `wait`）、恢复（`restart_app`）、记忆（`memory_*`）、流程（`run_flow` / `list_flows` / `create_flow` / `edit_flow` / `save_as_flow` / `update_flow` / `patch_flow_node`）、任务（`list_tasks` / `create_task` / `update_task`）、协作（`ask_user` / `notify_user` / `update_plan` / `finish` 等）。
 
 ## 快速开始
 
@@ -145,6 +146,7 @@ flowchart LR
 
 - JDK 21（`gradle/gradle-daemon-jvm.properties` 指定）
 - Android SDK，compileSdk 37；设备 Android 11（API 30）及以上
+- 不需要 root，也不需要刷机；无线调试注入通道是可选项
 - 大模型服务：任意 OpenAI 兼容或 Anthropic 兼容端点，以及对应的 API Key
 
 ### 构建与安装
@@ -160,13 +162,13 @@ Release 签名读取仓库根目录的 `keystore.properties`（`storeFile` / `st
 
 应用内有逐项引导并实时检测状态：
 
-1. **模型配置**（必需）：选择协议，填写 baseUrl、API Key、模型名，点「测试连接」，会自动探测工具调用与视觉能力。
-2. **无障碍服务**（必需）：没有它 Agent 既看不到屏幕也不能操作。
+1. **模型配置**（必需）：选择协议，填写 baseUrl、API Key、模型名，点「测试连接」，确认模型可以连通；如果模型不支持工具调用，会自动改用文本协议。
+2. **无障碍服务**（必需）：读取界面节点、截图和前台应用，也是观测与截图的来源；没有它 Agent 无法观测。点击和滑动另有 shell 注入通道，但不替代观测。
    Android 13+ 侧载安装的应用会被「受限设置」拦截：应用信息 → 右上角菜单 → 允许受限设置。
 3. **悬浮窗权限**（推荐）：悬浮球与执行期指示的备用通道。
 4. 通知使用权（条件触发需要）、通知权限、全屏提醒权限（锁屏提醒需要）。
 5. 电池优化白名单与各厂商的自启动 / 后台运行设置，保证定时与条件任务不被系统杀掉。
-6. **无线调试注入通道**（可选）：设置 → 注入通道，配对后点击与按键走 shell 注入。
+6. **无线调试注入通道**（可选）：设置 → 注入通道，配对后点击、滑动和文字输入可走 shell 注入。
 
 ## 权限说明
 
@@ -271,4 +273,4 @@ push 到 `main`、打 `v*` tag 或手动触发 `.github/workflows/release.yml`�
 统一在 [GitHub Releases](https://github.com/W1412X/autop/releases) 下载最新的 `app-release.apk`。侧载安装时，Android 13 及以上需要先在应用信息里「允许受限设置」，再开启无障碍服务，详见[首次使用](#首次使用)。
 ## 许可
 
-仓库目前没有声明许可证，保留所有权利。如需使用或二次开发，请先联系作者。
+仅供开发学习使用。仓库目前没有声明许可证；如需使用或二次开发，请先联系作者。
