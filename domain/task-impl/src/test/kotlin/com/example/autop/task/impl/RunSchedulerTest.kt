@@ -83,8 +83,11 @@ public class RunSchedulerTest {
     public fun `higher origin weight is scheduled first`() =
         runTest {
             val fixture = Fixture(backgroundScope)
+            // 先占住屏幕租约：两条都入队后再释放，避免后台收集器在只有一条时抢先调度。
+            fixture.screenLease.setHolder("other-owner")
             val condition = fixture.enqueueRun("run-c", RunOrigin.CONDITION, taskOf("t1"))
             val scheduled = fixture.enqueueRun("run-s", RunOrigin.SCHEDULE, taskOf("t2"))
+            fixture.screenLease.setHolder(null)
             fixture.scheduler.trySchedule()
             pump(fixture)
             assertEquals(listOf(scheduled.id, condition.id), fixture.session.requests.map { it.runId })
