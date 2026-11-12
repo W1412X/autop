@@ -3,6 +3,7 @@
  */
 package com.example.autop.feature.settings.me
 
+import com.example.autop.core.config.DeviceActionSection
 import com.example.autop.core.config.UiAppearanceSection
 import com.example.autop.core.config.UiBannerSection
 import com.example.autop.device.ShellState
@@ -34,7 +35,7 @@ public data class MeUiState(
     /** 当前横幅提示；null 表示无。 */
     val notice: NoticeKind? = null,
     /** 主模型显示名（模型分组"模型配置"入口副标题；null=未分配）。 */
-    val mainModelName: String? = null,
+    val defaultModelName: String? = null,
     /** 向量提供方 id（`llm.embedding.provider`，"检索向量"入口副标题）。 */
     val embeddingProviderId: String = "none",
     /** `ui.overlay.windowType`（悬浮窗通道：auto / accessibility / application，docs/tech/05 §10）。 */
@@ -53,6 +54,8 @@ public data class MeUiState(
     val conditionsEnabled: Boolean = true,
     /** `device.touch.shieldEnabled`（执行期触摸盾总开关，N215）。 */
     val shieldEnabled: Boolean = true,
+    /** `device.action.delayMs`（动作后固定等待毫秒数，tool_optimize 03 §5.1）。 */
+    val actionDelayMs: Long = DeviceActionSection().delayMs,
     /** `task.reminder.snoozeMinutes`（默认稍后分钟数，docs/tech/07 §4.4）。 */
     val snoozeMinutes: Int = 10,
     /** `task.reminder.snoozeOptions`（稍后可选档位）。 */
@@ -69,12 +72,14 @@ public data class MeUiState(
     val notificationListenerGranted: Boolean = false,
     /** AgentHost 前台服务运行中（状态卡）。 */
     val hostRunning: Boolean = false,
-    /** 主模型已分配（状态卡）。 */
-    val mainModelAssigned: Boolean = false,
+    /** 默认模型已设置（状态卡）。 */
+    val defaultModelAssigned: Boolean = false,
     /** 应用更新状态（关于分组"检查更新"与新版本横幅）。 */
     val update: UpdateState = UpdateState.Idle,
     /** 手动检测结果提示（已是最新/检测失败；null 表示无）。 */
     val updateNotice: UpdateNotice? = null,
+    /** `ui.debug.verboseLogging`（调试模式）：true 时显示"工具测试记录"入口（tool_optimize D20）。 */
+    val probeEntryVisible: Boolean = false,
     /** `device.intent.preferredMap`（导航应用偏好：auto / ask / 应用 id）。 */
     val navigationPreferred: String = "auto",
     /** 导航规则表里的全部应用及其安装状态（设置行副标题与选项弹层用）。 */

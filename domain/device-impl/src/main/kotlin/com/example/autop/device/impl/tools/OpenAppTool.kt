@@ -12,6 +12,7 @@ import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.ConfigSnapshot
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppInfo
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceErrorCodes
@@ -21,7 +22,6 @@ import com.example.autop.device.core.AppMatcher
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
-import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -31,6 +31,7 @@ private data class AppAction(
     val targetPackage: String?,
     val candidates: List<AppInfo>,
     val name: String?,
+    val waitMs: Long?,
     val replayArgs: JsonObject,
 )
 
@@ -43,6 +44,7 @@ public class OpenAppTool
         private val apps: AppLauncher,
         private val subjects: PolicySubjectBuilder,
         private val epilogue: ActionEpilogue,
+        private val prompts: PromptRepository,
     ) : ScreenActionTool {
         override val id: String = "tool.open_app"
 
@@ -77,7 +79,7 @@ public class OpenAppTool
                     Outcome.Ok(
                         PreparedAction(
                             subjects.build(ID, snap, null, extra, config),
-                            AppAction(targetPkg, candidates, name, replayArgsOf(args, hit = null)),
+                            AppAction(targetPkg, candidates, name, waitMsOf(args), replayArgsOf(args, hit = null)),
                         ),
                     )
             }
@@ -94,41 +96,44 @@ public class OpenAppTool
             }
         }
 
-        /** 启动应用：候选列表路径不是屏幕动作，不记录回放；失败原因（WP7.5）原样带给模型。 */
+        /** 启动应用：结果只报"已请求打开"，不检查前台（tool_optimize 02 §8）。 */
         private suspend fun launchTarget(
             targetPkg: String,
             app: AppAction,
             ctx: ToolContext,
         ): ToolOutput {
+            val pre = epilogue.preSample(ctx)
             apps.launchWithError(targetPkg)?.let { return errorOutput(it) }
-            val out =
-                epilogue.finish(
-                    ctx,
-                    "已提交启动请求 $targetPkg",
-                    null,
-                    ReplayInput(ID, app.replayArgs, gesture = null),
-                )
-            val fg = out.observation?.packageName
-            val note =
-                if (fg == targetPkg) {
-                    "当前前台：$targetPkg（启动已生效）"
-                } else {
-                    "当前前台：${fg ?: "未获取到"}；启动请求已发出，但尚未确认目标应用已到前台。"
-                }
-            return out.copy(content = out.content + Block.Text(note))
+            val label = app.candidates.singleOrNull()?.label ?: targetPkg
+            return epilogue.finish(
+                ctx,
+                prompts.text(PROMPT_RESULT, mapOf(VAR_LABEL to label, VAR_PKG to targetPkg)),
+                app.waitMs,
+                ReplayInput(ID, app.replayArgs, gesture = null),
+                pre,
+            )
         }
 
-        /** 名称匹配多个候选：返回列表让模型用 package 参数指定。 */
+        /** 名称匹配多个候选：失败返回候选列表，让模型用 package 参数指定（tool_optimize D17）。 */
         private fun candidatesOutput(app: AppAction): ToolOutput {
             if (app.candidates.isEmpty()) {
                 return toolError(DeviceErrorCodes.APP_NOT_FOUND, "没有找到应用 ${app.name.orEmpty()}")
             }
-            val lines = app.candidates.joinToString("\n") { "${it.label} ${it.packageName}" }
-            return textOutput("找到多个应用，请用 package 参数指定：\n$lines")
+            val list = app.candidates.joinToString("；") { "${it.label} ${it.packageName}" }
+            return toolError(
+                DeviceErrorCodes.APP_AMBIGUOUS,
+                "multiple apps match '${app.name.orEmpty()}'",
+                prompts.text(PROMPT_AMBIGUOUS_HINT, mapOf(VAR_CANDIDATES to list)),
+            )
         }
 
         private companion object {
             const val ID = "tool.open_app"
             const val EXTRA_TARGET_PACKAGE = "targetPackage"
+            const val PROMPT_RESULT = "device.open_app.result"
+            const val PROMPT_AMBIGUOUS_HINT = "device.open_app.ambiguous_hint"
+            const val VAR_LABEL = "label"
+            const val VAR_PKG = "pkg"
+            const val VAR_CANDIDATES = "candidates"
         }
     }

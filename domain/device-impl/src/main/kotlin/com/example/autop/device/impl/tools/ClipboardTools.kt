@@ -13,6 +13,7 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.core.UntrustedText
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
@@ -50,7 +51,7 @@ public class ClipboardGetTool
             return if (text.isNullOrEmpty()) {
                 textOutput("(剪贴板为空)")
             } else {
-                textOutput(text)
+                textOutput(UntrustedText.wrap(UntrustedText.SOURCE_CLIPBOARD, text))
             }
         }
     }

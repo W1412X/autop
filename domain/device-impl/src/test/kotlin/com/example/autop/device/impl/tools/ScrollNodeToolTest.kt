@@ -68,7 +68,7 @@ class ScrollNodeToolTest {
         }
 
     @Test
-    fun `stops after first step when screen does not move`() =
+    fun `runs all steps even when screen does not move`() =
         runTest {
             val env = ToolTestEnv()
             recordA11y(env)
@@ -79,8 +79,8 @@ class ScrollNodeToolTest {
             val out = env.scrollNodeTool().perform(prepared, ctx)
 
             assertThat(out.ok).isTrue()
-            // 帧没变化判“已到头”：只走 1 步，不补手势。
-            assertThat(env.gestures.nodeActions).hasSize(1)
+            // tool_optimize 02 §5：不做“到头”判断，steps 连续执行。
+            assertThat(env.gestures.nodeActions).hasSize(3)
             assertThat(env.gestures.swipes).isEmpty()
         }
 

@@ -1,7 +1,6 @@
 ---
 id: device.scroll.summary
-version: 1
-vars: [steps, reachedEnd]
-optionalVars: [reachedEnd]
+version: 2
+vars: [steps]
 ---
-滚动 {{steps}} 次{{#if reachedEnd}}，已到头，不要再向这个方向滚动{{/if}}。
+滚动 {{steps}} 次。

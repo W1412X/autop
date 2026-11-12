@@ -128,8 +128,6 @@ public data class FlowContractSection(
 public data class FlowAuthorAnalysisSection(
     /** 分析循环的最大轮数。 */
     @SerialName("maxTurns") val maxTurns: Int = 8,
-    /** 使用的模型角色（main / vision / light）。 */
-    @SerialName("role") val role: String = "main",
 ) : ConfigSection {
     override fun validate(): List<String> =
         buildList {
@@ -150,7 +148,6 @@ public data class FlowRecoverySection(
             "recovery.wait_stable",
             "recovery.alt_click",
             "recovery.scroll_into_view",
-            "recovery.dismiss_popup",
             "recovery.back_and_retry",
             "recovery.reopen_app",
             "recovery.restart_app",

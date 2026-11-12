@@ -130,8 +130,6 @@ private class FakeAppLauncher(
     }
 
     override suspend fun launch(packageName: String): Boolean = true
-
-    override suspend fun openUri(uri: String): Boolean = true
 }
 
 private fun blockedOverrides(vararg packages: String): JsonObject =

@@ -1,6 +1,6 @@
 /**
  * 屏幕序列化入口（docs/design/observation-modes-coordinate-actions §3）：
- * 快照 → 统一 `ScreenModel` → JSON 观测文本；差量由 [ScreenJsonDiffer] 生成。
+ * 快照 → 统一 `ScreenModel` → JSON 观测文本。
  */
 package com.example.autop.device.core
 

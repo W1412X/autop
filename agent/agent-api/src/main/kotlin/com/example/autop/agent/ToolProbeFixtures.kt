@@ -14,7 +14,7 @@ import kotlinx.serialization.json.JsonPrimitive
 public object ToolProbeFixtures {
     private val fixtures: Map<String, JsonObject> =
         mapOf(
-            "observe" to jsonObjectOf("mode" to "a11y", "full" to true),
+            "observe" to jsonObjectOf("mode" to "a11y"),
             "screenshot" to jsonObjectOf("reason" to "工具自测（N198）"),
             "tap" to jsonObjectOf("x" to 500, "y" to 500),
             // 运行时没有 a11y 观测会返回 mode_unavailable，这是正常的自测结果。
@@ -25,7 +25,6 @@ public object ToolProbeFixtures {
             "swipe" to jsonObjectOf("x1" to 500, "y1" to 700, "x2" to 500, "y2" to 300, "duration_ms" to 300),
             "global_action" to jsonObjectOf("action" to "notifications"),
             "open_app" to jsonObjectOf("package" to "com.android.settings"),
-            "open_uri" to jsonObjectOf("uri" to "https://example.com"),
             "intent" to jsonObjectOf("kind" to "settings", "page" to "home"),
             "wait" to jsonObjectOf("ms" to 200),
             "list_apps" to jsonObjectOf("query" to "设置"),
@@ -33,7 +32,6 @@ public object ToolProbeFixtures {
             "clipboard_get" to jsonObjectOf(),
             "clipboard_set" to jsonObjectOf("text" to "autop-probe"),
             "read_notifications" to jsonObjectOf(),
-            "dismiss_popup" to jsonObjectOf(),
             "restart_app" to jsonObjectOf("package" to "com.android.settings"),
             "memory_list" to jsonObjectOf("path" to "/"),
             "memory_read" to jsonObjectOf("path" to "/"),
@@ -73,8 +71,21 @@ public object ToolProbeFixtures {
     /** 有默认测试参数的工具名（测试守护：注册的工具须全部落在这里）。 */
     public val names: Set<String> = fixtures.keys
 
+    /**
+     * 额外示例（tool_optimize D20）：同一工具的其他用法示例，给参数示例补充展示，
+     * 不作默认回填。intent 的 kind=uri（open_uri 并入 intent；示例地址无副作用）。
+     */
+    private val extraFixtures: Map<String, List<JsonObject>> =
+        mapOf(
+            "intent" to listOf(jsonObjectOf("kind" to "uri", "uri" to "https://example.com")),
+        )
+
     /** 工具的默认测试参数；无条目回退空对象。 */
     public fun fixtureFor(toolName: String): JsonObject = fixtures[toolName] ?: JsonObject(emptyMap())
+
+    /** 工具的全部示例参数（首个即 [fixtureFor] 的默认值）。 */
+    public fun examplesFor(toolName: String): List<JsonObject> =
+        listOf(fixtureFor(toolName)) + extraFixtures[toolName].orEmpty()
 }
 
 /** 简便构造：字符串/数字值的 JSON 对象。 */

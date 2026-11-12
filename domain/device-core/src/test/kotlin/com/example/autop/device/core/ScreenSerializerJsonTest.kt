@@ -128,7 +128,7 @@ class ScreenSerializerJsonTest {
                     ObserveMode.A11Y,
                     { RedactionMode.NONE },
                     TestScreens.OWN_PACKAGE,
-                    effectiveModes = listOf(ObserveMode.A11Y, ObserveMode.VISUAL, ObserveMode.LLM),
+                    effectiveModes = listOf(ObserveMode.A11Y, ObserveMode.VISUAL),
                 )
         val jsonBody = result.observation.text.substringBeforeLast("\n")
         val quality =
@@ -150,7 +150,7 @@ class ScreenSerializerJsonTest {
                     ObserveMode.VISUAL,
                     { RedactionMode.NONE },
                     TestScreens.OWN_PACKAGE,
-                    effectiveModes = listOf(ObserveMode.VISUAL, ObserveMode.LLM),
+                    effectiveModes = listOf(ObserveMode.VISUAL, ObserveMode.A11Y),
                     cached = true,
                 )
         val screenJson =
@@ -161,7 +161,7 @@ class ScreenSerializerJsonTest {
         // 统一口径：visual 与 a11y 一样按 insufficient/suggest 输出，不做来源区分。
         val quality = screenJson.getValue("quality").jsonObject
         assertThat(quality.getValue("insufficient").jsonPrimitive.content).isEqualTo("few_nodes")
-        assertThat(quality.getValue("suggest").jsonPrimitive.content).isEqualTo("llm")
+        assertThat(quality.getValue("suggest").jsonPrimitive.content).isEqualTo("a11y")
     }
 
     @Test

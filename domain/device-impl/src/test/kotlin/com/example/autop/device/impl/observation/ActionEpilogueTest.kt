@@ -1,18 +1,16 @@
 /**
- * 动作收尾（agent-harness-overhaul WP2.11）：效果回执由 ScreenDelta 渲染；
- * 显式 llm 用画面帧签名比较且不调视觉大模型；观测失败保持动作成功。
+ * 动作收尾（docs/design/tool_optimize/01 §5、06 §1.2）：
+ * 智能体路径按 device.action.delayMs 固定等待、trace 末行为等待行、不观测；
+ * quietActions 等界面稳定、不追加等待行、不生成回放；preSample 的采样来源与失败语义。
  */
 package com.example.autop.device.impl.observation
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import com.example.autop.agent.EventPayload
 import com.example.autop.agent.ReplayStateProbe
 import com.example.autop.agent.ReplayStateSample
 import com.example.autop.agent.RunScopedValues
-import com.example.autop.agent.ScreenDeltaKind
-import com.example.autop.agent.ScreenDeltaReasons
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ThreadSummary
@@ -25,16 +23,10 @@ import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
-import com.example.autop.core.testing.TestDispatcherProvider
-import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NodeFlags
 import com.example.autop.device.NodeSnapshot
-import com.example.autop.device.Observation
-import com.example.autop.device.ObservationMode
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.Rect
-import com.example.autop.device.ScreenModel
-import com.example.autop.device.ScreenQuality
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.Screenshot
@@ -45,35 +37,24 @@ import com.example.autop.device.VisualFrame
 import com.example.autop.device.VisualScreenParser
 import com.example.autop.device.VisualTree
 import com.example.autop.device.WindowSnapshot
-import com.example.autop.device.WindowType
 import com.example.autop.device.core.RedactionMode
-import com.example.autop.device.core.SerializedScreen
 import com.example.autop.device.impl.AppIdentity
 import com.example.autop.device.impl.AutopAccessibilityService
 import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.ForegroundTracker
 import com.example.autop.device.impl.ObserveModeResolver
 import com.example.autop.device.impl.ObserveSelection
-import com.example.autop.device.impl.RecordedObservation
 import com.example.autop.device.impl.SerializerRulesLoader
 import com.example.autop.device.impl.ServiceHolder
 import com.example.autop.device.impl.SnapshotCapturer
 import com.example.autop.device.impl.SnapshotSerializer
 import com.example.autop.device.impl.WindowRedactor
-import com.example.autop.device.impl.deviceHistory
-import com.example.autop.device.impl.vision.FrameSignature
-import com.example.autop.device.impl.vision.frameSignatureOf
-import com.example.autop.device.impl.vision.llm.LlmScreenParser
-import com.example.autop.llm.LlmErrorCodes
-import com.example.autop.llm.LlmGateway
-import com.example.autop.llm.LlmProvider
-import com.example.autop.llm.ModelRole
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
+import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -95,116 +76,143 @@ class ActionEpilogueTest {
     private val provider = FakeConfigProvider(Json.parseToJsonElement("{}").jsonObject)
 
     @Test
-    fun `visual unchanged screen yields UNCHANGED effect line`() =
+    fun `agent path waits device action delayMs and appends waited line`() =
         runTest {
-            val reader = FakeReader(jpegBytes(GRAY))
-            val visual = FakeVisual(listOf(visualTree("条目"), visualTree("条目")))
-            val (observer, epilogue) = fixture(reader, visual)
+            val probe = RecordingProbe(Outcome.Ok(sample()))
+            val monitor = RecordingMonitor()
+            val epilogue = epilogue(probe, monitor)
             val ctx = ctx()
-            okOf(observer.observe(ctx, ObserveSelection.Explicit(ObserveMode.VISUAL)))
 
-            val out = epilogue.finish(ctx, "已点击 (1, 1)", null, ReplayInput("tool.tap", JsonObject(emptyMap())))
-
-            val effect = out.content.last().toString()
-            assertThat(effect).contains("效果：界面没有变化（页面元素与动作前一致")
-            assertThat(effect).contains("device.no_effect")
-            assertThat(out.screenDelta?.kind).isEqualTo(ScreenDeltaKind.UNCHANGED)
-        }
-
-    @Test
-    fun `visual changed screen yields CHANGED`() =
-        runTest {
-            val reader = FakeReader(jpegBytes(GRAY))
-            val visual = FakeVisual(listOf(visualTree("条目"), visualTree("已改")))
-            val (observer, epilogue) = fixture(reader, visual)
-            val ctx = ctx()
-            okOf(observer.observe(ctx, ObserveSelection.Explicit(ObserveMode.VISUAL)))
-
-            val out = epilogue.finish(ctx, "已点击 (1, 1)", null, ReplayInput("tool.tap", JsonObject(emptyMap())))
-
-            val effect = out.content.last().toString()
-            assertThat(effect).contains("效果：界面已变化（页面内容有变化）")
-            assertThat(out.screenDelta?.kind).isEqualTo(ScreenDeltaKind.CHANGED)
-        }
-
-    @Test
-    fun `explicit llm uses frame signature and does not call llm parser`() =
-        runTest {
-            val bytes = jpegBytes(GRAY)
-            val reader = FakeReader(bytes)
-            val (observer, epilogue, gateway) = fixture(reader, FakeVisual())
-            val ctx = ctx()
-            ctx.deviceHistory().last =
-                RecordedObservation(
-                    mode = ObserveMode.LLM,
-                    selection = ObserveSelection.Explicit(ObserveMode.LLM),
-                    screen = llmScreen(),
-                    snapshot = a11ySnapshot(sufficientNodes()),
-                    frame = signatureOf(bytes),
+            val out =
+                epilogue.finish(
+                    ctx,
+                    "已点击 (1, 1)",
+                    null,
+                    ReplayInput("tool.tap", JsonObject(emptyMap())),
+                    sample(),
                 )
 
-            val out = epilogue.finish(ctx, "已点击 (1, 1)", null, ReplayInput("tool.tap", JsonObject(emptyMap())))
-
-            assertThat(gateway.calls).isEqualTo(0)
-            val effect = out.content.last().toString()
-            assertThat(effect).contains("效果：界面没有变化（按画面比较")
-            assertThat(out.screenDelta?.kind).isEqualTo(ScreenDeltaKind.UNCHANGED)
-            assertThat(out.screenDelta?.reason).isEqualTo(ScreenDeltaReasons.FRAME)
+            assertThat(currentTime).isEqualTo(5000)
             assertThat(out.observation).isNull()
+            val waited = out.trace.last()
+            assertThat(waited).contains("5000")
+            assertThat(out.content.joinToString("\n")).doesNotContain("效果：")
+            assertThat(out.replay).isNotNull()
+        }
+
+    @Test
+    fun `wait_ms overrides the default delay`() =
+        runTest {
+            val epilogue = epilogue(RecordingProbe(Outcome.Ok(sample())), RecordingMonitor())
+            val ctx = ctx()
+
+            epilogue.finish(ctx, "已点击 (1, 1)", 1200, ReplayInput("tool.tap", JsonObject(emptyMap())), sample())
+
+            assertThat(currentTime).isEqualTo(1200)
+        }
+
+    @Test
+    fun `wait_ms above max is clamped and noted`() =
+        runTest {
+            val epilogue = epilogue(RecordingProbe(Outcome.Ok(sample())), RecordingMonitor())
+            val ctx = ctx()
+
+            val out =
+                epilogue.finish(
+                    ctx,
+                    "已点击 (1, 1)",
+                    40000,
+                    ReplayInput("tool.tap", JsonObject(emptyMap())),
+                    sample(),
+                )
+
+            assertThat(currentTime).isEqualTo(30000)
+            val joined = out.trace.joinToString("\n")
+            assertThat(joined).contains("30000")
+            assertThat(out.trace.size).isAtLeast(2)
+        }
+
+    @Test
+    fun `quietActions waits for stability without waited line and without replay`() =
+        runTest {
+            val stabilizer = RecordingStabilizer()
+            val epilogue = epilogue(RecordingProbe(Outcome.Ok(sample())), RecordingMonitor(), stabilizer)
+            val ctx = ctx(quiet = true)
+
+            val out = epilogue.finish(ctx, "已滚动 2 次", 1200, ReplayInput("tool.scroll", JsonObject(emptyMap())), null)
+
+            assertThat(stabilizer.calls).isEqualTo(1)
+            assertThat(out.trace).isEmpty()
             assertThat(out.replay).isNull()
         }
 
     @Test
-    fun `observe failure keeps ok true and UNKNOWN observe_failed`() =
+    fun `preSample uses a11y probe when no observation yet`() =
         runTest {
-            val reader =
-                FakeReader(
-                    jpegBytes(GRAY),
-                    snapshots =
-                        listOf(
-                            Outcome.Ok(a11ySnapshot(sufficientNodes())),
-                            Outcome.Err(
-                                AppError(DeviceErrorCodes.APP_TREE_EMPTY, "app accessibility tree is empty"),
-                            ),
-                        ),
-                )
-            val (observer, epilogue, _) = fixture(reader, FakeVisual())
+            val probe = RecordingProbe(Outcome.Ok(sample()))
+            val epilogue = epilogue(probe, RecordingMonitor())
             val ctx = ctx()
-            okOf(observer.observe(ctx, ObserveSelection.Explicit(ObserveMode.A11Y)))
 
-            val out = epilogue.finish(ctx, "已点击 (1, 1)", null, ReplayInput("tool.tap", JsonObject(emptyMap())))
+            val pre = epilogue.preSample(ctx)
 
-            assertThat(out.ok).isTrue()
-            val effect = out.content.last().toString()
-            assertThat(effect).contains("效果：无法判断，动作后的观测失败（${DeviceErrorCodes.APP_TREE_EMPTY}）")
-            assertThat(out.screenDelta?.kind).isEqualTo(ScreenDeltaKind.UNKNOWN)
-            assertThat(out.screenDelta?.reason).isEqualTo(ScreenDeltaReasons.OBSERVE_FAILED)
+            assertThat(pre).isNotNull()
+            assertThat(probe.calls).isEqualTo(1)
         }
 
     @Test
-    fun `no baseline yields UNKNOWN no_baseline`() =
+    fun `preSample reuses last visual observation without probing`() =
         runTest {
-            val reader =
-                FakeReader(
-                    jpegBytes(GRAY),
-                    snapshots = listOf(Outcome.Ok(a11ySnapshot(sufficientNodes()))),
-                )
-            val (observer, epilogue, _) = fixture(reader, FakeVisual())
+            val reader = FakeReader(jpegBytes(GRAY))
+            val visual = FakeVisual(listOf(visualTree("条目")))
+            val probe = RecordingProbe(Outcome.Ok(sample()))
+            val (observer, epilogue) = fixture(reader, visual, probe)
+            val ctx = ctx()
+            okOf(observer.observe(ctx, ObserveSelection.Explicit(ObserveMode.VISUAL)))
+
+            val pre = epilogue.preSample(ctx)
+
+            assertThat(pre).isNotNull()
+            assertThat(probe.calls).isEqualTo(0)
+        }
+
+    @Test
+    fun `preSample failure returns null and finish records no replay`() =
+        runTest {
+            val probe = RecordingProbe(Outcome.Err(AppError("test.no_sample", "sample failed")))
+            val epilogue = epilogue(probe, RecordingMonitor())
             val ctx = ctx()
 
-            val out = epilogue.finish(ctx, "已点击 (1, 1)", null, ReplayInput("tool.tap", JsonObject(emptyMap())))
+            val pre = epilogue.preSample(ctx)
+            assertThat(pre).isNull()
 
-            assertThat(out.ok).isTrue()
-            val effect = out.content.last().toString()
-            assertThat(effect).contains("效果：无法判断，本次运行在这个动作之前还没有观测")
-            assertThat(out.screenDelta?.kind).isEqualTo(ScreenDeltaKind.UNKNOWN)
-            assertThat(out.screenDelta?.reason).isEqualTo(ScreenDeltaReasons.NO_BASELINE)
+            val out = epilogue.finish(ctx, "已点击 (1, 1)", null, ReplayInput("tool.tap", JsonObject(emptyMap())), pre)
+            assertThat(out.replay).isNull()
         }
+
+    @Test
+    fun `self action window is registered before and after the wait`() =
+        runTest {
+            val monitor = RecordingMonitor()
+            val epilogue = epilogue(RecordingProbe(Outcome.Ok(sample())), monitor)
+            val ctx = ctx()
+
+            epilogue.finish(ctx, "已点击 (1, 1)", null, ReplayInput("tool.tap", JsonObject(emptyMap())), sample())
+
+            assertThat(monitor.windows).hasSize(2)
+            assertThat(monitor.windows[0].first).isEqualTo(0L)
+        }
+
+    private fun epilogue(
+        probe: ReplayStateProbe,
+        monitor: UserActivityMonitor,
+        stabilizer: UiStabilizer = FakeStabilizer,
+    ): ActionEpilogue = ActionEpilogue(stabilizer, probe, frameMotion(), FakePromptRepository(), FakeClock(0L), monitor)
 
     private fun fixture(
         reader: FakeReader,
         visual: FakeVisual,
-    ): Triple<ScreenObserver, ActionEpilogue, CountingGateway> {
+        probe: ReplayStateProbe,
+    ): Pair<ScreenObserver, ActionEpilogue> {
         val prompts = FakePromptRepository()
         val contentAreas = ContentAreaProvider(provider)
         val holder = ServiceHolder().apply { register(service()) }
@@ -220,91 +228,33 @@ class ActionEpilogueTest {
                 prompts = prompts,
                 context = context,
             )
-        val llm =
-            LlmScreenParser(
-                context = context,
-                gateway = CountingGateway,
-                prompts = prompts,
-                rules = rules,
-                configProvider = provider,
-                dispatchers = TestDispatcherProvider(StandardTestDispatcher()),
-                clock = FakeClock(0L),
-            )
-        val modes = ObserveModeResolver(holder, visual, CountingGateway, prompts)
-        val preparer = ScreenPreparer(reader, capturer, contentAreas, visual, llm, serializer)
+        val modes = ObserveModeResolver(holder, visual, prompts)
+        val preparer = ScreenPreparer(reader, capturer, contentAreas, visual, serializer)
         val observer = ScreenObserver(preparer, serializer, modes)
-        val frameMotion = FrameMotion(reader, provider)
-        val epilogue =
-            ActionEpilogue(FakeStabilizer, observer, FakeProbe, frameMotion, prompts, FakeClock(0L), FakeMonitor)
-        return Triple(observer, epilogue, CountingGateway)
+        val epilogue = ActionEpilogue(FakeStabilizer, probe, frameMotion(), prompts, FakeClock(0L), RecordingMonitor())
+        return Pair(observer, epilogue)
     }
 
     private fun service(): AutopAccessibilityService =
         Robolectric.buildService(AutopAccessibilityService::class.java).get()
 
-    private fun ctx(): ToolContext = TestContext(provider)
+    private fun ctx(quiet: Boolean = false): ToolContext = TestContext(provider, quiet)
+
+    private fun sample(): ReplayStateSample =
+        ReplayStateSample(
+            packageName = APP,
+            activity = "$APP.MainActivity",
+            fingerprint = "fp-1",
+            keys = emptyList(),
+            semanticsVersion = 3,
+            observeMode = "a11y",
+        )
 
     private fun <T> okOf(outcome: Outcome<T>): T =
         when (outcome) {
             is Outcome.Ok -> outcome.value
             is Outcome.Err -> error("expected ok, was ${outcome.error.code}")
         }
-
-    private fun a11ySnapshot(nodes: List<NodeSnapshot>): ScreenSnapshot =
-        ScreenSnapshot(
-            capturedAt = 0L,
-            windows =
-                listOf(
-                    WindowSnapshot(
-                        windowId = 1,
-                        type = WindowType.APPLICATION,
-                        layer = 0,
-                        packageName = APP,
-                        title = "示例",
-                        bounds = FULL,
-                        active = true,
-                        focused = true,
-                        rootIdx = 0,
-                    ),
-                ),
-            nodes = nodes,
-            foregroundPackage = APP,
-            activity = "$APP.MainActivity",
-            screenWidth = SCREEN_WIDTH,
-            screenHeight = SCREEN_HEIGHT,
-            rotation = 0,
-            keyguardLocked = false,
-            contentArea = FULL,
-            truncated = false,
-        )
-
-    private fun sufficientNodes(): List<NodeSnapshot> {
-        val root =
-            NodeSnapshot(
-                idx = 0,
-                children = (1..5).toList(),
-                childIndex = 0,
-                className = "android.widget.FrameLayout",
-                bounds = FULL,
-                flags = NodeFlags.VISIBLE or NodeFlags.ENABLED,
-                packageName = APP,
-            )
-        val children =
-            (1..5).map { index ->
-                NodeSnapshot(
-                    idx = index,
-                    parent = 0,
-                    children = emptyList(),
-                    childIndex = index - 1,
-                    className = "android.widget.Button",
-                    text = "按钮$index",
-                    bounds = Rect(0, index * 100, 600, index * 100 + 50),
-                    flags = NodeFlags.VISIBLE or NodeFlags.ENABLED or NodeFlags.CLICKABLE,
-                    packageName = APP,
-                )
-            }
-        return listOf(root) + children
-    }
 
     private fun visualTree(label: String): VisualTree {
         val root =
@@ -332,23 +282,6 @@ class ActionEpilogueTest {
         return VisualTree(rootIdx = 0, nodes = listOf(root) + children)
     }
 
-    private fun llmScreen(): SerializedScreen =
-        SerializedScreen(
-            Observation(
-                text = "{}",
-                mode = ObservationMode.FULL,
-                observeMode = ObserveMode.LLM,
-                fingerprint = "fp",
-                packageName = APP,
-                activity = "$APP.MainActivity",
-                summaryLine = "app",
-                interactiveCount = 1,
-                nodeCount = 1,
-                semanticPoor = false,
-            ),
-            ScreenModel(mode = ObserveMode.LLM, windows = emptyList(), quality = ScreenQuality(1, 1)),
-        )
-
     private fun jpegBytes(color: Int): ByteArray {
         val bitmap = Bitmap.createBitmap(64, 64, Bitmap.Config.ARGB_8888)
         bitmap.eraseColor(color)
@@ -358,21 +291,10 @@ class ActionEpilogueTest {
         return out.toByteArray()
     }
 
-    private fun signatureOf(bytes: ByteArray): FrameSignature {
-        val bitmap = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        return frameSignatureOf(bitmap)
-    }
-
     private class FakeReader(
         private val jpeg: ByteArray,
-        snapshots: List<Outcome<ScreenSnapshot>> = emptyList(),
     ) : ScreenReader {
-        private val pending = ArrayDeque(snapshots)
-
-        override suspend fun snapshot(): Outcome<ScreenSnapshot> {
-            check(pending.isNotEmpty()) { "no snapshot queued" }
-            return pending.removeFirst()
-        }
+        override suspend fun snapshot(): Outcome<ScreenSnapshot> = error("not used")
 
         override suspend fun screenshot(): Outcome<Screenshot> =
             Outcome.Ok(Screenshot(width = 64, height = 64, jpegBytes = jpeg, handle = Any()))
@@ -402,8 +324,24 @@ class ActionEpilogueTest {
         ): StableWait = StableWait(0L, settled = true)
     }
 
-    /** 触摸监测替身（WP7.3：收尾会登记自身动作窗口，这里只记录不判定）。 */
-    private object FakeMonitor : UserActivityMonitor {
+    private class RecordingStabilizer : UiStabilizer {
+        var calls: Int = 0
+
+        override suspend fun awaitStable(
+            quietMs: Long,
+            maxWaitMs: Long,
+            firstEventTimeoutMs: Long,
+            sampleFingerprint: suspend () -> String?,
+        ): StableWait {
+            calls += 1
+            return StableWait(0L, settled = true)
+        }
+    }
+
+    /** 触摸监测替身：记录自身动作窗口登记。 */
+    private class RecordingMonitor : UserActivityMonitor {
+        val windows: MutableList<Pair<Long, Long>> = mutableListOf()
+
         override val userTouches: SharedFlow<Long> = MutableSharedFlow()
 
         override fun lastUserTouchAt(): Long? = null
@@ -411,30 +349,27 @@ class ActionEpilogueTest {
         override fun markSelfActionWindow(
             startMs: Long,
             endMs: Long,
-        ) = Unit
+        ) {
+            windows += startMs to endMs
+        }
     }
 
-    private object FakeProbe : ReplayStateProbe {
+    private class RecordingProbe(
+        private val result: Outcome<ReplayStateSample>,
+    ) : ReplayStateProbe {
+        var calls: Int = 0
+
         override suspend fun sample(
             observeMode: String,
             config: ConfigSnapshot,
-        ): Outcome<ReplayStateSample> = Outcome.Err(AppError("test.unused", "probe is not used"))
-    }
-
-    /** 视觉大模型网关替身：计数调用，保证 llm 收尾不打大模型。 */
-    private object CountingGateway : LlmGateway {
-        var calls: Int = 0
-
-        override fun forRole(role: ModelRole): Outcome<LlmProvider> {
-            calls++
-            return Outcome.Err(AppError(LlmErrorCodes.NOT_CONFIGURED, "no vision model"))
-        }
-
-        override fun forProfile(profileId: String): Outcome<LlmProvider> {
-            calls++
-            return Outcome.Err(AppError(LlmErrorCodes.NOT_CONFIGURED, "no vision model"))
+        ): Outcome<ReplayStateSample> {
+            calls += 1
+            return result
         }
     }
+
+    private fun frameMotion(): FrameMotion =
+        FrameMotion(FakeReader(byteArrayOf()), FakeConfigProvider(Json.parseToJsonElement("{}").jsonObject))
 
     private object NoRedaction : WindowRedactor {
         override fun redact(
@@ -445,12 +380,14 @@ class ActionEpilogueTest {
 
     private class TestContext(
         private val provider: FakeConfigProvider,
+        private val quiet: Boolean,
     ) : ToolContext {
         override val runId: RunId = RunId("run-1")
         override val threadId: ThreadId = ThreadId("thread-1")
         override val config: ConfigSnapshot get() = provider.current()
         override val runScope: RunScopedValues = MapRunScope()
         override val threadStore: ThreadStore = UnusedThreadStore
+        override val quietActions: Boolean get() = quiet
 
         override suspend fun askUser(
             question: String,

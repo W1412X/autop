@@ -18,28 +18,22 @@ class ReplayRecordTest {
     @Test
     fun `gesture input keeps coordinates and marks execution gesture`() {
         val gesture = gestureJson(10, 20, 300)
-        val replay = buildReplay(ReplayInput("tool.tap", args(), gesture), sample(), postFingerprint = "post-1")
+        val replay = buildReplay(ReplayInput("tool.tap", args(), gesture), sample())
         assertThat(replay).isNotNull()
         assertThat(replay!!.toolId).isEqualTo("tool.tap")
         assertThat(replay.execution).isEqualTo("gesture")
         assertThat(replay.gesture).isEqualTo(gesture)
-        assertThat(replay.postFingerprint).isEqualTo("post-1")
+        assertThat(replay.postFingerprint).isNull()
         assertThat(replay.pre).isEqualTo(sample())
     }
 
     @Test
     fun `node action input marks execution node_action without gesture`() {
-        val replay = buildReplay(ReplayInput("tool.tap", args(), gesture = null), sample(), postFingerprint = null)
+        val replay = buildReplay(ReplayInput("tool.tap", args(), gesture = null), sample())
         assertThat(replay).isNotNull()
         assertThat(replay!!.execution).isEqualTo("node_action")
         assertThat(replay.gesture).isNull()
         assertThat(replay.postFingerprint).isNull()
-    }
-
-    @Test
-    fun `missing pre sample records nothing`() {
-        val replay = buildReplay(ReplayInput("tool.tap", args(), gestureJson(1, 2, 3)), null, postFingerprint = "p")
-        assertThat(replay).isNull()
     }
 
     @Test

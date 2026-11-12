@@ -7,8 +7,6 @@ import com.example.autop.llm.LlmErrorCodes
 import com.example.autop.llm.LlmRequest
 import com.example.autop.llm.LlmRequestLog
 import com.example.autop.llm.ModelProfile
-import com.example.autop.llm.ModelRole
-import com.example.autop.llm.ModelRoles
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.SystemPart
@@ -24,21 +22,21 @@ import org.junit.Test
 @OptIn(ExperimentalCoroutinesApi::class)
 internal class DefaultLlmGatewayTest {
     @Test
-    fun forRoleFailsWhenRoleUnassigned() {
+    fun forDefaultFailsWhenNoDefaultSet() {
         runTest {
             val gateway = gateway(FakeModelProfileStore())
-            val outcome = gateway.forRole(ModelRole.MAIN)
+            val outcome = gateway.forDefault()
             assertThat(outcome.unwrapError().code).isEqualTo(LlmErrorCodes.NOT_CONFIGURED)
         }
     }
 
     @Test
-    fun forRoleReturnsProviderForAssignedRole() {
+    fun forDefaultReturnsProviderForDefaultProfile() {
         runTest {
             val store = FakeModelProfileStore()
             store.upsert(profile(PROFILE_A))
-            store.setRoles(ModelRoles(main = PROFILE_A))
-            val outcome = gateway(store, factory("openai")).forRole(ModelRole.MAIN)
+            store.setDefaultProfileId(PROFILE_A)
+            val outcome = gateway(store, factory("openai")).forDefault()
             assertThat(outcome.unwrap().profile.id).isEqualTo(PROFILE_A)
         }
     }

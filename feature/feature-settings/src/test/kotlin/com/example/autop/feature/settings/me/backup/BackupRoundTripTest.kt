@@ -14,7 +14,6 @@ import com.example.autop.core.common.getOrNull
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeModelProfileStore
 import com.example.autop.feature.settings.me.testProfile
-import com.example.autop.llm.ModelRoles
 import com.example.autop.memory.AppliedMode
 import com.example.autop.memory.MemoryNode
 import com.example.autop.memory.MemoryPath
@@ -45,7 +44,7 @@ class BackupRoundTripTest {
             val memory = FakeMemoryStore()
             memory.seed(node("/people"), node("/people/张三"))
             val tasks = FakeTaskRepository(listOf(testTask("t1")))
-            val profiles = FakeModelProfileStore(listOf(testProfile("p1")), ModelRoles(main = "p1"))
+            val profiles = FakeModelProfileStore(listOf(testProfile("p1")), "p1")
             val bundle = BackupExporter(memory, tasks, profiles, clock).export()
 
             assertThat(bundle.format).isEqualTo(BackupFormat.FORMAT)
@@ -69,7 +68,7 @@ class BackupRoundTripTest {
                     .single()
                     .apiKeyRef,
             ).isEmpty()
-            assertThat(emptyProfiles.roles.first().main).isEqualTo("p1")
+            assertThat(emptyProfiles.defaultProfileId.first()).isEqualTo("p1")
             assertThat(emptyMemory.nodes.keys).containsExactly("/people", "/people/张三")
         }
 

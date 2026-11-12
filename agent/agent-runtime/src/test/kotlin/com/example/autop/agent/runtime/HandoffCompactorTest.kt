@@ -21,7 +21,6 @@ import com.example.autop.llm.Block
 import com.example.autop.llm.LlmErrorCodes
 import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.LlmProvider
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.SystemPart
@@ -42,10 +41,10 @@ class HandoffCompactorTest {
         }
 
     @Test
-    fun `LIGHT 未配置时回退 MAIN`() =
+    fun `压缩使用默认模型`() =
         runTest {
             val llm = ScriptedLlmProvider().say("交接摘要")
-            val compactor = HandoffCompactor(MainOnlyGateway(llm), TestPromptRepository())
+            val compactor = HandoffCompactor(DefaultOnlyGateway(llm), TestPromptRepository())
 
             val result = compactor.compact(input(live = listOf(render(1))))
 
@@ -206,25 +205,20 @@ class HandoffCompactorTest {
     private fun render(seq: Long): RenderItem =
         RenderItem(seq, Msg(Role.USER, listOf(Block.Text("消息$seq"))), null, null)
 
-    /** 所有角色都无模型。 */
+    /** 没有默认模型。 */
     private object EmptyGateway : LlmGateway {
-        override fun forRole(role: ModelRole): Outcome<LlmProvider> =
+        override fun forDefault(): Outcome<LlmProvider> =
             Outcome.Err(AppError(code = LlmErrorCodes.NOT_CONFIGURED, message = "no model"))
 
         override fun forProfile(profileId: String): Outcome<LlmProvider> =
             Outcome.Err(AppError(code = LlmErrorCodes.NOT_CONFIGURED, message = "no model"))
     }
 
-    /** 只有 MAIN 角色有模型（LIGHT 缺失，验证回退）。 */
-    private class MainOnlyGateway(
+    /** 默认模型即给定 provider。 */
+    private class DefaultOnlyGateway(
         private val provider: LlmProvider,
     ) : LlmGateway {
-        override fun forRole(role: ModelRole): Outcome<LlmProvider> =
-            if (role == ModelRole.MAIN) {
-                Outcome.Ok(provider)
-            } else {
-                Outcome.Err(AppError(code = LlmErrorCodes.NOT_CONFIGURED, message = "no light model"))
-            }
+        override fun forDefault(): Outcome<LlmProvider> = Outcome.Ok(provider)
 
         override fun forProfile(profileId: String): Outcome<LlmProvider> = Outcome.Ok(provider)
     }

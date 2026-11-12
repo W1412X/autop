@@ -90,7 +90,6 @@ public object ScreenJsonWire {
     public const val PROMPT_INSUFFICIENT_REASON_PREFIX: String = "device.observe.insufficient."
     public const val PROMPT_DIFF_NONE: String = "device.observe.diff_none"
     public const val PROMPT_HINT_MODE_UNAVAILABLE: String = "device.hint.mode_unavailable"
-    public const val PROMPT_HINT_LLM_PARSE_FAILED: String = "device.hint.llm_parse_failed"
 
     /** 模式对应的节点字段集合（顶层 `fields`）。 */
     public fun fieldsOf(mode: com.example.autop.device.ObserveMode): List<String> =
@@ -109,7 +108,5 @@ public object ScreenJsonWire {
                 )
             com.example.autop.device.ObserveMode.VISUAL ->
                 listOf(FIELD_TEXT, FIELD_ICON, FIELD_HINT, FIELD_STATE, FIELD_ACT, FIELD_ST)
-            com.example.autop.device.ObserveMode.LLM ->
-                listOf(FIELD_TEXT, FIELD_ICON, FIELD_DESC, FIELD_HINT, FIELD_STATE, FIELD_ACT, FIELD_ST)
         }
 }

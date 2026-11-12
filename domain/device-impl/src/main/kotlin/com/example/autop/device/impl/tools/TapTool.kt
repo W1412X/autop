@@ -24,7 +24,6 @@ import com.example.autop.device.impl.CoordSpaceResolver
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
-import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -111,7 +110,7 @@ public class TapTool
                     long = long,
                     waitMs = args.long("wait_ms"),
                     hitKnown = tree != null,
-                    hitNone = tree != null && receipts.node(tree, modelPoint) == null,
+                    hitNone = tree != null && receipts.node(tree, actualModel) == null,
                     resultText = resultTextOf(x, y, long, receipts.receipt(tree, actualModel)),
                     replayArgs = replayArgsOf(args, receipts.describe(tree, actualModel)),
                 )
@@ -123,15 +122,9 @@ public class TapTool
             ctx: ToolContext,
         ): ToolOutput {
             val tap = action.payload as TapAction
+            val pre = epilogue.preSample(ctx)
             val gesture = tapGesture(tap) ?: return errorOutput(injectFailed("点击"))
-            val out =
-                epilogue.finish(
-                    ctx,
-                    tap.resultText,
-                    tap.waitMs,
-                    ReplayInput(ID, tap.replayArgs, gesture.replay),
-                )
-            val notes =
+            val trace =
                 buildList {
                     add(executionText(gesture.result))
                     when {
@@ -139,7 +132,14 @@ public class TapTool
                         tap.hitNone -> add(prompts.text(PROMPT_HIT_NONE))
                     }
                 }
-            return out.copy(content = out.content + notes.map { Block.Text(it) })
+            return epilogue.finish(
+                ctx,
+                tap.resultText,
+                tap.waitMs,
+                ReplayInput(ID, tap.replayArgs, gesture.replay),
+                pre,
+                trace,
+            )
         }
 
         /** 实际执行方式：坐标手势（带注入通道与未走 shell 的原因）。 */
@@ -162,14 +162,30 @@ public class TapTool
             long: Boolean,
             receipt: String,
         ): String {
-            val verb = if (long) "已提交长按" else "已提交点击"
-            return "$verb ($x, $y)\n$receipt"
+            val verb = prompts.text(if (long) PROMPT_VERB_LONG else PROMPT_VERB_TAP)
+            return prompts.text(
+                PROMPT_RESULT,
+                mapOf(
+                    VAR_VERB to verb,
+                    VAR_X to "$x",
+                    VAR_Y to "$y",
+                    VAR_RECEIPT to receipt,
+                ),
+            )
         }
 
         private companion object {
             const val ID = "tool.tap"
 
+            const val PROMPT_RESULT = "device.tap.result"
+            const val PROMPT_VERB_TAP = "device.tap.verb_tap"
+            const val PROMPT_VERB_LONG = "device.tap.verb_long"
             const val PROMPT_HIT_NO_TREE = "device.hit.no_tree"
             const val PROMPT_HIT_NONE = "device.hit.none"
+
+            const val VAR_VERB = "verb"
+            const val VAR_X = "x"
+            const val VAR_Y = "y"
+            const val VAR_RECEIPT = "receipt"
         }
     }

@@ -11,16 +11,14 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class HistorySanitizerTest {
-    private val texts = SanitizeTexts(imageUnsupported = "[图片占位]", emptyToolResult = "[空结果]")
+    private val texts = SanitizeTexts(emptyToolResult = "[空结果]")
 
     private fun target(
         keepThinking: Boolean = false,
-        vision: Boolean = true,
         requireSignature: Boolean = true,
     ) = SanitizeTarget(
         profileId = "p1",
         keepThinking = keepThinking,
-        vision = vision,
         requireThinkingSignature = requireSignature,
     )
 
@@ -70,10 +68,10 @@ class HistorySanitizerTest {
     }
 
     @Test
-    fun `image replaced when model lacks vision`() {
+    fun `image is kept because every model accepts images`() {
         val msg = Msg(Role.USER, listOf(Block.Image("ref", "image/png", 1, 1)))
-        val out = HistorySanitizer.sanitize(listOf(msg), target(vision = false), texts)
-        assertThat((out.single().blocks.single() as Block.Text).text).isEqualTo("[图片占位]")
+        val out = HistorySanitizer.sanitize(listOf(msg), target(), texts)
+        assertThat(out.single().blocks.single()).isInstanceOf(Block.Image::class.java)
     }
 
     @Test

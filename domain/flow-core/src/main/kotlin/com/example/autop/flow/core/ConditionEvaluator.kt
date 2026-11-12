@@ -257,7 +257,6 @@ internal class ConditionEvaluator(
             ports.llm.complete(
                 LlmCall(
                     nodeId = "cond",
-                    role = cond.role,
                     system = null,
                     prompt = frame.templates.renderString(cond.prompt),
                     images = cond.images.map { frame.templates.renderString(it) },

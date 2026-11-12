@@ -1,38 +1,31 @@
 /**
- * 动作收尾（agent-harness-overhaul WP2.3）：等界面稳定 → 按最近观测的选择方式重新观测 →
- * 用观测记录给出的变化结论写效果回执。最近观测是显式 llm 时不再调视觉模型，
- * 改用画面帧签名比较（llm 每个动作都调用成本过高）。
+ * 动作收尾（docs/design/tool_optimize/01 §5）：智能体调用按 `device.action.delayMs` 固定等待，
+ * 追加等待行，并生成回放记录；流程调用（quietActions）只等待界面稳定。不观测，不判断效果。
  */
 package com.example.autop.device.impl.observation
 
 import com.example.autop.agent.ReplayStateProbe
 import com.example.autop.agent.ReplayStateSample
 import com.example.autop.agent.ReplayableAction
-import com.example.autop.agent.ScreenDelta
-import com.example.autop.agent.ScreenDeltaKind
-import com.example.autop.agent.ScreenDeltaReasons
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.Clock
-import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.getOrNull
-import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.StableWait
 import com.example.autop.device.UiStabilizer
 import com.example.autop.device.UserActivityMonitor
-import com.example.autop.device.impl.ObserveSelection
-import com.example.autop.device.impl.RecordedObservation
 import com.example.autop.device.impl.deviceHistory
 import com.example.autop.device.impl.tools.text
 import com.example.autop.llm.Block
+import kotlinx.coroutines.delay
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 可回放记录的输入（docs/tech/05 §13）：工具提供参数与实际手势，收尾时补 pre/post 样本。 */
+/** 可回放记录的输入（docs/tech/05 §13）：工具提供参数与实际手势，收尾时补 pre 样本。 */
 public data class ReplayInput(
     val toolId: String,
     /** 回放参数：坐标原样，另加 `_hit`（§5.7）。 */
@@ -41,32 +34,96 @@ public data class ReplayInput(
     val gesture: JsonObject? = null,
 )
 
-/** 收尾结果：工具输出与本次收尾观测（dismiss_popup 等复核用；静默/llm 路径为 null）。 */
-public data class EpilogueResult(
-    val output: ToolOutput,
-    val observed: ObservationResult?,
-)
-
-/** WRITE_SCREEN 工具 perform 之后的统一收尾。 */
+/** WRITE_SCREEN 工具 perform 的统一收尾。 */
 @Singleton
-@Suppress("LongParameterList") // 装配类：稳定器+观测+回放+帧比较+模板+时钟+触摸监测，不可再减（N114）
+@Suppress("LongParameterList") // 装配类：稳定器+回放+帧比较+模板+时钟+触摸监测，不可再减（N114）
 public class ActionEpilogue
     @Inject
     constructor(
         private val stabilizer: UiStabilizer,
-        private val observer: ScreenObserver,
         private val probe: ReplayStateProbe,
         private val frameMotion: FrameMotion,
         private val prompts: PromptRepository,
         private val clock: Clock,
         private val activityMonitor: UserActivityMonitor,
     ) {
+        /** 动作发出前调用：回放录制用的动作前样本；quietActions 时返回 null（流程不录制）。 */
+        public suspend fun preSample(ctx: ToolContext): ReplayStateSample? {
+            if (ctx.quietActions) return null
+            val last = ctx.deviceHistory().last
+            return when (last?.mode) {
+                // visual 采样要运行本地模型（数秒），不能每个动作做一次：沿用最近一次 visual 观测。
+                ObserveMode.VISUAL -> sampleOf(last.screen, ObserveMode.VISUAL, ctx.config)
+                // a11y 或尚无观测：实时 a11y 采样（只读，不写观测历史）。
+                else -> probe.sample(ObserveMode.A11Y.id, ctx.config).getOrNull()
+            }
+        }
+
+        /**
+         * 两个连续子动作之间的停顿（input_text 点击后、scroll 的步间）：
+         * quietActions 时等界面稳定；否则固定等待 [fixedMs]。
+         */
+        public suspend fun pause(
+            ctx: ToolContext,
+            fixedMs: Long,
+        ) {
+            if (ctx.quietActions) {
+                awaitStable(ctx, null)
+                return
+            }
+            fixedWait(ctx, fixedMs)
+        }
+
+        /**
+         * 收尾：等待 → 追加等待行（放在执行记录最后）→ 生成回放记录（只在 pre 非空时）。
+         * [waitMs] 为工具的 `wait_ms`；quietActions 等待界面稳定，不追加等待行、不生成回放。
+         */
+        public suspend fun finish(
+            ctx: ToolContext,
+            resultText: String,
+            waitMs: Long?,
+            replay: ReplayInput,
+            pre: ReplayStateSample?,
+            trace: List<String> = emptyList(),
+        ): ToolOutput {
+            if (ctx.quietActions) {
+                val wait = awaitStable(ctx, waitMs)
+                val head = mutableListOf(Block.Text(resultText))
+                if (!wait.settled) {
+                    head += Block.Text(prompts.text(PROMPT_NOT_SETTLED, mapOf(VAR_MS to wait.waitedMs.toString())))
+                }
+                return ToolOutput(ok = true, content = head, trace = trace, replay = null)
+            }
+            val wait = waitOf(ctx, waitMs)
+            fixedWait(ctx, wait.ms)
+            val waitedLines =
+                buildList {
+                    add(prompts.text(PROMPT_WAITED, mapOf(VAR_MS to wait.ms.toString())))
+                    if (wait.clamped) {
+                        add(
+                            prompts.text(
+                                PROMPT_WAIT_CLAMPED,
+                                mapOf(
+                                    VAR_MAX to ctx.config[DeviceConfig.ACTION].maxDelayMs.toString(),
+                                ),
+                            ),
+                        )
+                    }
+                }
+            return ToolOutput(
+                ok = true,
+                content = listOf(Block.Text(resultText)),
+                trace = trace + waitedLines,
+                replay = pre?.let { buildReplay(replay, it) },
+            )
+        }
+
         /**
          * 等待界面稳定（[waitMs] 为空取 `device.stabilize.maxWaitMs`）；按最近观测方式取样：
-         * null/a11y 用 a11y 快照指纹（便宜），visual/llm 用画面帧签名（WP2.10）。
-         * 等待前后登记自身动作窗口，等待期间的触摸不算用户操作（WP7.3）。
+         * null/a11y 用 a11y 快照指纹（便宜），visual 用画面帧签名。
+         * 等待前后登记自身动作窗口，等待期间的触摸不算用户操作（WP7.3）。只供 quietActions 路径。
          */
-        public suspend fun awaitStable(
+        private suspend fun awaitStable(
             ctx: ToolContext,
             waitMs: Long? = null,
         ): StableWait {
@@ -86,199 +143,58 @@ public class ActionEpilogue
             return wait
         }
 
-        /**
-         * 收尾：等待界面稳定（[waitMs] 为工具的 `wait_ms`）→ 按最近观测的选择方式重新观测，
-         * 用观测记录的变化结论写效果回执。动作成功时填写 [ToolOutput.replay]（只记录成功的调用）。
-         */
-        public suspend fun finish(
+        /** 智能体路径的固定等待：等待前后登记自身动作窗口。 */
+        private suspend fun fixedWait(
             ctx: ToolContext,
-            resultText: String,
+            ms: Long,
+        ) {
+            val touch = ctx.config[DeviceConfig.TOUCH]
+            val start = clock.nowMillis()
+            activityMonitor.markSelfActionWindow(start, start + touch.selfActionMaxMs)
+            delay(ms)
+            activityMonitor.markSelfActionWindow(start, clock.nowMillis() + touch.selfActionGraceMs)
+        }
+
+        private fun waitOf(
+            ctx: ToolContext,
             waitMs: Long?,
-            replay: ReplayInput,
-        ): ToolOutput = finishWithObservation(ctx, resultText, waitMs, replay).output
-
-        /** 同 [finish]，并把收尾观测交给调用方（dismiss_popup 复核弹窗用）。 */
-        public suspend fun finishWithObservation(
-            ctx: ToolContext,
-            resultText: String,
-            waitMs: Long?,
-            replay: ReplayInput,
-        ): EpilogueResult {
-            val wait = awaitStable(ctx, waitMs)
-            val head = mutableListOf(Block.Text(resultText))
-            if (!wait.settled) {
-                head += Block.Text(prompts.text(PROMPT_NOT_SETTLED, mapOf(VAR_MS to wait.waitedMs.toString())))
-            }
-            if (ctx.quietActions) {
-                return EpilogueResult(ToolOutput(ok = true, content = head, screenDelta = null, replay = null), null)
-            }
-            val last = ctx.deviceHistory().last
-            val selection = last?.selection ?: ObserveSelection.Auto
-            if (selection is ObserveSelection.Explicit && selection.mode == ObserveMode.LLM) {
-                return llmFinish(ctx, head, last, replay)
-            }
-            return when (val observed = observer.observe(ctx, selection, full = false)) {
-                is Outcome.Ok -> {
-                    val delta = observed.value.delta
-                    EpilogueResult(
-                        ToolOutput(
-                            ok = true,
-                            content =
-                                head +
-                                    observationAndEffect(
-                                        observed.value.observation.text,
-                                        delta,
-                                        replay.toolId,
-                                        null,
-                                    ),
-                            observation = observed.value.ref,
-                            screenDelta = delta,
-                            replay = buildReplay(replay, preOf(last, ctx.config), observed.value.ref.fingerprint),
-                        ),
-                        observed.value,
-                    )
-                }
-                is Outcome.Err -> {
-                    val delta = ScreenDelta(ScreenDeltaKind.UNKNOWN, ScreenDeltaReasons.OBSERVE_FAILED)
-                    EpilogueResult(
-                        ToolOutput(
-                            ok = true,
-                            content = head + effectBlock(delta, replay.toolId, observed.error.code),
-                            screenDelta = delta,
-                            replay = null,
-                        ),
-                        null,
-                    )
-                }
-            }
+        ): Wait {
+            val cfg = ctx.config[DeviceConfig.ACTION]
+            val requested = waitMs ?: cfg.delayMs
+            val actual = requested.coerceIn(0, cfg.maxDelayMs)
+            return Wait(actual, clamped = actual != requested)
         }
 
-        /** 显式 llm：画面帧签名比较，不调视觉模型、不更新历史、不录回放。 */
-        private suspend fun llmFinish(
-            ctx: ToolContext,
-            head: List<Block>,
-            last: RecordedObservation?,
-            replay: ReplayInput,
-        ): EpilogueResult {
-            val post = frameMotion.capture()
-            val before = last?.frame
-            val delta =
-                if (post == null || before == null) {
-                    ScreenDelta(ScreenDeltaKind.UNKNOWN, ScreenDeltaReasons.NO_BASELINE)
-                } else {
-                    val same = frameMotion.same(before, post, ctx.config[DeviceConfig.CHANGE])
-                    ScreenDelta(
-                        if (same) ScreenDeltaKind.UNCHANGED else ScreenDeltaKind.CHANGED,
-                        ScreenDeltaReasons.FRAME,
-                    )
-                }
-            return EpilogueResult(
-                ToolOutput(
-                    ok = true,
-                    content = head + effectBlock(delta, replay.toolId, null),
-                    screenDelta = delta,
-                    replay = null,
-                ),
-                null,
-            )
-        }
-
-        private fun observationAndEffect(
-            observationText: String,
-            delta: ScreenDelta,
-            toolId: String,
-            code: String?,
-        ): List<Block> = listOf(Block.Text(observationText)) + effectBlock(delta, toolId, code)
-
-        private fun effectBlock(
-            delta: ScreenDelta,
-            toolId: String,
-            code: String?,
-        ): List<Block> = listOf(Block.Text(effectLine(delta, toolId, code)))
-
-        /** 效果行（WP2.3 表格口径）：CHANGED/UNCHANGED 带依据，UNKNOWN 带原因。 */
-        private fun effectLine(
-            delta: ScreenDelta,
-            toolId: String,
-            code: String?,
-        ): String {
-            val tool = toolId.removePrefix("tool.")
-            return when (delta.kind) {
-                ScreenDeltaKind.CHANGED ->
-                    prompts.text(PROMPT_EFFECT_CHANGED, mapOf(VAR_BASIS to basisText(delta.reason)))
-                ScreenDeltaKind.UNCHANGED ->
-                    prompts.text(
-                        PROMPT_EFFECT_UNCHANGED,
-                        mapOf(VAR_BASIS to basisText(delta.reason), VAR_HINT to hintText(tool)),
-                    )
-                ScreenDeltaKind.UNKNOWN ->
-                    prompts.text(PROMPT_EFFECT_UNKNOWN, mapOf(VAR_REASON to unknownText(delta.reason, code)))
-            }
-        }
-
-        private fun basisText(reason: String): String = prompts.text(PROMPT_BASIS_PREFIX + reason)
-
-        private fun unknownText(
-            reason: String,
-            code: String?,
-        ): String =
-            if (reason == ScreenDeltaReasons.OBSERVE_FAILED) {
-                prompts.text(PROMPT_UNKNOWN_OBSERVE_FAILED, mapOf(VAR_CODE to code.orEmpty()))
-            } else {
-                prompts.text(PROMPT_UNKNOWN_PREFIX + reason)
-            }
-
-        private fun hintText(tool: String): String {
-            val id = PROMPT_HINT_PREFIX + tool
-            return if (id in knownIds) prompts.text(id) else prompts.text(PROMPT_HINT_DEFAULT)
-        }
-
-        /** “模板不存在”的判断：一次性取 id 集合缓存，不用 try/catch 吞 get 异常（WP2.3）。 */
-        private val knownIds: Set<String> by lazy { prompts.all().mapTo(mutableSetOf()) { it.id } }
+        private data class Wait(
+            val ms: Long,
+            val clamped: Boolean,
+        )
 
         private companion object {
             const val MODE_A11Y = "a11y"
 
             const val PROMPT_NOT_SETTLED = "device.stabilize.not_settled"
-            const val PROMPT_EFFECT_CHANGED = "device.effect.changed"
-            const val PROMPT_EFFECT_UNCHANGED = "device.effect.unchanged"
-            const val PROMPT_EFFECT_UNKNOWN = "device.effect.unknown"
-            const val PROMPT_BASIS_PREFIX = "device.effect.basis."
-            const val PROMPT_UNKNOWN_PREFIX = "device.effect.unknown."
-            const val PROMPT_UNKNOWN_OBSERVE_FAILED = "device.effect.unknown.observe_failed"
-            const val PROMPT_HINT_PREFIX = "device.effect.unchanged_hint."
-            const val PROMPT_HINT_DEFAULT = "device.effect.unchanged_hint.default"
+            const val PROMPT_WAITED = "device.action.waited"
+            const val PROMPT_WAIT_CLAMPED = "device.action.wait_clamped"
 
             const val VAR_MS = "ms"
-            const val VAR_BASIS = "basis"
-            const val VAR_HINT = "hint"
-            const val VAR_REASON = "reason"
-            const val VAR_CODE = "code"
+            const val VAR_MAX = "max"
         }
     }
 
-/** 组装可回放记录（docs/tech/05 §13）：pre 缺失（动作前没有可用观测）时不记录。 */
+/** 组装可回放记录（docs/tech/05 §13）：pre 缺失（动作前采样失败）时不记录。 */
 internal fun buildReplay(
     replay: ReplayInput,
-    pre: ReplayStateSample?,
-    postFingerprint: String?,
-): ReplayableAction? {
-    val preSample = pre ?: return null
-    return ReplayableAction(
+    pre: ReplayStateSample,
+): ReplayableAction =
+    ReplayableAction(
         toolId = replay.toolId,
         replayArgs = replay.replayArgs,
-        pre = preSample,
-        postFingerprint = postFingerprint,
+        pre = pre,
+        postFingerprint = null,
         execution = if (replay.gesture != null) EXEC_GESTURE else EXEC_NODE_ACTION,
         gesture = replay.gesture,
     )
-}
-
-/** 动作前样本（WP2.8）：取自收尾前的最近观测；llm 观测不录回放。 */
-internal fun preOf(
-    last: RecordedObservation?,
-    config: ConfigSnapshot,
-): ReplayStateSample? = last?.takeIf { it.mode != ObserveMode.LLM }?.let { sampleOf(it.screen, it.mode, config) }
 
 /** 执行方式（docs/tech/05 §13）：无障碍节点动作或手势坐标。 */
 private const val EXEC_NODE_ACTION = "node_action"

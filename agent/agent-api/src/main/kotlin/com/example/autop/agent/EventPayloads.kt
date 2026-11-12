@@ -175,7 +175,7 @@ public data class ToolResultEvent(
     val fullBlocks: List<Block>? = null,
     /** R1/A6：可回放动作记录（docs/tech/04 §2.7），只在成功时填写。 */
     val replay: ReplayableAction? = null,
-    /** 屏幕变化结论（agent-harness-overhaul D4）；无屏幕语义的工具为 null。 */
+    /** 屏幕变化结论；已停用（tool_optimize D1），只为读取旧事件保留，新事件恒为 null。 */
     val screenDelta: ScreenDelta? = null,
 ) : EventPayload
 

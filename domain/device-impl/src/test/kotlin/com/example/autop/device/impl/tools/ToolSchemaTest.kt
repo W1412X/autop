@@ -4,7 +4,9 @@ import com.example.autop.agent.ToolProbeFixtures
 import com.example.autop.agent.ToolSchemaBuilder
 import com.example.autop.core.testing.FakePromptRepository
 import com.google.common.truth.Truth.assertThat
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import org.junit.Test
 
 /** 17 个设备工具的 schema 都能由真实模板组装，且每个参数都有说明（docs/tech/04 §2.3）。 */
@@ -39,6 +41,38 @@ class ToolSchemaTest {
     }
 
     @Test
+    fun `screen action tools declare wait_ms and observe has no full`() {
+        val screenActionTools =
+            setOf(
+                "tap",
+                "tap_node",
+                "input_text",
+                "scroll",
+                "scroll_node",
+                "swipe",
+                "global_action",
+                "open_app",
+                "restart_app",
+                "intent",
+            )
+        for (spec in DeviceToolSpecs.ALL.filter { it.name in screenActionTools }) {
+            val properties = spec.parameters["properties"]!!.jsonObject
+            assertThat(properties.keys).contains("wait_ms")
+        }
+        val observe = DeviceToolSpecs.ALL.first { it.name == "observe" }
+        val observeProps = observe.parameters["properties"]!!.jsonObject
+        assertThat(observeProps.keys).doesNotContain("full")
+    }
+
+    @Test
+    fun `intent kind enum contains uri`() {
+        val intent = DeviceToolSpecs.intent
+        val kind = intent.parameters["properties"]!!.jsonObject["kind"]!!.jsonObject
+        val enum = kind["enum"]!!.jsonArray.map { it.jsonPrimitive.content }
+        assertThat(enum).contains("uri")
+    }
+
+    @Test
     fun `every device tool has a probe fixture (N198)`() {
         for (spec in DeviceToolSpecs.ALL) {
             assertThat(ToolProbeFixtures.names).contains(spec.name)
@@ -57,10 +91,8 @@ class ToolSchemaTest {
                 "scroll_node",
                 "swipe",
                 "global_action",
-                "dismiss_popup",
                 "restart_app",
                 "open_app",
-                "open_uri",
                 "intent",
                 "wait",
                 "list_apps",

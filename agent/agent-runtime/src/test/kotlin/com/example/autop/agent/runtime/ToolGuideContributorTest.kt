@@ -41,7 +41,7 @@ class ToolGuideContributorTest {
 
             val text = checkNotNull(contributor.contribute(request(provider))).text
 
-            assertThat(text).contains("较早的屏幕观测会被省略")
+            assertThat(text).contains("更早的观测会被省略成一行摘要")
         }
 
     private fun request(provider: FakeConfigProvider): ContextRequest =

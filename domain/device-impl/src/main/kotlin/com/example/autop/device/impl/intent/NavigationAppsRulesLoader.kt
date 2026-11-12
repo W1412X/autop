@@ -1,6 +1,6 @@
 /**
  * 导航规则加载（intent-tool §5.1）：从 `assets/rules/navigation_apps.json` 读取，进程内缓存一份。
- * 解析失败、schemaVersion 不符或加载校验不通过时抛错，避免静默用错规则（与 PopupRulesLoader 一致）。
+ * 解析失败、schemaVersion 不符或加载校验不通过时抛错，避免静默用错规则（与 RestartRulesLoader 一致）。
  */
 package com.example.autop.device.impl.intent
 

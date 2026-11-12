@@ -105,7 +105,6 @@ internal class TaskAuthorTools(
                     "observe",
                     buildJsonObject {
                         put("mode", args.str("mode") ?: "a11y")
-                        put("full", true)
                     },
                 )
             }

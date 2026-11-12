@@ -33,7 +33,6 @@ internal class ToolPhase(
             threadStore = controller.toolStore,
             ask = ::askUser,
             progress = { text -> controller.emit(AgentEvent.ToolProgress(callId = "", text = text)) },
-            modelVision = parts.modelVision,
             tools = RouterToolInvoker(parts.router),
         )
     }

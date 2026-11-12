@@ -135,8 +135,9 @@ class TapNodeToolTest {
             assertThat(env.gestures.taps).isEmpty()
             assertThat(env.gestures.nodeActions).hasSize(1)
             val text = out.content.joinToString("\n") { it.toString() }
+            val seen = text + out.trace.joinToString(" ")
             assertThat(text).contains("已对节点 #1 执行 ACTION_CLICK")
-            assertThat(text).contains("执行：无障碍节点动作 ACTION_CLICK")
+            assertThat(seen).contains("执行：无障碍节点动作 ACTION_CLICK")
             // 回放写成等价 tool.tap 坐标（id 不进回放）。
             val replay = out.replay
             assertThat(replay?.toolId).isEqualTo("tool.tap")

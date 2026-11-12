@@ -11,11 +11,8 @@ import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.device.DeviceErrorCodes
-import com.example.autop.device.Observation
-import com.example.autop.device.ObservationMode
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.Rect
-import com.example.autop.device.ScreenModel
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.Screenshot
@@ -26,9 +23,6 @@ import com.example.autop.device.WindowSnapshot
 import com.example.autop.device.WindowType
 import com.example.autop.device.core.NodeIdAssigner
 import com.example.autop.device.core.NodeIds
-import com.example.autop.device.core.ScreenFingerprint
-import com.example.autop.device.core.ScreenJsonRenderer
-import com.example.autop.device.core.ScreenJsonWire
 import com.example.autop.device.core.SerializedScreen
 import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.SnapshotCapturer
@@ -36,7 +30,6 @@ import com.example.autop.device.impl.SnapshotSerializer
 import com.example.autop.device.impl.deviceHistory
 import com.example.autop.device.impl.vision.FrameSignature
 import com.example.autop.device.impl.vision.frameSignatureOf
-import com.example.autop.device.impl.vision.llm.LlmScreenParser
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
@@ -60,20 +53,17 @@ public class ScreenPreparer
         private val capturer: SnapshotCapturer,
         private val contentAreas: ContentAreaProvider,
         private val visualParser: VisualScreenParser,
-        private val llmParser: LlmScreenParser,
         private val serializer: SnapshotSerializer,
     ) {
         /** 按方式准备一次观测（未写历史）。 */
         internal suspend fun prepare(
             ctx: ToolContext,
             mode: ObserveMode,
-            region: Rect?,
             effective: List<ObserveMode>,
         ): Outcome<Prepared> =
             when (mode) {
                 ObserveMode.A11Y -> a11y(ctx.config, effective, idAssignerOf(ctx, ctx.config))
                 ObserveMode.VISUAL -> visual(ctx.config, effective)
-                ObserveMode.LLM -> llm(ctx, region, effective)
             }
 
         /**
@@ -170,90 +160,6 @@ public class ScreenPreparer
                     frame = signatureOf(shot),
                 ),
             )
-        }
-
-        /** llm 观测：独立 VISION 请求，只把 JSON 作为工具结果（§4）；签名与模型来自同一张截图。 */
-        internal suspend fun llm(
-            ctx: ToolContext,
-            region: Rect?,
-            effective: List<ObserveMode>,
-        ): Outcome<Prepared> {
-            val base = capturer.buildSnapshot()
-            val shot =
-                when (val got = screenReader.screenshot()) {
-                    is Outcome.Err -> return got
-                    is Outcome.Ok -> got.value
-                }
-            val frame = frameOf(shot, base)
-            val app = base.foregroundPackage.orEmpty()
-            val page = base.activity?.substringAfterLast('.')
-            return when (
-                val got =
-                    llmParser.parse(
-                        ctx = ctx,
-                        frame = frame,
-                        region = region,
-                        app = app,
-                        page = page,
-                        effectiveModes = effective,
-                    )
-            ) {
-                is Outcome.Err -> got
-                is Outcome.Ok ->
-                    Outcome.Ok(
-                        Prepared(
-                            mode = ObserveMode.LLM,
-                            snapshot = base,
-                            serialized = serializedOf(ctx.config, got.value.model, base),
-                            frame = got.value.signature,
-                        ),
-                    )
-            }
-        }
-
-        /** llm 模型 → 观测文本（a11y/visual 由 [SnapshotSerializer] 直接产出）。 */
-        private fun serializedOf(
-            config: ConfigSnapshot,
-            model: ScreenModel,
-            base: ScreenSnapshot,
-        ): SerializedScreen {
-            val serializerConfig = serializer.configOf(config)
-            val suggestion =
-                model.quality.insufficient?.let { code ->
-                    serializerConfig.renderPrompt(
-                        ScreenJsonWire.PROMPT_INSUFFICIENT,
-                        mapOf(
-                            VAR_REASON to
-                                serializerConfig.renderPrompt(
-                                    ScreenJsonWire.PROMPT_INSUFFICIENT_REASON_PREFIX + code,
-                                    emptyMap(),
-                                ),
-                            VAR_SUGGEST to (model.quality.suggest?.id ?: ""),
-                        ),
-                    )
-                }
-            val text =
-                ScreenJsonRenderer.render(
-                    model = model,
-                    coordText = serializerConfig.renderPrompt(ScreenJsonWire.PROMPT_COORD, emptyMap()),
-                    suggestion = suggestion,
-                )
-            val window = model.windows.firstOrNull()
-            val observation =
-                Observation(
-                    text = text,
-                    mode = ObservationMode.FULL,
-                    observeMode = ObserveMode.LLM,
-                    fingerprint = ScreenFingerprint.of(base.foregroundPackage, base.activity, model.appFlatten()),
-                    packageName = base.foregroundPackage,
-                    activity = base.activity,
-                    summaryLine =
-                        "${window?.app.orEmpty()} / ${window?.page.orEmpty()}，${model.quality.nodes} 个节点",
-                    interactiveCount = model.quality.interactive,
-                    nodeCount = model.quality.nodes,
-                    semanticPoor = false,
-                )
-            return SerializedScreen(observation, model)
         }
 
         /** 视觉伪树替换：保留前台/尺寸信息，窗口收敛为单个 APPLICATION 窗口（§3.2）。 */

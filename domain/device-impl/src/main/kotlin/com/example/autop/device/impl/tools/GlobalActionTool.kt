@@ -12,6 +12,7 @@ import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.ConfigSnapshot
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.GestureController
 import com.example.autop.device.GlobalAction
@@ -20,7 +21,6 @@ import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
-import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -28,6 +28,7 @@ import javax.inject.Singleton
 /** prepare 生成的执行载荷。 */
 private data class GlobalActionPayload(
     val action: GlobalAction,
+    val waitMs: Long?,
     val replayArgs: JsonObject,
 )
 
@@ -41,6 +42,7 @@ public class GlobalActionTool
         private val subjects: PolicySubjectBuilder,
         private val epilogue: ActionEpilogue,
         private val trace: ExecutionTraceRenderer,
+        private val prompts: PromptRepository,
     ) : ScreenActionTool {
         override val id: String = "tool.global_action"
 
@@ -70,7 +72,12 @@ public class GlobalActionTool
                 Outcome.Err(AppError(code = CommonErrorCodes.INVALID_ARGUMENT, message = "未知的全局动作 $name"))
             } else {
                 val subject = subjects.build(ID, snap, null, mapOf(EXTRA_ACTION to name), config)
-                Outcome.Ok(PreparedAction(subject, GlobalActionPayload(action, replayArgsOf(args, hit = null))))
+                Outcome.Ok(
+                    PreparedAction(
+                        subject,
+                        GlobalActionPayload(action, waitMsOf(args), replayArgsOf(args, hit = null)),
+                    ),
+                )
             }
         }
 
@@ -79,27 +86,28 @@ public class GlobalActionTool
             ctx: ToolContext,
         ): ToolOutput {
             val payload = action.payload as GlobalActionPayload
+            val pre = epilogue.preSample(ctx)
             val result = gestures.globalAction(payload.action)
             if (!result.ok) {
-                return toolError(DeviceErrorCodes.ACTION_FAILED, "全局动作 ${payload.action.name} 执行失败")
-            }
-            val out =
-                epilogue.finish(
-                    ctx,
-                    "已提交全局操作 ${payload.action.name}",
-                    null,
-                    ReplayInput(ID, payload.replayArgs, gesture = null),
+                return toolError(
+                    DeviceErrorCodes.ACTION_FAILED,
+                    "全局动作 ${payload.action.name} 执行失败",
+                    prompts.text(PROMPT_FAILED_HINT),
                 )
-            return out.copy(
-                content =
-                    out.content +
-                        Block.Text(
-                            trace.executionLine(
-                                ExecMethod.GLOBAL_ACTION,
-                                channel = result.channel,
-                                shellSkip = result.shellSkip,
-                            ),
-                        ),
+            }
+            val traceLine =
+                trace.executionLine(
+                    ExecMethod.GLOBAL_ACTION,
+                    channel = result.channel,
+                    shellSkip = result.shellSkip,
+                )
+            return epilogue.finish(
+                ctx,
+                prompts.text(PROMPT_RESULT, mapOf(VAR_ACTION to payload.action.name)),
+                payload.waitMs,
+                ReplayInput(ID, payload.replayArgs, gesture = null),
+                pre,
+                trace = listOf(traceLine),
             )
         }
 
@@ -117,5 +125,8 @@ public class GlobalActionTool
         private companion object {
             const val ID = "tool.global_action"
             const val EXTRA_ACTION = "action"
+            const val PROMPT_RESULT = "device.global_action.result"
+            const val PROMPT_FAILED_HINT = "device.global_action.failed_hint"
+            const val VAR_ACTION = "action"
         }
     }

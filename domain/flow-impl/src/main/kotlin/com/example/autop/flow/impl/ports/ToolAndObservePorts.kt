@@ -173,7 +173,6 @@ internal class ObservePortImpl(
         val args =
             buildJsonObject {
                 if (wanted != AUTO_MODE) put("mode", wanted)
-                put("full", true)
             }
         val out = invoker.invoke(OBSERVE_TOOL, args, ctx)
         val text = out.content.filterIsInstance<Block.Text>().joinToString("\n") { it.text }

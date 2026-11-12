@@ -29,7 +29,7 @@ public class BackupExporter(
             tasks = taskRepository.observeTasks().first(),
             // 导出不含密钥（docs/tech/03 §3：导入后需重新输入）。
             modelProfiles = modelProfileStore.profiles.first().map { it.copy(apiKeyRef = "") },
-            modelRoles = modelProfileStore.roles.first(),
+            defaultProfileId = modelProfileStore.defaultProfileId.first(),
         )
 
     /** 先序遍历记忆树（子节点分页拉全）。 */

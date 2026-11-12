@@ -72,7 +72,6 @@ internal class RecoveryCatalog(
                     WaitStableAction(),
                     AltClickAction(),
                     ScrollIntoViewAction(),
-                    DismissPopupAction(),
                     BackAndRetryAction(),
                     ReopenAppAction(),
                     RestartAppAction(),
@@ -153,7 +152,6 @@ internal suspend fun anchorHolds(
 private const val TOOL_TAP = "tap"
 private const val TOOL_WAIT = "wait"
 private const val TOOL_SCROLL = "scroll"
-private const val TOOL_DISMISS_POPUP = "dismiss_popup"
 private const val TOOL_GLOBAL_ACTION = "global_action"
 private const val TOOL_OPEN_APP = "open_app"
 private const val TOOL_RESTART_APP = "restart_app"
@@ -210,18 +208,6 @@ internal class ScrollIntoViewAction : RecoveryAction {
             .call(TOOL_SCROLL, JsonObject(mapOf(ARG_DIRECTION to JsonPrimitive(direction))), ctx.node.id)
             .ok
     }
-}
-
-/** 关闭遮挡的弹窗。 */
-internal class DismissPopupAction : RecoveryAction {
-    override val id: String = "recovery.dismiss_popup"
-
-    override suspend fun applicable(ctx: RecoveryContext): Boolean = true
-
-    override suspend fun run(ctx: RecoveryContext): Boolean =
-        ctx.ports.tools
-            .call(TOOL_DISMISS_POPUP, JsonObject(emptyMap()), ctx.node.id)
-            .ok
 }
 
 /** 返回一次；若已离开锚点应用则重新打开该应用。仅在锚点不成立时适用。 */

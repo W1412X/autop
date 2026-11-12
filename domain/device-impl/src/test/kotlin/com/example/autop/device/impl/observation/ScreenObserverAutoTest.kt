@@ -19,7 +19,6 @@ import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
-import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NodeFlags
 import com.example.autop.device.NodeSnapshot
@@ -46,15 +45,9 @@ import com.example.autop.device.impl.ServiceHolder
 import com.example.autop.device.impl.SnapshotCapturer
 import com.example.autop.device.impl.SnapshotSerializer
 import com.example.autop.device.impl.WindowRedactor
-import com.example.autop.device.impl.vision.llm.LlmScreenParser
-import com.example.autop.llm.LlmErrorCodes
-import com.example.autop.llm.LlmGateway
-import com.example.autop.llm.LlmProvider
-import com.example.autop.llm.ModelRole
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -133,7 +126,7 @@ class ScreenObserverAutoTest {
         }
 
     @Test
-    fun `record diffs against last only when same mode`() =
+    fun `record always returns full now that diffs are removed`() =
         runTest {
             val visual = FakeVisual(listOf(visualTree(visualNodes(count = 5))))
             val snapshots = List(3) { Outcome.Ok(a11ySnapshot(sufficientNodes())) }
@@ -145,7 +138,7 @@ class ScreenObserverAutoTest {
             val third = okOf(observer.observe(context, ObserveSelection.Explicit(ObserveMode.VISUAL)))
 
             assertThat(first.observation.mode).isEqualTo(ObservationMode.FULL)
-            assertThat(second.observation.mode).isEqualTo(ObservationMode.DIFF)
+            assertThat(second.observation.mode).isEqualTo(ObservationMode.FULL)
             assertThat(third.observation.mode).isEqualTo(ObservationMode.FULL)
             assertThat(third.screen.model.mode).isEqualTo(ObserveMode.VISUAL)
         }
@@ -187,18 +180,8 @@ class ScreenObserverAutoTest {
                 prompts = prompts,
                 context = context,
             )
-        val llm =
-            LlmScreenParser(
-                context = context,
-                gateway = NoVisionGateway,
-                prompts = prompts,
-                rules = rules,
-                configProvider = provider,
-                dispatchers = TestDispatcherProvider(StandardTestDispatcher()),
-                clock = FakeClock(0L),
-            )
-        val modes = ObserveModeResolver(holder, visual, NoVisionGateway, prompts)
-        val preparer = ScreenPreparer(reader, capturer, contentAreas, visual, llm, serializer)
+        val modes = ObserveModeResolver(holder, visual, prompts)
+        val preparer = ScreenPreparer(reader, capturer, contentAreas, visual, serializer)
         return ScreenObserver(preparer, serializer, modes)
     }
 
@@ -337,14 +320,6 @@ class ScreenObserverAutoTest {
         }
 
         override suspend fun warmUp() = Unit
-    }
-
-    private object NoVisionGateway : LlmGateway {
-        override fun forRole(role: ModelRole): Outcome<LlmProvider> =
-            Outcome.Err(AppError(LlmErrorCodes.NOT_CONFIGURED, "no vision model"))
-
-        override fun forProfile(profileId: String): Outcome<LlmProvider> =
-            Outcome.Err(AppError(LlmErrorCodes.NOT_CONFIGURED, "no vision model"))
     }
 
     private object NoRedaction : WindowRedactor {

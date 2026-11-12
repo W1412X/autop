@@ -8,7 +8,7 @@ import org.junit.Test
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 
-/** [ModelProfilesSerializer] 单测：解析、损坏回退、schemaVersion 归一（docs/tech/03 §3）。 */
+/** [ModelProfilesSerializer] 单测：解析、v1 迁移、损坏回退、schemaVersion 归一（docs/tech/03 §3）。 */
 internal class ModelProfilesSerializerTest {
     private val serializer = ModelProfilesSerializer()
 
@@ -18,7 +18,16 @@ internal class ModelProfilesSerializerTest {
         assertThat(doc.schemaVersion).isEqualTo(MODEL_PROFILES_SCHEMA_VERSION)
         assertThat(doc.profiles).hasSize(1)
         assertThat(doc.profiles.first().id).isEqualTo(PROFILE_ID)
-        assertThat(doc.roles.main).isEqualTo(PROFILE_ID)
+        assertThat(doc.defaultProfileId).isEqualTo(PROFILE_ID)
+    }
+
+    @Test
+    fun readFromMigratesV1RolesMainToDefault() {
+        val json =
+            """{"schemaVersion": 1, "profiles": [], "roles": {"main": "$PROFILE_ID", "vision": "other"}}"""
+        val doc = runBlocking { serializer.readFrom(ByteArrayInputStream(json.toByteArray())) }
+        assertThat(doc.schemaVersion).isEqualTo(MODEL_PROFILES_SCHEMA_VERSION)
+        assertThat(doc.defaultProfileId).isEqualTo(PROFILE_ID)
     }
 
     @Test
@@ -58,10 +67,11 @@ internal class ModelProfilesSerializerTest {
               "apiKeyRef": "secret:model:$PROFILE_ID",
               "model": "m1",
               "contextWindow": 8192,
-              "maxOutputTokens": 256
+              "maxOutputTokens": 256,
+              "capabilities": {"tools": true, "vision": true}
             }
           ],
-          "roles": {"main": "$PROFILE_ID"}
+          "defaultProfileId": "$PROFILE_ID"
         }
         """.trimIndent()
 

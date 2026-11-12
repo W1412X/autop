@@ -17,8 +17,6 @@ import com.example.autop.feature.settings.me.RecordingModelProbe
 import com.example.autop.feature.settings.me.okProbeReport
 import com.example.autop.feature.settings.me.testProfile
 import com.example.autop.llm.ModelCapabilities
-import com.example.autop.llm.ModelRole
-import com.example.autop.llm.ModelRoles
 import com.example.autop.llm.ProbeResult
 import com.example.autop.llm.ProbeVerdict
 import com.google.common.truth.Truth.assertThat
@@ -135,8 +133,6 @@ class ModelsViewModelTest {
             assertThat(saved.model).isEqualTo("gpt-4o-mini")
             assertThat(saved.apiKeyRef).isEqualTo("secret:model:id-1")
             assertThat(secrets.get("secret:model:id-1")).isEqualTo("sk-new")
-            assertThat(saved.capabilities.tools).isTrue()
-            assertThat(saved.capabilities.vision).isTrue()
             viewModel.onAction(ModelsAction.CloseProbe)
             assertThat(viewModel.uiState.value.draft).isNull()
             assertThat(viewModel.uiState.value.probe.visible).isFalse()
@@ -170,7 +166,6 @@ class ModelsViewModelTest {
             viewModel.onAction(ModelsAction.Save)
             val draft = checkNotNull(viewModel.uiState.value.draft)
             assertThat(draft.capabilities.tools).isTrue()
-            assertThat(draft.capabilities.vision).isTrue()
             assertThat(probe.received.single().apiKeyRef).isEqualTo("secret:model:id-1")
         }
 
@@ -184,13 +179,12 @@ class ModelsViewModelTest {
             viewModel.onAction(ModelsAction.Save)
             val saved = store.profiles.first().single()
             assertThat(saved.capabilities.tools).isTrue()
-            assertThat(saved.capabilities.vision).isTrue()
         }
 
     @Test
     fun `inconclusive tools probe keeps existing tools capability`() =
         runTest(dispatcher) {
-            store.upsert(testProfile("p1").copy(capabilities = ModelCapabilities(tools = true, vision = false)))
+            store.upsert(testProfile("p1").copy(capabilities = ModelCapabilities(tools = true)))
             probe.report =
                 okProbeReport().copy(tools = ProbeResult(verdict = ProbeVerdict.INCONCLUSIVE, elapsedMs = 900))
             val viewModel = createViewModel()
@@ -198,7 +192,6 @@ class ModelsViewModelTest {
             viewModel.onAction(ModelsAction.Save)
             val saved = store.profiles.first().single()
             assertThat(saved.capabilities.tools).isTrue()
-            assertThat(saved.capabilities.vision).isTrue()
         }
 
     @Test
@@ -243,14 +236,14 @@ class ModelsViewModelTest {
         }
 
     @Test
-    fun `role assignment writes roles`() =
+    fun `set default writes default profile id`() =
         runTest(dispatcher) {
             store.upsert(testProfile("p1"))
             val viewModel = createViewModel()
-            viewModel.onAction(ModelsAction.AssignRole(ModelRole.MAIN, "p1"))
-            viewModel.onAction(ModelsAction.AssignRole(ModelRole.LIGHT, null))
-            val roles = store.roles.first()
-            assertThat(roles).isEqualTo(ModelRoles(main = "p1", vision = null, light = null))
+            viewModel.onAction(ModelsAction.SetDefault("p1"))
+            viewModel.onAction(ModelsAction.SetDefault(null))
+            val defaultId = store.defaultProfileId.first()
+            assertThat(defaultId).isNull()
         }
 
     @Test

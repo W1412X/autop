@@ -261,7 +261,6 @@ public data class Handoff(
     @SerialName("tools") val tools: List<String>? = null,
     @SerialName("maxSteps") val maxSteps: Int? = null,
     @SerialName("maxDurationMs") val maxDurationMs: Long? = null,
-    @SerialName("role") val role: String? = null,
 )
 
 /** handoff / steps 成功后如何接回。 */
@@ -492,7 +491,6 @@ public sealed interface Condition {
         @SerialName("prompt") val prompt: String,
         @SerialName("screen") val screen: Boolean = false,
         @SerialName("images") val images: List<String> = emptyList(),
-        @SerialName("role") val role: String? = null,
     ) : Condition
 
     /** 全部为真。 */
@@ -931,7 +929,6 @@ public data class LlmNode(
     @SerialName("timeoutMs") override val timeoutMs: Long? = null,
     @SerialName("trace") override val trace: TraceLevel? = null,
     @SerialName("pre") override val pre: Precondition? = null,
-    @SerialName("role") val role: String? = null,
     @SerialName("system") val system: String? = null,
     @SerialName("prompt") val prompt: String,
     @SerialName("screen") val screen: Boolean = false,
@@ -1103,7 +1100,6 @@ public data class AgentNode(
     @SerialName("tools") val tools: List<String>? = null,
     @SerialName("maxSteps") val maxSteps: Int? = null,
     @SerialName("maxDurationMs") val maxDurationMs: Long? = null,
-    @SerialName("role") val role: String? = null,
     @SerialName("out") val out: String? = null,
 ) : Node
 

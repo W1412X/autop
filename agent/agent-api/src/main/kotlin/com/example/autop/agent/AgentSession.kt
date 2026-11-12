@@ -10,7 +10,6 @@ import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.llm.Block
 import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.LlmProvider
-import com.example.autop.llm.ModelRole
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -28,16 +27,15 @@ public data class RunRequest(
     val config: ConfigSnapshot,
     /** 允许的工具 id；null = 配置中全部启用的工具。 */
     val toolFilter: Set<String>?,
-    val modelRole: ModelRole = ModelRole.MAIN,
-    /** 会话级模型覆盖（ModelProfile id）；有值时优先于 [modelRole]（模型切换，ADR-0021 之后）。 */
+    /** 会话级模型覆盖（ModelProfile id）；null 时使用默认模型（模型切换，ADR-0021/0022）。 */
     val modelProfileId: String? = null,
     /** WP10：有值时先回放再进入主循环（docs/tech/04 §3.12）。 */
     val replay: ReplayPlan? = null,
 )
 
-/** 按请求解析 provider：会话级覆盖优先，否则取角色默认（模型切换）。 */
+/** 按请求解析 provider：会话级覆盖优先，否则取默认模型（模型切换）。 */
 public fun LlmGateway.forRequest(request: RunRequest): Outcome<LlmProvider> =
-    request.modelProfileId?.let { forProfile(it) } ?: forRole(request.modelRole)
+    request.modelProfileId?.let { forProfile(it) } ?: forDefault()
 
 /** Run 的状态机（docs/tech/04 §2.6）。 */
 public enum class RunState {

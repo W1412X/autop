@@ -41,6 +41,7 @@ private class Parser(
             "share" -> share(args)
             "navigate" -> navigate(args)
             "settings" -> settings(args)
+            "uri" -> uri(args)
             else -> fail(IntentInvalidReason.UNKNOWN_KIND, value = kind, detail = KIND_IDS)
         }
     }
@@ -180,6 +181,16 @@ private class Parser(
         return ok(IntentSpec.Settings(page, app))
     }
 
+    /** 打开链接（tool_optimize §10.1）：必须带 scheme，长度受 textMaxChars 约束。 */
+    private fun uri(args: JsonObject): IntentParse {
+        val raw = args.text("uri") ?: return fail(IntentInvalidReason.URI_MISSING, value = "uri")
+        if (':' !in raw || raw.substringBefore(':').isEmpty()) {
+            return fail(IntentInvalidReason.URI_NO_SCHEME, value = "uri")
+        }
+        checkLength(raw)?.let { return it }
+        return ok(IntentSpec.Uri(raw))
+    }
+
     private fun checkLength(text: String): IntentParse? =
         if (text.length > limits.textMaxChars) {
             fail(IntentInvalidReason.TEXT_TOO_LONG, detail = limits.textMaxChars.toString())
@@ -226,7 +237,7 @@ private class Parser(
 
         /** 电话号码：可选 +，首位数字，之后允许空格、括号、连字符；服务码（* #）由调用方另行拒绝。 */
         val PHONE_PATTERN = Regex("^\\+?[0-9][0-9 ()\\-]{1,30}$")
-        const val KIND_IDS = "alarm, timer, calendar, dial, sms_draft, share, navigate, settings"
+        const val KIND_IDS = "alarm, timer, calendar, dial, sms_draft, share, navigate, settings, uri"
         val MODE_IDS = NavMode.entries.joinToString(", ") { it.id }
         val PAGE_IDS = SettingsPage.entries.joinToString(", ") { it.id }
     }

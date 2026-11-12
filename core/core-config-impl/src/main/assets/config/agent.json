@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "agent": {
     "context": {
       "contributors": [
@@ -28,10 +28,8 @@
         "tool.swipe",
         "tool.global_action",
         "tool.open_app",
-        "tool.open_uri",
         "tool.intent",
         "tool.wait",
-        "tool.dismiss_popup",
         "tool.restart_app",
         "tool.list_apps",
         "tool.read_notifications",
@@ -59,7 +57,7 @@
         "tool.create_task",
         "tool.update_task"
       ],
-      "defaultTimeoutMs": 30000,
+      "defaultTimeoutMs": 60000,
       "timeoutMs": {
         "tool.observe": 300000,
         "tool.wait": 120000,
@@ -75,7 +73,7 @@
         "history.long_text_truncate"
       ],
       "observation": {
-        "keepFull": -1
+        "keepFull": 2
       },
       "image": {
         "keep": 1
@@ -111,11 +109,7 @@
     },
     "breaker": {
       "sameErrorWarn": 3,
-      "sameErrorStop": 5,
-      "stuckWarn": 3,
-      "stuckStop": 6,
-      "repeatWarn": 3,
-      "repeatStop": 5
+      "sameErrorStop": 5
     },
     "turn": {
       "maxTruncatedRetries": 2,

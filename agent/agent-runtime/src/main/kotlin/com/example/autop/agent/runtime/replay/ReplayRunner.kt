@@ -132,7 +132,6 @@ internal class ReplayRunner(
             durationMs = result.durationMs,
             fullBlocks = output.fullContent,
             replay = output.replay,
-            screenDelta = output.screenDelta,
         )
     }
 

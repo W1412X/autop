@@ -30,6 +30,7 @@ internal fun PermissionsSection(
     onOpenDisplayModeSheet: () -> Unit,
     onOpenOpacitySheet: () -> Unit,
     onOpenNavigationSheet: () -> Unit,
+    onOpenActionDelaySheet: () -> Unit,
     onAction: (MeAction) -> Unit,
 ) {
     Column {
@@ -79,14 +80,19 @@ internal fun PermissionsSection(
             value = navigationLabel(state.navigationPreferred, state.navigationApps),
             onClick = onOpenNavigationSheet,
         )
-        BehaviorRows(state = state, onAction = onAction)
+        BehaviorRows(
+            state = state,
+            onOpenActionDelaySheet = onOpenActionDelaySheet,
+            onAction = onAction,
+        )
     }
 }
 
-/** 运行行为开关：常驻后台 / 结束后返回原应用 / 执行期触摸盾。 */
+/** 运行行为开关：常驻后台 / 结束后返回原应用 / 执行期触摸盾 + 动作后等待。 */
 @Composable
 private fun BehaviorRows(
     state: MeUiState,
+    onOpenActionDelaySheet: () -> Unit,
     onAction: (MeAction) -> Unit,
 ) {
     SwitchRow(
@@ -106,6 +112,16 @@ private fun BehaviorRows(
         subtitle = stringResource(R.string.me_shield_enabled_desc),
         checked = state.shieldEnabled,
         onCheckedChange = { onAction(MeAction.SetShieldEnabled(it)) },
+    )
+    OptionRow(
+        title = stringResource(R.string.settings_action_delay_title),
+        subtitle = stringResource(R.string.settings_action_delay_subtitle),
+        value =
+            stringResource(
+                R.string.settings_action_delay_seconds,
+                (state.actionDelayMs / MILLIS_PER_SECOND).toInt(),
+            ),
+        onClick = onOpenActionDelaySheet,
     )
 }
 

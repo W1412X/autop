@@ -94,7 +94,6 @@ public object AgentSessionModule {
     @Singleton
     @Suppress("LongParameterList") // DI 装配方法，端口逐个注入是职责所在
     public fun provideToolInvokerFactory(
-        llm: LlmGateway,
         prompts: PromptRepository,
         clock: Clock,
         tools: Set<@JvmSuppressWildcards Tool>,
@@ -108,7 +107,6 @@ public object AgentSessionModule {
             RouterBuilder(
                 tools = tools,
                 enrichers = enrichers,
-                llm = llm,
                 prompts = prompts,
                 clock = clock,
                 policy = policy,

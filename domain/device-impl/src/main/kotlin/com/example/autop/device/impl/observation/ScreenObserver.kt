@@ -1,11 +1,11 @@
 /**
- * 观测入口（agent-harness-overhaul WP1.6）：按选择方式分派 a11y/visual/llm，
- * 自动选择时按 `device.observe.priority` 依次尝试直到信息足够，输出统一 JSON 与屏幕变化结论。
+ * 观测入口（agent-harness-overhaul WP1.6）：按选择方式分派 a11y/visual，
+ * 自动选择时按 `device.observe.priority` 依次尝试直到信息足够，输出统一 JSON。
+ * tool_optimize 后始终返回完整屏幕，不做差量、不产生变化结论。
  */
 package com.example.autop.device.impl.observation
 
 import com.example.autop.agent.ObservationRef
-import com.example.autop.agent.ScreenDelta
 import com.example.autop.agent.ToolContext
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
@@ -13,16 +13,10 @@ import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.DeviceObserveSection
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.Observation
-import com.example.autop.device.ObservationMode
 import com.example.autop.device.ObserveMode
-import com.example.autop.device.Rect
 import com.example.autop.device.ScreenSnapshot
-import com.example.autop.device.core.DiffOutcome
-import com.example.autop.device.core.ScreenJsonDiffer
 import com.example.autop.device.core.ScreenJsonWire
-import com.example.autop.device.core.ScreenNodeMatcher
 import com.example.autop.device.core.SerializedScreen
-import com.example.autop.device.core.SerializerConfig
 import com.example.autop.device.impl.ObserveModeResolver
 import com.example.autop.device.impl.ObserveSelection
 import com.example.autop.device.impl.RecordedObservation
@@ -37,8 +31,6 @@ public class ObservationResult(
     public val ref: ObservationRef,
     public val screen: SerializedScreen,
     public val snapshot: ScreenSnapshot,
-    /** 相对最近观测的屏幕变化结论（WP2.3）。 */
-    public val delta: ScreenDelta,
 )
 
 /** 观测生成器（observe 工具与动作收尾共用）。 */
@@ -52,21 +44,18 @@ public class ScreenObserver
     ) {
         /**
          * 观测当前屏幕：[ObserveSelection.Auto] 按优先级自动选择，信息足够即停止；
-         * [ObserveSelection.Explicit] 不自动更换。[full] 为 false 时同方式、同页面出差量（llm 恒完整）；
-         * [region] 只在使用 llm 时生效（内容区 0–1000）。
+         * [ObserveSelection.Explicit] 不自动更换。始终返回完整结果（tool_optimize）。
          */
         public suspend fun observe(
             ctx: ToolContext,
             selection: ObserveSelection,
-            full: Boolean = false,
-            region: Rect? = null,
         ): Outcome<ObservationResult> {
             val cfg = ctx.config[DeviceConfig.OBSERVE]
             val effective = modes.effective(cfg)
             return when (selection) {
                 is ObserveSelection.Explicit ->
-                    explicit(ctx, selection, effective, full, region, cfg)
-                ObserveSelection.Auto -> auto(ctx, effective, full, region)
+                    explicit(ctx, selection, effective, cfg)
+                ObserveSelection.Auto -> auto(ctx, effective)
             }
         }
 
@@ -74,17 +63,15 @@ public class ScreenObserver
             ctx: ToolContext,
             selection: ObserveSelection.Explicit,
             effective: List<ObserveMode>,
-            full: Boolean,
-            region: Rect?,
             cfg: DeviceObserveSection,
         ): Outcome<ObservationResult> {
             val reason = modes.unavailableReason(selection.mode, cfg)
             if (reason != null) {
                 return Outcome.Err(modeUnavailable(ctx, selection.mode, reason, effective))
             }
-            return when (val got = preparer.prepare(ctx, selection.mode, region, effective)) {
+            return when (val got = preparer.prepare(ctx, selection.mode, effective)) {
                 is Outcome.Err -> got
-                is Outcome.Ok -> Outcome.Ok(record(ctx, selection, got.value, full, null))
+                is Outcome.Ok -> Outcome.Ok(record(ctx, selection, got.value, null))
             }
         }
 
@@ -92,10 +79,8 @@ public class ScreenObserver
         private suspend fun auto(
             ctx: ToolContext,
             effective: List<ObserveMode>,
-            full: Boolean,
-            region: Rect?,
         ): Outcome<ObservationResult> =
-            when (val got = selectAuto(ctx, effective, region)) {
+            when (val got = selectAuto(ctx, effective)) {
                 is Outcome.Err -> got
                 is Outcome.Ok -> {
                     val selected = got.value
@@ -104,7 +89,6 @@ public class ScreenObserver
                             ctx,
                             ObserveSelection.Auto,
                             selected.prepared,
-                            full,
                             autoNote(ctx, selected),
                         ),
                     )
@@ -114,7 +98,6 @@ public class ScreenObserver
         private suspend fun selectAuto(
             ctx: ToolContext,
             effective: List<ObserveMode>,
-            region: Rect?,
         ): Outcome<Selected> {
             val candidates = modes.autoCandidates(ctx.config[DeviceConfig.OBSERVE])
             if (candidates.isEmpty()) {
@@ -130,7 +113,7 @@ public class ScreenObserver
             val skipped = mutableListOf<Skipped>()
             var fallback: Prepared? = null
             for (mode in candidates) {
-                when (val got = preparer.prepare(ctx, mode, if (mode == ObserveMode.LLM) region else null, effective)) {
+                when (val got = preparer.prepare(ctx, mode, effective)) {
                     is Outcome.Err -> skipped += Skipped(mode, got.error.message)
                     is Outcome.Ok -> {
                         val reason = got.value.serialized.model.quality.insufficient
@@ -159,19 +142,9 @@ public class ScreenObserver
             ctx: ToolContext,
             selection: ObserveSelection,
             prepared: Prepared,
-            full: Boolean,
             note: String?,
         ): ObservationResult {
             val history = ctx.deviceHistory()
-            val prev = history.last
-            val config = serializer.configOf(ctx.config)
-            val outcome =
-                if (full || prev == null || prev.mode != prepared.mode) {
-                    DiffOutcome(prepared.serialized.observation, matchOf(prev, prepared, config))
-                } else {
-                    ScreenJsonDiffer.diff(prev.screen, prepared.serialized, config)
-                }
-            val delta = ScreenDeltas.of(prev, prepared, outcome.match, ctx.config[DeviceConfig.CHANGE])
             history.last =
                 RecordedObservation(
                     mode = prepared.mode,
@@ -180,11 +153,12 @@ public class ScreenObserver
                     snapshot = prepared.snapshot,
                     frame = prepared.frame,
                 )
+            val fullObservation = prepared.serialized.observation
             val observation =
                 if (note == null) {
-                    outcome.observation
+                    fullObservation
                 } else {
-                    outcome.observation.copy(text = note + "\n" + outcome.observation.text)
+                    fullObservation.copy(text = note + "\n" + fullObservation.text)
                 }
             return ObservationResult(
                 observation = observation,
@@ -196,28 +170,11 @@ public class ScreenObserver
                         summaryLine = observation.summaryLine,
                         nodeCount = prepared.serialized.model.quality.nodes,
                         hasImage = false,
-                        isDiff = observation.mode == ObservationMode.DIFF,
+                        isDiff = false,
                     ),
                 screen = prepared.serialized,
                 snapshot = prepared.snapshot,
-                delta = delta,
             )
-        }
-
-        /** 完整观测时也要配对（变化结论与是否输出差量无关）；不可比较返回 null。 */
-        private fun matchOf(
-            prev: RecordedObservation?,
-            prepared: Prepared,
-            config: SerializerConfig,
-        ): ScreenNodeMatcher.Result? {
-            val base = prev ?: return null
-            if (base.mode != prepared.mode || prepared.mode == ObserveMode.LLM) return null
-            if (base.screen.observation.packageName != prepared.serialized.observation.packageName ||
-                base.screen.observation.activity != prepared.serialized.observation.activity
-            ) {
-                return null
-            }
-            return ScreenJsonDiffer.matchOf(base.screen, prepared.serialized, config)
         }
 
         private fun autoNote(

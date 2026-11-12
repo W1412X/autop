@@ -68,8 +68,6 @@ public class AppLauncherImpl
 
         override suspend fun launch(packageName: String): Boolean = launchWithError(packageName) == null
 
-        override suspend fun openUri(uri: String): Boolean = openUriWithError(uri) == null
-
         override suspend fun launchWithError(packageName: String): AppError? {
             val intent = context.packageManager.getLaunchIntentForPackage(packageName)
             if (intent == null) {
@@ -85,11 +83,6 @@ public class AppLauncherImpl
                 packageName,
                 DeviceErrorCodes.LAUNCH_FAILED,
             )
-        }
-
-        override suspend fun openUriWithError(uri: String): AppError? {
-            val intent = Intent(Intent.ACTION_VIEW, android.net.Uri.parse(uri))
-            return startSafely(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK), uri, DeviceErrorCodes.URI_FAILED)
         }
 
         private fun matches(

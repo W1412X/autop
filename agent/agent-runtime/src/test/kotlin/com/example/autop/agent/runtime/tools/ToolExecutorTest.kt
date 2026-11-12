@@ -119,7 +119,6 @@ class ToolExecutorTest {
         override val spec: ToolSpec = toolSpec(name = name, descriptionPromptId = "tool.fake") { }
         override val access: ToolAccess = ToolAccess.READ_MEMORY
         override val requiredCapabilities: Set<Capability> = emptySet()
-        override val requiresModelVision: Boolean = false
 
         override suspend fun invoke(
             args: JsonObject,

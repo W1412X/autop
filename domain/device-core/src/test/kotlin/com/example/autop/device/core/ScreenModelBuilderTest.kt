@@ -44,9 +44,9 @@ class ScreenModelBuilderTest {
                 mode = ObserveMode.VISUAL,
                 windows = listOf(window(listOf(node("设置")))),
                 degenerate = true,
-                effectiveModes = listOf(ObserveMode.A11Y, ObserveMode.VISUAL, ObserveMode.LLM),
+                effectiveModes = listOf(ObserveMode.A11Y, ObserveMode.VISUAL),
             )
-        assertThat(visual.quality.suggest).isEqualTo(ObserveMode.LLM)
+        assertThat(visual.quality.suggest).isNull()
         val a11y =
             ScreenModelBuilder.of(
                 mode = ObserveMode.A11Y,

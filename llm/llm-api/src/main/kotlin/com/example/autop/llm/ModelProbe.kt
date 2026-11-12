@@ -1,13 +1,13 @@
 /**
- * 测试连接（docs/tech/03 §3）：依次发 3 个最小请求判定 text / tools / vision 可用性。
+ * 测试连接（docs/tech/03 §3）：文本请求判定能否连通；工具调用请求判定模型是否支持工具调用。
  */
 package com.example.autop.llm
 
 import com.example.autop.core.common.AppError
 
 /**
- * 单项探测结论。工具探测要避免把“支持”误判成“不支持”（误判会让 agent 整条链路降级到
- * JSON 回退协议），所以只有拿到明确反证才给 [UNSUPPORTED]，测不出结论给 [INCONCLUSIVE]。
+ * 单项探测结论。工具探测只有拿到明确反证才给 [UNSUPPORTED]（误判会把可用模型切到文本回退协议），
+ * 测不出结论给 [INCONCLUSIVE]。
  */
 public enum class ProbeVerdict {
     SUPPORTED,
@@ -17,7 +17,7 @@ public enum class ProbeVerdict {
     INCONCLUSIVE,
 }
 
-/** 单项探测结果。[error] 在 UNSUPPORTED 时是失败原因，在 INCONCLUSIVE 时是未能确认的原因。 */
+/** 单项探测结果。[error] 在 UNSUPPORTED / INCONCLUSIVE 时给出原因，[elapsedMs] 为耗时。 */
 public data class ProbeResult(
     val verdict: ProbeVerdict,
     val error: AppError? = null,
@@ -26,11 +26,10 @@ public data class ProbeResult(
     val ok: Boolean get() = verdict == ProbeVerdict.SUPPORTED
 }
 
-/** 测试连接报告（设置页据此回填 `ModelCapabilities`）。 */
+/** 测试连接报告。 */
 public data class ProbeReport(
     val text: ProbeResult,
     val tools: ProbeResult,
-    val vision: ProbeResult,
 )
 
 /** 测试连接端口（llm-api 接口，llm-http 通用实现）。 */

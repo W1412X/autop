@@ -10,7 +10,6 @@ import com.example.autop.agent.PlanStatus
 import com.example.autop.agent.RenderItem
 import com.example.autop.agent.RunRequest
 import com.example.autop.agent.RunState
-import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolOutput
 import com.example.autop.agent.runtime.compaction.CompactionOutcome
 import com.example.autop.agent.runtime.guard.BreakerEntry
@@ -154,11 +153,8 @@ internal class RunGuards(
                 val tool = router.toolFor(call.name)
                 BreakerEntry(
                     toolId = tool?.id ?: call.name,
-                    argsJson = call.argsJson,
-                    access = tool?.access ?: ToolAccess.CONTROL,
                     ok = output.ok,
                     errorCode = output.error?.code,
-                    screenDelta = output.screenDelta,
                 )
             },
         )

@@ -1,9 +1,10 @@
 ---
 id: tool.restart_app
-version: 2
+version: 3
 vars: []
 meta:
   param.package: 要重启的应用包名，缺省时使用当前前台应用
+  param.wait_ms: 动作后等待的毫秒数；缺省按设置（默认 5000），最大 30000。页面切换慢时调大，连续输入等确定不需要等待时可以调小
 ---
-强制结束一个应用的进程，然后重新打开它。用于应用卡死、页面无法恢复的情况。需要 shell 通道已连接；不可用时会返回失败，请改用 global_action back 或 home 再用 open_app。
-受保护包名（系统界面等）、本应用自身与非法包名不允许结束，会返回 device.restart_denied，请换一个应用。
+强制结束一个应用的进程，然后重新打开它。用于应用卡死、页面无法恢复的情况；应用里未保存的内容会丢失。需要 shell 通道已连接；不可用时会返回失败，请改用 global_action back 或 home 再用 open_app。
+受保护包名（系统界面等）、本应用自身与非法包名不允许结束，会返回 device.restart_denied，请换一个应用。强制结束成功但重新打开失败时，执行记录会写明应用已被结束。

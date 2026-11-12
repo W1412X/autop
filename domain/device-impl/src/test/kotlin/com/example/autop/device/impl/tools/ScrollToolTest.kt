@@ -40,8 +40,9 @@ class ScrollToolTest {
             assertThat(env.gestures.swipes).hasSize(1)
             assertThat(env.gestures.nodeActions).isEmpty()
             val text = out.content.joinToString("\n") { it.toString() }
-            assertThat(text).contains("第 1 步")
-            assertThat(text).contains("执行：坐标手势")
+            val seen = text + out.trace.joinToString(" ")
+            assertThat(seen).contains("第 1 步")
+            assertThat(seen).contains("执行：坐标手势")
         }
 
     private fun args(json: String): JsonObject = Json.parseToJsonElement(json).jsonObject

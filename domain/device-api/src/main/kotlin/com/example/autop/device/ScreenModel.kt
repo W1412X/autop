@@ -13,14 +13,13 @@ public data class Point(
     val y: Int,
 )
 
-/** 观测方式（稳定 id `a11y` / `visual` / `llm`）。 */
+/** 观测方式（稳定 id `a11y` / `visual`）。 */
 @Serializable
 public enum class ObserveMode(
     public val id: String,
 ) {
     A11Y("a11y"),
     VISUAL("visual"),
-    LLM("llm"),
     ;
 
     public companion object {

@@ -111,7 +111,7 @@ class RunGuardsTest {
     }
 
     private object FakeLlmGatewayNone : com.example.autop.llm.LlmGateway {
-        override fun forRole(role: com.example.autop.llm.ModelRole): Outcome<com.example.autop.llm.LlmProvider> =
+        override fun forDefault(): Outcome<com.example.autop.llm.LlmProvider> =
             Outcome.Err(
                 com.example.autop.core.common
                     .AppError("llm.not_configured", "none"),

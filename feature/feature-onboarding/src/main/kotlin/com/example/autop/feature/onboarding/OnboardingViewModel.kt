@@ -1,7 +1,7 @@
 /**
  * 引导与健康检查 ViewModel（docs/tech/08 §4.7）。
  *
- * 检查项状态来源：模型配置（ModelProfileStore.roles.main）、无障碍（AccessibilityStatus）走状态流；
+ * 检查项状态来源：默认模型（ModelProfileStore.defaultProfileId）、无障碍（AccessibilityStatus）走状态流；
  * 权限类（悬浮窗/通知/通知使用权/全屏提醒/精确闹钟/电池优化）经 [PermissionChecks] 端口读系统授权状态
  * （通知使用权查授权名单而非服务连接态，N190），回到前台（ON_RESUME）时 [refresh] 重新评估，
  * 已授权但监听服务未连接时自动 [NotificationFeed.requestRebind] 重连。
@@ -57,13 +57,13 @@ public class OnboardingViewModel
                 refreshTick,
                 accessibilityStatus.connected,
                 notificationFeed.connected,
-                modelProfiles.roles,
+                modelProfiles.defaultProfileId,
                 completed,
-            ) { _, accessibilityConnected, _, roles, done ->
+            ) { _, accessibilityConnected, _, defaultId, done ->
                 OnboardingUiState(
                     items =
                         buildItems(
-                            mainModelAssigned = roles.main != null,
+                            defaultModelAssigned = defaultId != null,
                             accessibilityConnected = accessibilityConnected,
                         ),
                     restrictedSettings = capabilities.has(Capability.RESTRICTED_SETTINGS),
@@ -94,11 +94,11 @@ public class OnboardingViewModel
 
         /** 检查项状态（顺序即 docs/tech/08 §4.7 的卡片顺序）。 */
         private fun buildItems(
-            mainModelAssigned: Boolean,
+            defaultModelAssigned: Boolean,
             accessibilityConnected: Boolean,
         ): List<CheckItem> =
             listOf(
-                CheckItem(CheckId.MODEL, done = mainModelAssigned, required = true, visible = true),
+                CheckItem(CheckId.MODEL, done = defaultModelAssigned, required = true, visible = true),
                 CheckItem(CheckId.ACCESSIBILITY, done = accessibilityConnected, required = true, visible = true),
                 CheckItem(CheckId.OVERLAY, done = permissionChecks.canDrawOverlay(), required = false, visible = true),
                 CheckItem(

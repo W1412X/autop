@@ -44,7 +44,6 @@ public class ScreenshotTool
         private val prompts: PromptRepository,
         private val logger: Logger,
     ) : Tool {
-        override val requiresModelVision: Boolean = true
         override val id: String = "tool.screenshot"
 
         override val spec = DeviceToolSpecs.screenshot
@@ -90,12 +89,15 @@ public class ScreenshotTool
                 val base = contentAreas.base()
                 val point = mark?.let { markPointOf(screen, it.x, it.y, base) }
                 val processed =
-                    processor.process(
-                        bitmap,
-                        pixelCropOf(bitmap, region, base),
-                        listOfNotNull(point),
-                    )
-                bitmap.recycle()
+                    try {
+                        processor.process(
+                            bitmap,
+                            pixelCropOf(bitmap, region, base),
+                            listOfNotNull(point),
+                        )
+                    } finally {
+                        bitmap.recycle()
+                    }
                 val note = coordNote(region != null)
                 val image = save(ctx, processed, note)
                 ToolOutput(

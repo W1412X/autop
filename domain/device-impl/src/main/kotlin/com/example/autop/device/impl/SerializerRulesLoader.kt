@@ -40,7 +40,6 @@ public class SerializerRulesLoader
                 maxMergedLabels = device.maxMergedLabels,
                 maxListItems = device.maxListItems,
                 hideSystemDecoration = device.hideSystemDecoration,
-                diffMaxRatio = device.diffMaxRatio,
                 semanticPoorMinInteractive = device.semanticPoorMinInteractive,
                 semanticPoorAreaRatio = device.semanticPoorAreaRatio,
                 minEffectiveNodes = config[DeviceConfig.OBSERVE].sufficiency.minEffectiveNodes,

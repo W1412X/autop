@@ -22,7 +22,7 @@ public data class ConfigMigration(
 )
 
 /** 配置（用户覆盖）文件的当前 schemaVersion。 */
-public const val CURRENT_SCHEMA_VERSION: Int = 6
+public const val CURRENT_SCHEMA_VERSION: Int = 7
 
 /**
  * 内置迁移链：v2 删除屏幕观测 v4 不再使用的配置键（docs/design/
@@ -45,6 +45,12 @@ public fun builtinConfigMigrations(): List<ConfigMigration> =
         },
         // intent-tool：补注册 tool.intent 与 state.navigation（用户覆盖了对应数组时才改写）。
         ConfigMigration(from = 5, to = 6) { doc -> insertIntentEntries(doc) },
+        // tool_optimize：删除已停用的配置键与工具，补 ADR-0024 遗漏的 llm 观测键清理。
+        ConfigMigration(from = 6, to = 7) { doc ->
+            val cleaned = DELETE_PATHS_V7.fold(doc) { acc, path -> removePath(acc, path) }
+            val withoutTools = removeFromArray(cleaned, listOf("agent", "tools", "enabled"), REMOVED_TOOLS_V7)
+            removeFromArray(withoutTools, listOf("flow", "recovery", "ladder"), REMOVED_RECOVERY_V7)
+        },
     )
 
 /** v2 删除的配置路径。 */
@@ -69,20 +75,46 @@ private val DELETE_PATHS_V2: List<String> =
         "device.readNode",
     )
 
-/** `agent.tools.enabled` 去掉已删除的工具（v2）。 */
-private fun filterAgentTools(doc: JsonObject): JsonObject {
-    val agent = doc["agent"] as? JsonObject ?: return doc
-    val tools = agent["tools"] as? JsonObject ?: return doc
-    val enabled = tools["enabled"] as? JsonArray ?: return doc
-    val filtered =
-        JsonArray(
-            enabled.filter {
-                val id = (it as? JsonPrimitive)?.contentOrNull
-                id !in REMOVED_TOOLS_V2
-            },
-        )
-    return doc.withChild("agent", agent.withChild("tools", JsonObject(tools + ("enabled" to filtered))))
+/** v7 删除的配置路径。 */
+private val DELETE_PATHS_V7: List<String> =
+    listOf(
+        "agent.breaker.stuckWarn",
+        "agent.breaker.stuckStop",
+        "agent.breaker.repeatWarn",
+        "agent.breaker.repeatStop",
+        "device.serializer.diffMaxRatio",
+        // ADR-0024 删除 llm 观测方式时遗漏的迁移
+        "device.observe.llm",
+        "device.observe.modes.llm",
+        "flow.author.analysis.role",
+    )
+
+/** v7 从 `agent.tools.enabled` 删除的工具 id。 */
+private val REMOVED_TOOLS_V7: Set<String> = setOf("tool.open_uri", "tool.dismiss_popup")
+
+/** v7 从 `flow.recovery.ladder` 删除的恢复动作 id。 */
+private val REMOVED_RECOVERY_V7: Set<String> = setOf("recovery.dismiss_popup")
+
+/** 按路径找到数组，过滤掉字符串值在 [ids] 中的元素；路径任一层缺失时原样返回。 */
+private fun removeFromArray(
+    doc: JsonObject,
+    path: List<String>,
+    ids: Set<String>,
+): JsonObject {
+    val head = path.first()
+    if (path.size == 1) {
+        val array = doc[head] as? JsonArray ?: return doc
+        val filtered = JsonArray(array.filter { (it as? JsonPrimitive)?.contentOrNull !in ids })
+        return if (filtered == array) doc else doc.withChild(head, filtered)
+    }
+    val child = doc[head] as? JsonObject ?: return doc
+    val updated = removeFromArray(child, path.drop(1), ids)
+    return if (updated === child) doc else doc.withChild(head, updated)
 }
+
+/** `agent.tools.enabled` 去掉已删除的工具（v2）。 */
+private fun filterAgentTools(doc: JsonObject): JsonObject =
+    removeFromArray(doc, listOf("agent", "tools", "enabled"), REMOVED_TOOLS_V2)
 
 /** `agent.tools.enabled` 在 tool.tap / tool.scroll 之后补上节点工具 id（v5；已存在则不重复）。 */
 private fun insertAgentTools(doc: JsonObject): JsonObject {

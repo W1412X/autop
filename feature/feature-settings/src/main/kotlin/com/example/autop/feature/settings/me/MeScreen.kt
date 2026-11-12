@@ -48,6 +48,7 @@ public fun MeScreen(
     var displayModeSheet by remember { mutableStateOf(false) }
     var opacitySheet by remember { mutableStateOf(false) }
     var snoozeSheet by remember { mutableStateOf(false) }
+    var actionDelaySheet by remember { mutableStateOf(false) }
     var navigationSheet by remember { mutableStateOf(false) }
     val importLauncher =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
@@ -86,6 +87,7 @@ public fun MeScreen(
                     onOpenDisplayModeSheet = { displayModeSheet = true },
                     onOpenOpacitySheet = { opacitySheet = true },
                     onOpenNavigationSheet = { navigationSheet = true },
+                    onOpenActionDelaySheet = { actionDelaySheet = true },
                     onAction = onAction,
                 )
             }
@@ -104,6 +106,7 @@ public fun MeScreen(
             item {
                 HorizontalDivider()
                 AdvancedSection(
+                    probeEntryVisible = state.probeEntryVisible,
                     onOpen = onOpenSection,
                     onExport = { onAction(MeAction.ExportData) },
                     onImport = { importLauncher.launch(BACKUP_MIME_TYPES) },
@@ -177,6 +180,16 @@ public fun MeScreen(
             onDismiss = { snoozeSheet = false },
         )
     }
+    if (actionDelaySheet) {
+        ActionDelaySheet(
+            selectedMs = state.actionDelayMs,
+            onSelect = { seconds ->
+                onAction(MeAction.SetActionDelay(seconds))
+                actionDelaySheet = false
+            },
+            onDismiss = { actionDelaySheet = false },
+        )
+    }
 }
 
 /** 占位点击横幅（"即将推出"等提示，ui.banner.durationMs 后消失）。 */
@@ -233,7 +246,7 @@ private fun ModelLinksSection(
         SectionTitle(text = stringResource(R.string.me_section_model))
         NavRow(
             title = stringResource(R.string.me_nav_models),
-            subtitle = state.mainModelName ?: stringResource(R.string.me_model_unassigned),
+            subtitle = state.defaultModelName ?: stringResource(R.string.me_model_unassigned),
             onClick = { onOpen(SettingsSection.MODEL) },
         )
         NavRow(
@@ -281,9 +294,13 @@ private fun SecuritySection(onOpen: (SettingsSection) -> Unit) {
     }
 }
 
-/** 高级分组（docs/tech/08 §4.5）：高级配置 / 提示词 / 调试 / 诊断日志 + 导出/导入数据。 */
+/**
+ * 高级分组（docs/tech/08 §4.5）：高级配置 / 提示词 / 调试 / 诊断日志 + 导出/导入数据。
+ * "工具测试记录"入口只在调试模式（`ui.debug.verboseLogging`）下显示（tool_optimize D20）。
+ */
 @Composable
 private fun AdvancedSection(
+    probeEntryVisible: Boolean,
     onOpen: (SettingsSection) -> Unit,
     onExport: () -> Unit,
     onImport: () -> Unit,
@@ -310,11 +327,13 @@ private fun AdvancedSection(
             subtitle = null,
             onClick = { onOpen(SettingsSection.LOGS) },
         )
-        NavRow(
-            title = stringResource(R.string.me_nav_probe_history),
-            subtitle = null,
-            onClick = { onOpen(SettingsSection.PROBE) },
-        )
+        if (probeEntryVisible) {
+            NavRow(
+                title = stringResource(R.string.me_nav_probe_history),
+                subtitle = null,
+                onClick = { onOpen(SettingsSection.PROBE) },
+            )
+        }
         ActionRow(
             title = stringResource(R.string.me_backup_export),
             subtitle = null,
@@ -350,6 +369,34 @@ private fun SnoozeSheet(
         onDismiss = onDismiss,
     )
 }
+
+/** 动作后等待选择弹层（`device.action.delayMs`，tool_optimize 03 §5.1）：当前值高亮。 */
+@Composable
+internal fun ActionDelaySheet(
+    selectedMs: Long,
+    onSelect: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    OptionSheet(
+        title = stringResource(R.string.settings_action_delay_title),
+        options =
+            ACTION_DELAY_OPTIONS.map { seconds ->
+                OptionItem(
+                    id = seconds.toString(),
+                    label = stringResource(R.string.settings_action_delay_seconds, seconds),
+                )
+            },
+        selectedId = (selectedMs / MILLIS_PER_SECOND).toString(),
+        onSelect = { id -> id.toIntOrNull()?.let(onSelect) },
+        onDismiss = onDismiss,
+    )
+}
+
+/** 动作后等待可选档位（秒）。 */
+private val ACTION_DELAY_OPTIONS: List<Int> = listOf(1, 2, 3, 5, 8, 10)
+
+/** 毫秒换算（配置 `device.action.delayMs` 存毫秒，选项按秒给）。 */
+internal const val MILLIS_PER_SECOND: Long = 1000
 
 /** 导入文档的 MIME 类型（备份为 JSON）。 */
 private val BACKUP_MIME_TYPES = arrayOf("application/json", "text/json", "*/*")

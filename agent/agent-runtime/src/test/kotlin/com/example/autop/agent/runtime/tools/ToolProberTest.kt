@@ -17,6 +17,7 @@ import com.example.autop.agent.ToolSpecBuilder
 import com.example.autop.agent.runtime.testing.InMemoryThreadStore
 import com.example.autop.agent.runtime.testing.okText
 import com.example.autop.agent.toolSpec
+import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.LogFiles
 import com.example.autop.core.common.Outcome
@@ -27,11 +28,15 @@ import com.example.autop.policy.PolicySubject
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import org.junit.Test
 
 class ToolProberTest {
     private val threadStore = InMemoryThreadStore()
-    private val config = FakeConfigProvider()
+
+    /** 自测执行门控要求调试模式开（tool_optimize D20），用例默认把 `ui.debug.verboseLogging` 打开。 */
+    private val config = FakeConfigProvider(verboseLoggingOn())
     private val clock = FakeClock()
 
     @Test
@@ -71,6 +76,61 @@ class ToolProberTest {
 
             assertThat(result.ok).isFalse()
             assertThat(result.summary).contains("agent.tool_crashed")
+        }
+
+    @Test
+    fun `probe is refused when debug switch is off`() =
+        runTest {
+            val tool = ProbeTool(name = "probe_plain")
+            val prober =
+                ToolProber(
+                    tools = listOf(tool),
+                    threadStore = threadStore,
+                    config = FakeConfigProvider(),
+                    clock = clock,
+                    logFiles = FakeLogFiles(""),
+                    prompts = FakePromptRepository(),
+                )
+
+            val result = prober.probe("probe_plain", null)
+
+            assertThat(result.ok).isFalse()
+            assertThat(result.summary).contains("agent.probe_disabled")
+            assertThat(tool.invocations).isEmpty()
+            assertThat(prober.history()).containsExactly(result)
+        }
+
+    @Test
+    fun `probe appends trace lines to summary on success and failure`() =
+        runTest {
+            val okTool =
+                ProbeTool(
+                    name = "probe_ok",
+                    output =
+                        ToolOutput(
+                            ok = true,
+                            content = listOf(Block.Text("done")),
+                            trace = listOf("步骤 1：经无障碍点击", "步骤 2：等待 500ms"),
+                        ),
+                )
+            val failTool =
+                ProbeTool(
+                    name = "probe_fail",
+                    output =
+                        ToolOutput(
+                            ok = false,
+                            content = emptyList(),
+                            error = AppError(code = "device.tap_failed", message = "注入失败"),
+                            trace = listOf("步骤 1：经 shell 注入"),
+                        ),
+                )
+            val prober = proberOf(okTool, failTool)
+
+            val okResult = prober.probe("probe_ok", null)
+            val failResult = prober.probe("probe_fail", null)
+
+            assertThat(okResult.summary).contains("步骤 1：经无障碍点击\n步骤 2：等待 500ms")
+            assertThat(failResult.summary).contains("步骤 1：经 shell 注入")
         }
 
     @Test
@@ -247,6 +307,12 @@ private class FakeClock : Clock {
 
     override fun nowMillis(): Long = now.also { now += 1 }
 }
+
+/** 调试模式开的配置覆盖（`ui.debug.verboseLogging`，tool_optimize D20 自测门控）。 */
+private fun verboseLoggingOn(): JsonObject =
+    buildJsonObject {
+        put("ui", buildJsonObject { put("debug", buildJsonObject { put("verboseLogging", true) }) })
+    }
 
 /** 日志文件假件（只读路径用）。 */
 private class FakeLogFiles(

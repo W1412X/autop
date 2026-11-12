@@ -100,7 +100,7 @@ class ScreenJsonRendererTest {
     fun `empty fields are omitted and cached flag is rendered`() {
         val model =
             ScreenModel(
-                mode = ObserveMode.LLM,
+                mode = ObserveMode.VISUAL,
                 windows = listOf(ScreenWindow(app = "微信")),
                 quality = ScreenQuality(nodes = 0, interactive = 0),
                 cached = true,

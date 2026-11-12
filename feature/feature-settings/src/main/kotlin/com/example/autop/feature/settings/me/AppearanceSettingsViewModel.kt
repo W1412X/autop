@@ -41,7 +41,6 @@ import com.example.autop.feature.settings.me.backup.readBackupText
 import com.example.autop.feature.settings.me.backup.writeBackupToDownloads
 import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.ModelProfileStore
-import com.example.autop.llm.ModelRoles
 import com.example.autop.memory.MemoryStore
 import com.example.autop.task.AgentHostStatus
 import com.example.autop.task.TaskRepository
@@ -99,7 +98,7 @@ public class AppearanceSettingsViewModel
             combine(
                 configProvider.observe(),
                 store.profiles,
-                store.roles,
+                store.defaultProfileId,
                 notice,
                 combine(
                     refreshTick,
@@ -119,7 +118,7 @@ public class AppearanceSettingsViewModel
 
                 @Suppress("UNCHECKED_CAST")
                 val profiles = values[1] as List<ModelProfile>
-                val roles = values[2] as ModelRoles
+                val defaultId = values[2] as String?
                 val pending = values[3] as NoticeKind?
                 val health = values[4] as HealthSignals
                 val update = values[5] as UpdateState
@@ -132,7 +131,7 @@ public class AppearanceSettingsViewModel
                     appearance = snapshot[UiConfig.APPEARANCE],
                     bannerDurationMs = snapshot[UiConfig.BANNER].durationMs,
                     notice = pending,
-                    mainModelName = roles.main?.let { id -> profiles.firstOrNull { it.id == id }?.displayName },
+                    defaultModelName = profiles.firstOrNull { it.id == defaultId }?.displayName,
                     embeddingProviderId = snapshot[LlmConfig.EMBEDDING].provider,
                     overlayWindowType = snapshot[UiConfig.OVERLAY].windowType,
                     overlayEnabled = snapshot[UiConfig.OVERLAY].enabled,
@@ -142,6 +141,7 @@ public class AppearanceSettingsViewModel
                     returnToOriginApp = snapshot[TaskConfig.TASK].returnToOriginApp,
                     conditionsEnabled = snapshot[TaskConfig.CONDITIONS].enabled,
                     shieldEnabled = snapshot[DeviceConfig.TOUCH].shieldEnabled,
+                    actionDelayMs = snapshot[DeviceConfig.ACTION].delayMs,
                     snoozeMinutes = reminder.snoozeMinutes,
                     snoozeOptions = reminder.snoozeOptions,
                     reminderExpireSchedule = reminder.expireMinutes.schedule,
@@ -150,11 +150,12 @@ public class AppearanceSettingsViewModel
                     accessibilityConnected = health.accessibility,
                     notificationListenerGranted = health.notifications,
                     hostRunning = health.host,
-                    mainModelAssigned = roles.main != null,
+                    defaultModelAssigned = defaultId != null,
                     update = update,
                     updateNotice = pendingUpdateNotice,
                     navigationPreferred = snapshot[DeviceConfig.INTENT].preferredMap,
                     navigationApps = nav,
+                    probeEntryVisible = snapshot[UiConfig.DEBUG].verboseLogging,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -206,6 +207,11 @@ public class AppearanceSettingsViewModel
                 is MeAction.SetReturnToOriginApp -> write(RETURN_TO_ORIGIN_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetConditionsEnabled -> write(CONDITIONS_ENABLED_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetShieldEnabled -> write(SHIELD_ENABLED_PATH, JsonPrimitive(action.enabled))
+                is MeAction.SetActionDelay ->
+                    write(
+                        ACTION_DELAY_PATH,
+                        JsonPrimitive(action.seconds * MILLIS_PER_SECOND),
+                    )
                 is MeAction.SetSnoozeMinutes -> write(SNOOZE_MINUTES_PATH, JsonPrimitive(action.value))
                 is MeAction.SetNavigationApp -> write(NAVIGATION_PREFERRED_PATH, JsonPrimitive(action.value))
                 MeAction.ExportData -> export()
@@ -339,6 +345,12 @@ public class AppearanceSettingsViewModel
 
             /** 执行期触摸盾总开关写入路径（device.touch.shieldEnabled，N215）。 */
             const val SHIELD_ENABLED_PATH = "device.touch.shieldEnabled"
+
+            /** 动作后等待写入路径（device.action.delayMs，tool_optimize 03 §5.1）。 */
+            const val ACTION_DELAY_PATH = "device.action.delayMs"
+
+            /** 秒 → 毫秒换算（动作后等待选项按秒给，配置存毫秒）。 */
+            const val MILLIS_PER_SECOND = 1000
 
             /** 默认稍后写入路径（task.reminder.snoozeMinutes，docs/tech/07 §4.4）。 */
             const val SNOOZE_MINUTES_PATH = "task.reminder.snoozeMinutes"

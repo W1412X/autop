@@ -1,6 +1,6 @@
 /**
- * `tool.scroll`（docs/design/observation-modes-coordinate-actions §5.1；ADR-0019）：
- * 一步 = 一次人手滑动，距离由可滚动容器的尺寸决定；`steps` 连续多步，内容到头时提前停止。
+ * `tool.scroll`（docs/design/tool_optimize/02 §4；ADR-0019）：
+ * 一步 = 一次人手滑动，距离由可滚动容器的尺寸决定；`steps` 连续多步，不做"到头"判断。
  * 每步都是容器内的手势（shell → 无障碍）；节点滚动用 `scroll_node`。
  * `x,y` 为滚动区域内一点（缺省内容区中心）；方向沿用 `up` = 手指从下往上滑。
  */
@@ -34,9 +34,7 @@ import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.CoordSpaceResolver
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
-import com.example.autop.device.impl.observation.FrameMotion
 import com.example.autop.device.impl.observation.ReplayInput
-import com.example.autop.device.impl.vision.FrameSignature
 import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.ThreadLocalRandom
 import javax.inject.Inject
@@ -54,15 +52,12 @@ private data class ScrollAction(
     val requestedSteps: Int,
     /** 传了已废弃的 amount（收尾文本说明它被忽略）。 */
     val amountIgnored: Boolean,
+    val waitMs: Long?,
     val replayArgs: JsonObject,
 )
 
-/** 一步的执行结果（WP2.6：moved 由画面帧签名比较得出）。 */
+/** 一步的执行结果。 */
 private data class StepResult(
-    /** 屏幕是否变化；null 表示不可判断（帧签名缺失或静默模式）。 */
-    val moved: Boolean?,
-    /** 本步结束时的帧签名，直接作为下一步的 before。 */
-    val after: FrameSignature?,
     val gesture: JsonObject?,
     /** 这一步实际怎么执行的回执（模型可见）。 */
     val trace: String,
@@ -71,7 +66,7 @@ private data class StepResult(
 
 /** 滚动工具。 */
 @Singleton
-@Suppress("LongParameterList") // 装配类：读屏/手势/策略/收尾/坐标/内容区/回执/帧比较均为滚动必需，不可再减
+@Suppress("LongParameterList") // 装配类：读屏/手势/策略/收尾/坐标/内容区/回执均为滚动必需，不可再减
 public class ScrollTool
     @Inject
     constructor(
@@ -82,7 +77,6 @@ public class ScrollTool
         private val coords: CoordSpaceResolver,
         private val contentAreas: ContentAreaProvider,
         private val receipts: HitReceiptBuilder,
-        private val frameMotion: FrameMotion,
         private val trace: ExecutionTraceRenderer,
         private val prompts: PromptRepository,
     ) : ScreenActionTool {
@@ -137,34 +131,46 @@ public class ScrollTool
                     steps = requested.coerceIn(1, maxSteps),
                     requestedSteps = requested,
                     amountIgnored = args.containsKey("amount"),
+                    waitMs = waitMsOf(args),
                     replayArgs = replayArgsOf(args, receipts.describe(tree, Point(x, y))),
                 )
             return Outcome.Ok(PreparedAction(subject, action))
         }
 
+        /** steps 连续执行（tool_optimize §4.2）：步间固定停顿，中途失败 trace 写明已完成步数。 */
         override suspend fun perform(
             action: PreparedAction,
             ctx: ToolContext,
         ): ToolOutput {
             val scroll = action.payload as ScrollAction
+            val pre = epilogue.preSample(ctx)
             var snap = scroll.snapshot
-            var before = frameMotion.capture()
-            var done = 0
-            var reachedEnd = false
             var firstGesture: JsonObject? = null
-            val traces = mutableListOf<String>()
-            while (done < scroll.steps && !reachedEnd) {
-                if (done > 0) snap = screenReader.snapshotOrDegraded().let { (it as? Outcome.Ok)?.value } ?: snap
-                val step = runStep(ctx, scroll, snap, before)
-                if (step.error != null) return errorOutput(step.error)
-                done += 1
-                traces += "第 $done 步 ${step.trace}"
-                if (done == 1) firstGesture = step.gesture
-                reachedEnd = step.moved == false
-                before = step.after ?: before
+            val trace = mutableListOf<String>()
+            for (i in 1..scroll.steps) {
+                if (i > 1) {
+                    epilogue.pause(ctx, ctx.config[DeviceConfig.SCROLL].stepDelayMs)
+                    snap = screenReader.snapshotOrDegraded().let { (it as? Outcome.Ok)?.value } ?: snap
+                }
+                val step = runStep(ctx, scroll, snap)
+                if (step.error != null) {
+                    if (i > 1) {
+                        trace +=
+                            prompts.text(PROMPT_PARTIAL, mapOf(VAR_DONE to "${i - 1}", VAR_TOTAL to "${scroll.steps}"))
+                    }
+                    return errorOutput(step.error).copy(trace = trace)
+                }
+                trace += prompts.text(PROMPT_STEP, mapOf(VAR_N to "$i", VAR_LINE to step.trace))
+                if (i == 1) firstGesture = step.gesture
             }
-            val replay = ReplayInput(ID, scroll.replayArgs, firstGesture)
-            return epilogue.finish(ctx, resultText(scroll, done, reachedEnd, traces), null, replay)
+            return epilogue.finish(
+                ctx,
+                resultText(scroll),
+                scroll.waitMs,
+                ReplayInput(ID, scroll.replayArgs, firstGesture),
+                pre,
+                trace,
+            )
         }
 
         /** 一步：滚动容器内的手势滑动（节点滚动用 `scroll_node`，这里不走节点动作）。 */
@@ -172,15 +178,12 @@ public class ScrollTool
             ctx: ToolContext,
             scroll: ScrollAction,
             snap: ScreenSnapshot,
-            before: FrameSignature?,
         ): StepResult {
             val base = contentAreas.base()
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
             val anchor = mapper.toScreen(scroll.anchor.x, scroll.anchor.y)
             if (anchor == null) {
                 return StepResult(
-                    moved = null,
-                    after = null,
                     gesture = null,
                     trace = "",
                     error = AppError(CommonErrorCodes.INVALID_ARGUMENT, "滚动坐标换算失败"),
@@ -191,22 +194,17 @@ public class ScrollTool
             val shot =
                 swipe(ctx, container, anchor, scroll.direction)
                     ?: return StepResult(
-                        moved = null,
-                        after = null,
                         gesture = null,
                         trace = "",
                         error = injectFailed("滚动手势"),
                     )
-            epilogue.awaitStable(ctx)
-            val after = frameMotion.capture()
-            val moved = movedOf(frameMotion, ctx, before, after)
             val line =
                 trace.executionLine(
                     ExecMethod.GESTURE,
                     channel = shot.result.channel,
                     shellSkip = shot.result.shellSkip,
                 )
-            return StepResult(moved, after, shot.replay, line)
+            return StepResult(shot.replay, line)
         }
 
         /** 滚动容器 bounds：落点处最上层的可滚动节点；快照没有节点树时 null（用内容区）。 */
@@ -245,43 +243,33 @@ public class ScrollTool
                 cfg.maxDurationMs,
             )
 
-        /** 结果文字：滚动汇总行（steps/到头）+ 截断/忽略说明 + 每步执行回执。 */
-        private fun resultText(
-            scroll: ScrollAction,
-            done: Int,
-            reachedEnd: Boolean,
-            traces: List<String>,
-        ): String {
-            val clamped =
-                if (scroll.requestedSteps > scroll.steps) {
-                    "；steps 超出上限，已截断到 ${scroll.steps} 步"
-                } else {
-                    ""
+        /** 结果行（模板 device.scroll.result）：方向名、步数、截断与 amount 忽略说明。 */
+        private fun resultText(scroll: ScrollAction): String {
+            val vars =
+                buildMap {
+                    put(VAR_DIRECTION, prompts.text(PROMPT_DIR_PREFIX + scroll.direction.id))
+                    put(VAR_STEPS, scroll.steps.toString())
+                    if (scroll.requestedSteps > scroll.steps) put(VAR_CLAMPED_TO, scroll.steps.toString())
+                    if (scroll.amountIgnored) put(VAR_AMOUNT_IGNORED, "1")
                 }
-            val ignored = if (scroll.amountIgnored) "；amount 已废弃，本次已忽略（距离由容器尺寸决定）" else ""
-            val summary =
-                prompts.text(
-                    PROMPT_SCROLL_SUMMARY,
-                    mapOf(VAR_STEPS to done.toString(), VAR_REACHED_END to if (reachedEnd) "1" else ""),
-                )
-            val detail = traces.takeIf { it.isNotEmpty() }?.joinToString("\n", prefix = "\n") ?: ""
-            return "已向${directionName(scroll.direction)}滚动$clamped$ignored\n$summary$detail"
+            return prompts.text(PROMPT_RESULT, vars)
         }
-
-        private fun directionName(direction: ScrollDirection): String =
-            when (direction) {
-                ScrollDirection.UP -> "上"
-                ScrollDirection.DOWN -> "下"
-                ScrollDirection.LEFT -> "左"
-                ScrollDirection.RIGHT -> "右"
-            }
 
         private companion object {
             const val ID = "tool.scroll"
             const val EXTRA_DIRECTION = "direction"
             const val CENTER = 500
-            const val PROMPT_SCROLL_SUMMARY = "device.scroll.summary"
+            const val PROMPT_RESULT = "device.scroll.result"
+            const val PROMPT_STEP = "device.scroll.step"
+            const val PROMPT_PARTIAL = "device.scroll.partial"
+            const val PROMPT_DIR_PREFIX = "device.scroll.dir_"
+            const val VAR_DIRECTION = "direction"
             const val VAR_STEPS = "steps"
-            const val VAR_REACHED_END = "reachedEnd"
+            const val VAR_CLAMPED_TO = "clampedTo"
+            const val VAR_AMOUNT_IGNORED = "amountIgnored"
+            const val VAR_N = "n"
+            const val VAR_LINE = "line"
+            const val VAR_DONE = "done"
+            const val VAR_TOTAL = "total"
         }
     }

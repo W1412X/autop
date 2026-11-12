@@ -4,8 +4,6 @@
  */
 package com.example.autop.feature.settings.me.models
 
-import com.example.autop.llm.ModelRole
-
 public sealed interface ModelsAction {
     /** 新建模型配置。 */
     public data object New : ModelsAction
@@ -56,9 +54,8 @@ public sealed interface ModelsAction {
     /** 高级（quirks）折叠区展开/收起。 */
     public data object ToggleQuirks : ModelsAction
 
-    /** 角色分配（null 表示取消分配）。 */
-    public data class AssignRole(
-        val role: ModelRole,
+    /** 设置默认模型（null 表示清除默认）。 */
+    public data class SetDefault(
         val profileId: String?,
     ) : ModelsAction
 }

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "flow": {
     "run": {
       "pollMs": 500,
@@ -32,8 +32,7 @@
     "author": {
       "maxTurns": 30,
       "analysis": {
-        "maxTurns": 8,
-        "role": "main"
+        "maxTurns": 8
       }
     },
     "contract": {
@@ -46,7 +45,6 @@
         "recovery.wait_stable",
         "recovery.alt_click",
         "recovery.scroll_into_view",
-        "recovery.dismiss_popup",
         "recovery.back_and_retry",
         "recovery.reopen_app",
         "recovery.restart_app"

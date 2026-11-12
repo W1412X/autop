@@ -6,11 +6,9 @@ package com.example.autop.device.impl.di
 import com.example.autop.agent.Tool
 import com.example.autop.device.impl.tools.ClipboardGetTool
 import com.example.autop.device.impl.tools.ClipboardSetTool
-import com.example.autop.device.impl.tools.DismissPopupTool
 import com.example.autop.device.impl.tools.IntentTool
 import com.example.autop.device.impl.tools.ListAppsTool
 import com.example.autop.device.impl.tools.OpenAppTool
-import com.example.autop.device.impl.tools.OpenUriTool
 import com.example.autop.device.impl.tools.RestartAppTool
 import dagger.Module
 import dagger.Provides
@@ -18,7 +16,7 @@ import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
 import dagger.multibindings.IntoSet
 
-/** open_app / open_uri / intent / list_apps / device_state / clipboard / dismiss_popup / restart_app。 */
+/** open_app / intent / list_apps / device_state / clipboard / restart_app。 */
 @Module
 @InstallIn(SingletonComponent::class)
 public object ToolsSystemModule {
@@ -28,15 +26,7 @@ public object ToolsSystemModule {
 
     @Provides
     @IntoSet
-    public fun provideDismissPopupTool(tool: DismissPopupTool): Tool = tool
-
-    @Provides
-    @IntoSet
     public fun provideRestartAppTool(tool: RestartAppTool): Tool = tool
-
-    @Provides
-    @IntoSet
-    public fun provideOpenUriTool(tool: OpenUriTool): Tool = tool
 
     @Provides
     @IntoSet

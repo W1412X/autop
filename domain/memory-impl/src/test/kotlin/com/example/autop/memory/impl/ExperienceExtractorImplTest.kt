@@ -174,6 +174,4 @@ private class ExperienceAppLauncher : AppLauncher {
         listOf(AppInfo(packageName = "com.example.app", label = "示例应用"))
 
     override suspend fun launch(packageName: String): Boolean = error("not used")
-
-    override suspend fun openUri(uri: String): Boolean = error("not used")
 }

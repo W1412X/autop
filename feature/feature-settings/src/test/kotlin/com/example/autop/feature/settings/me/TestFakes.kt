@@ -77,12 +77,7 @@ internal class FakeIdGenerator : IdGenerator {
 
 /** 可编程结果的 [ModelProbe]（记录收到的 profile；[error] 非空时抛出模拟请求级失败）。 */
 internal class RecordingModelProbe(
-    var report: ProbeReport =
-        ProbeReport(
-            text = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 1200),
-            tools = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 800),
-            vision = ProbeResult(verdict = ProbeVerdict.UNSUPPORTED, elapsedMs = 300),
-        ),
+    var report: ProbeReport = okProbeReport(),
     var error: Exception? = null,
 ) : ModelProbe {
     val received = mutableListOf<ModelProfile>()
@@ -124,10 +119,9 @@ internal fun testProfile(
         maxOutputTokens = 4096,
     )
 
-/** 全通过的 [ProbeResult]（能力回填断言用）。 */
+/** 文本与工具调用都探测成功的报告（能力回填断言用）。 */
 internal fun okProbeReport(): ProbeReport =
     ProbeReport(
         text = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 1100),
         tools = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 900),
-        vision = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 700),
     )

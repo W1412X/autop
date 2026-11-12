@@ -9,7 +9,6 @@ import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.SecretStore
 import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.ModelProfileStore
-import com.example.autop.llm.ModelRoles
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 
@@ -24,8 +23,8 @@ public class ModelProfilesEditor
         /** 全部 profile（变更时重发）。 */
         public val profiles: Flow<List<ModelProfile>> = store.profiles
 
-        /** 角色分配（变更时重发）。 */
-        public val roles: Flow<ModelRoles> = store.roles
+        /** 默认模型 id（变更时重发）。 */
+        public val defaultProfileId: Flow<String?> = store.defaultProfileId
 
         /** 生成新 profile 的 id（创建草稿时即分配，API Key 引用需要它）。 */
         public fun newId(): String = ids.newId()
@@ -63,7 +62,7 @@ public class ModelProfilesEditor
             secrets.remove(keyRef(id))
         }
 
-        public suspend fun setRoles(roles: ModelRoles) = store.setRoles(roles)
+        public suspend fun setDefaultProfileId(id: String?) = store.setDefaultProfileId(id)
 
         public companion object {
             /** SecretStore 引用格式（core-common `SecretStore` KDoc 约定：`secret:model:<profileId>`）。 */

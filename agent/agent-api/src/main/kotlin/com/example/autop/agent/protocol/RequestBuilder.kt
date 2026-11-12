@@ -1,7 +1,7 @@
 /**
  * 采样请求组装（docs/tech/04 §3.2/§3.8）：发送前先净化历史（[HistorySanitizer]）；
- * finalRound 不带工具；回退协议发送前降级历史；thinking 按模型能力与配置传 budget；
- * 缓存断点取最后一条 USER/TOOL 消息之前的那条消息下标。
+ * finalRound 不带工具；工具能力为 false 时走 JSON 文本回退（工具不放 tools 字段，历史降级为文本）；
+ * thinking 需要配置开启且模型 quirk `thinking=true`；缓存断点取最后一条 USER/TOOL 消息之前的那条消息下标。
  *
  * 放在 agent-api，智能体主循环与流程创作会话共用同一套组装逻辑。
  */
@@ -27,7 +27,9 @@ public class RequestBuilder(
     /** 输出上限覆盖（流程/任务创作会话用固定上限；缺省取 [ModelProfile.maxOutputTokens]）。 */
     maxOutputTokensOverride: Int? = null,
 ) {
+    /** 工具能力为 false（探测判定不支持工具调用）时走文本回退。 */
     private val fallback: Boolean = !profile.capabilities.tools
+    private val thinkingOn: Boolean = thinking.enabled && profile.quirks[QUIRK_THINKING] == "true"
     private val maxOutputTokens: Int = maxOutputTokensOverride ?: profile.maxOutputTokens
 
     public fun build(
@@ -37,23 +39,16 @@ public class RequestBuilder(
         finalRound: Boolean,
     ): LlmRequest {
         val clean = HistorySanitizer.sanitize(messages, sanitizeTarget(), texts)
-        val downgraded = if (fallback) JsonToolProtocol.downgrade(clean, prompts) else clean
+        val history = if (fallback) JsonToolProtocol.downgrade(clean, prompts) else clean
         val tools = if (finalRound || fallback) emptyList() else schemas
         return LlmRequest(
             system = system,
-            messages = downgraded,
+            messages = history,
             tools = tools,
             toolChoice = if (tools.isEmpty()) ToolChoice.NONE else ToolChoice.AUTO,
             maxOutputTokens = maxOutputTokens,
-            thinkingBudgetTokens =
-                if (profile.capabilities.thinking &&
-                    thinking.enabled
-                ) {
-                    thinking.budgetTokens
-                } else {
-                    null
-                },
-            cacheBreakpointMessageIndex = cacheBreakpointOf(downgraded),
+            thinkingBudgetTokens = if (thinkingOn) thinking.budgetTokens else null,
+            cacheBreakpointMessageIndex = cacheBreakpointOf(history),
         )
     }
 
@@ -63,11 +58,10 @@ public class RequestBuilder(
             profileId = profile.id,
             keepThinking =
                 if (anthropic) {
-                    profile.capabilities.thinking && thinking.enabled
+                    thinkingOn
                 } else {
                     profile.quirks[QUIRK_ECHO_REASONING] == "true"
                 },
-            vision = profile.capabilities.vision,
             requireThinkingSignature = anthropic,
         )
     }
@@ -80,5 +74,8 @@ public class RequestBuilder(
     private companion object {
         /** OpenAI 协议回显思考内容的 quirk（`OpenAiQuirkKeys.ECHO_REASONING`）。 */
         const val QUIRK_ECHO_REASONING = "echoReasoning"
+
+        /** 模型是否支持思考参数的 quirk（ADR-0024：原先是能力标记，现作为模型差异配置）。 */
+        const val QUIRK_THINKING = "thinking"
     }
 }

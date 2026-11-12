@@ -25,7 +25,6 @@ import com.example.autop.device.UpdateChecker
 import com.example.autop.device.UpdateInfo
 import com.example.autop.device.UpdateState
 import com.example.autop.feature.settings.SettingsSection
-import com.example.autop.llm.ModelRoles
 import com.example.autop.memory.MemoryNode
 import com.example.autop.memory.MemoryPath
 import com.example.autop.memory.MemorySource
@@ -123,9 +122,9 @@ class AppearanceSettingsViewModelTest {
     fun `main model name comes from assigned role`() =
         runTest(testDispatcher) {
             store.upsert(testProfile("p1", displayName = "主力"))
-            store.setRoles(ModelRoles(main = "p1", vision = null, light = null))
+            store.setDefaultProfileId("p1")
             val viewModel = createViewModel()
-            assertThat(viewModel.uiState.value.mainModelName).isEqualTo("主力")
+            assertThat(viewModel.uiState.value.defaultModelName).isEqualTo("主力")
         }
 
     @Test
@@ -221,6 +220,39 @@ class AppearanceSettingsViewModelTest {
             val viewModel = createViewModel()
             viewModel.onAction(MeAction.SetNavigationApp("baidu"))
             assertThat(editor.writes).containsExactly("device.intent.preferredMap" to JsonPrimitive("baidu"))
+        }
+
+    @Test
+    fun `debug switch decides tool probe entry visibility`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel()
+            assertThat(viewModel.uiState.value.probeEntryVisible).isFalse()
+            provider.setOverrides(
+                buildJsonObject {
+                    put("ui", buildJsonObject { put("debug", buildJsonObject { put("verboseLogging", true) }) })
+                },
+            )
+            assertThat(viewModel.uiState.value.probeEntryVisible).isTrue()
+        }
+
+    @Test
+    fun `set action delay of eight seconds writes 8000 ms`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel()
+            viewModel.onAction(MeAction.SetActionDelay(8))
+            assertThat(editor.writes).containsExactly("device.action.delayMs" to JsonPrimitive(8000))
+        }
+
+    @Test
+    fun `action delay value follows device action config`() =
+        runTest(testDispatcher) {
+            provider.setOverrides(
+                buildJsonObject {
+                    put("device", buildJsonObject { put("action", buildJsonObject { put("delayMs", 2000) }) })
+                },
+            )
+            val viewModel = createViewModel()
+            assertThat(viewModel.uiState.value.actionDelayMs).isEqualTo(2000L)
         }
 
     private fun createViewModel(

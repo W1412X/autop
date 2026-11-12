@@ -31,7 +31,7 @@ internal fun HealthCard(
         state.accessibilityConnected &&
             state.notificationListenerGranted &&
             hostHealthy &&
-            state.mainModelAssigned
+            state.defaultModelAssigned
     val spacing = LocalSpacing.current
     Column(
         modifier =
@@ -54,7 +54,7 @@ internal fun HealthCard(
         }
         Row(horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
             HostChip(running = state.hostRunning, persistent = state.hostPersistent)
-            HealthChip(label = stringResource(R.string.me_health_model), ok = state.mainModelAssigned)
+            HealthChip(label = stringResource(R.string.me_health_model), ok = state.defaultModelAssigned)
         }
         if (!allOk) {
             AutopTextButton(

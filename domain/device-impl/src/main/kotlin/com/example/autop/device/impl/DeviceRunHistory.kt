@@ -6,8 +6,6 @@ package com.example.autop.device.impl
 
 import com.example.autop.agent.ToolContext
 import com.example.autop.device.ObserveMode
-import com.example.autop.device.Rect
-import com.example.autop.device.ScreenModel
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.core.SerializedScreen
 import com.example.autop.device.impl.vision.FrameSignature
@@ -41,9 +39,6 @@ public class DeviceRunHistory {
     /** 截图文件序号（`img/{seq}-{n}.jpg` 的 seq）。 */
     public var imageSeq: Int = 0
 
-    /** LLM 观测缓存。 */
-    internal var llmCache: LlmObservationCache = LlmObservationCache()
-
     /** 节点 id 计数器（a11y 观测分配 id 用，coordinate-node-action-split §3.2）。 */
     internal var nextNodeId: Int = 1
 
@@ -54,19 +49,6 @@ public class DeviceRunHistory {
         /** runScope 中观测历史的键。 */
         public const val HISTORY_KEY: String = "device.history"
     }
-}
-
-/** LLM 观测缓存条目。 */
-internal class LlmObservationCache {
-    internal var entry: Entry? = null
-
-    internal class Entry(
-        val rotation: Int,
-        val signature: FrameSignature,
-        val region: Rect?,
-        val atMillis: Long,
-        val model: ScreenModel,
-    )
 }
 
 /** 取本 Run 的观测历史。 */

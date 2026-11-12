@@ -57,17 +57,17 @@ public object DeviceErrorCodes {
     /** 点位上没有可拾取的元素。 */
     public const val ELEMENT_NOT_FOUND: String = "device.element_not_found"
 
-    /** 没有发现可关闭的弹窗。 */
-    public const val POPUP_NOT_FOUND: String = "device.popup_not_found"
-
     /** 无法强制结束应用（shell 通道不可用或包名被拒绝）。 */
     public const val RESTART_UNAVAILABLE: String = "device.restart_unavailable"
 
     /** 强制结束应用失败（包名不合法或被保护）。 */
     public const val RESTART_DENIED: String = "device.restart_denied"
 
-    /** 打开 URI 失败。 */
-    public const val URI_FAILED: String = "device.uri_failed"
+    /** 按名称匹配到多个应用，没有执行（结果附候选列表）。 */
+    public const val APP_AMBIGUOUS: String = "device.app_ambiguous"
+
+    /** 写入目标是密码框，input_text 不写入（设计 §9.3）。 */
+    public const val PASSWORD_FIELD: String = "device.password_field"
 
     /** 目标节点不可编辑。 */
     public const val NOT_EDITABLE: String = "device.not_editable"
@@ -77,9 +77,6 @@ public object DeviceErrorCodes {
 
     /** 观测模式不可用（未启用/服务未连接/模型未就绪）。 */
     public const val MODE_UNAVAILABLE: String = "device.mode_unavailable"
-
-    /** llm 观测解析失败（重试耗尽）。 */
-    public const val LLM_PARSE_FAILED: String = "device.llm_parse_failed"
 
     /** 视觉解析失败（超时或解析器异常）。 */
     public const val VISUAL_PARSE_FAILED: String = "device.visual_parse_failed"

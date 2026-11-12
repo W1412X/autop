@@ -40,7 +40,7 @@ class ReachStateTemplateTest {
                     "failure" -> "结果契约不成立"
                     "precondition" -> "页面文字 contains 「发布页」"
                     "executed" -> "点发布(tool): failed"
-                    "tried" -> "recovery.dismiss_popup"
+                    "tried" -> "recovery.back_and_retry"
                     else -> "<untrusted>页面文字</untrusted>"
                 }
             }

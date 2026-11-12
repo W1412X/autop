@@ -1,6 +1,6 @@
 ---
 id: device.trace.channel.shell
-version: 1
+version: 2
 vars: []
 ---
-shell 注入
+shell 注入（命令已发出）

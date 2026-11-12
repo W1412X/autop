@@ -31,7 +31,6 @@ import com.example.autop.flow.core.StatePort
 import com.example.autop.flow.core.UserPort
 import com.example.autop.flow.core.expr.FlowException
 import com.example.autop.llm.Block
-import com.example.autop.llm.ModelRole
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withTimeoutOrNull
@@ -146,15 +145,6 @@ internal class FlowResolverImpl(
     override suspend fun resolve(nameOrId: String): FlowDefinition? = store.resolve(nameOrId)?.definition
 }
 
-/** 角色字符串 → [ModelRole]。 */
-internal fun roleOf(raw: String?): ModelRole? =
-    when (raw?.lowercase()) {
-        "main" -> ModelRole.MAIN
-        "vision" -> ModelRole.VISION
-        "light" -> ModelRole.LIGHT
-        else -> null
-    }
-
 /**
  * 智能体端口：为 `agent` 节点与 handoff 启动子 Run（独立线程、独立 runId），
  * 登记谱系使其 ask_user 落到根流程 Run 上。
@@ -176,7 +166,6 @@ internal class AgentPortImpl(
         tools: List<String>?,
         maxSteps: Int?,
         maxDurationMs: Long?,
-        role: String?,
         context: AgentContext?,
     ): AgentResult {
         // 空目标表示“隐式交回”：按目标状态生成交回目标（reach_state）；无状态描述时回落旧模板。
@@ -194,7 +183,6 @@ internal class AgentPortImpl(
                     vars = mapOf(RUN_MODE_KEY to RUN_MODE_BACKGROUND),
                     config = budgetConfig(maxSteps, maxDurationMs),
                     toolFilter = tools?.toSet(),
-                    modelRole = roleOf(role) ?: ModelRole.MAIN,
                 )
             val finished = session.start(request, scope).await()
             val ok = finished.status == RunOutcome.SUCCEEDED

@@ -13,7 +13,6 @@ import com.example.autop.flow.PolishedName
 import com.example.autop.llm.Block
 import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.LlmRequest
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.SystemPart
@@ -37,7 +36,7 @@ internal class NamePolisher
             steps: List<String>,
         ): Outcome<PolishedName> {
             val provider =
-                ((gateway.forRole(ModelRole.LIGHT) as? Outcome.Ok) ?: (gateway.forRole(ModelRole.MAIN) as? Outcome.Ok))
+                (gateway.forDefault() as? Outcome.Ok)
                     ?.value
                     ?: return Outcome.Err(AppError(code = FlowErrorCodes.LLM_UNAVAILABLE, message = "没有可用的模型"))
             val prompt =

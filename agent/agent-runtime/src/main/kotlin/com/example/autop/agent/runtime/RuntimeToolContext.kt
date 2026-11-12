@@ -31,7 +31,6 @@ internal class RuntimeToolContext(
     override val threadStore: ThreadStore,
     private val ask: suspend (String, List<String>, Long) -> Outcome<String>,
     private val progress: (String) -> Unit,
-    override val modelVision: Boolean = false,
     override val tools: ToolInvoker? = null,
 ) : ToolContext {
     override val runId get() = req.runId

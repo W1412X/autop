@@ -22,3 +22,20 @@ internal fun MeScreenDarkPreview() {
         MeScreen(state = MeUiState(), onAction = {})
     }
 }
+
+/** 动作后等待弹层（tool_optimize 03 §5.1）：亮色、暗色各一个。 */
+@Preview(name = "ActionDelay light")
+@Composable
+internal fun ActionDelaySheetLightPreview() {
+    PreviewTheme {
+        ActionDelaySheet(selectedMs = 5000, onSelect = {}, onDismiss = {})
+    }
+}
+
+@Preview(name = "ActionDelay dark")
+@Composable
+internal fun ActionDelaySheetDarkPreview() {
+    PreviewTheme(dark = true) {
+        ActionDelaySheet(selectedMs = 5000, onSelect = {}, onDismiss = {})
+    }
+}

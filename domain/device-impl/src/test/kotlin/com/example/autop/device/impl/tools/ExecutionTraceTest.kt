@@ -22,7 +22,7 @@ class ExecutionTraceTest {
     @Test
     fun `gesture line reports shell channel`() {
         assertThat(trace.executionLine(ExecMethod.GESTURE, channel = InjectionChannel.SHELL))
-            .isEqualTo("执行：坐标手势（shell 注入）")
+            .isEqualTo("执行：坐标手势（shell 注入（命令已发出））")
     }
 
     @Test
@@ -39,7 +39,7 @@ class ExecutionTraceTest {
     @Test
     fun `global action and shell key carry their own labels`() {
         assertThat(trace.executionLine(ExecMethod.GLOBAL_ACTION, channel = InjectionChannel.SHELL))
-            .isEqualTo("执行：全局动作（shell 注入）")
+            .isEqualTo("执行：全局动作（shell 注入（命令已发出））")
         assertThat(trace.executionLine(ExecMethod.SHELL_KEY, actionLabel = "剪贴板粘贴"))
             .isEqualTo("执行：shell 键盘注入（剪贴板粘贴）")
     }

@@ -84,7 +84,7 @@ class JsonFallbackTest {
                 ScriptedLlmProvider(
                     profile =
                         ScriptedLlmProvider.TEST_PROFILE.copy(
-                            capabilities = ModelCapabilities(tools = false, vision = true, thinking = false),
+                            capabilities = ModelCapabilities(tools = false),
                         ),
                 )
             val tool = FakeTool()
@@ -122,7 +122,7 @@ class JsonFallbackTest {
                 ScriptedLlmProvider(
                     profile =
                         ScriptedLlmProvider.TEST_PROFILE.copy(
-                            capabilities = ModelCapabilities(tools = false, vision = true, thinking = false),
+                            capabilities = ModelCapabilities(tools = false),
                         ),
                 )
             val tool = FakeTool()

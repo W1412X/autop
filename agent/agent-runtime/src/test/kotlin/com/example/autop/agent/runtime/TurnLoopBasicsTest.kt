@@ -130,28 +130,6 @@ class TurnLoopBasicsTest {
         }
 
     @Test
-    fun `回退模式解析重试超限以 FAILED 收口而非把协议原文当回复`() =
-        runTest {
-            val fallbackProfile =
-                ScriptedLlmProvider.TEST_PROFILE.copy(
-                    capabilities = ModelCapabilities(tools = false, vision = true, thinking = false),
-                )
-            val h =
-                RuntimeHarness(
-                    llm = ScriptedLlmProvider(fallbackProfile),
-                    configOverrides = overridesOf("agent", "fallback", "parseRetries" to 1),
-                )
-            h.llm.say("这不是协议 JSON").say("仍然不是协议 JSON")
-            val thread = h.newThread()
-
-            val finished = h.start(this, threadId = thread).await()
-
-            assertThat(finished.status).isEqualTo(RunOutcome.FAILED)
-            assertThat(finished.errorCode).isEqualTo(AgentErrorCodes.FALLBACK_PARSE_FAILED)
-            assertThat(finished.summary).isNull()
-        }
-
-    @Test
     fun `调度层已落盘时 INPUT 只出现一次`() =
         runTest {
             val h = RuntimeHarness()
@@ -178,4 +156,26 @@ class TurnLoopBasicsTest {
         h: RuntimeHarness,
         thread: ThreadId,
     ): List<String> = h.store.payloadsOf(thread).map { it::class.simpleName ?: "?" }
+
+    @Test
+    fun `回退模式解析重试超限以 FAILED 收口而非把协议原文当回复`() =
+        runTest {
+            val fallbackProfile =
+                ScriptedLlmProvider.TEST_PROFILE.copy(
+                    capabilities = ModelCapabilities(tools = false),
+                )
+            val h =
+                RuntimeHarness(
+                    llm = ScriptedLlmProvider(fallbackProfile),
+                    configOverrides = overridesOf("agent", "fallback", "parseRetries" to 1),
+                )
+            h.llm.say("这不是协议 JSON").say("仍然不是协议 JSON")
+            val thread = h.newThread()
+
+            val finished = h.start(this, threadId = thread).await()
+
+            assertThat(finished.status).isEqualTo(RunOutcome.FAILED)
+            assertThat(finished.errorCode).isEqualTo(AgentErrorCodes.FALLBACK_PARSE_FAILED)
+            assertThat(finished.summary).isNull()
+        }
 }

@@ -2,7 +2,7 @@
  * 模型配置页 ViewModel（docs/tech/08 §4.5、docs/standards/coding-standards §8）。
  *
  * 列表数据来自 [ModelProfilesEditor]（ModelProfileStore 流）；编辑草稿落库时同时
- * 经 SecretStore 写 API Key；测试连接经 [ModelProbe] 回填 `ModelCapabilities`。
+ * 经 SecretStore 写 API Key；测试连接经 [ModelProbe] 给出连通结论。
  */
 package com.example.autop.feature.settings.me.models
 
@@ -19,7 +19,6 @@ import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.UiConfig
 import com.example.autop.llm.ModelDirectory
 import com.example.autop.llm.ModelProbe
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.ProbeReport
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -54,7 +53,7 @@ public class ModelsViewModel
 
         public val uiState: StateFlow<ModelsUiState> =
             combine(
-                combine(editor.profiles, editor.roles) { list, roles -> list to roles },
+                combine(editor.profiles, editor.defaultProfileId) { list, defaultId -> list to defaultId },
                 combine(draftState, probeState, remoteModelsState) { draft, probe, remote ->
                     Triple(draft, probe, remote)
                 },
@@ -62,10 +61,10 @@ public class ModelsViewModel
                     Triple(error, notice, confirm)
                 },
                 configProvider.observe(),
-            ) { (profiles, roles), (draft, probe, remote), (error, notice, confirm), snapshot ->
+            ) { (profiles, defaultId), (draft, probe, remote), (error, notice, confirm), snapshot ->
                 ModelsUiState(
                     profiles = profiles,
-                    roles = roles,
+                    defaultProfileId = defaultId,
                     draft = draft,
                     probe = probe,
                     remoteModels = remote,
@@ -84,7 +83,7 @@ public class ModelsViewModel
             when (action) {
                 is ModelsAction.SetField -> setField(action.field, action.value)
                 is ModelsAction.SetQuirk -> mutate { it.withQuirk(action.key, action.value) }
-                is ModelsAction.AssignRole -> assignRole(action.role, action.profileId)
+                is ModelsAction.SetDefault -> setDefault(action.profileId)
                 is ModelsAction.Dismiss -> dismiss(action.kind)
                 ModelsAction.ToggleQuirks -> mutate { it.copy(quirksExpanded = !it.quirksExpanded) }
                 ModelsAction.New -> newDraft()
@@ -192,7 +191,7 @@ public class ModelsViewModel
                 }
         }
 
-        /** 回填并持久化探测出的能力（tools / vision），弹窗展示逐项结果。 */
+        /** 回填并持久化探测出的工具能力，弹窗展示逐项结果。 */
         private suspend fun onProbed(
             draft: ModelDraft,
             report: ProbeReport,
@@ -267,23 +266,11 @@ public class ModelsViewModel
             }
         }
 
-        private fun assignRole(
-            role: ModelRole,
-            profileId: String?,
-        ) {
-            val current = uiState.value.roles
+        private fun setDefault(profileId: String?) {
             viewModelScope.launch(dispatchers.io) {
                 val outcome =
-                    runCatchingCancellable(CommonErrorCodes.IO) {
-                        editor.setRoles(
-                            when (role) {
-                                ModelRole.MAIN -> current.copy(main = profileId)
-                                ModelRole.VISION -> current.copy(vision = profileId)
-                                ModelRole.LIGHT -> current.copy(light = profileId)
-                            },
-                        )
-                    }
-                if (outcome is Outcome.Err) fail("model_role_failed", outcome.error)
+                    runCatchingCancellable(CommonErrorCodes.IO) { editor.setDefaultProfileId(profileId) }
+                if (outcome is Outcome.Err) fail("model_default_failed", outcome.error)
             }
         }
 

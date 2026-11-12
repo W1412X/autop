@@ -1,5 +1,5 @@
 /**
- * 模型配置页状态（docs/tech/08 §4.5：列表 + 新建/编辑页 + 测试连接结果 + 角色分配；
+ * 模型配置页状态（docs/tech/08 §4.5：列表 + 新建/编辑页 + 测试连接结果 + 默认模型；
  * docs/standards/coding-standards §8：不可变 data class 表达页面全部状态）。
  */
 package com.example.autop.feature.settings.me.models
@@ -8,7 +8,6 @@ import com.example.autop.core.common.AppError
 import com.example.autop.core.config.UiBannerSection
 import com.example.autop.llm.ModelCapabilities
 import com.example.autop.llm.ModelProfile
-import com.example.autop.llm.ModelRoles
 import com.example.autop.llm.ProbeReport
 import com.example.autop.llm.ProbeResult
 import com.example.autop.llm.ProbeVerdict
@@ -69,8 +68,8 @@ public data class ModelDraft(
 )
 
 /**
- * 保存后自动测试状态（docs/tech/08 §4.5：结果三行文本 / 工具 / 图片）。
- * [visible] 驱动结果对话框；[error] 为拿不到逐项报告时的请求级失败（配置仍已保存）。
+ * 保存后自动测试状态（docs/tech/08 §4.5）。[visible] 驱动结果对话框；
+ * [result] 为连通性探测结论；[error] 为请求级失败（配置仍已保存）。
  */
 public data class ProbeUiState(
     val visible: Boolean = false,
@@ -88,7 +87,8 @@ public data class RemoteModelsUiState(
 /** 模型配置页状态。 */
 public data class ModelsUiState(
     val profiles: List<ModelProfile> = emptyList(),
-    val roles: ModelRoles = ModelRoles(),
+    /** 默认模型的 profile id；未设置为 null。 */
+    val defaultProfileId: String? = null,
     /** 非 null 表示处于新建/编辑页。 */
     val draft: ModelDraft? = null,
     val probe: ProbeUiState = ProbeUiState(),
@@ -97,7 +97,7 @@ public data class ModelsUiState(
     val notice: ModelsNoticeKind? = null,
     /** 删除确认对话框是否显示。 */
     val confirmDelete: Boolean = false,
-    /** 横幅显示时长（`ui.banner.durationMs`，错误/回填提示共用）。 */
+    /** 横幅显示时长（`ui.banner.durationMs`，错误提示共用）。 */
     val bannerDurationMs: Long = UiBannerSection().durationMs,
 )
 
@@ -129,8 +129,8 @@ public fun ModelDraft.toProfile(): ModelProfile =
         model = model.trim(),
         contextWindow = contextWindow.trim().toIntOrNull() ?: 0,
         maxOutputTokens = maxOutputTokens.trim().toIntOrNull() ?: 0,
-        capabilities = capabilities,
         quirks = quirks.filterValues { it.isNotBlank() },
+        capabilities = capabilities,
     )
 
 /** 保存/探测前校验；null 表示通过。 */
@@ -169,25 +169,20 @@ internal fun ModelDraft.withQuirk(
 ): ModelDraft = copy(quirks = if (value.isBlank()) quirks - key else quirks + (key to value))
 
 /**
- * 测试连接结果回填（docs/tech/08 §4.5"已根据测试结果更新能力"）：只回填
- * `tools`/`vision`（探测直接给出的两项），`thinking`/`streamUsage` 不自动改（N48）。
- * 未确认（INCONCLUSIVE）时保持原值：误把支持工具的模型关掉会让 agent 降级到 JSON 回退。
+ * 测试连接结果回填：只回填 `tools`（工具调用探测直接给出的结论）。
+ * 未确认（INCONCLUSIVE）时保持原值：误把支持工具的模型关掉会让它被切到文本回退协议。
  */
 internal fun ModelDraft.withProbed(
     report: ProbeReport,
     apiKeyTail: String?,
 ): ModelDraft =
     copy(
-        capabilities =
-            capabilities.copy(
-                tools = report.tools.applyTo(capabilities.tools),
-                vision = report.vision.applyTo(capabilities.vision),
-            ),
+        capabilities = capabilities.copy(tools = report.tools.applyTo(capabilities.tools)),
         apiKeyInput = "",
         apiKeyTail = apiKeyTail,
     )
 
-/** 按探测结论更新一项能力：未确认时保持 [current]。 */
+/** 按探测结论更新工具能力：未确认时保持 [current]。 */
 private fun ProbeResult.applyTo(current: Boolean): Boolean =
     when (verdict) {
         ProbeVerdict.SUPPORTED -> true

@@ -25,9 +25,7 @@ import com.example.autop.device.core.ScrollDirection
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.nodeaction.NodeActionIds
 import com.example.autop.device.impl.observation.ActionEpilogue
-import com.example.autop.device.impl.observation.FrameMotion
 import com.example.autop.device.impl.observation.ReplayInput
-import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -40,6 +38,9 @@ private data class NodeScrollAction(
     val target: ResolvedTarget,
     val direction: ScrollDirection,
     val steps: Int,
+    /** 模型请求的步数（大于 [steps] 时被截断，收尾文本要说明）。 */
+    val requestedSteps: Int,
+    val waitMs: Long?,
     val replayArgs: JsonObject,
 )
 
@@ -52,7 +53,6 @@ public class ScrollNodeTool
         private val gestures: GestureController,
         private val subjects: PolicySubjectBuilder,
         private val epilogue: ActionEpilogue,
-        private val frameMotion: FrameMotion,
         private val trace: ExecutionTraceRenderer,
         private val prompts: PromptRepository,
     ) : ScreenActionTool {
@@ -101,29 +101,33 @@ public class ScrollNodeTool
                     ctx.config,
                 )
             val maxSteps = ctx.config[DeviceConfig.SCROLL].maxSteps
-            val steps = (args.int("steps") ?: 1).coerceIn(1, maxSteps)
+            val requested = args.int("steps") ?: 1
+            val steps = requested.coerceIn(1, maxSteps)
             val action =
                 NodeScrollAction(
                     id = nodeId,
                     target = target,
                     direction = direction,
                     steps = steps,
+                    requestedSteps = requested,
+                    waitMs = waitMsOf(args),
                     replayArgs = replayArgsOf(target.observed, direction, steps),
                 )
             return Outcome.Ok(PreparedAction(subject, action))
         }
 
+        /** steps 连续执行（tool_optimize 02 §5）：步间固定停顿，不做到头判断。 */
         override suspend fun perform(
             action: PreparedAction,
             ctx: ToolContext,
         ): ToolOutput {
             val scroll = action.payload as NodeScrollAction
+            val pre = epilogue.preSample(ctx)
             val actionId = NodeActionIds.scrollActionOf(scroll.direction)
             val label = NodeActionIds.scrollLabelOf(scroll.direction)
-            var before = frameMotion.capture()
-            var done = 0
-            var reachedEnd = false
-            while (done < scroll.steps && !reachedEnd) {
+            val stepTraces = mutableListOf<String>()
+            for (i in 1..scroll.steps) {
+                if (i > 1) epilogue.pause(ctx, ctx.config[DeviceConfig.SCROLL].stepDelayMs)
                 val outcome =
                     gestures.performAtPath(
                         scroll.target.target.windowId,
@@ -131,60 +135,56 @@ public class ScrollNodeTool
                         scroll.target.live.bounds,
                         actionId,
                     )
-                when (outcome) {
-                    NodeActionOutcome.STALE ->
-                        return errorOutput(
+                val error =
+                    when (outcome) {
+                        NodeActionOutcome.STALE ->
                             AppError(
                                 code = DeviceErrorCodes.NODE_STALE,
                                 message = "node #${scroll.id} is stale in the live tree",
                                 retryable = true,
                                 hint = prompts.text(PROMPT_STALE),
-                            ),
-                        )
-                    NodeActionOutcome.REJECTED ->
-                        return errorOutput(
+                            )
+                        NodeActionOutcome.REJECTED ->
                             AppError(
                                 code = DeviceErrorCodes.NODE_REJECTED,
                                 message = "app rejected $label on node #${scroll.id}",
                                 retryable = false,
                                 hint = rejectedHint(scroll, label),
-                            ),
-                        )
-                    NodeActionOutcome.DONE -> Unit
+                            )
+                        NodeActionOutcome.DONE -> null
+                    }
+                if (error != null) {
+                    if (i > 1) {
+                        stepTraces +=
+                            prompts.text(PROMPT_PARTIAL, mapOf(VAR_DONE to "${i - 1}", VAR_TOTAL to "${scroll.steps}"))
+                    }
+                    return errorOutput(error).copy(trace = stepTraces)
                 }
-                done += 1
-                epilogue.awaitStable(ctx)
-                val after = frameMotion.capture()
-                reachedEnd = movedOf(frameMotion, ctx, before, after) == false
-                before = after ?: before
             }
-            val out =
-                epilogue.finish(
-                    ctx,
-                    resultText(scroll, done, reachedEnd),
-                    null,
-                    ReplayInput(TOOL_SCROLL_ID, scroll.replayArgs, gesture = null),
-                )
-            return out.copy(content = out.content + Block.Text(trace.executionLine(ExecMethod.NODE_ACTION, label)))
+            return epilogue.finish(
+                ctx,
+                resultText(scroll),
+                scroll.waitMs,
+                ReplayInput(TOOL_SCROLL_ID, scroll.replayArgs, gesture = null),
+                pre,
+                stepTraces + listOf(trace.executionLine(ExecMethod.NODE_ACTION, label)),
+            )
         }
 
-        /** 结果：节点滚动汇总行 + 复用的滚动汇总（steps / 已到头）。 */
-        private fun resultText(
-            scroll: NodeScrollAction,
-            done: Int,
-            reachedEnd: Boolean,
-        ): String {
+        /** 结果：节点滚动行 + 与 scroll 一致的汇总（steps / 截断说明）。 */
+        private fun resultText(scroll: NodeScrollAction): String {
             val head =
                 prompts.text(
                     PROMPT_SCROLL_RESULT,
                     mapOf(VAR_ID to scroll.id.toString(), VAR_DIRECTION to scroll.direction.id),
                 )
-            val summary =
-                prompts.text(
-                    PROMPT_SCROLL_SUMMARY,
-                    mapOf(VAR_STEPS to done.toString(), VAR_REACHED_END to if (reachedEnd) "1" else ""),
-                )
-            return "$head\n$summary"
+            val vars =
+                buildMap {
+                    put(VAR_DIRECTION_NAME, prompts.text(PROMPT_DIR_PREFIX + scroll.direction.id))
+                    put(VAR_STEPS, scroll.steps.toString())
+                    if (scroll.requestedSteps > scroll.steps) put(VAR_CLAMPED_TO, scroll.steps.toString())
+                }
+            return head + "\n" + prompts.text(PROMPT_RESULT, vars)
         }
 
         /** 拒绝提示（§8）：带动作名与节点 at，让模型决定是否改用 scroll。 */
@@ -229,6 +229,9 @@ public class ScrollNodeTool
             const val EXTRA_DIRECTION = "direction"
 
             const val PROMPT_SCROLL_RESULT = "device.node.scroll_result"
+            const val PROMPT_RESULT = "device.scroll.result"
+            const val PROMPT_PARTIAL = "device.scroll.partial"
+            const val PROMPT_DIR_PREFIX = "device.scroll.dir_"
             const val PROMPT_SCROLL_SUMMARY = "device.scroll.summary"
             const val PROMPT_REJECTED = "device.hint.node_rejected"
             const val PROMPT_STALE = "device.hint.node_stale"
@@ -238,6 +241,9 @@ public class ScrollNodeTool
             const val VAR_ACTION = "action"
             const val VAR_AT = "at"
             const val VAR_STEPS = "steps"
-            const val VAR_REACHED_END = "reachedEnd"
+            const val VAR_CLAMPED_TO = "clampedTo"
+            const val VAR_DIRECTION_NAME = "direction"
+            const val VAR_DONE = "done"
+            const val VAR_TOTAL = "total"
         }
     }

@@ -32,8 +32,8 @@ class ContextContributorsTest {
             assertThat(role?.placement).isEqualTo(Placement.SYSTEM_STATIC)
             assertThat(role?.promptIds).containsExactly("agent.system.role", 3)
             assertThat(role?.text).isNotEmpty()
-            assertThat(safety?.promptIds).containsExactly("agent.system.safety", 1)
-            assertThat(guide?.promptIds).containsExactly("agent.system.tool_guide", 14)
+            assertThat(safety?.promptIds).containsExactly("agent.system.safety", 2)
+            assertThat(guide?.promptIds).containsExactly("agent.system.tool_guide", 15)
         }
 
     @Test

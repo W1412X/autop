@@ -130,7 +130,6 @@ private fun enabledOf(
     when (modeId) {
         "a11y" -> section.modes.a11y.enabled
         "visual" -> section.modes.visual.enabled
-        "llm" -> section.modes.llm.enabled
         else -> true
     }
 
@@ -143,7 +142,6 @@ private fun setEnabled(
         when (modeId) {
             "a11y" -> section.modes.copy(a11y = section.modes.a11y.copy(enabled = enabled))
             "visual" -> section.modes.copy(visual = section.modes.visual.copy(enabled = enabled))
-            "llm" -> section.modes.copy(llm = section.modes.llm.copy(enabled = enabled))
             else -> section.modes
         }
     return section.copy(modes = modes)

@@ -1,7 +1,7 @@
 /**
  * 坐标工具测试环境（coordinate-node-action-split WP3）：真实收尾链
  * （ScreenPreparer → ScreenObserver → ActionEpilogue）＋手势/读屏替身；
- * TapTool / ScrollTool / DismissPopupTool 共用。
+ * TapTool / ScrollTool 等屏幕动作工具共用。
  */
 package com.example.autop.device.impl.tools
 
@@ -24,7 +24,8 @@ import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
-import com.example.autop.core.testing.TestDispatcherProvider
+import com.example.autop.device.AppInfo
+import com.example.autop.device.AppLauncher
 import com.example.autop.device.GestureController
 import com.example.autop.device.GlobalAction
 import com.example.autop.device.InjectionResult
@@ -36,7 +37,9 @@ import com.example.autop.device.ResolvedNode
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.Screenshot
+import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellSkip
+import com.example.autop.device.ShellState
 import com.example.autop.device.StableWait
 import com.example.autop.device.UiStabilizer
 import com.example.autop.device.UserActivityMonitor
@@ -64,17 +67,12 @@ import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.FrameMotion
 import com.example.autop.device.impl.observation.ScreenObserver
 import com.example.autop.device.impl.observation.ScreenPreparer
-import com.example.autop.device.impl.popup.PopupRulesLoader
-import com.example.autop.device.impl.vision.llm.LlmScreenParser
-import com.example.autop.llm.LlmErrorCodes
-import com.example.autop.llm.LlmGateway
-import com.example.autop.llm.LlmProvider
-import com.example.autop.llm.ModelRole
+import com.example.autop.device.impl.restart.RestartRulesLoader
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.robolectric.Robolectric
@@ -109,22 +107,12 @@ internal class ToolTestEnv {
             prompts = prompts,
             context = context,
         )
-    private val llm =
-        LlmScreenParser(
-            context = context,
-            gateway = UnusedGateway,
-            prompts = prompts,
-            rules = SerializerRulesLoader(context),
-            configProvider = provider,
-            dispatchers = TestDispatcherProvider(StandardTestDispatcher()),
-            clock = FakeClock(0L),
-        )
-    private val preparer = ScreenPreparer(reader, capturer, contentAreas, FakeVisual(), llm, serializer)
-    private val modes = ObserveModeResolver(holder, FakeVisual(), UnusedGateway, prompts)
+    private val preparer = ScreenPreparer(reader, capturer, contentAreas, FakeVisual(), serializer)
+    private val modes = ObserveModeResolver(holder, FakeVisual(), prompts)
     val observer = ScreenObserver(preparer, serializer, modes)
     private val frameMotion = FrameMotion(reader, provider)
     val epilogue =
-        ActionEpilogue(FakeStabilizer, observer, FakeProbe, frameMotion, prompts, FakeClock(0L), FakeMonitor)
+        ActionEpilogue(FakeStabilizer, FakeProbe, frameMotion, prompts, FakeClock(0L), FakeMonitor)
 
     private val subjects = PolicySubjectBuilder(SecureWindowCache(FakeClock(0L)))
     private val trace = ExecutionTraceRenderer(prompts)
@@ -133,8 +121,7 @@ internal class ToolTestEnv {
 
     fun tapNodeTool(): TapNodeTool = TapNodeTool(resolver, gestures, subjects, epilogue, trace, prompts)
 
-    fun scrollNodeTool(): ScrollNodeTool =
-        ScrollNodeTool(resolver, gestures, subjects, epilogue, frameMotion, trace, prompts)
+    fun scrollNodeTool(): ScrollNodeTool = ScrollNodeTool(resolver, gestures, subjects, epilogue, trace, prompts)
 
     fun tapTool(): TapTool =
         TapTool(
@@ -158,13 +145,54 @@ internal class ToolTestEnv {
             CoordSpaceResolver(prompts),
             contentAreas,
             HitReceiptBuilder(serializer),
-            frameMotion,
             trace,
             prompts,
         )
 
-    fun dismissPopupTool(): DismissPopupTool =
-        DismissPopupTool(gestures, subjects, epilogue, PopupRulesLoader(context), observer, trace, prompts)
+    fun swipeTool(): SwipeTool =
+        SwipeTool(
+            reader,
+            gestures,
+            subjects,
+            epilogue,
+            CoordSpaceResolver(prompts),
+            contentAreas,
+            HitReceiptBuilder(serializer),
+            trace,
+            prompts,
+        )
+
+    fun inputTextTool(shell: ShellInput): InputTextTool =
+        InputTextTool(
+            context,
+            reader,
+            gestures,
+            shell,
+            subjects,
+            epilogue,
+            CoordSpaceResolver(prompts),
+            contentAreas,
+            HitReceiptBuilder(serializer),
+            trace,
+            prompts,
+        )
+
+    fun openAppTool(launcher: AppLauncher): OpenAppTool = OpenAppTool(reader, launcher, subjects, epilogue, prompts)
+
+    fun restartAppTool(
+        shell: ShellInput,
+        launcher: AppLauncher,
+    ): RestartAppTool =
+        RestartAppTool(
+            reader,
+            shell,
+            launcher,
+            subjects,
+            epilogue,
+            RestartRulesLoader(context),
+            prompts,
+            context,
+        )
 
     /** 同一个 Run 上下文（历史与计数跨调用保持）。 */
     fun ctx(): ToolContext = sharedCtx
@@ -226,12 +254,108 @@ internal fun clickableNode(
         packageName = "com.example.app",
     )
 
+/** 输入框节点（默认 FOCUSED+EDITABLE；[password] 加密码标志，[editable]=false 去掉可编辑标志）。 */
+internal fun editableNode(
+    idx: Int,
+    text: String = "",
+    editable: Boolean = true,
+    password: Boolean = false,
+): NodeSnapshot =
+    NodeSnapshot(
+        idx = idx,
+        parent = 0,
+        children = emptyList(),
+        childIndex = idx - 1,
+        className = "android.widget.EditText",
+        text = text,
+        bounds = Rect(0, 100, ENV_SCREEN_WIDTH, 200),
+        flags =
+            NodeFlags.VISIBLE or NodeFlags.ENABLED or NodeFlags.FOCUSED or
+                (if (editable) NodeFlags.EDITABLE else 0) or (if (password) NodeFlags.PASSWORD else 0),
+        actions = emptyList(),
+        packageName = "com.example.app",
+    )
+
+/** 焦点节点替身（input_text 的 focusedInput）。 */
+internal class FakeResolvedNode(
+    override val snapshot: NodeSnapshot,
+    override val windowId: Int = 1,
+    private val current: String? = null,
+) : ResolvedNode {
+    override fun currentText(): String? = current
+
+    override fun performAction(
+        actionId: Int,
+        args: Map<String, Any?>,
+    ): Boolean = true
+}
+
+/** shell 通道替身：记录 forceStop，可脚本化连接状态。 */
+internal class FakeShell : ShellInput {
+    override val state: MutableStateFlow<ShellState> = MutableStateFlow(ShellState.Connected)
+    override val paired: MutableStateFlow<Boolean> = MutableStateFlow(true)
+    val forceStopped = mutableListOf<String>()
+    var forceStopOk = true
+
+    override suspend fun pair(
+        pairingPort: Int,
+        pairCode: String,
+    ): Outcome<Unit> = Outcome.Ok(Unit)
+
+    override suspend fun connect(): Boolean = true
+
+    override suspend fun tap(
+        x: Int,
+        y: Int,
+        durationMs: Long,
+    ): Boolean = true
+
+    override suspend fun swipe(
+        fromX: Int,
+        fromY: Int,
+        toX: Int,
+        toY: Int,
+        durationMs: Long,
+    ): Boolean = true
+
+    override suspend fun keyEvent(code: Int): Boolean = true
+
+    override suspend fun forceStop(packageName: String): Boolean {
+        forceStopped += packageName
+        return forceStopOk
+    }
+
+    override suspend fun keyCombination(vararg codes: Int): Boolean = true
+}
+
+/** 应用启动替身：记录启动的包名。 */
+internal class FakeAppLauncher(
+    var apps: List<AppInfo> = emptyList(),
+    var launchOk: Boolean = true,
+) : AppLauncher {
+    val launched = mutableListOf<String>()
+
+    override suspend fun listApps(query: String?): List<AppInfo> = apps
+
+    override suspend fun launch(packageName: String): Boolean {
+        launched += packageName
+        return launchOk
+    }
+}
+
 /** 手势替身：记录 tap/swipe/节点动作调用；[pathOutcome] 可脚本化 performAtPath 结果。 */
 internal class FakeGestures : GestureController {
     val taps = mutableListOf<Pair<Int, Int>>()
     val swipes = mutableListOf<List<Int>>()
     val nodeActions = mutableListOf<Int>()
+    val nodeActionCalls = mutableListOf<Pair<Int, Map<String, Any?>>>()
+    val shellKeys = mutableListOf<Int>()
     var tapOk = true
+    var nodeActionOk = true
+    var shellKeysOk = true
+
+    /** focusedInput() 返回的焦点节点（null = 没有焦点）。 */
+    var focused: ResolvedNode? = null
     var pathOutcome: NodeActionOutcome = NodeActionOutcome.DONE
 
     override suspend fun performNodeAction(
@@ -240,7 +364,8 @@ internal class FakeGestures : GestureController {
         args: Map<String, Any?>,
     ): Boolean {
         nodeActions += actionId
-        return true
+        nodeActionCalls += actionId to args
+        return nodeActionOk
     }
 
     override suspend fun performAtPath(
@@ -274,14 +399,20 @@ internal class FakeGestures : GestureController {
         return InjectionResult.accessibility(true, ShellSkip.NOT_CONNECTED)
     }
 
-    override suspend fun focusedInput(): ResolvedNode? = null
+    override suspend fun focusedInput(): ResolvedNode? = focused
 
     override suspend fun globalAction(action: GlobalAction): InjectionResult =
         InjectionResult.accessibility(true, ShellSkip.NOT_CONNECTED)
 
-    override suspend fun shellKeyEvent(code: Int): Boolean = false
+    override suspend fun shellKeyEvent(code: Int): Boolean {
+        shellKeys += code
+        return shellKeysOk
+    }
 
-    override suspend fun shellKeyCombination(codes: List<Int>): Boolean = false
+    override suspend fun shellKeyCombination(codes: List<Int>): Boolean {
+        shellKeys += codes
+        return shellKeysOk
+    }
 }
 
 /** 读屏替身：排队消费快照；截图可切换“静止/变化”帧（帧签名移动判断用）。 */
@@ -350,14 +481,6 @@ private object FakeProbe : ReplayStateProbe {
                 observeMode = "a11y",
             ),
         )
-}
-
-private object UnusedGateway : LlmGateway {
-    override fun forRole(role: ModelRole): Outcome<LlmProvider> =
-        Outcome.Err(AppError(LlmErrorCodes.NOT_CONFIGURED, "no vision model"))
-
-    override fun forProfile(profileId: String): Outcome<LlmProvider> =
-        Outcome.Err(AppError(LlmErrorCodes.NOT_CONFIGURED, "no vision model"))
 }
 
 private object NoRedaction : WindowRedactor {

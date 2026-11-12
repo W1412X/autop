@@ -12,6 +12,7 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.DeviceConfig
+import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.GestureController
 import com.example.autop.device.Point
 import com.example.autop.device.Rect
@@ -24,7 +25,6 @@ import com.example.autop.device.impl.CoordSpaceResolver
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
-import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.ThreadLocalRandom
 import javax.inject.Inject
@@ -37,6 +37,7 @@ internal data class SwipeGesture(
     val to: Point,
     val durationMs: Long,
     val trajectoryJitterPx: Int,
+    val waitMs: Long?,
     val resultText: String,
     val replayArgs: JsonObject,
 )
@@ -55,6 +56,7 @@ public class SwipeTool
         private val contentAreas: ContentAreaProvider,
         private val receipts: HitReceiptBuilder,
         private val trace: ExecutionTraceRenderer,
+        private val prompts: PromptRepository,
     ) : ScreenActionTool {
         override val id: String = TOOL_ID
 
@@ -88,17 +90,18 @@ public class SwipeTool
         ): Outcome<PreparedAction> {
             val base = contentAreas.base()
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
-            val from = mapper.toScreen(start.x, start.y) ?: return coordOutOfRange(coords)
-            val to = mapper.toScreen(end.x, end.y) ?: return coordOutOfRange(coords)
+            val from = mapper.toScreen(start.x, start.y)
+            val to = mapper.toScreen(end.x, end.y)
+            if (from == null || to == null) return coordOutOfRange(coords)
             val area = base ?: Rect(0, 0, snap.screenWidth, snap.screenHeight)
             val cfg = ctx.config[DeviceConfig.SCROLL]
             val jittered =
                 SwipeJitter.endpoints(from, to, cfg.endpointJitterPx, area) {
                     ThreadLocalRandom.current().nextDouble()
                 }
-            val rawDuration = args.long("duration_ms")
-            if (rawDuration != null && rawDuration <= 0) return invalidArg("duration_ms 必须大于 0")
-            val durationMs = rawDuration ?: cfg.swipeDurationMs
+            val durationError = durationErrorOf(args, cfg)
+            if (durationError != null) return durationError
+            val durationMs = args.long("duration_ms") ?: cfg.swipeDurationMs
             val tree = receipts.treeOf(ctx, snap)
             val startModel = mapper.toNormalized(jittered.first.x, jittered.first.y)
             val hit = receipts.describe(tree, startModel)
@@ -124,18 +127,55 @@ public class SwipeTool
                     to = jittered.second,
                     durationMs = durationMs,
                     trajectoryJitterPx = cfg.trajectoryJitterPx,
-                    resultText =
-                        "已滑动 (${start.x}, ${start.y}) → (${end.x}, ${end.y})\n${receipts.receipt(tree, startModel)}",
+                    waitMs = waitMsOf(args),
+                    resultText = resultTextOf(start, end, receipts.receipt(tree, startModel)),
                     replayArgs = replayArgsOf(args, hit),
                 )
             return Outcome.Ok(PreparedAction(subject, gesture))
         }
+
+        /** duration_ms 校验（tool_optimize §6）：正数且不超过 swipeMaxDurationMs。 */
+        private fun durationErrorOf(
+            args: JsonObject,
+            cfg: com.example.autop.core.config.DeviceScrollSection,
+        ): com.example.autop.core.common.Outcome.Err? {
+            val raw = args.long("duration_ms") ?: return null
+            if (raw <= 0) return invalidArg("duration_ms 必须大于 0")
+            if (raw > cfg.swipeMaxDurationMs) {
+                return invalidArg(
+                    prompts.text(
+                        PROMPT_DURATION_TOO_LONG,
+                        mapOf(
+                            VAR_MAX to cfg.swipeMaxDurationMs.toString(),
+                        ),
+                    ),
+                )
+            }
+            return null
+        }
+
+        private fun resultTextOf(
+            start: Point,
+            end: Point,
+            receipt: String,
+        ): String =
+            prompts.text(
+                PROMPT_RESULT,
+                mapOf(
+                    VAR_X1 to start.x.toString(),
+                    VAR_Y1 to start.y.toString(),
+                    VAR_X2 to end.x.toString(),
+                    VAR_Y2 to end.y.toString(),
+                    VAR_RECEIPT to receipt,
+                ),
+            )
 
         override suspend fun perform(
             action: PreparedAction,
             ctx: ToolContext,
         ): ToolOutput {
             val swipe = action.payload as SwipeGesture
+            val pre = epilogue.preSample(ctx)
             val result =
                 gestures.swipe(
                     swipe.from.x,
@@ -148,24 +188,32 @@ public class SwipeTool
             if (!result.ok) return errorOutput(injectFailed("滑动"))
             val gesture =
                 gestureJson(swipe.from.x, swipe.from.y, swipe.to.x, swipe.to.y, swipe.durationMs)
-            val out =
-                epilogue.finish(
-                    ctx,
-                    swipe.resultText,
-                    null,
-                    ReplayInput(TOOL_ID, swipe.replayArgs, gesture),
+            val traceLine =
+                trace.executionLine(
+                    ExecMethod.GESTURE,
+                    channel = result.channel,
+                    shellSkip = result.shellSkip,
                 )
-            return out.copy(
-                content =
-                    out.content +
-                        Block.Text(
-                            trace.executionLine(
-                                ExecMethod.GESTURE,
-                                channel = result.channel,
-                                shellSkip = result.shellSkip,
-                            ),
-                        ),
+            return epilogue.finish(
+                ctx,
+                swipe.resultText,
+                swipe.waitMs,
+                ReplayInput(TOOL_ID, swipe.replayArgs, gesture),
+                pre,
+                trace = listOf(traceLine),
             )
+        }
+
+        private companion object {
+            const val PROMPT_RESULT = "device.swipe.result"
+            const val PROMPT_DURATION_TOO_LONG = "device.swipe.duration_too_long"
+
+            const val VAR_X1 = "x1"
+            const val VAR_Y1 = "y1"
+            const val VAR_X2 = "x2"
+            const val VAR_Y2 = "y2"
+            const val VAR_RECEIPT = "receipt"
+            const val VAR_MAX = "max"
         }
     }
 

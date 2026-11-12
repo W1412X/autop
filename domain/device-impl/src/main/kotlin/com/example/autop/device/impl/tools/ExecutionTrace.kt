@@ -13,11 +13,11 @@ import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 模板渲染（设备回执用）：不存在/渲染失败返回空串。 */
+/** 模板渲染（设备回执用）：不存在/渲染失败返回模板 id 本身，缺模板在测试与界面直接可见（§16）。 */
 internal fun PromptRepository.text(
     id: String,
     vars: Map<String, String> = emptyMap(),
-): String = render(id, vars).getOrNull()?.text.orEmpty()
+): String = render(id, vars).getOrNull()?.text ?: id
 
 /** 坐标手势成功后的结果：实际通道 + 回放参数。 */
 internal data class GestureShot(

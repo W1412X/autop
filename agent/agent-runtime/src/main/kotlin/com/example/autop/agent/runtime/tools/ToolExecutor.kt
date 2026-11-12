@@ -109,7 +109,13 @@ internal class ToolExecutor(
                 }
             }
         } catch (e: TimeoutCancellationException) {
-            errors.errorOutput(AgentErrorCodes.TOOL_TIMEOUT, "tool '${tool.id}' timed out after ${timeoutMs}ms")
+            val hint =
+                if (tool.access == ToolAccess.WRITE_SCREEN) {
+                    errors.render(ID_TIMEOUT_WRITE_HINT, emptyMap())
+                } else {
+                    null
+                }
+            errors.errorOutput(AgentErrorCodes.TOOL_TIMEOUT, "tool '${tool.id}' timed out after ${timeoutMs}ms", hint)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -156,9 +162,16 @@ internal class ToolExecutor(
         return output
     }
 
-    /** 失败结果统一格式（WP7.1）：正文 = agent.tool.error_result(code, message, hint)，保留工具附带的图片块。 */
+    /**
+     * 结果渲染（docs/design/tool_optimize/01 §4.1）：成功把执行记录逐行附在 content 末尾；
+     * 失败正文 = agent.tool.error_result(code, message, hint) + 执行记录块，保留工具附带的图片块。
+     * 渲染后把 trace 置空，避免下游重复渲染。
+     */
     private fun normalized(output: ToolOutput): ToolOutput {
-        if (output.ok) return output
+        if (output.ok) {
+            if (output.trace.isEmpty()) return output
+            return output.copy(content = output.content + output.trace.map { Block.Text(it) }, trace = emptyList())
+        }
         val error = output.error
         if (error == null) {
             logger.w(TAG, "tool_failed_without_error")
@@ -169,7 +182,19 @@ internal class ToolExecutor(
                 ID_ERROR_RESULT,
                 mapOf("code" to error.code, "message" to error.message, "hint" to (error.hint ?: "")),
             )
-        return output.copy(content = listOf(Block.Text(text)) + output.content.filterIsInstance<Block.Image>())
+        val traceBlocks = traceBlocks(output.trace)
+        return output.copy(
+            content = listOf(Block.Text(text)) + traceBlocks + output.content.filterIsInstance<Block.Image>(),
+            trace = emptyList(),
+        )
+    }
+
+    /** 执行记录块：第一块为标题模板，其后条目合并为一个 `- ` 前缀的 Text 块；trace 为空时不输出。 */
+    private fun traceBlocks(trace: List<String>): List<Block> {
+        if (trace.isEmpty()) return emptyList()
+        val header = errors.render(ID_TRACE_HEADER, emptyMap())
+        val entries = trace.joinToString("\n") { "- $it" }
+        return listOf(Block.Text(header), Block.Text(entries))
     }
 
     /** 解析失败一律转 invalid_args_json。 */
@@ -185,5 +210,7 @@ internal class ToolExecutor(
         const val TAG = "ToolExecutor"
         const val ID_ERROR_RESULT = "agent.tool.error_result"
         const val ID_BLOCKED_HINT = "agent.policy.blocked_hint"
+        const val ID_TIMEOUT_WRITE_HINT = "agent.tool.timeout_write_hint"
+        const val ID_TRACE_HEADER = "agent.tool.trace_header"
     }
 }

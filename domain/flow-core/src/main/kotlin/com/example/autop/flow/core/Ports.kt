@@ -60,7 +60,6 @@ public interface ObservePort {
 /** LLM 调用请求。 */
 public data class LlmCall(
     val nodeId: String,
-    val role: String?,
     val system: String?,
     val prompt: String,
     /** 附带的图片引用。 */
@@ -168,7 +167,6 @@ public interface AgentPort {
         tools: List<String>?,
         maxSteps: Int?,
         maxDurationMs: Long?,
-        role: String?,
         context: AgentContext? = null,
     ): AgentResult
 }

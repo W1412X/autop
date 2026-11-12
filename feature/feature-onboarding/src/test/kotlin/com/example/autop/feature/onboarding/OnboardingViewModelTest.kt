@@ -18,7 +18,6 @@ import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.NotificationFeed
 import com.example.autop.device.NotificationInfo
-import com.example.autop.llm.ModelRoles
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -177,7 +176,7 @@ class OnboardingViewModelTest {
             quirks = FakeQuirks(quirks),
             accessibilityStatus = FakeAccessibility(),
             notificationFeed = feed,
-            modelProfiles = FakeModelProfileStore(initialRoles = ModelRoles()),
+            modelProfiles = FakeModelProfileStore(),
             dispatchers = TestDispatcherProvider(testDispatcher),
             logger = logger,
         )

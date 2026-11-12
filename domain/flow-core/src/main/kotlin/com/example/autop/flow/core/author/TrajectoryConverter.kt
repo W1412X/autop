@@ -53,7 +53,7 @@ public object TrajectoryConverter {
         )
 
     /** 会切换页面的工具，之后插入等待。 */
-    private val PAGE_CHANGING_TOOLS = setOf("open_app", "restart_app", "open_uri")
+    private val PAGE_CHANGING_TOOLS = setOf("open_app", "restart_app", "intent")
 
     /** 动作后自动写效果校验的工具。 */
     private val AUTO_EXPECT_TOOLS = setOf(TOOL_TAP, "input_text")

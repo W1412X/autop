@@ -14,6 +14,7 @@ import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NotificationFeed
 import com.example.autop.device.NotificationInfo
+import com.example.autop.device.core.UntrustedText
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import java.text.SimpleDateFormat
@@ -108,17 +109,25 @@ public class ReadNotificationsTool
             return items.joinToString("\n\n") { item ->
                 buildString {
                     append("[${item.packageName}${item.appLabel?.let { " $it" } ?: ""}]")
-                    item.title?.let { append(" $it") }
-                    item.conversationTitle?.let { append(" 会话:$it") }
+                    item.title?.let { append(" " + untrusted(it)) }
+                    item.conversationTitle?.let { append(" 会话:" + untrusted(it)) }
                     append("\n")
-                    append(item.bigText ?: item.text ?: item.subText ?: "(无文本)")
+                    val body = item.bigText ?: item.text ?: item.subText
+                    append(body?.let { untrusted(it) } ?: "(无文本)")
                     if (item.messages.isNotEmpty()) {
                         append("\n")
-                        append(item.messages.joinToString("\n") { m -> "${m.sender ?: "?"}: ${m.text ?: ""}" })
+                        append(
+                            item.messages.joinToString("\n") { m ->
+                                "${untrusted(m.sender ?: "?")}: ${m.text?.let { untrusted(it) }.orEmpty()}"
+                            },
+                        )
                     }
                 }
             }
         }
+
+        /** 通知文本统一不可信包装（tool_optimize 02 §12、§14）。 */
+        private fun untrusted(text: String): String = UntrustedText.wrap(UntrustedText.SOURCE_NOTIFICATION, text)
 
         private companion object {
             const val DEFAULT_LIMIT = 20

@@ -61,6 +61,11 @@ public sealed interface IntentSpec {
         val page: SettingsPage,
         val app: String?,
     ) : IntentSpec
+
+    /** 打开链接或 deep link（原 tool.open_uri，tool_optimize D6）。 */
+    public data class Uri(
+        val uri: String,
+    ) : IntentSpec
 }
 
 /** 出行方式。[id] 是给模型和规则表用的稳定字符串。 */
@@ -127,6 +132,8 @@ public enum class IntentInvalidReason {
     SETTINGS_NEEDS_PAGE,
     BAD_PAGE,
     SETTINGS_NEEDS_APP,
+    URI_MISSING,
+    URI_NO_SCHEME,
 }
 
 /**
@@ -161,4 +168,5 @@ public val IntentSpec.kind: String
             is IntentSpec.Share -> "share"
             is IntentSpec.Navigate -> "navigate"
             is IntentSpec.Settings -> "settings"
+            is IntentSpec.Uri -> "uri"
         }

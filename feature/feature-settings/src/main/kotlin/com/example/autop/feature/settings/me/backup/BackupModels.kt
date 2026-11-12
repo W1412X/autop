@@ -6,7 +6,6 @@
 package com.example.autop.feature.settings.me.backup
 
 import com.example.autop.llm.ModelProfile
-import com.example.autop.llm.ModelRoles
 import com.example.autop.memory.MemoryNode
 import com.example.autop.task.Task
 import kotlinx.serialization.SerialName
@@ -21,7 +20,15 @@ public data class BackupFile(
     @SerialName("memories") val memories: List<MemoryNode>,
     @SerialName("tasks") val tasks: List<Task>,
     @SerialName("modelProfiles") val modelProfiles: List<ModelProfile>,
-    @SerialName("modelRoles") val modelRoles: ModelRoles = ModelRoles(),
+    @SerialName("defaultProfileId") val defaultProfileId: String? = null,
+    /** 旧版（角色时代）导出的角色分配；只读，导入时取其中的 main 作为默认模型（ADR-0024）。 */
+    @SerialName("modelRoles") val legacyModelRoles: LegacyModelRoles? = null,
+)
+
+/** 旧版角色分配（只读）。 */
+@Serializable
+public data class LegacyModelRoles(
+    @SerialName("main") val main: String? = null,
 )
 
 /** 备份格式常量。 */

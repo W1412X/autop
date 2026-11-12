@@ -1,6 +1,6 @@
 /**
  * `tool.observe`（agent-harness-overhaul WP1.7）：mode 缺省时按优先级自动选择，
- * 显式 mode 不自动更换；a11y/visual 的 `full=false` 出差量，llm 恒完整。
+ * 显式 mode 不自动更换；始终返回完整结果（tool_optimize，删 `full` 与差量）。
  * 调试图仅在最终用了 visual + 调试开关时附上。
  */
 package com.example.autop.device.impl.tools
@@ -81,16 +81,9 @@ public class ObserveTool
                     val parsed = ObserveMode.parse(rawMode) ?: return invalidArgOutput(ctx, rawMode)
                     ObserveSelection.Explicit(parsed)
                 }
-            val full = args.bool("full") == true
-            val region =
-                when (val parsed = regionFor(selection, args)) {
-                    is RegionArg.Malformed -> return toolError(CommonErrorCodes.INVALID_ARGUMENT, MALFORMED_REGION)
-                    is RegionArg.Value -> parsed.rect
-                    is RegionArg.None -> null
-                }
             val captureDebug = ctx.debugImages && mayUseVisual(selection)
             if (captureDebug) debug.begin()
-            val got = observer.observe(ctx, selection, full, region)
+            val got = observer.observe(ctx, selection)
             val taken = if (captureDebug) debug.take() else emptyList()
             val observed =
                 when (got) {
@@ -103,20 +96,14 @@ public class ObserveTool
                 } else {
                     emptyList()
                 }
-            val notes =
-                (selection as? ObserveSelection.Explicit)
-                    ?.let { observationNotes(it.mode, full, args) { id -> render(id) } }
-                    .orEmpty()
             val blocks =
                 listOf<Block>(Block.Text(observed.observation.text)) +
-                    notes.map { Block.Text(it) } +
                     debugImages
             return ToolOutput(
                 ok = true,
                 content = blocks,
                 data = buildJsonObject { put("interactiveCount", observed.observation.interactiveCount) },
                 observation = observed.ref,
-                screenDelta = observed.delta,
             )
         }
 
@@ -136,17 +123,6 @@ public class ObserveTool
             )
         }
 
-        /** region 只对 llm 生效；显式非 llm 一律忽略（不解析，避免误报格式错误）。 */
-        private fun regionFor(
-            selection: ObserveSelection,
-            args: JsonObject,
-        ): RegionArg =
-            when (selection) {
-                ObserveSelection.Auto -> regionOf(args.obj("region"))
-                is ObserveSelection.Explicit ->
-                    if (selection.mode == ObserveMode.LLM) regionOf(args.obj("region")) else RegionArg.None
-            }
-
         /** 自动选择可能落到 visual；显式只有 visual 会用到调试图。 */
         private fun mayUseVisual(selection: ObserveSelection): Boolean =
             when (selection) {
@@ -165,28 +141,9 @@ public class ObserveTool
                 .orEmpty()
 
         private companion object {
-            const val MALFORMED_REGION = "region 必须是 [x1,y1,x2,y2]（0–1000，x1<x2、y1<y2）"
             const val MODE_PROMPT_PREFIX = "tool.observe.mode."
             const val PROMPT_NO_EFFECTIVE_MODE = "tool.observe.no_effective_mode"
             const val PROMPT_MODE_NOT_AUTO = "tool.observe.mode_not_auto"
             const val PROMPT_INVALID_MODE = "tool.observe.invalid_mode"
         }
     }
-
-/**
- * 静默忽略参数会让模型误以为生效；这里把语义差异说清楚（观察模式设计文档 §5.9）。
- * `region` 只对 llm 生效；llm 恒为完整结果，`full` 无意义。
- */
-internal fun observationNotes(
-    mode: ObserveMode,
-    full: Boolean,
-    args: JsonObject,
-    render: (String) -> String,
-): List<String> =
-    buildList {
-        if (mode != ObserveMode.LLM && args.containsKey("region")) add(render(PROMPT_REGION_IGNORED))
-        if (mode == ObserveMode.LLM && full) add(render(PROMPT_FULL_IGNORED))
-    }
-
-private const val PROMPT_REGION_IGNORED = "tool.observe.region_ignored"
-private const val PROMPT_FULL_IGNORED = "tool.observe.full_ignored"

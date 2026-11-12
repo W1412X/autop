@@ -21,4 +21,7 @@ public object AgentErrorCodes {
     public const val BREAKER_STOPPED: String = "agent.breaker_stopped"
     public const val REPLAY_STATE_MISMATCH: String = "agent.replay_state_mismatch"
     public const val REPLAY_STEP_FAILED: String = "agent.replay_step_failed"
+
+    /** 工具自测被拒：调试开关（`ui.debug.verboseLogging`）关闭时自测入口不可执行（tool_optimize D20）。 */
+    public const val PROBE_DISABLED: String = "agent.probe_disabled"
 }

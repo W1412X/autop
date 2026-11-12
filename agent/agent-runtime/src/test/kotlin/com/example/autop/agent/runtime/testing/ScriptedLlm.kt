@@ -13,9 +13,7 @@ import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.LlmRequest
 import com.example.autop.llm.LlmStreamEvent
-import com.example.autop.llm.ModelCapabilities
 import com.example.autop.llm.ModelProfile
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.StopReason
@@ -117,7 +115,6 @@ internal class ScriptedLlmProvider(
                 model = "test-model",
                 contextWindow = 200000,
                 maxOutputTokens = 8192,
-                capabilities = ModelCapabilities(tools = true, vision = true, thinking = false),
             )
     }
 }
@@ -126,7 +123,7 @@ internal class ScriptedLlmProvider(
 internal class FakeLlmGateway(
     val provider: LlmProvider,
 ) : LlmGateway {
-    override fun forRole(role: ModelRole): Outcome<LlmProvider> = Outcome.Ok(provider)
+    override fun forDefault(): Outcome<LlmProvider> = Outcome.Ok(provider)
 
     override fun forProfile(profileId: String): Outcome<LlmProvider> = Outcome.Ok(provider)
 }

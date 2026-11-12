@@ -13,116 +13,55 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
-import org.junit.Rule
 import org.junit.Test
-import org.junit.rules.TemporaryFolder
-import java.io.File
 
-/** [DefaultModelProbe] 单测：三项烟测、错误/超时映射与内置探测图（docs/tech/03 §3）。 */
+/** [DefaultModelProbe] 单测：文本连通、工具三态、错误与超时映射、请求输出上限（docs/tech/03 §3）。 */
 internal class DefaultModelProbeTest {
-    @get:Rule
-    val folder = TemporaryFolder()
-
     @Test
-    fun allProbesReturnOkForHealthyProvider() {
+    fun healthyProviderSupportsTextAndTools() {
         runTest {
-            val provider = FakeLlmProvider(profile()) { echoToolCompletedEvent() }
-            val report = probe(factory("openai", provider)).probe(profile())
-            assertThat(report.text.ok).isTrue()
-            assertThat(report.tools.ok).isTrue()
-            assertThat(report.vision.ok).isTrue()
-            assertThat(provider.requests).hasSize(PROBE_COUNT)
-        }
-    }
+            val provider = FakeLlmProvider(profile()) { request -> answerFor(request) }
 
-    @Test
-    fun missingFactoryFailsAllProbes() {
-        runTest {
-            val report = probe(factory("openai", FakeLlmProvider(profile()))).probe(profile(protocol = "unknown"))
-            assertThat(report.text.error?.code).isEqualTo(LlmErrorCodes.NOT_CONFIGURED)
-            assertThat(report.tools.error?.code).isEqualTo(LlmErrorCodes.NOT_CONFIGURED)
-            assertThat(report.vision.error?.code).isEqualTo(LlmErrorCodes.NOT_CONFIGURED)
-        }
-    }
-
-    @Test
-    fun providerErrorPropagatesToResults() {
-        runTest {
-            val failing =
-                FakeLlmProvider(profile()) {
-                    throw LlmException(AppError(code = LlmErrorCodes.AUTH, message = "bad key"))
-                }
-            val report = probe(factory("openai", failing)).probe(profile())
-            assertThat(report.text.error?.code).isEqualTo(LlmErrorCodes.AUTH)
-            assertThat(report.vision.error?.code).isEqualTo(LlmErrorCodes.AUTH)
-        }
-    }
-
-    @Test
-    fun hangingProviderReportsTimeout() {
-        runTest {
-            val hanging =
-                FakeLlmProvider(profile()) {
-                    delay(HANG_DELAY_MS)
-                    completedEvent()
-                }
-            val config = FakeConfigProvider(probeTimeoutOverrides())
-            val report = probe(factory("openai", hanging), config).probe(profile())
-            assertThat(report.text.error?.code).isEqualTo(LlmErrorCodes.TIMEOUT)
-        }
-    }
-
-    @Test
-    fun toolsProbeWithoutEchoToolCallIsInconclusive() {
-        runTest {
-            val provider = FakeLlmProvider(profile())
             val report = probe(factory("openai", provider)).probe(profile())
 
-            assertThat(report.tools.verdict).isEqualTo(ProbeVerdict.INCONCLUSIVE)
             assertThat(report.text.ok).isTrue()
+            assertThat(report.tools.verdict).isEqualTo(ProbeVerdict.SUPPORTED)
         }
     }
 
     @Test
-    fun toolsRequestRejectedWhileTextWorksIsUnsupported() {
+    fun badRequestOnToolsWhileTextWorksIsUnsupported() {
         runTest {
             val provider =
                 FakeLlmProvider(profile()) { request ->
-                    if (request.tools.isNotEmpty()) {
-                        throw LlmException(AppError(code = LlmErrorCodes.BAD_REQUEST, message = "tools not supported"))
-                    }
-                    completedEvent()
+                    if (request.tools.isEmpty()) completedEvent() else throw badRequest()
                 }
+
             val report = probe(factory("openai", provider)).probe(profile())
 
+            assertThat(report.text.ok).isTrue()
             assertThat(report.tools.verdict).isEqualTo(ProbeVerdict.UNSUPPORTED)
         }
     }
 
     @Test
-    fun toolsProbeServerErrorIsInconclusive() {
+    fun answerWithoutToolCallIsInconclusive() {
         runTest {
-            val provider =
-                FakeLlmProvider(profile()) { request ->
-                    if (request.tools.isNotEmpty()) {
-                        throw LlmException(AppError(code = LlmErrorCodes.SERVER, message = "overloaded"))
-                    }
-                    completedEvent()
-                }
+            val provider = FakeLlmProvider(profile()) { completedEvent() }
+
             val report = probe(factory("openai", provider)).probe(profile())
 
+            assertThat(report.text.ok).isTrue()
             assertThat(report.tools.verdict).isEqualTo(ProbeVerdict.INCONCLUSIVE)
         }
     }
 
     @Test
-    fun badRequestWhenTextAlsoFailsIsInconclusiveForTools() {
+    fun failedTextProbeLeavesToolsInconclusive() {
         runTest {
-            val failing =
-                FakeLlmProvider(profile()) {
-                    throw LlmException(AppError(code = LlmErrorCodes.BAD_REQUEST, message = "bad model name"))
-                }
-            val report = probe(factory("openai", failing)).probe(profile())
+            val provider = FakeLlmProvider(profile()) { throw badRequest() }
+
+            val report = probe(factory("openai", provider)).probe(profile())
 
             assertThat(report.text.verdict).isEqualTo(ProbeVerdict.UNSUPPORTED)
             assertThat(report.tools.verdict).isEqualTo(ProbeVerdict.INCONCLUSIVE)
@@ -130,47 +69,65 @@ internal class DefaultModelProbeTest {
     }
 
     @Test
-    fun everyProbeUsesProfileMaxOutputTokensAndEchoHasRequiredText() {
+    fun hangingProviderIsReportedAsTimeout() {
         runTest {
-            val provider = FakeLlmProvider(profile()) { echoToolCompletedEvent() }
-            probe(factory("openai", provider)).probe(profile())
+            val provider =
+                FakeLlmProvider(profile()) {
+                    delay(HANG_DELAY_MS)
+                    completedEvent()
+                }
+            val config = FakeConfigProvider(probeTimeoutOverrides())
 
-            assertThat(provider.requests.map { it.maxOutputTokens }.distinct()).containsExactly(MAX_OUTPUT)
-            val echo = provider.requests.flatMap { it.tools }.single()
-            assertThat(echo.parameters["required"].toString()).contains("text")
+            val report = probe(factory("openai", provider), config).probe(profile())
+
+            assertThat(report.text.error?.code).isEqualTo(LlmErrorCodes.TIMEOUT)
         }
     }
 
     @Test
-    fun visionProbeCarriesLocalPngImage() {
+    fun unknownProtocolIsNotConfigured() {
         runTest {
-            var image: Block.Image? = null
-            var bytes: ByteArray? = null
-            val provider =
-                FakeLlmProvider(profile()) { request ->
-                    request.messages.single().blocks.filterIsInstance<Block.Image>().singleOrNull()?.let { block ->
-                        image = block
-                        bytes = File(block.fileRef).readBytes()
-                    }
-                    completedEvent()
-                }
-            val imageDir = folder.newFolder()
-            probe(factory("openai", provider), imageDir = imageDir).probe(profile())
-            val captured = requireNotNull(image)
-            val png = requireNotNull(bytes)
-            assertThat(png.copyOf(PNG_SIGNATURE.size).toList()).isEqualTo(pngSignature().toList())
-            assertThat(captured.mime).isEqualTo(PROBE_IMAGE_MIME)
-            assertThat(captured.width).isEqualTo(PROBE_IMAGE_EDGE)
-            assertThat(captured.height).isEqualTo(PROBE_IMAGE_EDGE)
-            assertThat(imageDir.listFiles()).isEmpty()
+            val provider = FakeLlmProvider(profile()) { completedEvent() }
+
+            val report = probe(factory("openai", provider)).probe(profile(protocol = "unknown"))
+
+            assertThat(report.text.error?.code).isEqualTo(LlmErrorCodes.NOT_CONFIGURED)
+            assertThat(report.tools.error?.code).isEqualTo(LlmErrorCodes.NOT_CONFIGURED)
         }
     }
+
+    @Test
+    fun probesUseProfileMaxOutputTokensAndTextThenToolsRequests() {
+        runTest {
+            val provider = FakeLlmProvider(profile()) { request -> answerFor(request) }
+
+            probe(factory("openai", provider)).probe(profile())
+
+            assertThat(provider.requests.map { it.maxOutputTokens }).containsExactly(MAX_OUTPUT, MAX_OUTPUT).inOrder()
+            assertThat(provider.requests[0].tools).isEmpty()
+            assertThat(provider.requests[1].tools.map { it.name }).containsExactly("echo")
+            assertThat(
+                (
+                    provider.requests[0]
+                        .messages
+                        .single()
+                        .blocks
+                        .single() as Block.Text
+                ).text,
+            ).isNotEmpty()
+        }
+    }
+
+    private fun answerFor(request: com.example.autop.llm.LlmRequest) =
+        if (request.tools.isEmpty()) completedEvent() else echoToolCompletedEvent()
+
+    private fun badRequest(): LlmException =
+        LlmException(AppError(code = LlmErrorCodes.BAD_REQUEST, message = "tools not supported"))
 
     private fun probe(
         factory: FakeLlmProviderFactory,
         config: FakeConfigProvider = FakeConfigProvider(),
-        imageDir: File = folder.root,
-    ): DefaultModelProbe = DefaultModelProbe(setOf(factory), config, imageDir, FakeClock())
+    ): DefaultModelProbe = DefaultModelProbe(setOf(factory), config, FakeClock())
 
     private fun factory(
         protocolId: String,
@@ -193,12 +150,8 @@ internal class DefaultModelProbeTest {
         Json.parseToJsonElement("""{"llm":{"probe":{"timeoutMs":$TIMEOUT_MS}}}""").jsonObject
 
     private companion object {
-        const val PROBE_COUNT = 3
         const val MAX_OUTPUT = 4096
-        const val PROBE_IMAGE_MIME = "image/png"
-        const val PROBE_IMAGE_EDGE = 8
-        const val TIMEOUT_MS = 50
+        const val TIMEOUT_MS = 50L
         const val HANG_DELAY_MS = 60_000L
-        val PNG_SIGNATURE = pngSignature()
     }
 }

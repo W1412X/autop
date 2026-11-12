@@ -1,0 +1,5 @@
+{
+  "schemaVersion": 1,
+  "protectedPackages": ["com.android.systemui", "com.android.settings"],
+  "settleMs": 800
+}

@@ -39,7 +39,6 @@ public data class DeviceSerializerSection(
     @SerialName("maxMergedLabels") val maxMergedLabels: Int = 4,
     /** 可滚动节点折叠阈值；≤0 不折叠（N209）。 */
     @SerialName("maxListItems") val maxListItems: Int = -1,
-    @SerialName("diffMaxRatio") val diffMaxRatio: Double = 0.4,
     @SerialName("semanticPoorMinInteractive") val semanticPoorMinInteractive: Int = 3,
     @SerialName("semanticPoorAreaRatio") val semanticPoorAreaRatio: Double = 0.5,
     /**
@@ -52,23 +51,25 @@ public data class DeviceSerializerSection(
 /** `device.observe`：三种观测模式的优先级与可用性（docs/design/observation-modes-coordinate-actions §2.3）。 */
 @Serializable
 public data class DeviceObserveSection(
-    /** 生效模式顺序，必须是三种模式的一个排列。 */
+    /**
+     * 生效模式顺序。a11y 与 visual 各出现一次；列表里的其它条目（如旧版本残留的 `llm`）被忽略。
+     */
     @SerialName("priority") val priority: List<String> = DEFAULT_PRIORITY,
     @SerialName("modes") val modes: DeviceObserveModesSection = DeviceObserveModesSection(),
     @SerialName("sufficiency") val sufficiency: DeviceObserveSufficiencySection = DeviceObserveSufficiencySection(),
-    @SerialName("llm") val llm: DeviceObserveLlmSection = DeviceObserveLlmSection(),
 ) : ConfigSection {
     override fun validate(): List<String> =
         buildList {
-            if (priority.size != MODE_IDS.size || priority.toSet() != MODE_IDS) {
-                add("priority must be a permutation of $MODE_IDS, was $priority")
+            MODE_IDS.forEach { id ->
+                val count = priority.count { it == id }
+                if (count != 1) add("priority must list '$id' exactly once, was $priority")
             }
         }
 
     public companion object {
-        /** 三种模式 id（与 [com.example.autop.device.ObserveMode] 一致）。 */
-        public val MODE_IDS: Set<String> = setOf("a11y", "visual", "llm")
-        public val DEFAULT_PRIORITY: List<String> = listOf("a11y", "visual", "llm")
+        /** 观测模式 id（与 [com.example.autop.device.ObserveMode] 一致）。 */
+        public val MODE_IDS: Set<String> = setOf("a11y", "visual")
+        public val DEFAULT_PRIORITY: List<String> = listOf("a11y", "visual")
     }
 }
 
@@ -77,14 +78,12 @@ public data class DeviceObserveSection(
 public data class DeviceObserveModesSection(
     @SerialName("a11y") val a11y: DeviceObserveModeSection = DeviceObserveModeSection(),
     @SerialName("visual") val visual: DeviceObserveModeSection = DeviceObserveModeSection(),
-    @SerialName("llm") val llm: DeviceObserveModeSection = DeviceObserveModeSection(auto = false),
 ) {
     /** 按模式 id 取开关（config 模块不依赖 device-api 的 ObserveMode）。 */
     public fun of(mode: String): DeviceObserveModeSection =
         when (mode) {
             "a11y" -> a11y
             "visual" -> visual
-            "llm" -> llm
             else -> error("unknown observe mode id: $mode")
         }
 }
@@ -105,30 +104,6 @@ public data class DeviceObserveSufficiencySection(
 ) : ConfigSection {
     override fun validate(): List<String> =
         if (minEffectiveNodes >= 1) emptyList() else listOf("minEffectiveNodes must be >= 1, was $minEffectiveNodes")
-}
-
-/** `device.observe.llm`：llm 观测模式参数。 */
-@Serializable
-public data class DeviceObserveLlmSection(
-    @SerialName("maxEdge") val maxEdge: Int = 1280,
-    @SerialName("maxElements") val maxElements: Int = 120,
-    @SerialName("retries") val retries: Int = 1,
-    /** 单次识别请求上限（毫秒）；视觉大模型首 token 慢，30s 偏紧，放到 2 分钟。 */
-    @SerialName("timeoutMs") val timeoutMs: Long = 120000,
-    @SerialName("cacheTtlMs") val cacheTtlMs: Long = 10000,
-    @SerialName("minAreaRatio") val minAreaRatio: Double = 0.0001,
-    @SerialName("dupIou") val dupIou: Double = 0.7,
-) : ConfigSection {
-    override fun validate(): List<String> =
-        buildList {
-            if (maxEdge <= 0) add("maxEdge must be > 0, was $maxEdge")
-            if (maxElements <= 0) add("maxElements must be > 0, was $maxElements")
-            if (retries < 0) add("retries must be >= 0, was $retries")
-            if (timeoutMs <= 0) add("timeoutMs must be > 0, was $timeoutMs")
-            if (cacheTtlMs < 0) add("cacheTtlMs must be >= 0, was $cacheTtlMs")
-            if (minAreaRatio < 0.0) add("minAreaRatio must be >= 0, was $minAreaRatio")
-            if (dupIou <= 0.0 || dupIou > 1.0) add("dupIou must be within (0,1], was $dupIou")
-        }
 }
 
 /** `device.screenshot`：截取与缩放。 */
@@ -281,6 +256,10 @@ public data class DeviceScrollSection(
     @SerialName("maxDurationMs") val maxDurationMs: Long = 900,
     @SerialName("maxSteps") val maxSteps: Int = 5,
     @SerialName("swipeDurationMs") val swipeDurationMs: Long = 350,
+    /** scroll、scroll_node 多步之间的停顿毫秒数（智能体调用）。 */
+    @SerialName("stepDelayMs") val stepDelayMs: Long = 300,
+    /** swipe 的 duration_ms 上限。 */
+    @SerialName("swipeMaxDurationMs") val swipeMaxDurationMs: Long = 3000,
     @SerialName("endpointJitterPx") val endpointJitterPx: Int = 12,
     @SerialName("trajectoryJitterPx") val trajectoryJitterPx: Int = 8,
 ) : ConfigSection {
@@ -297,9 +276,23 @@ public data class DeviceScrollSection(
             if (maxDurationMs < minDurationMs) add("maxDurationMs must be >= minDurationMs, was $maxDurationMs")
             if (maxSteps < 1) add("maxSteps must be >= 1, was $maxSteps")
             if (swipeDurationMs <= 0) add("swipeDurationMs must be > 0, was $swipeDurationMs")
+            if (stepDelayMs !in STEP_DELAY_MS_RANGE) {
+                add("stepDelayMs must be within $STEP_DELAY_MS_RANGE, was $stepDelayMs")
+            }
+            if (swipeMaxDurationMs !in swipeDurationMs..SWIPE_MAX_DURATION_MS_MAX) {
+                add(
+                    "swipeMaxDurationMs must be within $swipeDurationMs..$SWIPE_MAX_DURATION_MS_MAX, " +
+                        "was $swipeMaxDurationMs",
+                )
+            }
             if (endpointJitterPx < 0) add("endpointJitterPx must be >= 0, was $endpointJitterPx")
             if (trajectoryJitterPx < 0) add("trajectoryJitterPx must be >= 0, was $trajectoryJitterPx")
         }
+
+    internal companion object {
+        val STEP_DELAY_MS_RANGE: LongRange = 0L..5000L
+        const val SWIPE_MAX_DURATION_MS_MAX: Long = 10000
+    }
 }
 
 /** `device.wait`：wait 工具轮询。 */
@@ -334,7 +327,7 @@ public data class DeviceIntentSection(
     @SerialName("timerMaxSeconds") val timerMaxSeconds: Int = 86400,
     /** calendar 缺省时长（分钟）。 */
     @SerialName("calendarDefaultMinutes") val calendarDefaultMinutes: Int = 60,
-    /** share、sms_draft 的 text 与 calendar 的 description 最大字符数。 */
+    /** share、sms_draft 的 text 与 calendar 的 description 最大字符数；也约束 kind=uri 的 uri 长度。 */
     @SerialName("textMaxChars") val textMaxChars: Int = 4000,
 ) : ConfigSection {
     override fun validate(): List<String> =
@@ -362,6 +355,84 @@ private val ASK_TIMEOUT_MS_RANGE: LongRange = 5000L..600000L
 private val TIMER_MAX_SECONDS_RANGE: IntRange = 1..604800
 private val CALENDAR_DEFAULT_MINUTES_RANGE: IntRange = 1..1440
 private val TEXT_MAX_CHARS_RANGE: IntRange = 1..20000
+
+/** `device.action`：智能体屏幕动作后的固定等待（tool_optimize D2）；流程调用不使用。 */
+@Serializable
+public data class DeviceActionSection(
+    /** 动作后的默认等待毫秒数；模型可用工具参数 wait_ms 覆盖。 */
+    @SerialName("delayMs") val delayMs: Long = 5000,
+    /** wait_ms 与 delayMs 的上限。 */
+    @SerialName("maxDelayMs") val maxDelayMs: Long = 30000,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (maxDelayMs !in MAX_DELAY_RANGE) add("maxDelayMs must be within $MAX_DELAY_RANGE, was $maxDelayMs")
+            if (delayMs !in 0..maxDelayMs) add("delayMs must be within 0..maxDelayMs, was $delayMs")
+        }
+
+    internal companion object {
+        val MAX_DELAY_RANGE = 1_000L..60_000L
+    }
+}
+
+/** `device.input`：input_text 的时序参数（tool_optimize 02 §3）。 */
+@Serializable
+public data class DeviceInputSection(
+    /** 给出坐标时，点击输入框后等待焦点切换的毫秒数（智能体调用；流程调用改为等界面稳定）。 */
+    @SerialName("focusDelayMs") val focusDelayMs: Long = 500,
+    /** shell 粘贴后恢复原剪贴板前的等待毫秒数（粘贴按键是异步的）。 */
+    @SerialName("clipboardRestoreDelayMs") val clipboardRestoreDelayMs: Long = 400,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (focusDelayMs !in INPUT_DELAY_RANGE) {
+                add("focusDelayMs must be within $INPUT_DELAY_RANGE, was $focusDelayMs")
+            }
+            if (clipboardRestoreDelayMs !in INPUT_DELAY_RANGE) {
+                add("clipboardRestoreDelayMs must be within $INPUT_DELAY_RANGE, was $clipboardRestoreDelayMs")
+            }
+        }
+
+    internal companion object {
+        val INPUT_DELAY_RANGE: LongRange = 0L..5000L
+    }
+}
+
+/** `device.shell`：shell 注入通道（tool_optimize 02 §15）。 */
+@Serializable
+public data class DeviceShellSection(
+    /** 单条 shell 命令的超时毫秒数；超时后关闭连接，命令按未执行处理。 */
+    @SerialName("commandTimeoutMs") val commandTimeoutMs: Long = 5000,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        if (commandTimeoutMs in COMMAND_TIMEOUT_RANGE) {
+            emptyList()
+        } else {
+            listOf("commandTimeoutMs must be within $COMMAND_TIMEOUT_RANGE, was $commandTimeoutMs")
+        }
+
+    internal companion object {
+        val COMMAND_TIMEOUT_RANGE: LongRange = 500L..60000L
+    }
+}
+
+/** `device.apps`：应用列表（tool_optimize 02 §12）。 */
+@Serializable
+public data class DeviceAppsSection(
+    /** list_apps 未传 limit 时最多返回的条数。 */
+    @SerialName("listLimit") val listLimit: Int = 50,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        if (listLimit in LIST_LIMIT_RANGE) {
+            emptyList()
+        } else {
+            listOf("listLimit must be within $LIST_LIMIT_RANGE, was $listLimit")
+        }
+
+    internal companion object {
+        val LIST_LIMIT_RANGE: IntRange = 1..1000
+    }
+}
 
 /** `device` 领域全部配置键的登记（DI 多绑定与测试用）。 */
 public object DeviceConfig {
@@ -399,6 +470,14 @@ public object DeviceConfig {
         ConfigKey("device.replay", DeviceReplaySection.serializer()) { DeviceReplaySection() }
     public val INTENT: ConfigKey<DeviceIntentSection> =
         ConfigKey("device.intent", DeviceIntentSection.serializer()) { DeviceIntentSection() }
+    public val ACTION: ConfigKey<DeviceActionSection> =
+        ConfigKey("device.action", DeviceActionSection.serializer()) { DeviceActionSection() }
+    public val INPUT: ConfigKey<DeviceInputSection> =
+        ConfigKey("device.input", DeviceInputSection.serializer()) { DeviceInputSection() }
+    public val SHELL: ConfigKey<DeviceShellSection> =
+        ConfigKey("device.shell", DeviceShellSection.serializer()) { DeviceShellSection() }
+    public val APPS: ConfigKey<DeviceAppsSection> =
+        ConfigKey("device.apps", DeviceAppsSection.serializer()) { DeviceAppsSection() }
 
     public val ALL: List<ConfigKey<*>> =
         listOf(
@@ -419,5 +498,9 @@ public object DeviceConfig {
             NOTIFICATIONS,
             REPLAY,
             INTENT,
+            ACTION,
+            INPUT,
+            SHELL,
+            APPS,
         )
 }

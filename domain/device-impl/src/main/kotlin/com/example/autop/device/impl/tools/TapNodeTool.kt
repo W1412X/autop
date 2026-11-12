@@ -25,7 +25,6 @@ import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.nodeaction.NodeActionIds
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
-import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -117,6 +116,7 @@ public class TapNodeTool
             ctx: ToolContext,
         ): ToolOutput {
             val tap = action.payload as NodeTapAction
+            val pre = epilogue.preSample(ctx)
             val label = if (tap.long) ACTION_LONG_CLICK else ACTION_CLICK
             val actionId = if (tap.long) NodeActionIds.LONG_CLICK else NodeActionIds.CLICK
             val outcome =
@@ -147,14 +147,14 @@ public class TapNodeTool
                     )
                 NodeActionOutcome.DONE -> Unit
             }
-            val out =
-                epilogue.finish(
-                    ctx,
-                    tap.resultText,
-                    tap.waitMs,
-                    ReplayInput(TOOL_TAP_ID, tap.replayArgs, gesture = null),
-                )
-            return out.copy(content = out.content + Block.Text(trace.executionLine(ExecMethod.NODE_ACTION, label)))
+            return epilogue.finish(
+                ctx,
+                tap.resultText,
+                tap.waitMs,
+                ReplayInput(TOOL_TAP_ID, tap.replayArgs, gesture = null),
+                pre,
+                trace = listOf(trace.executionLine(ExecMethod.NODE_ACTION, label)),
+            )
         }
 
         /** 拒绝提示（§8）：带动作名与节点 at，让模型决定是否改用 tap。 */

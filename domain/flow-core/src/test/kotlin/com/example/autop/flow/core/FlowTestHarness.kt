@@ -148,7 +148,6 @@ internal class FlowTestHarness {
                         tools: List<String>?,
                         maxSteps: Int?,
                         maxDurationMs: Long?,
-                        role: String?,
                         context: AgentContext?,
                     ): AgentResult {
                         agentGoals += goal

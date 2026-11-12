@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "device": {
     "capture": {
       "timeoutMs": 1500,
@@ -20,7 +20,6 @@
       "textMaxChars": -1,
       "maxMergedLabels": 4,
       "maxListItems": -1,
-      "diffMaxRatio": 0.4,
       "semanticPoorMinInteractive": 3,
       "semanticPoorAreaRatio": 0.5,
       "hideSystemDecoration": true
@@ -38,23 +37,13 @@
       }
     },
     "observe": {
-      "priority": ["a11y", "visual", "llm"],
+      "priority": ["a11y", "visual"],
       "modes": {
         "a11y": { "enabled": true, "auto": true },
-        "visual": { "enabled": true, "auto": true },
-        "llm": { "enabled": true, "auto": false }
+        "visual": { "enabled": true, "auto": true }
       },
       "sufficiency": {
         "minEffectiveNodes": 5
-      },
-      "llm": {
-        "maxEdge": 1280,
-        "maxElements": 120,
-        "retries": 1,
-        "timeoutMs": 120000,
-        "cacheTtlMs": 10000,
-        "minAreaRatio": 0.0001,
-        "dupIou": 0.7
       }
     },
     "vision": {
@@ -97,6 +86,8 @@
       "maxDurationMs": 900,
       "maxSteps": 5,
       "swipeDurationMs": 350,
+      "stepDelayMs": 300,
+      "swipeMaxDurationMs": 3000,
       "endpointJitterPx": 12,
       "trajectoryJitterPx": 8
     },
@@ -118,6 +109,20 @@
       "timerMaxSeconds": 86400,
       "calendarDefaultMinutes": 60,
       "textMaxChars": 4000
+    },
+    "action": {
+      "delayMs": 5000,
+      "maxDelayMs": 30000
+    },
+    "input": {
+      "focusDelayMs": 500,
+      "clipboardRestoreDelayMs": 400
+    },
+    "shell": {
+      "commandTimeoutMs": 5000
+    },
+    "apps": {
+      "listLimit": 50
     }
   }
 }

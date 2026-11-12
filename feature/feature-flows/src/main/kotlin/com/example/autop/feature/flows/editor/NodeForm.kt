@@ -157,7 +157,6 @@ internal object NodeFields {
                     FieldSpec("output", FieldKind.JSON, simple = true),
                     FieldSpec("out", FieldKind.TEXT, simple = true),
                     FieldSpec("system", FieldKind.MULTI),
-                    FieldSpec("role", FieldKind.ENUM, options = listOf("main", "light", "vision")),
                     FieldSpec("images", FieldKind.LIST),
                     FieldSpec("validators", FieldKind.JSON),
                     FieldSpec("retry", FieldKind.JSON),
@@ -199,7 +198,6 @@ internal object NodeFields {
                     FieldSpec("tools", FieldKind.LIST),
                     FieldSpec("maxSteps", FieldKind.NUMBER),
                     FieldSpec("maxDurationMs", FieldKind.NUMBER),
-                    FieldSpec("role", FieldKind.ENUM, options = listOf("main", "light", "vision")),
                 )
             "api" ->
                 listOf(

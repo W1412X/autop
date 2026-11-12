@@ -8,8 +8,8 @@ import com.example.autop.core.common.getOrNull
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.Rect
 import com.example.autop.device.core.CoordMapper
+import com.example.autop.device.core.CoordSpace
 import com.example.autop.device.core.PixelSize
-import com.example.autop.llm.CoordSpace
 import javax.inject.Inject
 import javax.inject.Singleton
 

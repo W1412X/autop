@@ -57,10 +57,6 @@ public interface Tool {
     public val requiredCapabilities: Set<Capability>
         get() = emptySet()
 
-    /** 为真时只在主模型支持图片输入时暴露（返回图片给主模型的工具）。 */
-    public val requiresModelVision: Boolean
-        get() = false
-
     public suspend fun invoke(
         args: JsonObject,
         ctx: ToolContext,
@@ -102,12 +98,15 @@ public data class ToolOutput(
     val error: AppError? = null,
     val observation: ObservationRef? = null,
     val control: ToolControl? = null,
-    /** R1/B1：content 是差量观测时的完整版本，写入 ToolResultEvent.fullBlocks。 */
+    /** R1/B1：content 是差量观测时的完整版本，写入 ToolResultEvent.fullBlocks（tool_optimize 后不再填写）。 */
     val fullContent: List<Block>? = null,
     /** R1/A6：WRITE_SCREEN 工具成功时填写的可回放记录（docs/tech/04 §2.7）。 */
     val replay: ReplayableAction? = null,
-    /** 屏幕变化结论：observe 相对最近观测、动作工具相对动作前观测；无屏幕语义的工具为 null。 */
-    val screenDelta: ScreenDelta? = null,
+    /**
+     * 执行记录：工具实际执行了哪些步骤、经由哪个通道（docs/design/tool_optimize/01 §2）。
+     * 成功与失败都由 ToolExecutor 原样附在结果末尾给模型看；工具不要再把这些行拼进 content。
+     */
+    val trace: List<String> = emptyList(),
 )
 
 /** 工具对 Run 生命周期的控制指令。 */
@@ -137,10 +136,6 @@ public interface ToolContext {
     /** 本次 Run 内工具之间共享的状态（如设备领域的短 ID 注册表）。 */
     public val runScope: RunScopedValues
 
-    /** 当前主模型是否支持图片输入（新方案 §2.7 强制附图/no-image 提示的门控）。 */
-    public val modelVision: Boolean
-        get() = false
-
     /** N208：工具自测采集视觉链路调试图（检测渲染图＋逐框识别 I/O）；正常 Run 不产出。 */
     public val debugImages: Boolean
         get() = false
@@ -153,8 +148,8 @@ public interface ToolContext {
         get() = null
 
     /**
-     * 为真时动作工具收尾只等界面稳定，不自动附观测、不做回放前采样
-     * （流程自己决定何时观测；docs/design/flows.md §8.2）。
+     * 为真时（流程调用）动作工具收尾只等界面稳定，不生成回放；为假时（智能体调用）按
+     * `device.action.delayMs` 固定等待。两种情况都不自动观测（docs/design/flows.md §8.2）。
      */
     public val quietActions: Boolean
         get() = false

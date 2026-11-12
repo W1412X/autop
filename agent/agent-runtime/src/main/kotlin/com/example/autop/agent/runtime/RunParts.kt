@@ -12,6 +12,4 @@ internal class RunParts(
     val assembler: ContextAssembler,
     val router: ToolRouter,
     val engines: RunEngines,
-    /** 当前主模型是否支持图片输入（新方案 §2.7，ToolContext 下发）。 */
-    val modelVision: Boolean = false,
 )

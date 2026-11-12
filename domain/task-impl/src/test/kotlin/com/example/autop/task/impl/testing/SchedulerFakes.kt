@@ -192,8 +192,6 @@ public class FakeAppLauncher : AppLauncher {
         launched += packageName
         return true
     }
-
-    override suspend fun openUri(uri: String): Boolean = true
 }
 
 /** fake AgentSession：记录 start 请求并返回立即收口的句柄。 */

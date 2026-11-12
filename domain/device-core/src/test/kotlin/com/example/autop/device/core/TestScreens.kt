@@ -107,7 +107,7 @@ internal class ConfigSpec {
     var maxMergedLabels: Int = 4
     var maxListItems: Int = 15
     var hideSystemDecoration: Boolean = true
-    var diffMaxRatio: Double = 0.4
+
     var semanticPoorMinInteractive: Int = 3
     var semanticPoorAreaRatio: Double = 0.5
     var minEffectiveNodes: Int = 5
@@ -121,7 +121,6 @@ internal class ConfigSpec {
             maxMergedLabels = maxMergedLabels,
             maxListItems = maxListItems,
             hideSystemDecoration = hideSystemDecoration,
-            diffMaxRatio = diffMaxRatio,
             semanticPoorMinInteractive = semanticPoorMinInteractive,
             semanticPoorAreaRatio = semanticPoorAreaRatio,
             minEffectiveNodes = minEffectiveNodes,

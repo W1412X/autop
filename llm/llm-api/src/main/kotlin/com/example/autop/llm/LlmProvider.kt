@@ -8,13 +8,6 @@ import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import kotlinx.coroutines.flow.Flow
 
-/** 模型角色（docs/tech/03 §2）：MAIN 主对话 / VISION 视觉 / LIGHT 轻量。 */
-public enum class ModelRole {
-    MAIN,
-    VISION,
-    LIGHT,
-}
-
 /** 一个模型配置对应的流式提供者。 */
 public interface LlmProvider {
     public val profile: ModelProfile
@@ -42,8 +35,8 @@ public interface LlmProviderFactory {
 
 /** 模型网关入口（runtime 与其他模块使用）。 */
 public interface LlmGateway {
-    /** 取 [role] 对应的 provider；未配置返回 `Err(llm.not_configured)`。 */
-    public fun forRole(role: ModelRole): Outcome<LlmProvider>
+    /** 默认模型的 provider；未设置返回 `Err(llm.not_configured)`。 */
+    public fun forDefault(): Outcome<LlmProvider>
 
     /** 按配置 id 取 provider；不存在返回 `Err(llm.not_configured)`。 */
     public fun forProfile(profileId: String): Outcome<LlmProvider>

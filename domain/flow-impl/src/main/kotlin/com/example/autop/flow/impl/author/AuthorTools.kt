@@ -94,7 +94,7 @@ internal class AuthorTools(
                 toolSpec(
                     "inspect_screen",
                     "flow.author.tools",
-                ) { string("mode", enum = listOf("a11y", "visual", "llm")) },
+                ) { string("mode", enum = listOf("a11y", "visual")) },
                 toolSpec("demonstrate", "flow.author.tools") { string("goal", required = true) },
                 toolSpec("list_tools", "flow.author.tools") {},
                 toolSpec("list_flows", "flow.author.tools") {},
@@ -126,7 +126,6 @@ internal class AuthorTools(
                     "observe",
                     buildJsonObject {
                         put("mode", args.str("mode") ?: "a11y")
-                        put("full", true)
                     },
                 )
             }

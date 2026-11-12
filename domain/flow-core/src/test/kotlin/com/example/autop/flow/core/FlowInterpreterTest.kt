@@ -79,7 +79,6 @@ class FlowInterpreterTest {
                         tools: List<String>?,
                         maxSteps: Int?,
                         maxDurationMs: Long?,
-                        role: String?,
                         context: AgentContext?,
                     ) = AgentResult(true, "done", null, null)
                 },

@@ -1,6 +1,6 @@
 /**
  * 导航规则表的加载校验（intent-tool §3.1）。纯函数，返回错误描述列表；空列表表示通过。
- * 加载器对非空结果直接抛错，不静默回退（与 PopupRulesLoader 一致）。
+ * 加载器对非空结果直接抛错，不静默回退（与 RestartRulesLoader 一致）。
  */
 package com.example.autop.device.core.navigation
 

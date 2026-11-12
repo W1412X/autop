@@ -31,7 +31,6 @@ import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.LlmRequest
 import com.example.autop.llm.LlmStreamEvent
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.SystemPart
@@ -232,9 +231,9 @@ internal class TaskAuthorSessionImpl(
 
     // ---- 循环 ---------------------------------------------------------------------------------
 
-    /** 会话级模型覆盖优先，否则取主模型（ADR-0022）。 */
+    /** 会话级模型覆盖优先，否则取默认模型（ADR-0022）。 */
     private fun resolveProvider(): Outcome<LlmProvider> =
-        activeModelProfileId?.let { d.gateway.forProfile(it) } ?: d.gateway.forRole(ModelRole.MAIN)
+        activeModelProfileId?.let { d.gateway.forProfile(it) } ?: d.gateway.forDefault()
 
     private suspend fun loop() {
         val config = d.configProvider.current()
@@ -259,9 +258,8 @@ internal class TaskAuthorSessionImpl(
         provider: LlmProvider,
         config: ConfigSnapshot,
     ): TaskPipeline {
+        // 工具能力为 false 时走 JSON 文本回退（ADR-0024），否则原生 tools。
         val nativeTools = provider.profile.capabilities.tools
-        // 模型不支持原生 tools 时不发 tools、改走 JSON 回退；否则模型会把 <tool_call> XML
-        // 当正文返回，调用被当成普通消息展示。
         val resolver =
             FallbackMode(
                 prompts = d.prompts,

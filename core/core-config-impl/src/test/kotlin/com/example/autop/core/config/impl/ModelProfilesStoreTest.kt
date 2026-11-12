@@ -4,7 +4,6 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import com.example.autop.llm.ModelProfile
-import com.example.autop.llm.ModelRoles
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +15,7 @@ import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
 
-/** [DataStoreModelProfileStore] 集成测试：真实 DataStore 文件、损坏与超前版本回退（docs/tech/03 §3）。 */
+/** [DataStoreModelProfileStore] 集成测试：真实 DataStore 文件、默认模型、损坏与超前版本回退（docs/tech/03 §3）。 */
 internal class ModelProfilesStoreTest {
     @get:Rule
     val folder = TemporaryFolder()
@@ -45,24 +44,49 @@ internal class ModelProfilesStoreTest {
     }
 
     @Test
-    fun deleteRemovesProfileAndClearsRoleReferences() {
+    fun deleteDefaultClearsDefault() {
         runBlocking {
             val store = createStore()
             store.upsert(profile(PROFILE_A))
             store.upsert(profile(PROFILE_B))
-            store.setRoles(ModelRoles(main = PROFILE_A, vision = PROFILE_A, light = PROFILE_B))
+            store.setDefaultProfileId(PROFILE_A)
             store.delete(PROFILE_A)
             assertThat(store.get(PROFILE_A)).isNull()
-            assertThat(store.roles.first()).isEqualTo(ModelRoles(main = null, vision = null, light = PROFILE_B))
+            assertThat(store.defaultProfileId.first()).isNull()
         }
     }
 
     @Test
-    fun setRolesPersistsRoles() {
+    fun deleteOtherProfileKeepsDefault() {
         runBlocking {
             val store = createStore()
-            store.setRoles(ModelRoles(main = PROFILE_A))
-            assertThat(store.roles.first()).isEqualTo(ModelRoles(main = PROFILE_A))
+            store.upsert(profile(PROFILE_A))
+            store.upsert(profile(PROFILE_B))
+            store.setDefaultProfileId(PROFILE_A)
+            store.delete(PROFILE_B)
+            assertThat(store.defaultProfileId.first()).isEqualTo(PROFILE_A)
+        }
+    }
+
+    @Test
+    fun setDefaultPersistsDefault() {
+        runBlocking {
+            val store = createStore()
+            store.setDefaultProfileId(PROFILE_A)
+            assertThat(store.defaultProfileId.first()).isEqualTo(PROFILE_A)
+        }
+    }
+
+    @Test
+    fun v1RolesMainMigratesToDefault() {
+        runBlocking {
+            file().writeText(
+                """
+                {"schemaVersion": 1, "profiles": [], "roles": {"main": "$PROFILE_A", "light": "$PROFILE_B"}}
+                """.trimIndent(),
+            )
+            val store = createStore()
+            assertThat(store.defaultProfileId.first()).isEqualTo(PROFILE_A)
         }
     }
 
@@ -72,14 +96,14 @@ internal class ModelProfilesStoreTest {
             file().writeText("{ not valid json")
             val store = createStore()
             assertThat(store.profiles.first()).isEmpty()
-            assertThat(store.roles.first()).isEqualTo(ModelRoles())
+            assertThat(store.defaultProfileId.first()).isNull()
         }
     }
 
     @Test
     fun newerSchemaVersionFallsBackToEmptyDocument() {
         runBlocking {
-            file().writeText("""{"schemaVersion": ${MODEL_PROFILES_SCHEMA_VERSION + 1}, "profiles": [], "roles": {}}""")
+            file().writeText("""{"schemaVersion": ${MODEL_PROFILES_SCHEMA_VERSION + 1}, "profiles": []}""")
             val store = createStore()
             assertThat(store.profiles.first()).isEmpty()
         }

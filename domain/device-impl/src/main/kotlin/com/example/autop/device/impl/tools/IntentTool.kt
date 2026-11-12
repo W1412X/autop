@@ -7,6 +7,7 @@ package com.example.autop.device.impl.tools
 import android.content.Intent
 import android.net.Uri
 import com.example.autop.agent.PreparedAction
+import com.example.autop.agent.ReplayStateSample
 import com.example.autop.agent.ScreenActionTool
 import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolContext
@@ -45,18 +46,16 @@ import com.example.autop.device.impl.intent.PreparedIntent
 import com.example.autop.device.impl.intent.SystemIntents
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
-import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonObject
 import java.time.ZoneId
 import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** prepare 生成的执行载荷：已校验参数、原始参数（回放用）、动作前前台包名。 */
+/** prepare 生成的执行载荷：已校验参数、原始参数（回放用）。 */
 private data class IntentAction(
     val spec: IntentSpec,
     val args: JsonObject,
-    val foregroundBefore: String?,
 )
 
 /** 系统事务工具。 */
@@ -117,9 +116,13 @@ public class IntentTool
                 buildMap {
                     put(EXTRA_KIND, intent.kind)
                     pageOf(intent)?.let { put(EXTRA_PAGE, it) }
+                    if (intent is IntentSpec.Uri) {
+                        put(EXTRA_URI, intent.uri)
+                        put(EXTRA_SCHEME, intent.uri.substringBefore(':', missingDelimiterValue = "").lowercase())
+                    }
                 }
             val subject = subjects.build(ID, snap, null, extra, ctx.config)
-            return Outcome.Ok(PreparedAction(subject, IntentAction(intent, args, snap.foregroundPackage)))
+            return Outcome.Ok(PreparedAction(subject, IntentAction(intent, args)))
         }
 
         override suspend fun perform(
@@ -127,8 +130,9 @@ public class IntentTool
             ctx: ToolContext,
         ): ToolOutput {
             val payload = action.payload as IntentAction
+            val pre = epilogue.preSample(ctx)
             return when (val intent = payload.spec) {
-                is IntentSpec.Navigate -> performNavigate(intent, payload, ctx)
+                is IntentSpec.Navigate -> performNavigate(intent, payload, pre, ctx)
                 is IntentSpec.Alarm,
                 is IntentSpec.Timer,
                 is IntentSpec.Calendar,
@@ -136,7 +140,8 @@ public class IntentTool
                 is IntentSpec.SmsDraft,
                 is IntentSpec.Share,
                 is IntentSpec.Settings,
-                -> performSystem(intent, payload, ctx)
+                is IntentSpec.Uri,
+                -> performSystem(intent, payload, pre, ctx)
             }
         }
 
@@ -144,6 +149,7 @@ public class IntentTool
         private suspend fun performSystem(
             intent: IntentSpec,
             action: IntentAction,
+            pre: ReplayStateSample?,
             ctx: ToolContext,
         ): ToolOutput {
             val appPackage =
@@ -162,13 +168,14 @@ public class IntentTool
                     add(prompts.text(PROMPT_RESULT, resultVars(intent)))
                     prepared.settingsActual?.let { add(prompts.text(PROMPT_SETTINGS_FALLBACK, mapOf("actual" to it))) }
                 }
-            return finish(lines.joinToString("\n"), action, ctx)
+            return finish(lines.joinToString("\n"), action, pre, ctx)
         }
 
         /** 导航：按规则表与偏好选应用；每次询问时通过 askUser 让用户选。 */
         private suspend fun performNavigate(
             nav: IntentSpec.Navigate,
             action: IntentAction,
+            pre: ReplayStateSample?,
             ctx: ToolContext,
         ): ToolOutput {
             val rules = rulesLoader.get()
@@ -182,12 +189,13 @@ public class IntentTool
                         navChoiceText(choice.app.label, choice.reason),
                         nav,
                         action,
+                        pre,
                         ctx,
                         rules,
                     )
-                is NavChoice.Ask -> askAndLaunch(choice.options, nav, action, ctx, rules)
+                is NavChoice.Ask -> askAndLaunch(choice.options, nav, action, pre, ctx, rules)
                 is NavChoice.RequestedNotInstalled -> requestedMissing(choice.requestedId, installed)
-                NavChoice.NoneInstalled -> launchGeo(nav, action, ctx)
+                NavChoice.NoneInstalled -> launchGeo(nav, action, pre, ctx)
             }
         }
 
@@ -196,6 +204,7 @@ public class IntentTool
             options: List<NavigationApp>,
             nav: IntentSpec.Navigate,
             action: IntentAction,
+            pre: ReplayStateSample?,
             ctx: ToolContext,
             rules: NavigationRules,
         ): ToolOutput {
@@ -208,11 +217,11 @@ public class IntentTool
             val picked =
                 (answer as? Outcome.Ok)?.value?.let { label -> options.firstOrNull { it.label == label } }
             return if (picked != null) {
-                launchNavigation(picked, navChoiceText(picked.label, null, ask = true), nav, action, ctx, rules)
+                launchNavigation(picked, navChoiceText(picked.label, null, ask = true), nav, action, pre, ctx, rules)
             } else {
                 val fallback = options.first()
                 val note = navChoiceText(fallback.label, NavReason.AUTO, askFallback = true)
-                launchNavigation(fallback, note, nav, action, ctx, rules)
+                launchNavigation(fallback, note, nav, action, pre, ctx, rules)
             }
         }
 
@@ -222,6 +231,7 @@ public class IntentTool
             note: String,
             nav: IntentSpec.Navigate,
             action: IntentAction,
+            pre: ReplayStateSample?,
             ctx: ToolContext,
             rules: NavigationRules,
         ): ToolOutput {
@@ -232,13 +242,14 @@ public class IntentTool
                     .setPackage(app.packageName)
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             starter.start(intent, "navigate:${app.id}", DeviceErrorCodes.LAUNCH_FAILED)?.let { return errorOutput(it) }
-            return finishNavigation(nav, note, action, ctx)
+            return finishNavigation(nav, note, action, pre, ctx)
         }
 
         /** 没有任何导航应用：用 `geo:` 兜底，结果说明它只显示位置。 */
         private suspend fun launchGeo(
             nav: IntentSpec.Navigate,
             action: IntentAction,
+            pre: ReplayStateSample?,
             ctx: ToolContext,
         ): ToolOutput {
             val intent =
@@ -246,28 +257,28 @@ public class IntentTool
                     .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             if (intents.handlerOf(intent) == null) return noHandlerOutput(nav.kind)
             starter.start(intent, "navigate:geo", DeviceErrorCodes.LAUNCH_FAILED)?.let { return errorOutput(it) }
-            return finishNavigation(nav, navChoiceText(null, null, geo = true), action, ctx)
+            return finishNavigation(nav, navChoiceText(null, null, geo = true), action, pre, ctx)
         }
 
         private suspend fun finishNavigation(
             nav: IntentSpec.Navigate,
             note: String,
             action: IntentAction,
+            pre: ReplayStateSample?,
             ctx: ToolContext,
         ): ToolOutput {
             val result = prompts.text(PROMPT_RESULT, resultVars(nav))
-            return finish(listOf(result, note).joinToString("\n"), action, ctx)
+            return finish(listOf(result, note).joinToString("\n"), action, pre, ctx)
         }
 
-        /** 收尾观测与前台行（§1.3 的第 4、5 项）；结果文字在前。 */
+        /** 收尾：固定等待 + 回放记录（tool_optimize §10.3，不再有前台行）。 */
         private suspend fun finish(
             resultText: String,
             action: IntentAction,
+            pre: ReplayStateSample?,
             ctx: ToolContext,
-        ): ToolOutput {
-            val out = epilogue.finish(ctx, resultText, null, ReplayInput(ID, action.args, gesture = null))
-            return out.copy(content = out.content + Block.Text(foregroundLine(out, action.foregroundBefore)))
-        }
+        ): ToolOutput =
+            epilogue.finish(ctx, resultText, waitMsOf(action.args), ReplayInput(ID, action.args, gesture = null), pre)
 
         /** 用户指定的导航应用未安装：列出已安装的应用。 */
         private fun requestedMissing(
@@ -308,6 +319,7 @@ public class IntentTool
                 when (intent) {
                     is IntentSpec.Share -> intent.app
                     is IntentSpec.Settings -> intent.app.takeIf { intent.page == SettingsPage.APP_NOTIFICATIONS }
+                    is IntentSpec.Uri,
                     is IntentSpec.Alarm,
                     is IntentSpec.Timer,
                     is IntentSpec.Calendar,
@@ -360,8 +372,15 @@ public class IntentTool
                 is IntentSpec.SmsDraft -> intents.smsDraft(intent)
                 is IntentSpec.Share -> intents.share(intent, appPackage)
                 is IntentSpec.Settings -> intents.settings(intent, appPackage)
+                is IntentSpec.Uri -> uriIntent(intent)
                 is IntentSpec.Navigate -> error("navigate is launched by performNavigate")
             }
+
+        /** 打开链接或 deep link（原 tool.open_uri，tool_optimize §10.3）。 */
+        private fun uriIntent(spec: IntentSpec.Uri): PreparedIntent {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(spec.uri)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            return PreparedIntent(intent, intents.handlerOf(intent), null)
+        }
 
         /** 结果行的模板变量（§9.1 device.intent.result 的 detail 规则）。 */
         private fun resultVars(intent: IntentSpec): Map<String, String> =
@@ -378,6 +397,7 @@ public class IntentTool
                         "detail" to (intent.destination ?: "${intent.lat},${intent.lng}"),
                     )
                 is IntentSpec.Settings -> mapOf("settings" to ONE, "detail" to intent.page.id)
+                is IntentSpec.Uri -> mapOf("uri" to ONE, "detail" to intent.uri)
             }
 
         private fun alarmDetail(alarm: IntentSpec.Alarm): String {
@@ -411,20 +431,6 @@ public class IntentTool
                 NavReason.AUTO -> "auto"
                 NavReason.ONLY_ONE -> "onlyOne"
             }
-
-        /** 前台行：未获取到、或与动作前相同时带标记（§1.3 第 5 项）。 */
-        private fun foregroundLine(
-            out: ToolOutput,
-            before: String?,
-        ): String {
-            val now = out.observation?.packageName
-            val vars =
-                buildMap {
-                    if (now != null) put("pkg", now) else put("unknown", ONE)
-                    if (now != null && now == before) put("unchanged", ONE)
-                }
-            return prompts.text(PROMPT_FOREGROUND, vars)
-        }
 
         private fun invalid(error: IntentInvalid): Outcome.Err {
             val vars =
@@ -473,13 +479,14 @@ public class IntentTool
             const val TAG = "IntentTool"
             const val ONE = "1"
             const val EXTRA_KIND = "kind"
+            const val EXTRA_URI = "uri"
+            const val EXTRA_SCHEME = "scheme"
             const val EXTRA_PAGE = "page"
             const val SHARE_DETAIL_CHARS = 20
             const val PROMPT_INVALID = "device.intent.invalid"
             const val PROMPT_RESULT = "device.intent.result"
             const val PROMPT_NAV_CHOICE = "device.intent.navigate_choice"
             const val PROMPT_SETTINGS_FALLBACK = "device.intent.settings_fallback"
-            const val PROMPT_FOREGROUND = "device.intent.foreground"
             const val PROMPT_ASK_MAP = "device.intent.ask_map"
             const val PROMPT_NO_HANDLER = "device.hint.intent_no_handler"
             const val PROMPT_APP_CANDIDATES = "device.hint.intent_app_candidates"

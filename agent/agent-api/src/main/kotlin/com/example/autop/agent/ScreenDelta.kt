@@ -1,6 +1,7 @@
 /**
- * 屏幕变化结论（agent-harness-overhaul D4）：由设备领域在记录观测时给出，
- * 动作效果回执、熔断与节点动作学习只消费它，不自行比较指纹。
+ * 屏幕变化结论（agent-harness-overhaul D4）。
+ *
+ * 已停用（tool_optimize D1）：只为读取旧事件保留，新事件恒为 null，生产代码不再构造。
  */
 package com.example.autop.agent
 

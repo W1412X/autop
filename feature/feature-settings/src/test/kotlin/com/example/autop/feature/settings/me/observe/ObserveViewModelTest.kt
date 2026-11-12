@@ -52,8 +52,8 @@ class ObserveViewModelTest {
             val viewModel = createViewModel()
 
             val items = viewModel.uiState.value.items
-            assertThat(items.map { it.id }).containsExactly("a11y", "visual", "llm").inOrder()
-            assertThat(items.map { it.enabled }).containsExactly(true, true, true)
+            assertThat(items.map { it.id }).containsExactly("a11y", "visual").inOrder()
+            assertThat(items.map { it.enabled }).containsExactly(true, true)
         }
 
     @Test
@@ -80,7 +80,7 @@ class ObserveViewModelTest {
             val (_, value) = editor.writes.single()
             val priority = (value as JsonObject)["priority"] as JsonArray
             assertThat(priority.map { (it as JsonPrimitive).content })
-                .containsExactly("visual", "a11y", "llm")
+                .containsExactly("visual", "a11y")
                 .inOrder()
         }
 
@@ -97,12 +97,12 @@ class ObserveViewModelTest {
     @Test
     fun `unavailable reason is exposed per mode`() =
         runTest(testDispatcher) {
-            availability.reasons[ObserveMode.LLM] = "未在模型配置中设置视觉模型"
+            availability.reasons[ObserveMode.VISUAL] = "视觉模型未就绪"
 
             val viewModel = createViewModel()
 
             val items = viewModel.uiState.value.items
-            assertThat(items.first { it.id == "llm" }.unavailableReason).isEqualTo("未在模型配置中设置视觉模型")
+            assertThat(items.first { it.id == "visual" }.unavailableReason).isEqualTo("视觉模型未就绪")
             assertThat(items.first { it.id == "a11y" }.unavailableReason).isNull()
         }
 
@@ -122,7 +122,6 @@ class ObserveViewModelTest {
                                         "priority",
                                         JsonArray(
                                             listOf(
-                                                JsonPrimitive("llm"),
                                                 JsonPrimitive("a11y"),
                                                 JsonPrimitive("visual"),
                                             ),
@@ -138,7 +137,7 @@ class ObserveViewModelTest {
             val items = viewModel.uiState.value.items
             val ids = items.map { it.id }
             assertThat(ids)
-                .containsExactly("llm", "a11y", "visual")
+                .containsExactly("a11y", "visual")
                 .inOrder()
         }
 

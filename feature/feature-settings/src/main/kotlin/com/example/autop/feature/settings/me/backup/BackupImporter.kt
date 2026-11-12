@@ -86,7 +86,7 @@ public class BackupImporter(
             modelProfileStore.upsert(profile.copy(apiKeyRef = ""))
             count++
         }
-        modelProfileStore.setRoles(bundle.modelRoles)
+        modelProfileStore.setDefaultProfileId(bundle.defaultProfileId ?: bundle.legacyModelRoles?.main)
         return count
     }
 

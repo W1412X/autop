@@ -4,7 +4,7 @@ version: 2
 vars: []
 ---
 ask_user|向用户提问并等待回答。question 是问题，options 是供选择的答案（尽量提供）。
-inspect_screen|只读地观察手机当前屏幕，返回屏幕内容。mode 为 a11y、visual 或 llm。
+inspect_screen|只读地观察手机当前屏幕，返回屏幕内容。mode 为 a11y 或 visual。
 demonstrate|让智能体在手机上真实操作一遍来示范目标，返回证据包（逐步的动作前后差异、命中元素与契约候选）。调用前会征得用户同意。goal 是要示范的目标。
 list_tools|列出流程里可用的工具及其参数。
 list_flows|列出已有流程的名称、说明与参数。

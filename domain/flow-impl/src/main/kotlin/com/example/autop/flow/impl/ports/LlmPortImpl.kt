@@ -15,14 +15,13 @@ import com.example.autop.llm.Block
 import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.LlmRequest
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.SystemPart
 import com.example.autop.llm.ToolChoice
 import com.example.autop.llm.complete
 
-/** LLM 端口：按角色/视觉需求选模型，渲染系统提示模板，返回文本与用量。 */
+/** LLM 端口：使用默认模型，渲染系统提示模板，返回文本与用量。 */
 internal class LlmPortImpl(
     private val gateway: LlmGateway,
     private val prompts: PromptRepository,
@@ -34,14 +33,12 @@ internal class LlmPortImpl(
 ) : LlmPort {
     override suspend fun complete(call: LlmCall): LlmReply {
         checkDailyBudget()
-        val needsVision = call.images.isNotEmpty() || call.attachScreenshot
-        val provider = pick(call.role, needsVision)
-        val vision = provider.profile.capabilities.vision
+        val provider = defaultProvider()
         val blocks = mutableListOf<Block>(Block.Text(userText(call)))
         call.images.forEach { ref ->
             blocks += images.get(ref) ?: throw FlowException(FlowErrorCodes.ARGS_INVALID, "找不到图片引用：$ref")
         }
-        if (call.attachScreenshot && vision) {
+        if (call.attachScreenshot) {
             val ref = observe.screenshot(null)
             images.get(ref)?.let { blocks += it }
         }
@@ -77,30 +74,8 @@ internal class LlmPortImpl(
         clock.nowMillis()
     }
 
-    /** 显式角色优先；否则有图用 VISION → 支持视觉的 MAIN，无图用 LIGHT → MAIN。 */
-    private fun pick(
-        role: String?,
-        needsVision: Boolean,
-    ): LlmProvider {
-        roleOf(role)?.let { return provider(it) }
-        val order =
-            if (needsVision) {
-                listOf(
-                    ModelRole.VISION,
-                    ModelRole.MAIN,
-                )
-            } else {
-                listOf(ModelRole.LIGHT, ModelRole.MAIN)
-            }
-        for (candidate in order) {
-            val p = (gateway.forRole(candidate) as? Outcome.Ok)?.value ?: continue
-            if (!needsVision || p.profile.capabilities.vision) return p
-        }
-        throw FlowException(FlowErrorCodes.LLM_UNAVAILABLE, if (needsVision) "没有可用的视觉模型" else "没有可用的模型")
-    }
-
-    private fun provider(role: ModelRole): LlmProvider =
-        when (val r = gateway.forRole(role)) {
+    private fun defaultProvider(): LlmProvider =
+        when (val r = gateway.forDefault()) {
             is Outcome.Ok -> r.value
             is Outcome.Err -> throw FlowException(FlowErrorCodes.LLM_UNAVAILABLE, r.error.message)
         }

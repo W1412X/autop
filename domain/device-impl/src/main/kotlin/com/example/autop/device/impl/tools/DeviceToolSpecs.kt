@@ -11,12 +11,12 @@ import com.example.autop.device.core.SettingsPage
 
 /** `intent` 的 kind 枚举（与 [com.example.autop.device.core.kind] 一致）。 */
 private val INTENT_KINDS: List<String> =
-    listOf("alarm", "timer", "calendar", "dial", "sms_draft", "share", "navigate", "settings")
+    listOf("alarm", "timer", "calendar", "dial", "sms_draft", "share", "navigate", "settings", "uri")
 
 /** 设备类工具的 spec。 */
 public object DeviceToolSpecs {
     /** `tool.observe`：静态形态（全模式枚举）；运行期由 [observeFor] 按生效模式收窄。 */
-    public val observe: ToolSpec = observeFor(listOf("a11y", "visual", "llm"), "")
+    public val observe: ToolSpec = observeFor(listOf("a11y", "visual"), "")
 
     /** `tool.observe` 的运行期形态：[modeIds] 为生效模式枚举，[modeList] 为说明中的优先级列表。 */
     public fun observeFor(
@@ -29,13 +29,6 @@ public object DeviceToolSpecs {
             descriptionVars = mapOf("modeList" to modeList),
         ) {
             string("mode", enum = modeIds)
-            boolean("full")
-            obj("region") {
-                integer("x1", required = true)
-                integer("y1", required = true)
-                integer("x2", required = true)
-                integer("y2", required = true)
-            }
         }
 
     /** `tool.screenshot`（截图不含编号框与网格）。 */
@@ -60,7 +53,7 @@ public object DeviceToolSpecs {
             integer("x", required = true, min = 0, max = 1000)
             integer("y", required = true, min = 0, max = 1000)
             boolean("long")
-            integer("wait_ms")
+            integer("wait_ms", min = 0)
         }
 
     /** `tool.tap_node`：对 a11y 观测里带 id 的节点执行无障碍点击动作。 */
@@ -68,7 +61,7 @@ public object DeviceToolSpecs {
         toolSpec(name = "tap_node", descriptionPromptId = "tool.tap_node") {
             integer("id", required = true, min = 1)
             boolean("long")
-            integer("wait_ms")
+            integer("wait_ms", min = 0)
         }
 
     /** `tool.scroll_node`：对可滚动节点执行无障碍滚动动作。 */
@@ -77,6 +70,7 @@ public object DeviceToolSpecs {
             integer("id", required = true, min = 1)
             string("direction", required = true, enum = listOf("up", "down", "left", "right"))
             integer("steps", min = 1)
+            integer("wait_ms", min = 0)
         }
 
     /** `tool.input_text`：写入焦点输入框，可选先点击输入框坐标。 */
@@ -87,7 +81,7 @@ public object DeviceToolSpecs {
             integer("y", min = 0, max = 1000)
             string("mode", enum = listOf("replace", "append"))
             boolean("submit")
-            integer("wait_ms")
+            integer("wait_ms", min = 0)
         }
 
     /** `tool.scroll`：单步人手滑动，`steps` 连续多步；`x,y` 为滚动区域内一点。 */
@@ -99,6 +93,7 @@ public object DeviceToolSpecs {
             string("amount", enum = listOf("page", "half"))
             integer("x", min = 0, max = 1000)
             integer("y", min = 0, max = 1000)
+            integer("wait_ms", min = 0)
         }
 
     /** `tool.swipe`。 */
@@ -109,6 +104,7 @@ public object DeviceToolSpecs {
             integer("x2", required = true, min = 0, max = 1000)
             integer("y2", required = true, min = 0, max = 1000)
             integer("duration_ms", min = 1)
+            integer("wait_ms", min = 0)
         }
 
     /** `tool.global_action`。 */
@@ -119,16 +115,14 @@ public object DeviceToolSpecs {
                 required = true,
                 enum = listOf("back", "home", "recents", "notifications", "quick_settings", "lock"),
             )
+            integer("wait_ms", min = 0)
         }
-
-    /** `tool.dismiss_popup`：无参数，自动识别并关闭遮挡页面的弹窗。 */
-    public val dismissPopup: ToolSpec =
-        toolSpec(name = "dismiss_popup", descriptionPromptId = "tool.dismiss_popup") {}
 
     /** `tool.restart_app`：强制结束并重新打开应用；package 缺省时用当前前台应用。 */
     public val restartApp: ToolSpec =
         toolSpec(name = "restart_app", descriptionPromptId = "tool.restart_app") {
             string("package")
+            integer("wait_ms", min = 0)
         }
 
     /** `tool.open_app`：`package` 与 `name` 二选一。 */
@@ -136,13 +130,8 @@ public object DeviceToolSpecs {
         toolSpec(name = "open_app", descriptionPromptId = "tool.open_app") {
             string("package")
             string("name")
+            integer("wait_ms", min = 0)
             oneOfRequired(listOf("package"), listOf("name"))
-        }
-
-    /** `tool.open_uri`。 */
-    public val openUri: ToolSpec =
-        toolSpec(name = "open_uri", descriptionPromptId = "tool.open_uri") {
-            string("uri", required = true)
         }
 
     /** `tool.intent` 的静态形态（导航应用枚举为空）；运行期由 [intentFor] 按规则表收窄。 */
@@ -182,12 +171,14 @@ public object DeviceToolSpecs {
             string("mode", enum = NavMode.entries.map { it.id })
             string("map", enum = mapIds.takeIf { it.isNotEmpty() })
             string("page", enum = SettingsPage.entries.map { it.id })
+            string("uri")
+            integer("wait_ms", min = 0)
         }
 
     /** `tool.wait`：`ms` 或 `until` 条件二选一（同传时按 `ms` 固定等待）。 */
     public val wait: ToolSpec =
         toolSpec(name = "wait", descriptionPromptId = "tool.wait") {
-            integer("ms")
+            integer("ms", min = 0)
             obj("until") {
                 string("text_appears")
                 string("text_disappears")
@@ -235,10 +226,8 @@ public object DeviceToolSpecs {
             scrollNode,
             swipe,
             globalAction,
-            dismissPopup,
             restartApp,
             openApp,
-            openUri,
             intent,
             wait,
             listApps,

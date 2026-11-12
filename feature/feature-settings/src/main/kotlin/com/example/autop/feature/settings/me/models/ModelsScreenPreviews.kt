@@ -7,7 +7,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.autop.core.ui.preview.PreviewTheme
 import com.example.autop.llm.ModelProfile
-import com.example.autop.llm.ModelRoles
 import com.example.autop.llm.ProbeReport
 import com.example.autop.llm.ProbeResult
 import com.example.autop.llm.ProbeVerdict
@@ -46,22 +45,22 @@ internal fun ModelEditScreenDarkPreview() {
 
 private fun previewListState(): ModelsUiState =
     ModelsUiState(
-        profiles = listOf(previewProfile("p1", "主力模型"), previewProfile("p2", "轻量模型")),
-        roles = ModelRoles(main = "p1", vision = "p1", light = "p2"),
+        profiles = listOf(previewProfile("p1", "主力模型"), previewProfile("p2", "备用模型")),
+        defaultProfileId = "p1",
     )
 
 private fun previewEditState(): ModelsUiState =
     ModelsUiState(
         profiles = listOf(previewProfile("p1", "主力模型")),
-        roles = ModelRoles(main = "p1", vision = "p1", light = null),
+        defaultProfileId = "p1",
         probe =
             ProbeUiState(
+                visible = true,
                 running = false,
                 report =
                     ProbeReport(
                         text = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 1200),
                         tools = ProbeResult(verdict = ProbeVerdict.SUPPORTED, elapsedMs = 800),
-                        vision = ProbeResult(verdict = ProbeVerdict.UNSUPPORTED, elapsedMs = 300),
                     ),
             ),
     )

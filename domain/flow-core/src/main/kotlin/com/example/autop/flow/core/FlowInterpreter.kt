@@ -781,7 +781,6 @@ public class FlowInterpreter(
                 handoff.tools,
                 steps,
                 handoff.maxDurationMs,
-                handoff.role,
                 context,
             )
         // 智能体可能已经改变了屏幕：返回后必须重新观测，不能用交回前的缓存。

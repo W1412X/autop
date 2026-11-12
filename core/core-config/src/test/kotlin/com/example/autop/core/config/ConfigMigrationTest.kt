@@ -121,11 +121,12 @@ class ConfigMigrationTest {
                 put("agent", agentDoc(TOOLS_V5, SOURCES_V5))
             }
         val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
-        assertThat(enabledIds(migrated)).containsExactly("tool.open_uri", "tool.intent", "tool.wait").inOrder()
+        // v6 插入 tool.intent；继续迁移到 v7 时 tool.open_uri 被删除（tool_optimize D6）。
+        assertThat(enabledIds(migrated)).containsExactly("tool.intent", "tool.wait").inOrder()
         assertThat(sourceIds(migrated))
             .containsExactly("state.environment", "state.observe", "state.navigation", "state.budget")
             .inOrder()
-        assertThat(schemaVersionOf(migrated)).isEqualTo(6)
+        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
     }
 
     @Test
@@ -138,7 +139,8 @@ class ConfigMigrationTest {
                 put("agent", agentDoc(tools, sources))
             }
         val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
-        assertThat(enabledIds(migrated)).isEqualTo(tools)
+        // v7 删除 tool.open_uri（tool_optimize D6），其余顺序不变。
+        assertThat(enabledIds(migrated)).containsExactly("tool.intent", "tool.wait").inOrder()
         assertThat(sourceIds(migrated)).isEqualTo(sources)
     }
 
@@ -152,6 +154,136 @@ class ConfigMigrationTest {
         val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
         assertThat(enabledIds(migrated)).containsExactly("tool.wait")
         assertThat(resolvePath(migrated, "agent.state")).isNull()
+    }
+
+    @Test
+    fun `v7 removes deleted config paths and keeps the rest`() {
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 6)
+                put(
+                    "agent",
+                    buildJsonObject {
+                        put(
+                            "breaker",
+                            buildJsonObject {
+                                put("stuckWarn", 3)
+                                put("sameErrorWarn", 3)
+                            },
+                        )
+                    },
+                )
+                put(
+                    "device",
+                    buildJsonObject {
+                        put(
+                            "serializer",
+                            buildJsonObject {
+                                put("diffMaxRatio", 0.4)
+                                put("textMaxChars", -1)
+                            },
+                        )
+                    },
+                )
+                put(
+                    "flow",
+                    buildJsonObject {
+                        put("author", buildJsonObject { put("analysis", buildJsonObject { put("role", "main") }) })
+                    },
+                )
+            }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val breaker = resolvePath(migrated, "agent.breaker")!!.jsonObject
+        assertThat(breaker).doesNotContainKey("stuckWarn")
+        assertThat(breaker).containsKey("sameErrorWarn")
+        val serializer = resolvePath(migrated, "device.serializer")!!.jsonObject
+        assertThat(serializer).doesNotContainKey("diffMaxRatio")
+        assertThat(serializer).containsKey("textMaxChars")
+        assertThat(resolvePath(migrated, "flow.author.analysis.role")).isNull()
+        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+    }
+
+    @Test
+    fun `v7 removes removed tools from enabled keeping order`() {
+        val tools = listOf("tool.open_uri", "tool.tap", "tool.dismiss_popup", "tool.wait")
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 6)
+                put("agent", agentDoc(tools, null))
+            }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(enabledIds(migrated)).containsExactly("tool.tap", "tool.wait").inOrder()
+    }
+
+    @Test
+    fun `v7 removes dismiss_popup recovery from ladder`() {
+        val ladder = listOf("recovery.wait_stable", "recovery.dismiss_popup", "recovery.back_and_retry")
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 6)
+                put(
+                    "flow",
+                    buildJsonObject {
+                        put(
+                            "recovery",
+                            buildJsonObject {
+                                put("ladder", JsonArray(ladder.map { JsonPrimitive(it) }))
+                            },
+                        )
+                    },
+                )
+            }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migratedLadder = resolvePath(migrated, "flow.recovery.ladder") as JsonArray
+        assertThat(migratedLadder.map { it.jsonPrimitive.content })
+            .containsExactly("recovery.wait_stable", "recovery.back_and_retry")
+            .inOrder()
+    }
+
+    @Test
+    fun `v7 keeps docs with missing paths unchanged`() {
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 6)
+                put("device", buildJsonObject { put("capture", buildJsonObject { put("timeoutMs", 1500) }) })
+            }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(resolvePath(migrated, "device.capture.timeoutMs")).isEqualTo(JsonPrimitive(1500))
+        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+    }
+
+    @Test
+    fun `v1 doc migrates all the way to v7`() {
+        val doc =
+            buildJsonObject {
+                put("schemaVersion", 1)
+                put(
+                    "agent",
+                    buildJsonObject {
+                        put(
+                            "tools",
+                            buildJsonObject {
+                                put(
+                                    "enabled",
+                                    JsonArray(
+                                        listOf(
+                                            JsonPrimitive("tool.find_nodes"),
+                                            JsonPrimitive("tool.open_uri"),
+                                            JsonPrimitive("tool.dismiss_popup"),
+                                            JsonPrimitive("tool.tap"),
+                                        ),
+                                    ),
+                                )
+                            },
+                        )
+                    },
+                )
+                put("device", buildJsonObject { put("nodeAction", buildJsonObject { put("enabled", true) }) })
+            }
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+        // v5 会在 tool.tap 之后补 tool.tap_node；v6 在 tool.open_uri 后插入 tool.intent（随后 v7 删 open_uri）。
+        assertThat(enabledIds(migrated)).containsExactly("tool.intent", "tool.tap", "tool.tap_node").inOrder()
     }
 
     private fun agentDoc(

@@ -18,30 +18,20 @@ public data class SanitizeTarget(
     val profileId: String,
     /** 是否回传思考块：Anthropic 协议且本次请求开启思考，或 OpenAI 协议且 quirk `echoReasoning=true`。 */
     val keepThinking: Boolean,
-    /** 目标模型是否接受图片。 */
-    val vision: Boolean,
     /** Anthropic 协议要求思考块带签名/脱敏回传；OpenAI 回显不要求（WP6.7）。 */
     val requireThinkingSignature: Boolean = true,
 )
 
 /** 净化时插入的占位文字（来自模板，调用方渲染后传入）。 */
 public data class SanitizeTexts(
-    val imageUnsupported: String,
     val emptyToolResult: String,
 )
 
-private const val ID_IMAGE_UNSUPPORTED = "agent.history.image_unsupported"
 private const val ID_EMPTY_TOOL_RESULT = "agent.history.empty_tool_result"
 
-/** 从模板渲染净化占位文字（`agent.history.image_unsupported`、`agent.history.empty_tool_result`）。 */
+/** 从模板渲染净化占位文字（`agent.history.empty_tool_result`）。 */
 public fun sanitizeTextsOf(prompts: com.example.autop.core.prompt.PromptRepository): SanitizeTexts =
     SanitizeTexts(
-        imageUnsupported =
-            prompts
-                .render(ID_IMAGE_UNSUPPORTED, emptyMap())
-                .getOrNull()
-                ?.text
-                .orEmpty(),
         emptyToolResult =
             prompts
                 .render(ID_EMPTY_TOOL_RESULT, emptyMap())
@@ -72,7 +62,7 @@ public object HistorySanitizer {
         when (block) {
             is Block.Text -> if (block.text.isBlank()) emptyList() else listOf(block)
             is Block.Thinking -> if (keepThinking(block, msg, target)) listOf(block) else emptyList()
-            is Block.Image -> if (target.vision) listOf(block) else listOf(Block.Text(texts.imageUnsupported))
+            is Block.Image -> listOf(block)
             is Block.ToolCall -> listOf(validatedCall(block))
             is Block.ToolResult ->
                 listOf(

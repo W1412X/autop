@@ -41,7 +41,7 @@ import com.example.autop.feature.settings.R
 import com.example.autop.llm.ProbeResult
 import com.example.autop.llm.ProbeVerdict
 
-/** 保存后自动测试的结果对话框：配置已保存的提示 + 逐项结果 + 能力回填提示。 */
+/** 保存后自动测试的结果对话框：配置已保存的提示 + 连通结果。 */
 @Composable
 internal fun ProbeResultDialog(
     state: ModelsUiState,
@@ -95,7 +95,7 @@ internal fun ProbeResultDialog(
     }
 }
 
-/** 对话框正文：保存提示、运行中指示、三行结果（或请求级失败）、能力回填提示。 */
+/** 对话框正文：保存提示、运行中指示、连通结果（或请求级失败）。 */
 @Composable
 private fun ProbeDialogBody(
     probe: ProbeUiState,
@@ -116,7 +116,6 @@ private fun ProbeDialogBody(
         if (report != null) {
             ProbeRow(labelRes = R.string.model_probe_text, result = report.text, onShowDetail = onShowDetail)
             ProbeRow(labelRes = R.string.model_probe_tools, result = report.tools, onShowDetail = onShowDetail)
-            ProbeRow(labelRes = R.string.model_probe_vision, result = report.vision, onShowDetail = onShowDetail)
             Text(
                 text = stringResource(R.string.model_probe_hint),
                 modifier = Modifier.padding(top = spacing.xs),
@@ -167,7 +166,7 @@ private fun ProbeRunningRow() {
 
 private val PROBE_SPINNER_STROKE = 2.dp
 
-/** 结果行（docs/tech/08 §4.5："文本 ✓ 1.2s / 工具 ✓ / 图片 ✗ 原因"；失败行可点击查看详情）。 */
+/** 结果行：成功显示耗时；未确认或失败显示原因（失败行可点击查看详情）。 */
 @Composable
 private fun ProbeRow(
     labelRes: Int,

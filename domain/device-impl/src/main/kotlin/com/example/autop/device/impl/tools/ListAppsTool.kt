@@ -7,6 +7,7 @@ import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
+import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppLauncher
 import kotlinx.serialization.json.JsonObject
@@ -32,10 +33,10 @@ public class ListAppsTool
             ctx: ToolContext,
         ): ToolOutput {
             val requestedLimit = args.int("limit")
-            val limit = requestedLimit?.coerceAtLeast(1) ?: Int.MAX_VALUE
+            val limit = requestedLimit?.coerceAtLeast(1) ?: ctx.config[DeviceConfig.APPS].listLimit
+            val all = apps.listApps(args.str("query"))
             val lines =
-                apps
-                    .listApps(args.str("query"))
+                all
                     .take(limit)
                     .joinToString("\n") { "${it.label} ${it.packageName}" }
             // limit 被钳制时说明实际用了多少（WP7.10）。
@@ -53,11 +54,27 @@ public class ListAppsTool
                 } else {
                     ""
                 }
-            return textOutput(lines.ifEmpty { "没有匹配的应用" } + clampedNote)
+            val truncatedNote =
+                if (all.size > limit) {
+                    "\n" +
+                        prompts.text(
+                            PROMPT_TRUNCATED,
+                            mapOf(
+                                VAR_TOTAL to all.size.toString(),
+                                VAR_SHOWN to limit.toString(),
+                            ),
+                        )
+                } else {
+                    ""
+                }
+            return textOutput(lines.ifEmpty { "没有匹配的应用" } + clampedNote + truncatedNote)
         }
 
         private companion object {
             const val PROMPT_ARG_CLAMPED = "agent.tool.arg_clamped"
+            const val PROMPT_TRUNCATED = "device.list_apps.truncated"
+            const val VAR_TOTAL = "total"
+            const val VAR_SHOWN = "shown"
             const val ARG_LIMIT = "limit"
             const val VAR_NAME = "name"
             const val VAR_REQUESTED = "requested"

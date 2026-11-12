@@ -1,5 +1,5 @@
 /**
- * `model_profiles.json` 存储（docs/tech/03 §3）：模型配置与角色分配放在独立 DataStore 文件，
+ * `model_profiles.json` 存储（docs/tech/03 §3）：模型配置与默认模型放在独立 DataStore 文件，
  * 带 `schemaVersion`（数据格式硬性规则 4）。[ModelProfileStore] 端口在 llm-api，实现在本模块。
  */
 package com.example.autop.core.config.impl
@@ -10,18 +10,20 @@ import androidx.datastore.core.Serializer
 import com.example.autop.core.common.AutopJson
 import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.ModelProfileStore
-import com.example.autop.llm.ModelRoles
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.jsonObject
 import java.io.InputStream
 import java.io.OutputStream
 
-/** 文档 schemaVersion（写入时统一写当前版本）。 */
-public const val MODEL_PROFILES_SCHEMA_VERSION: Int = 1
+/** 文档 schemaVersion（写入时统一写当前版本）。v2 起只有一个默认模型（ADR-0024）。 */
+public const val MODEL_PROFILES_SCHEMA_VERSION: Int = 2
 
 /**
  * `model_profiles.json` 文档结构。
@@ -33,19 +35,33 @@ public const val MODEL_PROFILES_SCHEMA_VERSION: Int = 1
 public data class ModelProfilesDoc(
     @SerialName("schemaVersion") val schemaVersion: Int = MODEL_PROFILES_SCHEMA_VERSION,
     @SerialName("profiles") val profiles: List<ModelProfile> = emptyList(),
-    @SerialName("roles") val roles: ModelRoles = ModelRoles(),
+    @SerialName("defaultProfileId") val defaultProfileId: String? = null,
 )
+
+/**
+ * v1 文档（ADR-0024 之前）把默认模型放在 `roles.main` 里。读取时只取这一项迁移为
+ * `defaultProfileId`，视觉与轻量角色被丢弃。
+ */
+private const val LEGACY_ROLES_KEY = "roles"
+private const val LEGACY_MAIN_KEY = "main"
 
 /** [ModelProfilesDoc] 的文件型 DataStore 序列化器。 */
 public class ModelProfilesSerializer : Serializer<ModelProfilesDoc> {
     override val defaultValue: ModelProfilesDoc = ModelProfilesDoc()
 
     override suspend fun readFrom(input: InputStream): ModelProfilesDoc {
-        val doc =
+        val text = input.readBytes().decodeToString()
+        val root =
             try {
-                AutopJson.default.decodeFromString(ModelProfilesDoc.serializer(), input.readBytes().decodeToString())
+                AutopJson.default.parseToJsonElement(text).jsonObject
             } catch (e: SerializationException) {
                 throw CorruptionException("model_profiles.json is not valid JSON: ${e.message}", e)
+            }
+        val doc =
+            try {
+                AutopJson.default.decodeFromJsonElement(ModelProfilesDoc.serializer(), root)
+            } catch (e: SerializationException) {
+                throw CorruptionException("model_profiles.json has invalid content: ${e.message}", e)
             }
         // 更高版本的文档无迁移路径：按损坏处理（回退空文档），不猜测语义。
         if (doc.schemaVersion > MODEL_PROFILES_SCHEMA_VERSION) {
@@ -53,8 +69,18 @@ public class ModelProfilesSerializer : Serializer<ModelProfilesDoc> {
                 "model_profiles.json schemaVersion=${doc.schemaVersion} > $MODEL_PROFILES_SCHEMA_VERSION",
             )
         }
-        return doc.copy(schemaVersion = MODEL_PROFILES_SCHEMA_VERSION)
+        return doc.copy(
+            schemaVersion = MODEL_PROFILES_SCHEMA_VERSION,
+            defaultProfileId = doc.defaultProfileId ?: legacyMainOf(root),
+        )
     }
+
+    private fun legacyMainOf(root: JsonObject): String? =
+        (root[LEGACY_ROLES_KEY] as? JsonObject)
+            ?.get(LEGACY_MAIN_KEY)
+            ?.let { it as? JsonPrimitive }
+            ?.takeIf { it.isString }
+            ?.content
 
     override suspend fun writeTo(
         t: ModelProfilesDoc,
@@ -71,7 +97,7 @@ internal class DataStoreModelProfileStore(
 ) : ModelProfileStore {
     override val profiles: Flow<List<ModelProfile>> = dataStore.data.map { it.profiles }
 
-    override val roles: Flow<ModelRoles> = dataStore.data.map { it.roles }
+    override val defaultProfileId: Flow<String?> = dataStore.data.map { it.defaultProfileId }
 
     override suspend fun get(id: String): ModelProfile? =
         dataStore.data
@@ -95,20 +121,12 @@ internal class DataStoreModelProfileStore(
         dataStore.updateData { doc ->
             doc.copy(
                 profiles = doc.profiles.filterNot { it.id == id },
-                roles = doc.roles.clearIf(id),
+                defaultProfileId = doc.defaultProfileId.takeIf { it != id },
             )
         }
     }
 
-    override suspend fun setRoles(roles: ModelRoles) {
-        dataStore.updateData { it.copy(roles = roles) }
+    override suspend fun setDefaultProfileId(id: String?) {
+        dataStore.updateData { it.copy(defaultProfileId = id) }
     }
 }
-
-/** 删除 profile 时同步清掉指向它的角色分配，避免残留悬空引用。 */
-private fun ModelRoles.clearIf(id: String): ModelRoles =
-    ModelRoles(
-        main = main?.takeIf { it != id },
-        vision = vision?.takeIf { it != id },
-        light = light?.takeIf { it != id },
-    )

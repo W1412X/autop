@@ -17,7 +17,6 @@ import com.example.autop.device.AppLauncher
 import com.example.autop.llm.Block
 import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.LlmRequest
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.ToolChoice
@@ -130,13 +129,9 @@ public class ExperienceExtractorImpl(
     /** 单轮轻量补全（LIGHT 优先、MAIN 兜底），返回拼接文本。 */
     private suspend fun completeText(userText: String): Outcome<String> {
         val llm =
-            when (val light = gateway.forRole(ModelRole.LIGHT)) {
-                is Outcome.Ok -> light.value
-                is Outcome.Err ->
-                    when (val main = gateway.forRole(ModelRole.MAIN)) {
-                        is Outcome.Ok -> main.value
-                        is Outcome.Err -> return Outcome.Err(main.error)
-                    }
+            when (val got = gateway.forDefault()) {
+                is Outcome.Ok -> got.value
+                is Outcome.Err -> return Outcome.Err(got.error)
             }
         val request =
             LlmRequest(

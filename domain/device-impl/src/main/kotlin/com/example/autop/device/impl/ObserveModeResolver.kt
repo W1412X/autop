@@ -1,10 +1,10 @@
 /**
  * 观测模式可用性（docs/design/observation-modes-coordinate-actions §2.1、§2.3）：
  * 生效模式 = `device.observe.priority` 中已启用且当前可用的模式，保持优先级顺序。
+ * 仅两种模式：无障碍（a11y）与端侧视觉（visual）。截图由主模型直接查看（ADR-0024）。
  */
 package com.example.autop.device.impl
 
-import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.DeviceObserveSection
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.ObserveMode
@@ -13,8 +13,6 @@ import com.example.autop.device.VisualScreenParser
 import com.example.autop.device.impl.tools.text
 import com.example.autop.device.impl.vision.VisualAvailability
 import com.example.autop.device.impl.vision.VisualUnavailable
-import com.example.autop.llm.LlmGateway
-import com.example.autop.llm.ModelRole
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -25,7 +23,6 @@ public class ObserveModeResolver
     constructor(
         private val holder: ServiceHolder,
         private val visual: VisualScreenParser,
-        private val gateway: LlmGateway,
         private val prompts: PromptRepository,
     ) : ObserveModeAvailability {
         /** 当前生效的模式列表（按配置优先级排序）。 */
@@ -62,7 +59,6 @@ public class ObserveModeResolver
                 ObserveMode.A11Y ->
                     if (holder.current() == null) "无障碍服务未连接" else null
                 ObserveMode.VISUAL -> visualReason()
-                ObserveMode.LLM -> llmReason()
             }
 
         /**
@@ -76,18 +72,6 @@ public class ObserveModeResolver
                 null, VisualUnavailable.NotReady -> prompts.text(PROMPT_VISUAL_NOT_READY)
             }
         }
-
-        /** llm 模式要求 VISION 角色已分配且模型声明支持图片（§4.1）。 */
-        private fun llmReason(): String? =
-            when (val got = gateway.forRole(ModelRole.VISION)) {
-                is Outcome.Err -> "未在模型配置中设置视觉模型"
-                is Outcome.Ok ->
-                    if (got.value.profile.capabilities.vision) {
-                        null
-                    } else {
-                        "所选视觉模型不支持图片"
-                    }
-            }
 
         private companion object {
             const val REASON_DISABLED: String = "该模式已在设置中关闭"

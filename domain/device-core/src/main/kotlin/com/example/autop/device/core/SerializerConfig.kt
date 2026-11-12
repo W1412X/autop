@@ -22,8 +22,6 @@ public data class SerializerConfig(
      * （与截图裁剪同开关，保持图与树一致）。
      */
     val hideSystemDecoration: Boolean,
-    /** 差量比例超过此值改发完整观测。 */
-    val diffMaxRatio: Double,
     /** 可交互节点少于此值且命中贫乏类名 → 语义贫乏。 */
     val semanticPoorMinInteractive: Int,
     /** 贫乏类名节点面积占屏幕比例阈值。 */

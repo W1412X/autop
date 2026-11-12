@@ -16,6 +16,9 @@ public object OpenAiQuirkKeys {
     public const val CONTEXT_EXCEEDED_PATTERNS: String = "contextExceededPatterns"
     public const val CONTEXT_EXCEEDED_STATUS: String = "contextExceededStatus"
     public const val IMAGE_MAX_EDGE: String = "imageMaxEdge"
+
+    /** 流式请求是否带 `stream_options.include_usage`；默认开，个别兼容服务不认该字段时设为 `"false"`。 */
+    public const val STREAM_USAGE: String = "streamUsage"
 }
 
 /** 未配置 quirk 时的兜底（来自配置 `llm.errors` / `llm.image`）。 */

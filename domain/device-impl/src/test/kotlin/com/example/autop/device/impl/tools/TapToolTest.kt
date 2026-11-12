@@ -39,8 +39,9 @@ class TapToolTest {
             assertThat(env.gestures.taps).hasSize(1)
             assertThat(env.gestures.nodeActions).isEmpty()
             val text = out.content.joinToString("\n") { it.toString() }
-            assertThat(text).contains("执行：坐标手势")
-            assertThat(text).doesNotContain("无障碍节点动作")
+            val seen = text + out.trace.joinToString(" ")
+            assertThat(seen).contains("执行：坐标手势")
+            assertThat(seen).doesNotContain("无障碍节点动作")
         }
 
     @Test

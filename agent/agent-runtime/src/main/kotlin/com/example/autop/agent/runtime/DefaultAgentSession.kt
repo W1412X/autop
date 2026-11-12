@@ -44,7 +44,6 @@ internal class DefaultAgentSession(
         RouterBuilder(
             tools = extensions.tools,
             enrichers = extensions.enrichers,
-            llm = services.llm,
             prompts = services.prompts,
             clock = services.clock,
             policy = ports.policy,
@@ -135,8 +134,7 @@ internal class DefaultAgentSession(
     ): RunFinished {
         val estimator = TokenEstimator(request.config[AgentConfig.TOKENS])
         val notes = RunNotes(controller.toolStore, services.prompts, estimator::estimateText)
-        val modelVision = routerBuilder.modelVisionOf(request)
-        val routerBuild = routerBuilder.build(request, request.toolFilter, modelVision)
+        val routerBuild = routerBuilder.build(request, request.toolFilter)
         val budget = Budget(request.config[AgentConfig.BUDGET], services.clock)
         val state =
             RuntimeStateTracker(
@@ -178,7 +176,6 @@ internal class DefaultAgentSession(
                         assembler = ContextAssembler(extensions.contributors),
                         router = routerBuild.router,
                         engines = engines,
-                        modelVision = modelVision,
                     ),
             )
         return loop.run()

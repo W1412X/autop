@@ -5,7 +5,6 @@ package com.example.autop.device.core
 
 import com.example.autop.device.Point
 import com.example.autop.device.Rect
-import com.example.autop.llm.CoordSpace
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 

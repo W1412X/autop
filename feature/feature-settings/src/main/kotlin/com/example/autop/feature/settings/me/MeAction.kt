@@ -87,6 +87,11 @@ public sealed interface MeAction {
         val enabled: Boolean,
     ) : MeAction
 
+    /** 动作后等待秒数（写 `device.action.delayMs` 毫秒，tool_optimize 03 §5.1）。 */
+    public data class SetActionDelay(
+        val seconds: Int,
+    ) : MeAction
+
     /** 默认稍后分钟数（`task.reminder.snoozeMinutes`，docs/tech/07 §4.4）。 */
     public data class SetSnoozeMinutes(
         val value: Int,

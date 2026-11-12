@@ -103,7 +103,7 @@ internal fun completedEvent(): LlmStreamEvent.Completed =
         usage = null,
     )
 
-/** 一次调用 echo 工具的 [LlmStreamEvent.Completed]（tools 探测判定用，WP6.10）。 */
+/** 一次调用 echo 工具的 [LlmStreamEvent.Completed]（工具调用探测判定用）。 */
 internal fun echoToolCompletedEvent(): LlmStreamEvent.Completed =
     LlmStreamEvent.Completed(
         message = Msg(role = Role.ASSISTANT, blocks = listOf(Block.ToolCall("call_probe", "echo", "{}"))),
@@ -116,6 +116,3 @@ internal fun <T> Outcome<T>.unwrap(): T = (this as Outcome.Ok<T>).value
 
 /** 取出错误（测试断言辅助）。 */
 internal fun <T> Outcome<T>.unwrapError(): AppError = (this as Outcome.Err).error
-
-/** PNG 8 字节签名（测试断言辅助）。 */
-internal fun pngSignature(): ByteArray = byteArrayOf(0x89.toByte(), 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)

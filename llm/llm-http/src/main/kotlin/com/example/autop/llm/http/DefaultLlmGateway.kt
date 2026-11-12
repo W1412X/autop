@@ -17,8 +17,6 @@ import com.example.autop.llm.LlmProviderFactory
 import com.example.autop.llm.LlmRequestLog
 import com.example.autop.llm.ModelProfile
 import com.example.autop.llm.ModelProfileStore
-import com.example.autop.llm.ModelRole
-import com.example.autop.llm.ModelRoles
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.combine
@@ -38,48 +36,36 @@ public class DefaultLlmGateway
     ) : LlmGateway {
         private val scope = CoroutineScope(SupervisorJob() + dispatchers.io + logger.exceptionHandler("LlmGateway"))
         private val lock = Any()
-        private var profiles: Map<String, ModelProfile>? = null
-        private var roles: ModelRoles = ModelRoles()
+        private var state: State? = null
         private val cache = mutableMapOf<String, LlmProvider>()
 
         init {
             scope.launch {
-                combine(store.profiles, store.roles) { list, newRoles -> list to newRoles }
-                    .collect { (list, newRoles) ->
+                combine(store.profiles, store.defaultProfileId) { list, defaultId -> State.of(list, defaultId) }
+                    .collect { newState ->
                         synchronized(lock) {
-                            profiles = list.associateBy { it.id }
-                            roles = newRoles
+                            state = newState
                             cache.clear()
                         }
                     }
             }
         }
 
-        override fun forRole(role: ModelRole): Outcome<LlmProvider> {
-            val state = ensureLoaded()
+        override fun forDefault(): Outcome<LlmProvider> {
+            val current = ensureLoaded()
             val profileId =
-                when (role) {
-                    ModelRole.MAIN -> state.roles.main
-                    ModelRole.VISION -> state.roles.vision
-                    ModelRole.LIGHT -> state.roles.light
-                }
-            return if (profileId == null) {
-                Outcome.Err(
-                    AppError(code = LlmErrorCodes.NOT_CONFIGURED, message = "no model assigned to role $role"),
-                )
-            } else {
-                providerFor(profileId, state.profiles)
-            }
+                current.defaultId
+                    ?: return Outcome.Err(AppError(code = LlmErrorCodes.NOT_CONFIGURED, message = "no default model"))
+            return providerFor(profileId, current)
         }
 
-        override fun forProfile(profileId: String): Outcome<LlmProvider> =
-            providerFor(profileId, ensureLoaded().profiles)
+        override fun forProfile(profileId: String): Outcome<LlmProvider> = providerFor(profileId, ensureLoaded())
 
         private fun providerFor(
             profileId: String,
-            profiles: Map<String, ModelProfile>,
+            current: State,
         ): Outcome<LlmProvider> {
-            val profile = profiles[profileId]
+            val profile = current.profiles[profileId]
             return if (profile == null) {
                 Outcome.Err(
                     AppError(code = LlmErrorCodes.NOT_CONFIGURED, message = "model profile not found: $profileId"),
@@ -117,23 +103,22 @@ public class DefaultLlmGateway
          */
         private fun ensureLoaded(): State =
             synchronized(lock) {
-                val current = profiles
-                if (current != null) {
-                    State(current, roles)
-                } else {
-                    val loaded =
-                        runBlocking {
-                            combine(store.profiles, store.roles) { list, newRoles -> list to newRoles }.first()
-                        }
-                    val loadedProfiles = loaded.first.associateBy { it.id }
-                    profiles = loadedProfiles
-                    roles = loaded.second
-                    State(loadedProfiles, loaded.second)
-                }
+                state ?: runBlocking {
+                    combine(store.profiles, store.defaultProfileId) { list, defaultId ->
+                        State.of(list, defaultId)
+                    }.first()
+                }.also { state = it }
             }
 
-        private data class State(
+        private class State(
             val profiles: Map<String, ModelProfile>,
-            val roles: ModelRoles,
-        )
+            val defaultId: String?,
+        ) {
+            companion object {
+                fun of(
+                    list: List<ModelProfile>,
+                    defaultId: String?,
+                ): State = State(list.associateBy { it.id }, defaultId)
+            }
+        }
     }

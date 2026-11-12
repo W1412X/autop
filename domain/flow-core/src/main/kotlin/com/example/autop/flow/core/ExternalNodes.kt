@@ -219,7 +219,6 @@ internal class ExternalNodes(
     ): LlmCall =
         LlmCall(
             nodeId = node.id,
-            role = node.role,
             system = system,
             prompt = prompt,
             images = images,
@@ -307,7 +306,6 @@ internal class ExternalNodes(
                 node.tools,
                 node.maxSteps ?: env.agentCfg.maxSteps,
                 node.maxDurationMs,
-                node.role,
             )
         env.screens.markDirty(action = true)
         val input = JsonPrimitive(goal)

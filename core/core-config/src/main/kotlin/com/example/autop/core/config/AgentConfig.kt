@@ -34,7 +34,8 @@ public data class AgentContextSection(
 @Serializable
 public data class AgentToolsSection(
     @SerialName("enabled") val enabled: List<String> = DEFAULT_ENABLED,
-    @SerialName("defaultTimeoutMs") val defaultTimeoutMs: Long = 30000,
+    /** 默认工具超时；需覆盖"动作 + 最长等待（device.action.maxDelayMs，默认 30000）"，故为 60000。 */
+    @SerialName("defaultTimeoutMs") val defaultTimeoutMs: Long = 60000,
     @SerialName("timeoutMs") val timeoutMs: Map<String, Long> = DEFAULT_TIMEOUT_MS,
 ) : ConfigSection {
     public companion object {
@@ -50,10 +51,8 @@ public data class AgentToolsSection(
                 "tool.swipe",
                 "tool.global_action",
                 "tool.open_app",
-                "tool.open_uri",
                 "tool.intent",
                 "tool.wait",
-                "tool.dismiss_popup",
                 "tool.restart_app",
                 "tool.list_apps",
                 "tool.read_notifications",
@@ -109,8 +108,8 @@ public data class AgentHistorySection(
     /** `agent.history.observation`：观测降级。 */
     @Serializable
     public data class Observation(
-        /** 保留原文的观测个数；≤0 不降级（N209）。 */
-        @SerialName("keepFull") val keepFull: Int = -1,
+        /** 保留原文的观测个数（默认保留本次与上次）；≤0 不降级（tool_optimize D11）。 */
+        @SerialName("keepFull") val keepFull: Int = 2,
     )
 
     /** `agent.history.image`：图片保留。 */
@@ -187,15 +186,11 @@ public data class AgentBudgetSection(
         )
 }
 
-/** `agent.breaker`：熔断阈值。 */
+/** `agent.breaker`：熔断阈值（tool_optimize D9：只保留同错误）。 */
 @Serializable
 public data class AgentBreakerSection(
     @SerialName("sameErrorWarn") val sameErrorWarn: Int = 3,
     @SerialName("sameErrorStop") val sameErrorStop: Int = 5,
-    @SerialName("stuckWarn") val stuckWarn: Int = 3,
-    @SerialName("stuckStop") val stuckStop: Int = 6,
-    @SerialName("repeatWarn") val repeatWarn: Int = 3,
-    @SerialName("repeatStop") val repeatStop: Int = 5,
 ) : ConfigSection {
     override fun validate(): List<String> =
         buildList {
@@ -203,10 +198,6 @@ public data class AgentBreakerSection(
             if (sameErrorWarn >= sameErrorStop) {
                 add("sameErrorWarn must be < sameErrorStop, was $sameErrorWarn >= $sameErrorStop")
             }
-            if (stuckWarn < 1) add("stuckWarn must be >= 1, was $stuckWarn")
-            if (stuckWarn >= stuckStop) add("stuckWarn must be < stuckStop, was $stuckWarn >= $stuckStop")
-            if (repeatWarn < 1) add("repeatWarn must be >= 1, was $repeatWarn")
-            if (repeatWarn >= repeatStop) add("repeatWarn must be < repeatStop, was $repeatWarn >= $repeatStop")
         }
 }
 

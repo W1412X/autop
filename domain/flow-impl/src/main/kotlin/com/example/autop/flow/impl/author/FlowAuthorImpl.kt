@@ -41,7 +41,6 @@ import com.example.autop.flow.core.contract.IssueLevel
 import com.example.autop.flow.core.expr.ExprFunctions
 import com.example.autop.flow.impl.db.FlowDraftEntity
 import com.example.autop.flow.impl.db.FlowsDb
-import com.example.autop.flow.impl.ports.roleOf
 import com.example.autop.flow.impl.service.FlowRevisionService
 import com.example.autop.llm.Block
 import com.example.autop.llm.LlmException
@@ -49,7 +48,6 @@ import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.LlmRequest
 import com.example.autop.llm.LlmStreamEvent
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.SystemPart
@@ -240,7 +238,7 @@ internal class FlowAuthorSessionImpl(
         _state.update { it.copy(busy = true) }
         conversation += userMsg(analysisContext(request))
         try {
-            loop(cfg.maxTurns, roleOf(cfg.role) ?: ModelRole.MAIN, ANALYSIS_SYSTEM)
+            loop(cfg.maxTurns, ANALYSIS_SYSTEM)
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
@@ -303,16 +301,15 @@ internal class FlowAuthorSessionImpl(
 
     private suspend fun loop() {
         val config = d.configProvider.current()
-        loop(config[FlowConfig.AUTHOR].maxTurns, ModelRole.MAIN, SYSTEM)
+        loop(config[FlowConfig.AUTHOR].maxTurns, SYSTEM)
     }
 
     private suspend fun loop(
         maxTurns: Int,
-        role: ModelRole,
         systemId: String,
     ) {
         val config = d.configProvider.current()
-        val provider = (resolveProvider(role) as? Outcome.Ok)?.value
+        val provider = (resolveProvider() as? Outcome.Ok)?.value
         if (provider == null) {
             _state.update { it.copy(errorCode = FlowErrorCodes.LLM_UNAVAILABLE) }
             return
@@ -328,15 +325,14 @@ internal class FlowAuthorSessionImpl(
         _state.update { it.copy(errorCode = ERROR_TOO_LONG) }
     }
 
-    /** 与智能体主循环同一套协议装配（docs/tech/04 §3.8）：能力判定、JSON 回退与请求组装。 */
+    /** 与智能体主循环同一套协议装配（docs/tech/04 §3.8）：原生 tools 与请求组装（ADR-0024）。 */
     private fun pipeline(
         provider: LlmProvider,
         config: ConfigSnapshot,
         systemId: String = SYSTEM,
     ): AuthorPipeline {
+        // 工具能力为 false 时走 JSON 文本回退（ADR-0024），否则原生 tools。
         val nativeTools = provider.profile.capabilities.tools
-        // 模型不支持原生 tools 时不发 tools、改走 JSON 回退；否则模型会把 <tool_call> XML
-        // 当正文返回，调用被当成普通消息展示。
         val resolver =
             FallbackMode(
                 prompts = d.prompts,
@@ -579,9 +575,9 @@ internal class FlowAuthorSessionImpl(
         vars: Map<String, String>,
     ): String = (d.prompts.render(id, vars) as? Outcome.Ok)?.value?.text.orEmpty()
 
-    /** 会话级模型覆盖优先，否则取角色默认（ADR-0022）。 */
-    private fun resolveProvider(role: ModelRole): Outcome<LlmProvider> =
-        activeModelProfileId?.let { d.gateway.forProfile(it) } ?: d.gateway.forRole(role)
+    /** 会话级模型覆盖优先，否则取默认模型（ADR-0022）。 */
+    private fun resolveProvider(): Outcome<LlmProvider> =
+        activeModelProfileId?.let { d.gateway.forProfile(it) } ?: d.gateway.forDefault()
 
     private suspend fun persist() {
         // REPLACE upsert 会整行覆盖：草稿自带的 reason（工具生成的修订来由）要保留到确认生效。

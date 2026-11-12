@@ -14,7 +14,6 @@ import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.LlmRequest
 import com.example.autop.llm.LlmStreamEvent
 import com.example.autop.llm.ModelProfile
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.StopReason
@@ -128,7 +127,7 @@ public class FakeLlmProvider(
 public class FakeLlmGateway(
     private val text: String,
 ) : LlmGateway {
-    override fun forRole(role: ModelRole): Outcome<LlmProvider> = Outcome.Ok(FakeLlmProvider(text))
+    override fun forDefault(): Outcome<LlmProvider> = Outcome.Ok(FakeLlmProvider(text))
 
     override fun forProfile(profileId: String): Outcome<LlmProvider> = Outcome.Ok(FakeLlmProvider(text))
 }

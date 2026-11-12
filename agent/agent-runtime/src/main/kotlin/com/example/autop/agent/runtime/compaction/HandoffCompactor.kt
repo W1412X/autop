@@ -18,7 +18,6 @@ import com.example.autop.llm.LlmErrorCodes
 import com.example.autop.llm.LlmGateway
 import com.example.autop.llm.LlmProvider
 import com.example.autop.llm.LlmRequest
-import com.example.autop.llm.ModelRole
 import com.example.autop.llm.Msg
 import com.example.autop.llm.Role
 import com.example.autop.llm.ToolChoice
@@ -35,8 +34,7 @@ internal class HandoffCompactor(
 
     override suspend fun compact(input: CompactionInput): Outcome<CompactionResult> {
         val provider =
-            llm.forRole(ModelRole.LIGHT).getOrNull()
-                ?: llm.forRole(ModelRole.MAIN).getOrNull()
+            llm.forDefault().getOrNull()
                 ?: return Outcome.Err(
                     AppError(code = LlmErrorCodes.NOT_CONFIGURED, message = "no model for compaction"),
                 )

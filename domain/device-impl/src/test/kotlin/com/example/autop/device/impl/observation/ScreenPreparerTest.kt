@@ -19,7 +19,6 @@ import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
-import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NodeFlags
 import com.example.autop.device.NodeSnapshot
@@ -46,15 +45,9 @@ import com.example.autop.device.impl.SnapshotCapturer
 import com.example.autop.device.impl.SnapshotSerializer
 import com.example.autop.device.impl.WindowRedactor
 import com.example.autop.device.impl.deviceHistory
-import com.example.autop.device.impl.vision.llm.LlmScreenParser
-import com.example.autop.llm.LlmErrorCodes
-import com.example.autop.llm.LlmGateway
-import com.example.autop.llm.LlmProvider
-import com.example.autop.llm.ModelRole
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -83,7 +76,7 @@ class ScreenPreparerTest {
             val reader = FakeReader(Outcome.Err(secure))
             val preparer = fixture(reader, FakeVisual())
 
-            val got = preparer.prepare(ctx(), ObserveMode.VISUAL, null, listOf(ObserveMode.VISUAL))
+            val got = preparer.prepare(ctx(), ObserveMode.VISUAL, listOf(ObserveMode.VISUAL))
 
             check(got is Outcome.Err)
             assertThat(got.error.code).isEqualTo(DeviceErrorCodes.SCREENSHOT_SECURE)
@@ -97,7 +90,7 @@ class ScreenPreparerTest {
                 FakeReader(Outcome.Ok(Screenshot(width = 1, height = 1, jpegBytes = ByteArray(0), handle = Any())))
             val preparer = fixture(reader, FakeVisual(boom = IllegalStateException("boom")))
 
-            val got = preparer.prepare(ctx(), ObserveMode.VISUAL, null, listOf(ObserveMode.VISUAL))
+            val got = preparer.prepare(ctx(), ObserveMode.VISUAL, listOf(ObserveMode.VISUAL))
 
             check(got is Outcome.Err)
             assertThat(got.error.code).isEqualTo(DeviceErrorCodes.VISUAL_PARSE_FAILED)
@@ -113,7 +106,7 @@ class ScreenPreparerTest {
             val snap = a11ySnapshot(activity = "com.example.app.MainActivity")
 
             reader.snap = Outcome.Ok(snap)
-            val first = preparer.prepare(ctx, ObserveMode.A11Y, null, listOf(ObserveMode.A11Y))
+            val first = preparer.prepare(ctx, ObserveMode.A11Y, listOf(ObserveMode.A11Y))
             check(first is Outcome.Ok)
             val firstModel = first.value.serialized.model
             val firstIds = firstModel.flatten().map { it.id }
@@ -121,7 +114,7 @@ class ScreenPreparerTest {
 
             // 记录上次观测后再次观测（内容不变）：id 沿用。
             record(ctx, first.value, snap)
-            val second = preparer.prepare(ctx, ObserveMode.A11Y, null, listOf(ObserveMode.A11Y))
+            val second = preparer.prepare(ctx, ObserveMode.A11Y, listOf(ObserveMode.A11Y))
             check(second is Outcome.Ok)
             val secondModel = second.value.serialized.model
             val secondIds = secondModel.flatten().map { it.id }
@@ -130,7 +123,7 @@ class ScreenPreparerTest {
             // 换页后不配对：全新 id（计数器继续走，不复用）。
             record(ctx, second.value, snap)
             reader.snap = Outcome.Ok(a11ySnapshot(activity = "com.example.app.OtherActivity"))
-            val third = preparer.prepare(ctx, ObserveMode.A11Y, null, listOf(ObserveMode.A11Y))
+            val third = preparer.prepare(ctx, ObserveMode.A11Y, listOf(ObserveMode.A11Y))
             check(third is Outcome.Ok)
             val thirdModel = third.value.serialized.model
             val thirdIds = thirdModel.flatten().map { it.id }
@@ -225,17 +218,7 @@ class ScreenPreparerTest {
                 prompts = prompts,
                 context = context,
             )
-        val llm =
-            LlmScreenParser(
-                context = context,
-                gateway = NoVisionGateway,
-                prompts = prompts,
-                rules = rules,
-                configProvider = provider,
-                dispatchers = TestDispatcherProvider(StandardTestDispatcher()),
-                clock = FakeClock(0L),
-            )
-        return ScreenPreparer(reader, capturer, contentAreas, visual, llm, serializer)
+        return ScreenPreparer(reader, capturer, contentAreas, visual, serializer)
     }
 
     private fun service(): AutopAccessibilityService =
@@ -266,14 +249,6 @@ class ScreenPreparerTest {
         }
 
         override suspend fun warmUp() = Unit
-    }
-
-    private object NoVisionGateway : LlmGateway {
-        override fun forRole(role: ModelRole): Outcome<LlmProvider> =
-            Outcome.Err(AppError(LlmErrorCodes.NOT_CONFIGURED, "no vision model"))
-
-        override fun forProfile(profileId: String): Outcome<LlmProvider> =
-            Outcome.Err(AppError(LlmErrorCodes.NOT_CONFIGURED, "no vision model"))
     }
 
     private object NoRedaction : WindowRedactor {

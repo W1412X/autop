@@ -7,6 +7,7 @@
  */
 package com.example.autop.agent.runtime.tools
 
+import com.example.autop.agent.AgentErrorCodes
 import com.example.autop.agent.RunScopedValues
 import com.example.autop.agent.ScreenActionTool
 import com.example.autop.agent.ThreadStore
@@ -28,6 +29,7 @@ import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.runCatchingCancellable
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.ConfigSnapshot
+import com.example.autop.core.config.UiConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.Block
 import kotlinx.serialization.json.Json
@@ -77,6 +79,19 @@ public class ToolProber(
         toolName: String,
         argsJson: String?,
     ): ToolProbeResult {
+        // 纵深防御（tool_optimize D20）：调试开关关闭时自测一律拒绝，避免其他入口绕过界面门控。
+        if (!config.current()[UiConfig.DEBUG].verboseLogging) {
+            return record(
+                ToolProbeResult(
+                    toolName = toolName,
+                    args = argsJson.orEmpty(),
+                    ok = false,
+                    durationMs = 0,
+                    summary = "错误 ${AgentErrorCodes.PROBE_DISABLED}: 调试模式关闭，工具自测已禁用",
+                    atMillis = clock.nowMillis(),
+                ),
+            )
+        }
         val tool = byName[toolName]
         if (tool == null) {
             return record(
@@ -168,14 +183,15 @@ public class ToolProber(
                 .mapNotNull { it.jsonPrimitive.contentOrNull }
                 .toSet()
         val meta = runCatching { prompts.get(tool.spec.descriptionPromptId).meta }.getOrDefault(emptyMap())
-        val fixture = fixtureFor(tool.spec.name)
+        // 参数示例合并全部示例 fixture（含 kind=uri 等附加示例，tool_optimize D20）。
+        val examples = ToolProbeFixtures.examplesFor(tool.spec.name)
         return props.map { (name, schema) ->
             paramOf(
                 name = name,
                 schema = schema.jsonObject,
                 required = name in requiredKeys,
                 doc = meta["param.$name"].orEmpty(),
-                example = fixture[name],
+                example = examples.firstNotNullOfOrNull { it[name] },
             )
         }
     }
@@ -213,7 +229,11 @@ public class ToolProber(
     }
 }
 
-/** 输出摘要：错误优先，其次文本/结构化数据；附控制指令标记（完整保留，展示端折叠；N207）。 */
+/**
+ * 输出摘要：错误优先，其次文本/结构化数据；附控制指令标记（完整保留，展示端折叠；N207）。
+ * `trace` 逐行追加在末尾（tool_optimize D20）：runTool 不经 ToolExecutor 的渲染，
+ * 执行记录要自己拼进结果文字，失败时同样追加，自测面板才看得到执行过程。
+ */
 private fun probeSummaryOf(output: ToolOutput): String {
     val error = output.error
     val text = output.content.filterIsInstance<Block.Text>().joinToString("\n") { it.text }
@@ -225,7 +245,8 @@ private fun probeSummaryOf(output: ToolOutput): String {
             else -> "(无文本输出)"
         }
     val control = output.control?.let { " [控制指令 ${it::class.simpleName}]" }.orEmpty()
-    return head + control
+    val trace = output.trace.joinToString("\n")
+    return head + control + if (trace.isEmpty()) "" else "\n" + trace
 }
 
 /** 提取附图（N208）：调试图/截图等 Block.Image 从输出内容抽出，给面板/记录页点选查看。 */
@@ -323,7 +344,7 @@ private class ProbeRunScope : RunScopedValues {
 
 /**
  * 会真实操作屏幕的工具名（UI 标注 + 执行时面板让路）。
- * restart_app 会重启应用、dismiss_popup 会点击弹窗按钮；clipboard_set 只写剪贴板不碰屏幕。
+ * restart_app 会重启应用；clipboard_set 只写剪贴板不碰屏幕。
  */
 private val ACTS_ON_SCREEN: Set<String> =
     setOf(
@@ -335,8 +356,6 @@ private val ACTS_ON_SCREEN: Set<String> =
         "swipe",
         "global_action",
         "open_app",
-        "open_uri",
         "intent",
         "restart_app",
-        "dismiss_popup",
     )

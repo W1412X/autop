@@ -79,8 +79,12 @@ public class OpenAiProvider(
             val quirks = OpenAiQuirks.of(profile, context.quirksDefaults)
             val body =
                 context.mapper
-                    .mapChatRequest(request, quirks, profile.model, profile.capabilities.streamUsage)
-                    .toString()
+                    .mapChatRequest(
+                        request,
+                        quirks,
+                        profile.model,
+                        profile.quirks[OpenAiQuirkKeys.STREAM_USAGE] != "false",
+                    ).toString()
             val handle = openStream(body, quirks)
             parseStream(handle, quirks).collect { emit(it) }
         }

@@ -2,6 +2,9 @@ package com.example.autop.device.impl.tools
 
 import android.app.Application
 import android.content.Intent
+import android.content.pm.ActivityInfo
+import android.content.pm.ResolveInfo
+import android.net.Uri
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.AppError
@@ -112,6 +115,65 @@ class IntentToolTest {
         env.queue(screen)
     }
 
+    @Test
+    fun `uri kind opens the link with the resolved handler`() =
+        runTest {
+            val env = ToolTestEnv()
+            registerBrowser()
+            queueTwoSnapshots(env)
+
+            val out =
+                perform(tool(env, FakeNavigationApps()), """{"kind":"uri","uri":"https://example.com"}""", env.ctx())
+
+            assertThat(out.ok).isTrue()
+            val started: Intent = shadowOf(app).nextStartedActivity
+            assertThat(started.action).isEqualTo(Intent.ACTION_VIEW)
+            assertThat(started.dataString).isEqualTo("https://example.com")
+        }
+
+    @Test
+    fun `uri without a handler reports no handler`() =
+        runTest {
+            val env = ToolTestEnv()
+            queueTwoSnapshots(env)
+
+            val out =
+                perform(tool(env, FakeNavigationApps()), """{"kind":"uri","uri":"https://example.com"}""", env.ctx())
+
+            assertThat(out.ok).isFalse()
+            assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.APP_NOT_FOUND)
+            assertThat(out.error?.hint).contains("没有应用可以处理")
+        }
+
+    @Test
+    fun `prepare puts uri and scheme into the policy subject`() =
+        runTest {
+            val env = ToolTestEnv()
+            env.queue(a11yScreenOf(emptyList()))
+
+            val got =
+                tool(env, FakeNavigationApps())
+                    .prepare(Json.parseToJsonElement("""{"kind":"uri","uri":"Intent:#x"}""").jsonObject, env.ctx())
+
+            val prepared = (got as Outcome.Ok).value
+            assertThat(prepared.subject.extra["uri"]).isEqualTo("Intent:#x")
+            assertThat(prepared.subject.extra["scheme"]).isEqualTo("intent")
+        }
+
+    /** 注册一个处理 https 链接的浏览器 Activity（ShadowPackageManager）。 */
+    private fun registerBrowser() {
+        val filter = Intent(Intent.ACTION_VIEW, Uri.parse("https://example.com"))
+        val info =
+            ResolveInfo().apply {
+                activityInfo =
+                    ActivityInfo().apply {
+                        packageName = "com.example.browser"
+                        name = "BrowserActivity"
+                    }
+            }
+        shadowOf(app.packageManager).addResolveInfoForIntent(filter, info)
+    }
+
     private fun preferredMap(value: String): JsonObject =
         Json.parseToJsonElement("""{"device":{"intent":{"preferredMap":"$value"}}}""").jsonObject
 
@@ -168,11 +230,7 @@ class IntentToolTest {
 
         override suspend fun launch(packageName: String): Boolean = false
 
-        override suspend fun openUri(uri: String): Boolean = false
-
         override suspend fun launchWithError(packageName: String): AppError? = null
-
-        override suspend fun openUriWithError(uri: String): AppError? = null
     }
 
     private object NoopLogger : Logger {

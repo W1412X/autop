@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 6,
+  "schemaVersion": 7,
   "task": {
     "idleBeforeStartMs": 10000,
     "returnToOriginApp": true,

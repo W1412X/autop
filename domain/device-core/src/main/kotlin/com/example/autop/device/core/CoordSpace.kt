@@ -6,7 +6,6 @@ package com.example.autop.device.core
 
 import com.example.autop.device.Point
 import com.example.autop.device.Rect
-import com.example.autop.llm.CoordSpace
 import kotlin.math.ceil
 import kotlin.math.roundToInt
 import kotlin.math.sqrt
@@ -57,6 +56,15 @@ public object VisionSizing {
         val bh = ceil(height.toDouble() / blockSize).toInt().coerceAtLeast(1)
         return bw * bh
     }
+}
+
+/** 模型输出坐标的参考空间（docs/adr/0006）。 */
+public enum class CoordSpace {
+    /** 0–1000 归一化坐标。 */
+    NORMALIZED_1000,
+
+    /** 按“看到的图片”的像素坐标回答。 */
+    IMAGE_PIXELS,
 }
 
 /**

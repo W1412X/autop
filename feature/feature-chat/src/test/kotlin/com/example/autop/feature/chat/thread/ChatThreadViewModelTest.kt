@@ -374,11 +374,7 @@ private object FakeChatLogFiles : LogFiles {
 private object FakeChatModelProfiles : com.example.autop.llm.ModelProfileStore {
     override val profiles: kotlinx.coroutines.flow.Flow<List<com.example.autop.llm.ModelProfile>> =
         kotlinx.coroutines.flow.flowOf(emptyList())
-    override val roles: kotlinx.coroutines.flow.Flow<com.example.autop.llm.ModelRoles> =
-        kotlinx.coroutines.flow.flowOf(
-            com.example.autop.llm
-                .ModelRoles(),
-        )
+    override val defaultProfileId: kotlinx.coroutines.flow.Flow<String?> = kotlinx.coroutines.flow.flowOf(null)
 
     override suspend fun get(id: String): com.example.autop.llm.ModelProfile? = null
 
@@ -386,5 +382,5 @@ private object FakeChatModelProfiles : com.example.autop.llm.ModelProfileStore {
 
     override suspend fun delete(id: String) = Unit
 
-    override suspend fun setRoles(roles: com.example.autop.llm.ModelRoles) = Unit
+    override suspend fun setDefaultProfileId(id: String?) = Unit
 }
