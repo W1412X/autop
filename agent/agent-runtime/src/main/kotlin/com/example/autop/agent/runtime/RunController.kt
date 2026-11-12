@@ -99,7 +99,7 @@ internal class RunController(
         pausedFlag = true
         gate.value = false
         setState(RunState.PAUSED)
-        scope.launch { append(RunPaused(reason = reason, detail = detail)) }
+        launchLifecycle { append(RunPaused(reason = reason, detail = detail)) }
     }
 
     /**
@@ -116,9 +116,9 @@ internal class RunController(
         if (!note.isNullOrBlank()) {
             steers.send(note, UserMessageKind.STEER)
         }
-        scope.launch {
+        launchLifecycle {
             // 恢复未落地就又被暂停：整段收尾作废（不落 RunResumed、不开门）。
-            if (pausedFlag) return@launch
+            if (pausedFlag) return@launchLifecycle
             append(RunResumed(userNote = note))
             // 恢复提示：要求模型先观察屏幕再行动（docs/tech/04 §3.2 要点）
             val reobserve = prompts.render(ID_REOBSERVE, emptyMap()).getOrNull()?.text
@@ -129,6 +129,24 @@ internal class RunController(
             // 且收尾期间落下的暂停不被开门覆盖。
             setState(RunState.STARTING)
             if (!pausedFlag) gate.value = true
+        }
+    }
+
+    /**
+     * 暂停/恢复的落盘串行：后一条必须等前一条落盘完成再写。否则 RunResumed 可能先于 RunPaused 落盘，
+     * 暂停横幅会残留（且无法被移除）。
+     */
+    private val lifecycleLock = Any()
+    private var lifecycleTail: Job? = null
+
+    private fun launchLifecycle(block: suspend () -> Unit) {
+        synchronized(lifecycleLock) {
+            val previous = lifecycleTail
+            lifecycleTail =
+                scope.launch {
+                    previous?.join()
+                    block()
+                }
         }
     }
 

@@ -232,15 +232,17 @@ private fun appendPayload(
             unpaired
         }
         is RunResumed -> {
-            val index = entries.indexOfLast { isUnresolvedBanner(it.row) }
-            if (index >= 0) {
-                entries.removeAt(index)
-            }
+            // 移除本轮所有未决横幅：暂停后又恢复时，之前的暂停横幅不得残留（含按钮）。
+            entries.removeAll { isUnresolvedBanner(it.row) }
             unpaired
         }
         is Baseline -> unpaired
+        is RunFinished -> {
+            // 运行已结束：暂停/拦截横幅随之失效（其按钮无法再作用于已结束的运行）。
+            entries.removeAll { isUnresolvedBanner(it.row) }
+            unpaired
+        }
         is RunStarted,
-        is RunFinished,
         is RunNoteAdded,
         is RuntimeStateReported,
         -> unpaired

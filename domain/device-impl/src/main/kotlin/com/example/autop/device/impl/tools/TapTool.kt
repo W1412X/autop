@@ -162,7 +162,7 @@ public class TapTool
             long: Boolean,
             receipt: String,
         ): String {
-            val verb = if (long) "已长按" else "已点击"
+            val verb = if (long) "已提交长按" else "已提交点击"
             return "$verb ($x, $y)\n$receipt"
         }
 

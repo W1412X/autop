@@ -86,7 +86,7 @@ public class GlobalActionTool
             val out =
                 epilogue.finish(
                     ctx,
-                    "已执行 ${payload.action.name}",
+                    "已提交全局操作 ${payload.action.name}",
                     null,
                     ReplayInput(ID, payload.replayArgs, gesture = null),
                 )

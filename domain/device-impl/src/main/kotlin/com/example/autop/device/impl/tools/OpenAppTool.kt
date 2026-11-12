@@ -103,7 +103,7 @@ public class OpenAppTool
             val out =
                 epilogue.finish(
                     ctx,
-                    "已发送启动请求 $targetPkg",
+                    "已提交启动请求 $targetPkg",
                     null,
                     ReplayInput(ID, app.replayArgs, gesture = null),
                 )

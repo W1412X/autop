@@ -109,7 +109,7 @@ public class DismissPopupTool
             val result =
                 epilogue.finishWithObservation(
                     ctx,
-                    "已点击弹窗关闭按钮（依据：${popup.reason}）",
+                    "已提交弹窗关闭按钮点击（依据：${popup.reason}）",
                     null,
                     ReplayInput(
                         ID,

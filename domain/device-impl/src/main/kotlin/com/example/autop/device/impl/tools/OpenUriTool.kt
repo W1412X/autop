@@ -76,7 +76,7 @@ public class OpenUriTool
             // 失败原因（WP7.5）原样带给模型，不再只报“无法打开”。
             apps.openUriWithError(uri)?.let { return errorOutput(it) }
             val replayArgs = buildJsonObject { put(EXTRA_URI, uri) }
-            val out = epilogue.finish(ctx, "已发送打开请求 $uri", null, ReplayInput(ID, replayArgs, gesture = null))
+            val out = epilogue.finish(ctx, "已提交打开请求 $uri", null, ReplayInput(ID, replayArgs, gesture = null))
             val fg = out.observation?.packageName
             return out.copy(
                 content =

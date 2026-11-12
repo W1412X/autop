@@ -107,7 +107,7 @@ public class RestartAppTool
             val out =
                 epilogue.finish(
                     ctx,
-                    "已发送重启请求 $pkg（force-stop 已执行，随后请求启动）",
+                    "已提交重启请求 $pkg（force-stop 与启动请求均已提交）",
                     null,
                     // 回放参数带上解析后的包名（含缺省时取的前台应用），否则回放会重启到别的应用。
                     ReplayInput(ID, buildJsonObject { put("package", pkg) }, gesture = null),

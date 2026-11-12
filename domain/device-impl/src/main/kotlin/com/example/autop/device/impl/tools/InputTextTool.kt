@@ -342,7 +342,7 @@ public class InputTextTool
         }
 
         private fun typedText(input: InputAction): String =
-            if (input.append) "已追加 \"${input.text}\"" else "已输入 \"${input.text}\""
+            if (input.append) "已提交追加 \"${input.text}\"" else "已提交输入 \"${input.text}\""
 
         private fun focusedEditable(snap: ScreenSnapshot): NodeSnapshot? =
             snap.nodes.firstOrNull { it.has(NodeFlags.FOCUSED) && it.has(NodeFlags.EDITABLE) }
