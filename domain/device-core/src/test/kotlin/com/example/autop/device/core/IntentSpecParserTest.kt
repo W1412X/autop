@@ -191,4 +191,27 @@ class IntentSpecParserTest {
         val result = IntentSpecParser.parse(obj, limits, maps, zone) as IntentParse.Invalid
         assertThat(result.error.reason).isEqualTo(IntentInvalidReason.TIMER_NEEDS_SECONDS)
     }
+
+    @Test
+    fun `uri keeps the raw value`() {
+        val spec = specOf("""{"kind":"uri","uri":"https://example.com"}""") as IntentSpec.Uri
+        assertThat(spec.uri).isEqualTo("https://example.com")
+    }
+
+    @Test
+    fun `uri needs the uri field`() {
+        assertThat(reasonOf("""{"kind":"uri"}""")).isEqualTo(IntentInvalidReason.URI_MISSING)
+    }
+
+    @Test
+    fun `uri without a scheme is rejected`() {
+        assertThat(reasonOf("""{"kind":"uri","uri":"example.com"}""")).isEqualTo(IntentInvalidReason.URI_NO_SCHEME)
+        assertThat(reasonOf("""{"kind":"uri","uri":":x"}""")).isEqualTo(IntentInvalidReason.URI_NO_SCHEME)
+    }
+
+    @Test
+    fun `uri longer than the limit is rejected`() {
+        assertThat(reasonOf("""{"kind":"uri","uri":"https://example.com/ab"}"""))
+            .isEqualTo(IntentInvalidReason.TEXT_TOO_LONG)
+    }
 }
