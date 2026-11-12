@@ -60,14 +60,12 @@ private val TOOLS: Map<String, ToolVariants> =
                 withTarget = listOf("正在打开「$TARGET_SLOT」", "启动「$TARGET_SLOT」"),
                 noTarget = listOf("打开应用中…", "正在启动应用…"),
             ),
-        "tool.open_uri" to ToolVariants(noTarget = listOf("打开链接中…", "正在打开链接…")),
         "tool.intent" to ToolVariants(noTarget = listOf("交给系统处理…", "处理系统事务中…")),
         "tool.global_action" to
             ToolVariants(
                 withTarget = listOf("${TARGET_SLOT}中…", "正在$TARGET_SLOT…"),
                 noTarget = listOf("执行系统动作…"),
             ),
-        "tool.dismiss_popup" to ToolVariants(noTarget = listOf("关掉弹窗…", "正在清理弹窗…")),
         "tool.restart_app" to ToolVariants(noTarget = listOf("重启应用中…", "正在重启应用…")),
         "tool.list_apps" to
             ToolVariants(

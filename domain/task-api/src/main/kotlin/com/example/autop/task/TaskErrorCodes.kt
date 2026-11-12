@@ -18,4 +18,7 @@ public object TaskErrorCodes {
     public const val LOCKED: String = "task.locked"
     public const val EXPIRED: String = "task.expired"
     public const val LOST_ON_RESTART: String = "task.lost_on_restart"
+
+    /** 通知权限未授予，通知不会显示（notify_user）。 */
+    public const val NOTIFICATION_DENIED: String = "task.notification_denied"
 }

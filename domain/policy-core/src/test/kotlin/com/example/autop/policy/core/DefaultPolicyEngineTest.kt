@@ -118,6 +118,36 @@ class DefaultPolicyEngineTest {
         }
 
     @Test
+    fun `dangerous uri schemes are blocked case-insensitively`() =
+        runTest {
+            val engine = engine(listOf(DANGEROUS_SCHEME_RULE))
+            val blocked =
+                engine.evaluate(
+                    subject().copy(extra = mapOf("uri" to "javascript:alert(1)")),
+                    PolicyOverrides(),
+                )
+            assertThat(
+                blocked,
+            ).isEqualTo(PolicyDecision.Block("uri.dangerous", "system_security", "policy_reason_system_security"))
+            val upperScheme = engine.evaluate(subject().copy(extra = mapOf("uri" to "Intent:#x")), PolicyOverrides())
+            assertThat(
+                upperScheme,
+            ).isEqualTo(PolicyDecision.Block("uri.dangerous", "system_security", "policy_reason_system_security"))
+            val allowed =
+                engine.evaluate(
+                    subject().copy(extra = mapOf("uri" to "https://example.com")),
+                    PolicyOverrides(),
+                )
+            assertThat(allowed).isEqualTo(PolicyDecision.Allow)
+            val upperAllowed =
+                engine.evaluate(
+                    subject().copy(extra = mapOf("uri" to "HTTPS://example.com")),
+                    PolicyOverrides(),
+                )
+            assertThat(upperAllowed).isEqualTo(PolicyDecision.Allow)
+        }
+
+    @Test
     fun `non overridable category ignores task overrides`() =
         runTest {
             val engine = engine(listOf(PAY_TARGET))
@@ -349,6 +379,10 @@ private const val SECURE_RULE = """
 private const val URI_RULE = """
     {"id": "uri.rule", "type": "uri_scheme", "category": "payment", "scope": "SCREEN",
      "params": {"schemes": ["alipay"]}}
+"""
+private const val DANGEROUS_SCHEME_RULE = """
+    {"id": "uri.dangerous", "type": "uri_scheme", "category": "system_security", "scope": "SCREEN",
+     "params": {"schemes": ["javascript", "file", "content", "intent"]}}
 """
 private const val USER_RULE = """
     {"id": "user.rule", "type": "text_any", "category": "account_danger", "scope": "TARGET",

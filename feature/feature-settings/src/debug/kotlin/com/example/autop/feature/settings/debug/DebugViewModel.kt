@@ -81,7 +81,6 @@ internal class DebugViewModel
                         TOOL_OBSERVE,
                         buildJsonObject {
                             put("mode", _uiState.value.observeMode)
-                            put("full", true)
                         },
                         runtime.context(configProvider.current()),
                     )

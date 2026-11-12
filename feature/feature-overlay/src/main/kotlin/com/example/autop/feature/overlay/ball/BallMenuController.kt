@@ -17,6 +17,8 @@ import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.onErr
 import com.example.autop.core.config.ConfigEditor
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.UiConfig
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlayHost
@@ -52,6 +54,7 @@ public class BallMenuController
         private val probeController: ProbeController,
         private val recordController: RecordController,
         private val configEditor: ConfigEditor,
+        private val configProvider: ConfigProvider,
         private val logger: Logger,
         dispatchers: DispatcherProvider,
     ) {
@@ -90,6 +93,7 @@ public class BallMenuController
         @Composable
         private fun MenuContent() {
             val active by actions.active.collectAsState()
+            val config by configProvider.observe().collectAsState()
             val position by holder.position.collectAsState()
             val density = LocalDensity.current
             val windowSize = LocalWindowInfo.current.containerSize
@@ -111,7 +115,7 @@ public class BallMenuController
                     BallMenuCallbacks(onAction = ::onAction, onDismiss = ::dismiss)
                 }
             BallMenuScreen(
-                actions = deriveBallMenu(active),
+                actions = deriveBallMenu(active, config[UiConfig.DEBUG].verboseLogging),
                 ballCenterX = centerX,
                 ballCenterY = centerY,
                 callbacks = callbacks,

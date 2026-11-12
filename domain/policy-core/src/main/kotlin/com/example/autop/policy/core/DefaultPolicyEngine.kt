@@ -108,7 +108,7 @@ public class DefaultPolicyEngine
         }
 
         private companion object {
-            /** 工具自报的目标包键（open_app/open_uri 的 extra）。 */
+            /** 工具自报的目标包键（open_app/intent 的 extra）。 */
             const val EXTRA_TARGET_PACKAGE: String = "targetPackage"
 
             /** 屏蔽应用内置拦截：规则标识与文案键；category 直排进拦截提示模板。 */

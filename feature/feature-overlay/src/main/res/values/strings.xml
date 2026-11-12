@@ -130,4 +130,8 @@
     <string name="progress_duration_sec">%1$d 秒</string>
     <string name="progress_duration_min_sec">%1$d 分 %2$d 秒</string>
     <string name="progress_duration_hour_min">%1$d 小时 %2$d 分</string>
+
+    <!-- 工具测试面板（tool_optimize D20 执行门控提示） -->
+    <string name="probe_blocked_debug_off">调试模式已关闭，无法执行工具自测</string>
+    <string name="probe_blocked_run_active">任务执行中正占用屏幕，暂时无法自测</string>
 </resources>

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
@@ -34,6 +35,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.autop.agent.ToolAccess
@@ -41,6 +43,7 @@ import com.example.autop.agent.ToolProbeResult
 import com.example.autop.agent.ToolProbeTarget
 import com.example.autop.core.ui.component.ExpandableImage
 import com.example.autop.core.ui.component.JsonTreeView
+import com.example.autop.feature.overlay.R
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -85,29 +88,52 @@ internal fun ProbeScreen(
                     }
                 }
                 item { ArgsSection(state.selected, state.args, callbacks) }
-                item {
-                    Button(
-                        onClick = callbacks.onRun,
-                        enabled = !state.running && state.selected != null,
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(top = 8.dp),
-                    ) {
-                        Text(if (state.running) "执行中…" else "执行（在当前界面）")
-                    }
-                }
-                item {
-                    Text(
-                        text = "执行结果（新→旧，共 ${state.results.size} 条，点行展开全部）",
-                        style = MaterialTheme.typography.labelSmall,
-                        modifier = Modifier.padding(top = 8.dp),
-                    )
-                }
-                items(state.results) { result -> ResultRow(result) }
+                runAndResults(state, callbacks)
             }
         }
     }
+}
+
+/** 执行按钮、拦截提示与结果列表（tool_optimize D20：拦截原因直接显示在面板）。 */
+private fun LazyListScope.runAndResults(
+    state: ProbeUiState,
+    callbacks: ProbeCallbacks,
+) {
+    item {
+        Button(
+            onClick = callbacks.onRun,
+            enabled = !state.running && state.selected != null,
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+        ) {
+            Text(if (state.running) "执行中…" else "执行（在当前界面）")
+        }
+    }
+    state.blocked?.let { blocked ->
+        item {
+            Text(
+                text =
+                    stringResource(
+                        when (blocked) {
+                            ProbeBlocked.DEBUG_OFF -> R.string.probe_blocked_debug_off
+                            ProbeBlocked.RUN_ACTIVE -> R.string.probe_blocked_run_active
+                        },
+                    ),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+            )
+        }
+    }
+    item {
+        Text(
+            text = "执行结果（新→旧，共 ${state.results.size} 条，点行展开全部）",
+            style = MaterialTheme.typography.labelSmall,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+    }
+    items(state.results) { result -> ResultRow(result) }
 }
 
 /** 注入通道提示（N200：配对/连接在设置页，面板只留指引）。 */

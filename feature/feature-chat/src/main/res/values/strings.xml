@@ -93,7 +93,6 @@
     <string name="step_swipe">滑动</string>
     <string name="step_global_action">系统操作</string>
     <string name="step_open_app">打开应用</string>
-    <string name="step_open_uri">打开链接</string>
     <string name="step_intent">系统事务</string>
     <string name="step_screenshot">截屏</string>
     <string name="step_observe">查看屏幕</string>

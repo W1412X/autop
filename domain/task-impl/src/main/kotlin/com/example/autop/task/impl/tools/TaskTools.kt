@@ -245,17 +245,6 @@ private fun link(
         label?.let { put("label", it) }
     }
 
-private fun failure(
-    code: String,
-    message: String,
-    hint: String? = null,
-): ToolOutput =
-    ToolOutput(
-        ok = false,
-        content = listOf(Block.Text(message)),
-        error = AppError(code = code, message = message, hint = hint),
-    )
-
 /** 工具参数 → 触发器 / 流程绑定（创建与更新共用）。 */
 private object TaskArgs {
     /** 创建时缺省 manual；更新时调用方只在给了 trigger_type 时才走这里。 */

@@ -39,14 +39,19 @@ public enum class BallMenuAction {
  * 菜单项条件（N182，N198 加工具测试）：空闲给「即时创建 / 打开应用 / 录制 / 工具测试 / 隐藏」；
  * 有任务运行时**不再提供悬浮球交互**（N218：执行中交互走顶部控制条＋消息条，运行期球本身
  * 也由控制条接管隐藏），返回空菜单。顺序即圆弧上的摆位（开口朝屏幕内侧，从上到下）。
+ *
+ * @param toolTestEnabled 调试模式开关（`ui.debug.verboseLogging`）：关闭时不放 TOOL_TEST（tool_optimize D20）。
  */
-public fun deriveBallMenu(active: ActiveRunInfo?): List<BallMenuAction> =
+public fun deriveBallMenu(
+    active: ActiveRunInfo?,
+    toolTestEnabled: Boolean,
+): List<BallMenuAction> =
     if (active == null) {
-        listOf(
+        listOfNotNull(
             BallMenuAction.CREATE_TASK,
             BallMenuAction.OPEN_APP,
             BallMenuAction.RECORD,
-            BallMenuAction.TOOL_TEST,
+            BallMenuAction.TOOL_TEST.takeIf { toolTestEnabled },
             BallMenuAction.HIDE_BALL,
         )
     } else {

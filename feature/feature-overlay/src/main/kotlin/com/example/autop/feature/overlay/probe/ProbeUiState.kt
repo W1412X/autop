@@ -16,7 +16,18 @@ internal data class ProbeUiState(
     val args: Map<String, String>,
     val running: Boolean,
     val results: List<ToolProbeResult>,
+    /** 执行被拦截的原因（面板提示；null=无提示，tool_optimize D20）。 */
+    val blocked: ProbeBlocked? = null,
 )
+
+/** 执行被拦截的原因（提示文案在 feature-overlay strings，ViewModel 不接触资源）。 */
+internal enum class ProbeBlocked {
+    /** 调试模式关闭（工具自测只在调试模式下可用）。 */
+    DEBUG_OFF,
+
+    /** 有 Run 持有屏幕租约，正在操作屏幕。 */
+    RUN_ACTIVE,
+}
 
 /** 面板动作回调。 */
 internal class ProbeCallbacks(
