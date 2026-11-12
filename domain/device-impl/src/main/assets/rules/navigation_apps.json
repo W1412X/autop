@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "apps": [
+    {
+      "id": "amap",
+      "label": "高德地图",
+      "packageName": "com.autonavi.minimap",
+      "priority": 10,
+      "uri": {
+        "base": "amapuri://route/plan/",
+        "params": [
+          { "key": "sourceApplication", "value": "{source}" },
+          { "key": "dname", "value": "{name}", "when": "has_name" },
+          { "key": "dlat", "value": "{lat}", "when": "has_coord" },
+          { "key": "dlon", "value": "{lng}", "when": "has_coord" },
+          { "key": "dev", "value": "0" },
+          { "key": "t", "value": "{mode}" }
+        ],
+        "modes": { "drive": "0", "transit": "1", "walk": "2", "ride": "3" }
+      }
+    },
+    {
+      "id": "baidu",
+      "label": "百度地图",
+      "packageName": "com.baidu.BaiduMap",
+      "priority": 20,
+      "uri": {
+        "base": "baidumap://map/direction",
+        "params": [
+          { "key": "destination", "value": "{name}", "when": "name_only" },
+          { "key": "destination", "value": "latlng:{lat},{lng}", "when": "coord_only" },
+          { "key": "destination", "value": "latlng:{lat},{lng}|name:{name}", "when": "coord_and_name" },
+          { "key": "coord_type", "value": "gcj02" },
+          { "key": "mode", "value": "{mode}" },
+          { "key": "src", "value": "{source}" }
+        ],
+        "modes": { "drive": "driving", "transit": "transit", "walk": "walking", "ride": "riding" }
+      }
+    },
+    {
+      "id": "tencent",
+      "label": "腾讯地图",
+      "packageName": "com.tencent.map",
+      "priority": 30,
+      "uri": {
+        "base": "qqmap://map/routeplan",
+        "params": [
+          { "key": "type", "value": "{mode}" },
+          { "key": "to", "value": "{name}", "when": "has_name" },
+          { "key": "tocoord", "value": "{lat},{lng}", "when": "has_coord" },
+          { "key": "referer", "value": "{source}" }
+        ],
+        "modes": { "drive": "drive", "transit": "bus", "walk": "walk", "ride": "bike" }
+      }
+    },
+    {
+      "id": "google",
+      "label": "Google 地图",
+      "packageName": "com.google.android.apps.maps",
+      "priority": 40,
+      "uri": {
+        "base": "https://www.google.com/maps/dir/",
+        "params": [
+          { "key": "api", "value": "1" },
+          { "key": "destination", "value": "{name}", "when": "name_only" },
+          { "key": "destination", "value": "{lat},{lng}", "when": "has_coord" },
+          { "key": "travelmode", "value": "{mode}" },
+          { "key": "dir_action", "value": "navigate", "onlyModes": ["drive", "walk", "ride"] }
+        ],
+        "modes": { "drive": "driving", "transit": "transit", "walk": "walking", "ride": "bicycling" }
+      }
+    }
+  ]
+}
