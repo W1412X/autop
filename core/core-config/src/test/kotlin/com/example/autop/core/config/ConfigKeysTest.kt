@@ -52,4 +52,14 @@ class ConfigKeysTest {
     fun `vision icon section validation rejects blank categories and range violations`() {
         assertThat(DeviceVisionIconSection().validate()).isEmpty()
     }
+
+    @Test
+    fun `vision parallel section validates thread ranges`() {
+        assertThat(DeviceVisionParallelSection().validate()).isEmpty()
+        assertThat(DeviceVisionParallelSection(maxThreads = 1, cropOrtThreads = 0).validate()).isEmpty()
+        assertThat(DeviceVisionParallelSection(maxThreads = 0).validate()).hasSize(1)
+        assertThat(DeviceVisionParallelSection(maxThreads = 17).validate()).hasSize(1)
+        assertThat(DeviceVisionParallelSection(cropOrtThreads = 9).validate()).hasSize(1)
+        assertThat(DeviceVisionParallelSection(maxThreads = 0, cropOrtThreads = -1).validate()).hasSize(2)
+    }
 }

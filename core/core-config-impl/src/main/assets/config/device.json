@@ -51,9 +51,13 @@
       "roiRatio": 0.5,
       "minConfidence": 0.35,
       "modelPack": "basic",
-      "timeoutMs": 30000,
+      "timeoutMs": 60000,
       "icon": {
         "enabled": true
+      },
+      "parallel": {
+        "maxThreads": 4,
+        "cropOrtThreads": 1
       }
     },
     "change": {

@@ -48,7 +48,7 @@ public data class DeviceSerializerSection(
     @SerialName("hideSystemDecoration") val hideSystemDecoration: Boolean = true,
 ) : ConfigSection
 
-/** `device.observe`：三种观测模式的优先级与可用性（docs/design/observation-modes-coordinate-actions §2.3）。 */
+/** `device.observe`：两种观测模式的优先级与可用性（docs/design/observation-modes-coordinate-actions §2.3）。 */
 @Serializable
 public data class DeviceObserveSection(
     /**
@@ -135,7 +135,7 @@ public data class DeviceVisionParseSection(
     /** basic=检测+OCR；full=+caption；vlm=+小 VLM。 */
     @SerialName("modelPack") val modelPack: String = "basic",
     /** 视觉解析整体预算（截图+检测+状态分类+建树）；超时按解析失败报错，不自动换模式（ADR-0010）。 */
-    @SerialName("timeoutMs") val timeoutMs: Long = 30000,
+    @SerialName("timeoutMs") val timeoutMs: Long = 60000,
 ) : ConfigSection {
     override fun validate(): List<String> =
         buildList {
@@ -161,6 +161,41 @@ public data class DeviceVisionParseSection(
 public data class DeviceVisionIconSection(
     @SerialName("enabled") val enabled: Boolean = true,
 ) : ConfigSection
+
+/**
+ * `device.vision.parallel`：视觉解析并行度（ADR-0026）。叶子内文字定位（det）→ 识别（rec）、
+ * 图标分类三条支路共用同一个推理并发上限，不再分阶段单独限流。
+ */
+@Serializable
+public data class DeviceVisionParallelSection(
+    /**
+     * 同时在途的推理调用数上限（det / rec / 图标分类共用）；1 = 完全串行。
+     * 实际取值不超过 CPU 核数 − 1（至少 1）。PC 实测并发超过 4 后收益递减、内存仍线性增长（约 +120MB/路）。
+     */
+    @SerialName("maxThreads") val maxThreads: Int = 4,
+    /**
+     * det / rec / 图标 / 状态分类会话的 ORT 线程数（0 = ORT 默认）。会话创建时固定，修改后重启生效。
+     * 小图裁剪用多线程反而更慢（PC 实测默认线程比单线程慢 2.4 倍），并发度交给 [maxThreads] 控制。
+     */
+    @SerialName("cropOrtThreads") val cropOrtThreads: Int = 1,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (maxThreads !in THREADS_MIN..THREADS_MAX) {
+                add("maxThreads must be within $THREADS_MIN..$THREADS_MAX, was $maxThreads")
+            }
+            if (cropOrtThreads !in ORT_THREADS_MIN..ORT_THREADS_MAX) {
+                add("cropOrtThreads must be within $ORT_THREADS_MIN..$ORT_THREADS_MAX, was $cropOrtThreads")
+            }
+        }
+
+    public companion object {
+        private const val THREADS_MIN: Int = 1
+        private const val THREADS_MAX: Int = 16
+        private const val ORT_THREADS_MIN: Int = 0
+        private const val ORT_THREADS_MAX: Int = 8
+    }
+}
 
 /** `device.change`：屏幕变化判定（WP1.5、WP2.4）。 */
 @Serializable
@@ -452,6 +487,8 @@ public object DeviceConfig {
         ConfigKey("device.vision", DeviceVisionParseSection.serializer()) { DeviceVisionParseSection() }
     public val VISION_ICON: ConfigKey<DeviceVisionIconSection> =
         ConfigKey("device.vision.icon", DeviceVisionIconSection.serializer()) { DeviceVisionIconSection() }
+    public val VISION_PARALLEL: ConfigKey<DeviceVisionParallelSection> =
+        ConfigKey("device.vision.parallel", DeviceVisionParallelSection.serializer()) { DeviceVisionParallelSection() }
     public val CHANGE: ConfigKey<DeviceChangeSection> =
         ConfigKey("device.change", DeviceChangeSection.serializer()) { DeviceChangeSection() }
     public val OVERLAY: ConfigKey<DeviceOverlaySection> =
@@ -489,6 +526,7 @@ public object DeviceConfig {
             OBSERVE,
             VISION,
             VISION_ICON,
+            VISION_PARALLEL,
             CHANGE,
             OVERLAY,
             TOUCH,
