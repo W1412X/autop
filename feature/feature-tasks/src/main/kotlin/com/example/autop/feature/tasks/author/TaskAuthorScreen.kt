@@ -130,7 +130,7 @@ public fun TaskAuthorScreen(
             state = listState,
             modifier = Modifier.weight(1f).fillMaxWidth(),
             verticalArrangement = Arrangement.spacedBy(spacing.md),
-            contentPadding = PaddingValues(vertical = spacing.md),
+            contentPadding = PaddingValues(horizontal = spacing.screenEdge, vertical = spacing.md),
         ) {
             if (author.messages.isEmpty() && author.live == null && !author.editing) {
                 item { Intro(onAction, flowsEnabled = state.flowsEnabled) }
@@ -147,7 +147,6 @@ public fun TaskAuthorScreen(
                         text = stringResource(R.string.task_author_thinking),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(horizontal = spacing.screenEdge),
                     )
                 }
             }
@@ -159,6 +158,7 @@ public fun TaskAuthorScreen(
             profiles = state.modelOptions,
             enabled = !state.author.busy,
             onSelect = { onAction(TaskAuthorAction.SetModel(it)) },
+            defaultProfileId = state.defaultModelId,
         )
         AutopInputBar(
             value = state.input,
@@ -201,10 +201,7 @@ private fun Intro(
     flowsEnabled: Boolean,
 ) {
     val spacing = LocalSpacing.current
-    Column(
-        modifier = Modifier.padding(horizontal = spacing.screenEdge),
-        verticalArrangement = Arrangement.spacedBy(spacing.sm),
-    ) {
+    Column(verticalArrangement = Arrangement.spacedBy(spacing.sm)) {
         Text(
             text = stringResource(R.string.task_author_intro),
             style = MaterialTheme.typography.bodyMedium,
@@ -232,7 +229,7 @@ private fun ErrorBanner(code: String) {
     StatusBanner(
         tone = StatusTone.BLOCKED,
         message = code,
-        modifier = Modifier.fillMaxWidth().padding(LocalSpacing.current.screenEdge),
+        modifier = Modifier.fillMaxWidth(),
     )
 }
 
@@ -242,18 +239,15 @@ private fun MessageItem(
     pending: AuthorMessage.Question?,
     onAction: (TaskAuthorAction) -> Unit,
 ) {
-    val spacing = LocalSpacing.current
     when (message) {
         is AuthorMessage.User -> UserBubble(message.text)
-        is AuthorMessage.Assistant ->
-            MarkdownText(text = message.text, modifier = Modifier.padding(horizontal = spacing.screenEdge))
+        is AuthorMessage.Assistant -> MarkdownText(text = message.text)
         is AuthorMessage.Thinking -> ThinkingBlock(text = message.text, streaming = false)
         is AuthorMessage.Activity ->
             Text(
                 text = activityText(message.text),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(horizontal = spacing.screenEdge),
             )
         is AuthorMessage.Question -> QuestionCard(message, pending = message === pending, onAction = onAction)
     }
@@ -277,7 +271,7 @@ private fun UserBubble(text: String) {
     val spacing = LocalSpacing.current
     val maxWidth = LocalConfiguration.current.screenWidthDp.dp * USER_BUBBLE_WIDTH_FRACTION
     Row(
-        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
+        modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.End,
     ) {
         Text(
@@ -309,7 +303,6 @@ private fun QuestionCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.screenEdge)
                 .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(spacing.md),
@@ -359,8 +352,7 @@ private fun CustomAnswer(onAnswer: (String) -> Unit) {
 /** 流式生成中的这一轮：思考展开实时显示，正文逐字出现，工具调用显示动作名。 */
 @Composable
 private fun LiveTurn(live: AuthorLive) {
-    val spacing = LocalSpacing.current
-    Column(modifier = Modifier.padding(horizontal = spacing.screenEdge)) {
+    Column {
         if (live.thinking.isNotBlank()) {
             ThinkingBlock(text = live.thinking, streaming = live.text.isEmpty() && live.tool == null)
         }
@@ -395,7 +387,7 @@ private fun ThinkingBlock(
             Modifier
                 .fillMaxWidth()
                 .clickable { manual = !expanded }
-                .padding(horizontal = LocalSpacing.current.screenEdge, vertical = LocalSpacing.current.xs),
+                .padding(vertical = LocalSpacing.current.xs),
     ) {
         Text(
             text = stringResource(R.string.task_author_thinking_label, text.length),
@@ -423,7 +415,6 @@ private fun DraftCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.screenEdge)
                 .clip(MaterialTheme.shapes.medium)
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(spacing.md),

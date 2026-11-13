@@ -20,6 +20,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -29,6 +30,8 @@ public data class FlowAuthorUiState(
     /** 会话级模型覆盖（null = 跟随默认）与可选模型。 */
     val modelProfileId: String? = null,
     val modelOptions: List<OptionItem> = emptyList(),
+    /** 全局默认模型 id（芯片跟随默认时显示其名称与"默认"标记）。 */
+    val defaultModelId: String? = null,
     val ready: Boolean = false,
     val author: AuthorState = AuthorState(),
     val input: String = "",
@@ -82,9 +85,14 @@ public class FlowAuthorViewModel
 
         init {
             viewModelScope.launch {
-                modelProfiles.profiles.collect { profiles ->
+                combine(modelProfiles.profiles, modelProfiles.defaultProfileId) { profiles, defaultId ->
+                    profiles to defaultId
+                }.collect { (profiles, defaultId) ->
                     _uiState.update {
-                        it.copy(modelOptions = profiles.map { p -> OptionItem(id = p.id, label = p.displayName) })
+                        it.copy(
+                            modelOptions = profiles.map { p -> OptionItem(id = p.id, label = p.displayName) },
+                            defaultModelId = defaultId,
+                        )
                     }
                 }
             }
