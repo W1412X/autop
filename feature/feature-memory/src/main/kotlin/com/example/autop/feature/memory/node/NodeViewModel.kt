@@ -19,6 +19,7 @@ import com.example.autop.memory.MemoryPath
 import com.example.autop.memory.MemorySource
 import com.example.autop.memory.MemoryStore
 import com.example.autop.memory.MemoryWrite
+import com.example.autop.memory.VectorStatus
 import com.example.autop.memory.WriteMode
 import com.example.autop.memory.isAutomated
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -51,6 +52,7 @@ public class NodeViewModel
 
         init {
             viewModelScope.launch { load() }
+            viewModelScope.launch { store.observeTree().collect { refreshVectorStatus() } }
         }
 
         /** 分派用户动作。 */
@@ -128,10 +130,18 @@ public class NodeViewModel
                     links = node?.links?.map { link -> link.value }.orEmpty(),
                     byAgent = node?.source?.isAutomated == true,
                     version = node?.version ?: 0,
+                    vectorStatus = node?.vectorStatus ?: VectorStatus.DISABLED,
                     updatedAt = node?.updatedAt ?: 0,
                     versions = versions.map(::toRow),
                 )
             }
+        }
+
+        /** 只刷新向量化状态，不碰用户正在编辑的字段。 */
+        private suspend fun refreshVectorStatus() {
+            val target = nodePath ?: return
+            val status = store.get(target)?.vectorStatus ?: return
+            update { it.copy(vectorStatus = status) }
         }
 
         private fun showVersions() {

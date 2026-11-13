@@ -12,12 +12,19 @@ import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.MemoryConfig
+import com.example.autop.memory.ChannelScore
+import com.example.autop.memory.ChannelStatus
 import com.example.autop.memory.MemoryErrorCodes
 import com.example.autop.memory.MemoryPath
 import com.example.autop.memory.MemorySearch
 import com.example.autop.memory.MemorySource
 import com.example.autop.memory.MemoryStore
+import com.example.autop.memory.SearchReport
+import com.example.autop.memory.VectorStatus
+import com.example.autop.memory.impl.retriever.KeywordRetriever
+import com.example.autop.memory.impl.retriever.VectorRetriever
 import kotlinx.serialization.json.JsonObject
+import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -81,6 +88,7 @@ public class MemoryReadTool
                     appendLine("来源：${sourceLabel(node.source)}")
                     if (node.keywords.isNotEmpty()) appendLine("关键词：${node.keywords.joinToString("、")}")
                     if (node.links.isNotEmpty()) appendLine("关联：${node.links.joinToString("、")}")
+                    appendLine("向量：${vectorLabel(node.vectorStatus, node.version)}")
                     appendLine()
                 }
             return textOutput(meta + page + "\n（共 ${node.content.length} 字，已显示 $offset–$end）")
@@ -109,17 +117,82 @@ public class MemorySearchTool
             if (query.isBlank()) return toolError("agent.invalid_args", "query 不能为空")
             val prefix = args.str("path_prefix")?.let { parsePath(it) }
             val k = args.intOrNull("k") ?: configProvider.current()[MemoryConfig.SEARCH].defaultK
-            val hits = search.search(query = query, prefix = prefix, k = k)
-            val text =
-                if (hits.isEmpty()) {
-                    "（没有匹配的记忆）"
-                } else {
-                    hits.joinToString(separator = "\n") { hit ->
-                        "${hit.path.value}  [${sourceLabel(hit.source)}] ${hit.title}：${hit.snippet}"
-                    }
-                }
-            return textOutput(text)
+            val report = search.searchReport(query = query, prefix = prefix, k = k)
+            val vectorMinScore = configProvider.current()[MemoryConfig.VECTOR].minScore
+            return textOutput(formatSearchReport(query, report, vectorMinScore))
         }
+    }
+
+/** 检索输出：先给通道状态与候选数，再逐条列出命中及各通道得分（综合分 = Σ 权重 × 归一化分）。 */
+internal fun formatSearchReport(
+    query: String,
+    report: SearchReport,
+    vectorMinScore: Double,
+): String {
+    val lines = mutableListOf<String>()
+    lines += "检索「$query」：候选 ${report.candidateCount} 条，返回 ${report.hits.size} 条"
+    lines += "通道：" + report.channels.joinToString("；") { channelLine(it, vectorMinScore) }
+    if (report.hits.isEmpty()) {
+        lines += "（没有匹配的记忆）"
+    }
+    for (hit in report.hits) {
+        lines += "${hit.path.value}  [${sourceLabel(hit.source)}] ${hit.title}：${hit.snippet}"
+        val breakdown = hit.scores.joinToString(" + ") { scoreTerm(it) }
+        lines += "    综合 ${fixed(hit.score, SCORE_DIGITS)}" + if (breakdown.isEmpty()) "" else " = $breakdown"
+    }
+    return lines.joinToString("\n")
+}
+
+private fun channelLine(
+    status: ChannelStatus,
+    vectorMinScore: Double,
+): String {
+    val label = channelLabel(status.channelId)
+    return when {
+        !status.available -> "$label 未启用"
+        status.channelId == VectorRetriever.ID ->
+            "$label 命中 ${status.candidates}（相似度 ≥ ${fixed(vectorMinScore, SCORE_DIGITS)}）"
+        else -> "$label 命中 ${status.candidates}"
+    }
+}
+
+private fun scoreTerm(score: ChannelScore): String {
+    val raw =
+        if (score.channelId == VectorRetriever.ID) {
+            "余弦 ${fixed(score.raw, COSINE_DIGITS)}"
+        } else {
+            "匹配 ${fixed(score.raw, CHARS_DIGITS)} 字"
+        }
+    return "${channelLabel(score.channelId)} ${fixed(score.weight, SCORE_DIGITS)}" +
+        "×${fixed(score.normalized, SCORE_DIGITS)}（$raw）"
+}
+
+private fun channelLabel(channelId: String): String =
+    when (channelId) {
+        KeywordRetriever.ID -> "关键词"
+        VectorRetriever.ID -> "向量"
+        else -> channelId
+    }
+
+private fun fixed(
+    value: Double,
+    digits: Int,
+): String = String.format(Locale.ROOT, "%.${digits}f", value)
+
+/** 检索输出的小数位：综合分与权重 2 位，余弦 3 位，关键词匹配字数 1 位。 */
+private const val SCORE_DIGITS: Int = 2
+private const val COSINE_DIGITS: Int = 3
+private const val CHARS_DIGITS: Int = 1
+
+/** 条目向量化状态的展示文字（读工具输出）。 */
+internal fun vectorLabel(
+    status: VectorStatus,
+    version: Int,
+): String =
+    when (status) {
+        VectorStatus.VECTORIZED -> "已向量化（v$version）"
+        VectorStatus.PENDING -> "待向量化"
+        VectorStatus.DISABLED -> "未启用"
     }
 
 internal const val DEFAULT_LIMIT: Int = 20

@@ -2,7 +2,7 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "32e75247704e3ccefa9002c55009e87e",
+    "identityHash": "ebe929d97d19e485a3d891475f0ff7b4",
     "entities": [
       {
         "tableName": "memory_nodes",
@@ -231,7 +231,7 @@
       },
       {
         "tableName": "memory_vectors",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`path` TEXT NOT NULL, `chunk` INTEGER NOT NULL, `modelId` TEXT NOT NULL, `dim` INTEGER NOT NULL, `vector` BLOB NOT NULL, `textHash` TEXT NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`path`, `chunk`, `modelId`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`path` TEXT NOT NULL, `chunk` INTEGER NOT NULL, `modelId` TEXT NOT NULL, `dim` INTEGER NOT NULL, `vector` BLOB NOT NULL, `textHash` TEXT NOT NULL, `nodeVersion` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, PRIMARY KEY(`path`, `chunk`, `modelId`))",
         "fields": [
           {
             "fieldPath": "path",
@@ -270,6 +270,12 @@
             "notNull": true
           },
           {
+            "fieldPath": "nodeVersion",
+            "columnName": "nodeVersion",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
             "fieldPath": "updatedAt",
             "columnName": "updatedAt",
             "affinity": "INTEGER",
@@ -299,7 +305,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '32e75247704e3ccefa9002c55009e87e')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'ebe929d97d19e485a3d891475f0ff7b4')"
     ]
   }
 }

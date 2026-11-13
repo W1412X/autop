@@ -3,6 +3,8 @@
  */
 package com.example.autop.feature.memory.node
 
+import com.example.autop.memory.VectorStatus
+
 /** 一行版本记录（时间、来源、变化类型、前后值供对比）。 */
 public data class VersionRow(
     val id: Long,
@@ -27,6 +29,8 @@ public data class NodeUiState(
     val links: List<String> = emptyList(),
     val byAgent: Boolean = false,
     val version: Int = 0,
+    /** 当前版本的向量化状态。 */
+    val vectorStatus: VectorStatus = VectorStatus.DISABLED,
     val updatedAt: Long = 0,
     val summaryMaxChars: Int = 60,
     /** 新建模式：条目尚未创建，[path] 为所在目录，保存即创建。 */

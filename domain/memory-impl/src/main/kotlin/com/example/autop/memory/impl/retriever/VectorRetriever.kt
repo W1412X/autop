@@ -34,6 +34,9 @@ public class VectorRetriever
     ) : MemoryRetriever {
         override val id: String = ID
 
+        override val available: Boolean
+            get() = gateway.current() != null
+
         @Suppress("ReturnCount") // 出口按“未配置/向量化失败”分支，是流程语义
         override suspend fun search(
             query: String,

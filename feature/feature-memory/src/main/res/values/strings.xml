@@ -23,6 +23,10 @@
     <string name="memory_new_dir_title">新建目录</string>
     <string name="memory_title_invalid">名称不能为空，且不能包含 /</string>
     <string name="memory_info_location">位置</string>
+    <string name="memory_info_vector">向量化</string>
+    <string name="memory_vector_done">已向量化（v%1$d）</string>
+    <string name="memory_vector_pending">待向量化</string>
+    <string name="memory_vector_disabled">未启用</string>
     <string name="memory_version_history">版本历史</string>
     <string name="memory_more">更多</string>
     <string name="memory_field_title">标题</string>

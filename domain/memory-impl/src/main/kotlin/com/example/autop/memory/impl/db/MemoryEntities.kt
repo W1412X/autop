@@ -68,6 +68,8 @@ public data class MemoryVectorEntity(
     val dim: Int,
     val vector: ByteArray,
     val textHash: String,
+    /** 计算此向量时条目的版本；与条目当前版本不等即为"待向量化"（按版本的向量化状态）。 */
+    val nodeVersion: Int,
     val updatedAt: Long,
 ) {
     override fun equals(other: Any?): Boolean =
@@ -76,7 +78,8 @@ public data class MemoryVectorEntity(
             other.chunk == chunk &&
             other.modelId == modelId &&
             other.dim == dim &&
-            other.textHash == textHash
+            other.textHash == textHash &&
+            other.nodeVersion == nodeVersion
 
     override fun hashCode(): Int {
         var result = path.hashCode()
@@ -84,6 +87,7 @@ public data class MemoryVectorEntity(
         result = 31 * result + modelId.hashCode()
         result = 31 * result + dim
         result = 31 * result + textHash.hashCode()
+        result = 31 * result + nodeVersion
         return result
     }
 }

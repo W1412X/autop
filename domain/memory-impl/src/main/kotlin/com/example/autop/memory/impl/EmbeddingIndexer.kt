@@ -17,11 +17,16 @@ import com.example.autop.core.config.MemoryConfig
 import com.example.autop.llm.EmbeddingGateway
 import com.example.autop.llm.EmbeddingProvider
 import com.example.autop.memory.MemoryIndexMaintenance
+import com.example.autop.memory.VectorStatus
 import com.example.autop.memory.impl.db.MemoryDb
+import com.example.autop.memory.impl.db.MemoryNodeEntity
 import com.example.autop.memory.impl.db.MemoryVectorEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -44,6 +49,10 @@ public class EmbeddingIndexer
         private val queue = Channel<String>(Channel.UNLIMITED)
         private val scope =
             CoroutineScope(SupervisorJob() + dispatchers.default + logger.exceptionHandler("EmbeddingIndexer"))
+        private val indexedEvents = MutableSharedFlow<Unit>(extraBufferCapacity = INDEXED_BUFFER)
+
+        /** 某条目的向量状态发生变化（计算完成或版本被标记）时发出，供页面刷新向量化状态。 */
+        public val indexed: Flow<Unit> = indexedEvents.asSharedFlow()
 
         init {
             scope.launch {
@@ -65,6 +74,26 @@ public class EmbeddingIndexer
         public fun enqueue(path: String) {
             queue.trySend(path)
         }
+
+        /** 一组条目的向量化状态（按当前 embedding 模型与条目版本）。 */
+        public suspend fun statusesOf(entities: List<MemoryNodeEntity>): Map<String, VectorStatus> {
+            val provider = gateway.current() ?: return entities.associate { it.path to VectorStatus.DISABLED }
+            val indexed = db.vectorDao().indexedVersions(provider.modelId).associate { it.path to it.nodeVersion }
+            return entities.associate { it.path to vectorStatusFor(indexed[it.path], it.version) }
+        }
+
+        /** 单个条目的向量化状态。 */
+        public suspend fun statusOf(entity: MemoryNodeEntity): VectorStatus {
+            val provider = gateway.current() ?: return VectorStatus.DISABLED
+            val rows = db.vectorDao().byPath(entity.path, provider.modelId)
+            val indexed = rows.firstOrNull { it.chunk == 0 }?.nodeVersion
+            return vectorStatusFor(indexed, entity.version)
+        }
+
+        private fun vectorStatusFor(
+            indexedVersion: Int?,
+            nodeVersion: Int,
+        ): VectorStatus = if (indexedVersion == nodeVersion) VectorStatus.VECTORIZED else VectorStatus.PENDING
 
         /**
          * 全量重建（设置页"重建记忆索引"，docs/tech/10 WP10）：删除非当前 modelId 的
@@ -103,8 +132,18 @@ public class EmbeddingIndexer
             val cfg = configProvider.current()[MemoryConfig.EMBEDDING]
             // 一个节点一个向量，输入为标题与关键词（ADR-0028）；正文与摘要变化不触发重新向量化
             val text = MemoryText.embeddingText(node.title, decodeList(node.keywordsJson))
-            val existing = db.vectorDao().byPath(path, provider.modelId)
-            if (existing.any { it.chunk == 0 && it.textHash == MemoryText.textHash(text) }) return
+            val textHash = MemoryText.textHash(text)
+            val existing = db.vectorDao().byPath(path, provider.modelId).firstOrNull { it.chunk == 0 }
+            if (existing != null && existing.textHash == textHash) {
+                // 输入未变：不再调用模型，只把向量标记到当前版本
+                if (existing.nodeVersion != node.version) {
+                    db.vectorDao().upsert(
+                        existing.copy(nodeVersion = node.version, updatedAt = System.currentTimeMillis()),
+                    )
+                    indexedEvents.tryEmit(Unit)
+                }
+                return
+            }
             val pending = listOf(0 to text)
             val batchSize = configProvider.current()[LlmConfig.EMBEDDING].batchSize
             pending.chunked(batchSize).forEach { batch ->
@@ -119,12 +158,14 @@ public class EmbeddingIndexer
                             dim = vector.size,
                             vector = vector.toByteArray(),
                             textHash = MemoryText.textHash(text),
+                            nodeVersion = node.version,
                             updatedAt = System.currentTimeMillis(),
                         ),
                     )
                     vectorCache.upsert(path, chunk, vector)
                 }
             }
+            indexedEvents.tryEmit(Unit)
         }
 
         private suspend fun embedWithRetry(
@@ -157,5 +198,6 @@ public class EmbeddingIndexer
 
         private companion object {
             const val TAG: String = "MemoryEmbedding"
+            const val INDEXED_BUFFER: Int = 16
         }
     }

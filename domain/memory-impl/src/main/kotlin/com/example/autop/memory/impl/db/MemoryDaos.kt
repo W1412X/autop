@@ -90,6 +90,12 @@ public data class SearchRow(
     val contentLength: Int,
 )
 
+/** 条目向量的版本投影（[MemoryVectorDao.indexedVersions]）。 */
+public data class IndexedVersion(
+    val path: String,
+    val nodeVersion: Int,
+)
+
 /** 版本表访问。 */
 @Dao
 public interface MemoryVersionDao {
@@ -139,6 +145,10 @@ public interface MemoryVectorDao {
         path: String,
         modelId: String,
     ): List<MemoryVectorEntity>
+
+    /** 当前模型下每个条目（主块）的向量所对应的条目版本；不读向量 BLOB。 */
+    @Query("SELECT path, nodeVersion FROM memory_vectors WHERE modelId = :modelId AND chunk = 0")
+    public suspend fun indexedVersions(modelId: String): List<IndexedVersion>
 
     @Query("DELETE FROM memory_vectors WHERE path = :path")
     public suspend fun deleteByPath(path: String)

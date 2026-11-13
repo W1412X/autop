@@ -41,6 +41,7 @@ import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.memory.R
+import com.example.autop.memory.VectorStatus
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -205,7 +206,20 @@ private fun NodeInfoRows(state: NodeUiState) {
         subtitle = null,
         value = formatTime(state.updatedAt),
     )
+    InfoRow(
+        title = stringResource(R.string.memory_info_vector),
+        subtitle = null,
+        value = vectorLabel(state),
+    )
 }
+
+@Composable
+private fun vectorLabel(state: NodeUiState): String =
+    when (state.vectorStatus) {
+        VectorStatus.VECTORIZED -> stringResource(R.string.memory_vector_done, state.version)
+        VectorStatus.PENDING -> stringResource(R.string.memory_vector_pending)
+        VectorStatus.DISABLED -> stringResource(R.string.memory_vector_disabled)
+    }
 
 @Composable
 private fun AgentBanner(onAction: (NodeAction) -> Unit) {

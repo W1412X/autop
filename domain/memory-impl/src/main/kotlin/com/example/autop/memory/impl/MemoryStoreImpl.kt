@@ -23,6 +23,7 @@ import com.example.autop.memory.MemorySource
 import com.example.autop.memory.MemoryStore
 import com.example.autop.memory.MemoryVersion
 import com.example.autop.memory.MemoryWrite
+import com.example.autop.memory.VectorStatus
 import com.example.autop.memory.WriteResult
 import com.example.autop.memory.impl.db.MemoryDb
 import com.example.autop.memory.impl.db.MemoryNodeEntity
@@ -32,6 +33,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -69,15 +71,23 @@ public class MemoryStoreImpl
             scope.launch { seeder.ensureRoots() }
         }
 
-        override suspend fun get(path: MemoryPath): MemoryNode? = db.nodeDao().get(path.value)?.let { toModel(it) }
+        override suspend fun get(path: MemoryPath): MemoryNode? {
+            val entity = db.nodeDao().get(path.value) ?: return null
+            return toModel(entity).copy(vectorStatus = indexer.statusOf(entity))
+        }
 
         override suspend fun children(
             path: MemoryPath,
             offset: Int,
             limit: Int,
-        ): List<MemoryNode> = db.nodeDao().children(path.value, offset, limit).map { toModel(it) }
+        ): List<MemoryNode> {
+            val entities = db.nodeDao().children(path.value, offset, limit)
+            val statuses = indexer.statusesOf(entities)
+            return entities.map { toModel(it).copy(vectorStatus = statuses[it.path] ?: VectorStatus.DISABLED) }
+        }
 
-        override fun observeTree(): Flow<Unit> = treeChanges.asSharedFlow()
+        /** 树变更（写入、删除、移动、撤销）与向量化完成都会发出，页面据此刷新。 */
+        override fun observeTree(): Flow<Unit> = merge(treeChanges.asSharedFlow(), indexer.indexed)
 
         override suspend fun write(w: MemoryWrite): Outcome<WriteResult> = commit { writer.apply(w) }
 
