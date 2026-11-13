@@ -44,6 +44,8 @@ public data class TaskEditUiState(
     val llmCondition: String = "",
     val cooldownMinutes: Int = DEFAULT_COOLDOWN_MINUTES,
     val dailyLimit: Int = DEFAULT_DAILY_LIMIT,
+    /** 流程 Beta 功能是否开启；关闭时隐藏执行方式区块，已绑定流程的任务保存时保留原绑定（ADR-0030）。 */
+    val flowsEnabled: Boolean = false,
     // 执行方式：智能体按目标执行，或运行绑定的流程
     val executorFlow: Boolean = false,
     val flowId: String = "",
@@ -157,8 +159,9 @@ internal fun TaskEditUiState.validate(now: Long): String? =
     when {
         name.isBlank() -> TaskEditError.NAME.name
         !executorFlow && goal.isBlank() -> TaskEditError.GOAL.name
-        executorFlow && flowId.isBlank() -> TaskEditError.FLOW.name
-        executorFlow && missingRequiredParam() -> TaskEditError.FLOW_PARAM.name
+        // 流程关闭时执行方式区块隐藏，流程相关校验不生效，否则无法修正已绑定流程的任务。
+        executorFlow && flowsEnabled && flowId.isBlank() -> TaskEditError.FLOW.name
+        executorFlow && flowsEnabled && missingRequiredParam() -> TaskEditError.FLOW_PARAM.name
         triggerKind == EditTriggerKind.CONDITION && sourceId.isBlank() -> TaskEditError.SOURCE.name
         isBlankCron() -> TaskEditError.CRON.name
         isPastOnce(now) -> TaskEditError.TIME.name

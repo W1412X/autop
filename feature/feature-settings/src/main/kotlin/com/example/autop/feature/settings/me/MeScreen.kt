@@ -1,7 +1,7 @@
 /**
  * "我的"页（docs/tech/08 §4.5）：一个 LazyColumn、SectionTitle 分组、组间 HorizontalDivider。
  *
- * 分组：健康状态卡 / 外观 / 模型 / 权限与运行 / 安全 / 任务与提醒 / 高级（含导出导入）/ 关于。
+ * 分组：健康状态卡 / 外观 / 模型 / 权限与运行 / 安全 / 任务与提醒 / Beta 功能 / 高级（含导出导入）/ 关于。
  * 高级配置、提示词、诊断日志、操作记录为子页入口（`me/{id}`）。
  */
 package com.example.autop.feature.settings.me
@@ -102,6 +102,10 @@ public fun MeScreen(
                     onOpenSnoozeSheet = { snoozeSheet = true },
                     onAction = onAction,
                 )
+            }
+            item {
+                HorizontalDivider()
+                BetaSection(state = state, onAction = onAction)
             }
             item {
                 HorizontalDivider()

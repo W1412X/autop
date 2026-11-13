@@ -132,12 +132,14 @@ public fun TaskAuthorScreen(
             verticalArrangement = Arrangement.spacedBy(spacing.md),
             contentPadding = PaddingValues(vertical = spacing.md),
         ) {
-            if (author.messages.isEmpty() && author.live == null && !author.editing) item { Intro(onAction) }
+            if (author.messages.isEmpty() && author.live == null && !author.editing) {
+                item { Intro(onAction, flowsEnabled = state.flowsEnabled) }
+            }
             items(author.messages) { message ->
                 MessageItem(message = message, pending = author.pendingQuestion, onAction = onAction)
             }
             // 草稿是此前轮次的产物，排在正在流式输出的这一轮之前，跟随底部时看到的始终是最新内容。
-            author.draft?.let { draft -> item { DraftCard(draft = draft) } }
+            author.draft?.let { draft -> item { DraftCard(draft = draft, flowsEnabled = state.flowsEnabled) } }
             author.live?.let { live -> item { LiveTurn(live = live) } }
             if (author.busy && author.live == null && author.pendingQuestion == null) {
                 item {
@@ -194,7 +196,10 @@ public fun TaskAuthorScreen(
 }
 
 @Composable
-private fun Intro(onAction: (TaskAuthorAction) -> Unit) {
+private fun Intro(
+    onAction: (TaskAuthorAction) -> Unit,
+    flowsEnabled: Boolean,
+) {
     val spacing = LocalSpacing.current
     Column(
         modifier = Modifier.padding(horizontal = spacing.screenEdge),
@@ -210,7 +215,8 @@ private fun Intro(onAction: (TaskAuthorAction) -> Unit) {
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        EXAMPLE_KEYS.forEach { key ->
+        // 流程示例只在流程功能开启时展示（ADR-0030）。
+        EXAMPLE_KEYS.filter { flowsEnabled || it != R.string.task_author_example_flow }.forEach { key ->
             val example = stringResource(key)
             AutopChip(
                 text = example,
@@ -408,7 +414,10 @@ private fun ThinkingBlock(
 
 /** 草稿卡片：名称、目标、触发方式、执行方式与提示。 */
 @Composable
-private fun DraftCard(draft: TaskDraft) {
+private fun DraftCard(
+    draft: TaskDraft,
+    flowsEnabled: Boolean,
+) {
     val spacing = LocalSpacing.current
     Column(
         modifier =
@@ -431,7 +440,7 @@ private fun DraftCard(draft: TaskDraft) {
         Text(text = triggerText(draft), style = MaterialTheme.typography.bodySmall)
         Text(
             text =
-                if (draft.executorFlow.isNullOrBlank()) {
+                if (!flowsEnabled || draft.executorFlow.isNullOrBlank()) {
                     stringResource(R.string.task_author_executor_agent)
                 } else {
                     stringResource(R.string.task_author_executor_flow, draft.executorFlow.orEmpty())

@@ -41,16 +41,18 @@ public enum class BallMenuAction {
  * 也由控制条接管隐藏），返回空菜单。顺序即圆弧上的摆位（开口朝屏幕内侧，从上到下）。
  *
  * @param toolTestEnabled 调试模式开关（`ui.debug.verboseLogging`）：关闭时不放 TOOL_TEST（tool_optimize D20）。
+ * @param flowsEnabled 流程 Beta 开关（`features.flows`，docs/adr/0030）：关闭时不放 RECORD（录制流程）。
  */
 public fun deriveBallMenu(
     active: ActiveRunInfo?,
     toolTestEnabled: Boolean,
+    flowsEnabled: Boolean,
 ): List<BallMenuAction> =
     if (active == null) {
         listOfNotNull(
             BallMenuAction.CREATE_TASK,
             BallMenuAction.OPEN_APP,
-            BallMenuAction.RECORD,
+            BallMenuAction.RECORD.takeIf { flowsEnabled },
             BallMenuAction.TOOL_TEST.takeIf { toolTestEnabled },
             BallMenuAction.HIDE_BALL,
         )

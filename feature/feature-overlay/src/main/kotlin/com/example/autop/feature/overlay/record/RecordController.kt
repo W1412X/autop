@@ -16,6 +16,9 @@ import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.exceptionHandler
+import com.example.autop.core.config.BetaFeature
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.device.ElementPicker
@@ -64,6 +67,7 @@ public class RecordController
         private val targetPick: TargetPickSession,
         private val picker: ElementPicker,
         private val logger: Logger,
+        private val configProvider: ConfigProvider,
         dispatchers: DispatcherProvider,
     ) {
         private val scope =
@@ -119,9 +123,13 @@ public class RecordController
                 composeOverlayView(windowContext, owner) { PickLayer(onPick = ::routePick) }
             }
 
-        /** 展开面板（已显示时不重复 show）。录制会话不随面板收起而结束。 */
+        /**
+         * 展开面板（已显示时不重复 show）。录制会话不随面板收起而结束。
+         * 流程 Beta 功能关闭时不展开，因此也不能开始录制（docs/adr/0030-beta-feature-switch.md）。
+         */
         public fun show() {
             if (visibleState.value) return
+            if (!configProvider.current()[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS)) return
             visibleState.value = true
             expandedState.value = false
             host.show(OverlayWindowIds.RECORD, recordSpec(context))

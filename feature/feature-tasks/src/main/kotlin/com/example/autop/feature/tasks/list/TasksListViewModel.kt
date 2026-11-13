@@ -6,14 +6,17 @@ package com.example.autop.feature.tasks.list
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.TaskId
+import com.example.autop.core.config.ConfigProvider
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.TasksNavigator
+import com.example.autop.feature.tasks.flowsEnabled
 import com.example.autop.feature.tasks.scheduleLabelRes
 import com.example.autop.feature.tasks.scheduleTimeText
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
+import com.example.autop.task.TaskExecutor
 import com.example.autop.task.TaskRepository
 import com.example.autop.task.Trigger
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -32,9 +36,17 @@ public class TasksListViewModel
     constructor(
         private val taskRepository: TaskRepository,
         private val runService: RunService,
+        private val configProvider: ConfigProvider,
     ) : ViewModel() {
         private val page = MutableStateFlow(TasksPage.TASKS)
         private val pendingDeleteId = MutableStateFlow<String?>(null)
+
+        /** 流程 Beta 开关（ADR-0030）：由配置流驱动，关闭时流程页签与新建流程入口不可用。 */
+        private val flowsEnabled: StateFlow<Boolean> =
+            configProvider
+                .observe()
+                .map { it.flowsEnabled() }
+                .stateIn(viewModelScope, SharingStarted.Eagerly, configProvider.current().flowsEnabled())
 
         public val uiState: StateFlow<TasksListUiState> =
             combine(
@@ -42,10 +54,13 @@ public class TasksListViewModel
                 taskRepository.observeRuns(taskId = null, limit = RUN_LIMIT),
                 page,
                 pendingDeleteId,
-            ) { tasks, runs, currentPage, deletingId ->
+                flowsEnabled,
+            ) { tasks, runs, currentPage, deletingId, flowsOn ->
                 TasksListUiState(
-                    page = currentPage,
-                    rows = tasks.map { rowOf(it, runs) }.sortedBy { it.triggerKind.ordinal },
+                    flowsEnabled = flowsOn,
+                    // 流程关闭时不停留在「流程」页签。
+                    page = if (flowsOn) currentPage else TasksPage.TASKS,
+                    rows = tasks.map { rowOf(it, runs, flowsOn) }.sortedBy { it.triggerKind.ordinal },
                     waiting = runs.filter { it.status == RunStatus.WAITING_USER }.map(::waitingOf),
                     pendingDeleteId = deletingId,
                 )
@@ -57,8 +72,9 @@ public class TasksListViewModel
             navigator: TasksNavigator,
         ) {
             when (action) {
-                is TasksListAction.SetPage -> page.value = action.page
-                TasksListAction.CreateFlow -> navigator.openFlowCreate()
+                is TasksListAction.SetPage ->
+                    if (action.page == TasksPage.TASKS || flowsEnabled.value) page.value = action.page
+                TasksListAction.CreateFlow -> if (flowsEnabled.value) navigator.openFlowCreate()
                 is TasksListAction.OpenDetail -> navigator.openDetail(action.taskId)
                 is TasksListAction.OpenEdit -> navigator.openEdit(action.taskId)
                 TasksListAction.CreateTask -> navigator.openEdit(NEW_TASK_ID)
@@ -111,6 +127,7 @@ public class TasksListViewModel
         private fun rowOf(
             task: Task,
             runs: List<RunRecord>,
+            flowsOn: Boolean,
         ): TaskRowUi {
             val (kind, detail) = triggerOf(task)
             val spec = (task.trigger as? Trigger.Schedule)?.spec
@@ -123,6 +140,7 @@ public class TasksListViewModel
                 cooldownMinutes = (task.trigger as? Trigger.Condition)?.cooldownMs?.div(MINUTE_MS)?.toInt() ?: 0,
                 enabled = task.enabled,
                 lastRunStatus = runs.firstOrNull { it.taskId == task.id }?.status?.name,
+                flowDisabled = task.executor == TaskExecutor.FLOW && !flowsOn,
             )
         }
 

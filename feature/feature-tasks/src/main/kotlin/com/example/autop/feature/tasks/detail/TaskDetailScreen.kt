@@ -15,6 +15,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopButton
+import com.example.autop.core.ui.component.AutopTag
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ListRow
@@ -66,6 +67,8 @@ public fun TaskDetailScreen(
                 AutopButton(
                     text = stringResource(R.string.task_detail_run_now),
                     onClick = { onAction(TaskDetailAction.RunNow) },
+                    // 流程任务且流程功能关闭：失效，禁用立即运行（与同页按钮样式一致，仅置灰）。
+                    enabled = !state.flowDisabled,
                     modifier =
                         Modifier
                             .fillMaxWidth()
@@ -94,6 +97,9 @@ private fun SummarySection(state: TaskDetailUiState) {
     ListRow(
         title = state.name,
         subtitle = state.goal,
+        trailing = {
+            if (state.flowDisabled) AutopTag(text = stringResource(R.string.tasks_invalid_tag))
+        },
         modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
     )
     ListRow(

@@ -16,8 +16,10 @@ import androidx.compose.ui.platform.LocalWindowInfo
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.onErr
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigEditor
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayGravity
@@ -115,7 +117,12 @@ public class BallMenuController
                     BallMenuCallbacks(onAction = ::onAction, onDismiss = ::dismiss)
                 }
             BallMenuScreen(
-                actions = deriveBallMenu(active, config[UiConfig.DEBUG].verboseLogging),
+                actions =
+                    deriveBallMenu(
+                        active = active,
+                        toolTestEnabled = config[UiConfig.DEBUG].verboseLogging,
+                        flowsEnabled = config[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS),
+                    ),
                 ballCenterX = centerX,
                 ballCenterY = centerY,
                 callbacks = callbacks,

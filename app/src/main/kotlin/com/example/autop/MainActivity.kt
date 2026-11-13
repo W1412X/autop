@@ -12,7 +12,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.autop.core.common.AnimationScaleReader
 import com.example.autop.core.common.Capability
 import com.example.autop.core.common.PlatformCapabilities
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.ui.theme.AutopTheme
 import com.example.autop.core.ui.theme.toAppearanceSettings
@@ -55,6 +57,8 @@ class MainActivity : ComponentActivity() {
             AutopTheme(appearance = appearance) {
                 AppNavHost(
                     showLabels = snapshot[UiConfig.NAV].showLabels,
+                    // 流程 Beta 开关（docs/adr/0030-beta-feature-switch.md）：关闭时流程入口不可达。
+                    flowsEnabled = snapshot[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS),
                     // 首次未完成引导进引导页（docs/tech/08 §4.7，N159）。
                     startDestination =
                         if (snapshot[UiConfig.ONBOARDING].completed) {

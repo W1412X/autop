@@ -8,11 +8,13 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.TaskId
+import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.TASK_HINT_ARG
 import com.example.autop.feature.tasks.TASK_ID_ARG
 import com.example.autop.feature.tasks.TasksNavigator
+import com.example.autop.feature.tasks.flowsEnabled
 import com.example.autop.llm.ModelProfileStore
 import com.example.autop.task.TaskAuthor
 import com.example.autop.task.TaskAuthorSession
@@ -27,6 +29,8 @@ import javax.inject.Inject
 
 /** 创作页状态。 */
 public data class TaskAuthorUiState(
+    /** 流程 Beta 功能是否开启；关闭时示例与草稿不展示流程（ADR-0030）。 */
+    val flowsEnabled: Boolean = false,
     /** 会话级模型覆盖（null = 跟随默认）与可选模型。 */
     val modelProfileId: String? = null,
     val modelOptions: List<com.example.autop.core.ui.component.OptionItem> = emptyList(),
@@ -66,14 +70,21 @@ public class TaskAuthorViewModel
         savedStateHandle: SavedStateHandle,
         private val author: TaskAuthor,
         private val modelProfiles: ModelProfileStore,
+        private val configProvider: ConfigProvider,
     ) : ViewModel() {
         private val taskId: String? = savedStateHandle.get<String>(TASK_ID_ARG)?.takeIf { it != NEW_TASK_ID }
-        private val _uiState = MutableStateFlow(TaskAuthorUiState())
+        private val _uiState =
+            MutableStateFlow(TaskAuthorUiState(flowsEnabled = configProvider.current().flowsEnabled()))
         public val uiState: StateFlow<TaskAuthorUiState> = _uiState
         private var session: TaskAuthorSession? = null
         private var sendJob: Job? = null
 
         init {
+            viewModelScope.launch {
+                configProvider.observe().collect { snapshot ->
+                    _uiState.update { it.copy(flowsEnabled = snapshot.flowsEnabled()) }
+                }
+            }
             viewModelScope.launch {
                 modelProfiles.profiles.collect { profiles ->
                     _uiState.update {

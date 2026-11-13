@@ -8,6 +8,9 @@
     <string name="me_section_tasks">任务与提醒</string>
     <string name="me_section_appearance">外观</string>
     <string name="me_section_advanced">高级</string>
+    <string name="me_section_beta">Beta 功能</string>
+    <string name="me_beta_flows">流程</string>
+    <string name="me_sub_beta_flows">可重复自动化的固定步骤流程（测试中）</string>
 
     <string name="me_nav_models">模型配置</string>
     <string name="me_nav_observe">观测方式</string>

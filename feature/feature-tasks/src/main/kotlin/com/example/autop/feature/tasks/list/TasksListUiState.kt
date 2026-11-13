@@ -5,6 +5,8 @@ package com.example.autop.feature.tasks.list
 
 /** 列表页状态。 */
 public data class TasksListUiState(
+    /** 流程 Beta 功能是否开启；关闭时不显示「流程」页签（ADR-0030）。 */
+    val flowsEnabled: Boolean = false,
     /** 顶部页签：任务（条件/定时/手动合并显示）或流程。 */
     val page: TasksPage = TasksPage.TASKS,
     val rows: List<TaskRowUi> = emptyList(),
@@ -25,6 +27,8 @@ public data class TaskRowUi(
     val enabled: Boolean,
     /** 最近一次 Run 的状态名（无运行记录为 null）。 */
     val lastRunStatus: String?,
+    /** 流程任务且流程功能关闭：列表显示「失效」标签（ADR-0030）。 */
+    val flowDisabled: Boolean = false,
 )
 
 /** 一个等待确认的 Run（WAITING_USER）。 */

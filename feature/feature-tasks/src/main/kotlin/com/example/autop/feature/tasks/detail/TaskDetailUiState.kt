@@ -16,6 +16,8 @@ public data class TaskDetailUiState(
     val lockedRemind: Boolean = true,
     val priority: Int = 0,
     val enabled: Boolean = true,
+    /** 流程任务且流程功能关闭：失效，不能立即运行（ADR-0030）。 */
+    val flowDisabled: Boolean = false,
     val runs: List<RunRowUi> = emptyList(),
     val feedback: TaskDetailFeedback? = null,
 )

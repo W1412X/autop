@@ -52,6 +52,8 @@ public data class MeUiState(
     val returnToOriginApp: Boolean = true,
     /** `task.conditions.enabled`（条件触发总开关，docs/tech/07 §4.2）。 */
     val conditionsEnabled: Boolean = true,
+    /** `features.flows`（流程 Beta 开关，docs/adr/0030-beta-feature-switch.md）。 */
+    val flowsEnabled: Boolean = false,
     /** `device.touch.shieldEnabled`（执行期触摸盾总开关，N215）。 */
     val shieldEnabled: Boolean = true,
     /** `device.action.delayMs`（动作后固定等待毫秒数，tool_optimize 03 §5.1）。 */

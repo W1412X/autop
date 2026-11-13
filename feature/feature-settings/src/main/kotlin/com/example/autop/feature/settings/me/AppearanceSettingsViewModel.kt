@@ -21,8 +21,10 @@ import com.example.autop.core.common.PermissionChecks
 import com.example.autop.core.common.onErr
 import com.example.autop.core.config.ConfigEditor
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.DeviceConfig
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.config.LlmConfig
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.core.config.UiConfig
@@ -140,6 +142,7 @@ public class AppearanceSettingsViewModel
                     hostPersistent = snapshot[TaskConfig.HOST].persistent,
                     returnToOriginApp = snapshot[TaskConfig.TASK].returnToOriginApp,
                     conditionsEnabled = snapshot[TaskConfig.CONDITIONS].enabled,
+                    flowsEnabled = snapshot[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS),
                     shieldEnabled = snapshot[DeviceConfig.TOUCH].shieldEnabled,
                     actionDelayMs = snapshot[DeviceConfig.ACTION].delayMs,
                     snoozeMinutes = reminder.snoozeMinutes,
@@ -206,6 +209,8 @@ public class AppearanceSettingsViewModel
                 is MeAction.SetHostPersistent -> write(HOST_PERSISTENT_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetReturnToOriginApp -> write(RETURN_TO_ORIGIN_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetConditionsEnabled -> write(CONDITIONS_ENABLED_PATH, JsonPrimitive(action.enabled))
+                is MeAction.SetBetaFeature ->
+                    write(FeaturesConfig.pathOf(action.feature), JsonPrimitive(action.enabled))
                 is MeAction.SetShieldEnabled -> write(SHIELD_ENABLED_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetActionDelay ->
                     write(

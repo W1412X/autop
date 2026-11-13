@@ -10,9 +10,11 @@ import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.TaskId
+import com.example.autop.core.config.ConfigProvider
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.TASK_ID_ARG
 import com.example.autop.feature.tasks.TasksNavigator
+import com.example.autop.feature.tasks.flowsEnabled
 import com.example.autop.flow.FlowParam
 import com.example.autop.flow.FlowStore
 import com.example.autop.flow.FlowValidationService
@@ -47,17 +49,26 @@ public class TaskEditViewModel
         private val clock: Clock,
         private val flowStore: FlowStore,
         private val flowValidation: FlowValidationService,
+        private val configProvider: ConfigProvider,
     ) : ViewModel() {
         private val taskId: String? =
             savedStateHandle.get<String>(TASK_ID_ARG)?.takeIf { it != NEW_TASK_ID }
 
-        private val _uiState = MutableStateFlow(TaskEditUiState(isNew = taskId == null))
+        private val _uiState =
+            MutableStateFlow(
+                TaskEditUiState(isNew = taskId == null, flowsEnabled = configProvider.current().flowsEnabled()),
+            )
 
         public val uiState: StateFlow<TaskEditUiState> = _uiState
 
         private var simEvents: List<TriggerEvent> = emptyList()
 
         init {
+            viewModelScope.launch {
+                configProvider.observe().collect { snapshot ->
+                    _uiState.update { it.copy(flowsEnabled = snapshot.flowsEnabled()) }
+                }
+            }
             _uiState.update {
                 it.copy(sourceOptions = sources.map { s -> SourceOptionUi(s.id, s.fieldNames, s.requiresPermission) })
             }
@@ -71,6 +82,12 @@ public class TaskEditViewModel
             action: TaskEditAction,
             navigator: TasksNavigator,
         ) {
+            // 流程功能关闭时执行方式区块隐藏，流程相关动作不生效（ADR-0030）。
+            val flowAction =
+                action is TaskEditAction.SetExecutorFlow ||
+                    action is TaskEditAction.SetFlow ||
+                    action is TaskEditAction.SetFlowParam
+            if (flowAction && !_uiState.value.flowsEnabled) return
             when (action) {
                 is TaskEditAction.SetName -> _uiState.update { it.copy(name = action.value) }
                 is TaskEditAction.SetGoal -> _uiState.update { it.copy(goal = action.value) }

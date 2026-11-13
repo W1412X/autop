@@ -31,8 +31,10 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -81,6 +83,7 @@ private val TOP_LEVEL_ROUTES: Set<String> =
  *
  * @param showLabels 底栏是否显示文字（`ui.nav.showLabels`，默认只显示图标）。
  * @param startDestination 起始页（首次未完成引导时为 [AutopRoutes.ONBOARDING]，docs/tech/08 §4.7）。
+ * @param flowsEnabled 流程 Beta 功能是否开启（docs/adr/0030-beta-feature-switch.md）；关闭时流程类跳转不导航。
  * @param debugPage 调试页（debug 源集提供；release 为 null，docs/tech/08 §4.6）。
  */
 @Composable
@@ -88,6 +91,7 @@ internal fun AppNavHost(
     showLabels: Boolean,
     startDestination: String = AutopRoutes.CHAT_LIST,
     openRoute: String? = null,
+    flowsEnabled: Boolean = false,
     debugPage: DebugPage? = null,
 ) {
     val navController = rememberNavController()
@@ -102,8 +106,11 @@ internal fun AppNavHost(
     val context = LocalContext.current
     val settingsNavigator = remember(navController, context) { createSettingsNavigator(navController, context) }
     val memoryNavigator = remember(navController) { createMemoryNavigator(navController) }
-    val chatNavigator = remember(navController, context) { createChatNavigator(navController, context) }
-    val tasksNavigator = remember(navController) { createTasksNavigator(navController) }
+    // 导航回调只在 navController 变化时重建，开关改变后需读取最新值，故以 State 传入、调用时取值。
+    val flowsEnabledState = rememberUpdatedState(flowsEnabled)
+    val chatNavigator =
+        remember(navController, context) { createChatNavigator(navController, context, flowsEnabledState) }
+    val tasksNavigator = remember(navController) { createTasksNavigator(navController, flowsEnabledState) }
     val flowsNavigator = remember(navController, context) { createFlowsNavigator(navController, context) }
     val onboardingNavigator = remember(navController, context) { createOnboardingNavigator(navController, context) }
     Column(modifier = Modifier.fillMaxSize()) {
@@ -358,10 +365,14 @@ private fun createOnboardingNavigator(
         }
     }
 
-/** 对话导航回调（docs/tech/08 §3/§4.1/§4.2）：路由跳转、无障碍设置、让出屏幕与日志导出分享。 */
+/**
+ * 对话导航回调（docs/tech/08 §3/§4.1/§4.2）：路由跳转、无障碍设置、让出屏幕与日志导出分享。
+ * 流程类跳转受 [flowsEnabled] 约束（ADR-0030）：关闭时忽略，因为未开启时流程路由不可达，导航会抛异常。
+ */
 private fun createChatNavigator(
     navController: NavHostController,
     context: Context,
+    flowsEnabled: State<Boolean>,
 ): ChatNavigator =
     object : ChatNavigator {
         override fun openThread(threadId: String) {
@@ -407,10 +418,12 @@ private fun createChatNavigator(
                 StepLink.TASK_DETAIL -> link.taskId?.let { navController.navigate(AutopRoutes.taskDetail(it)) }
                 StepLink.TASK_EDIT -> link.taskId?.let { navController.navigate(AutopRoutes.taskEdit(it)) }
                 StepLink.TASK_AI -> link.taskId?.let { navController.navigate(AutopRoutes.taskAuthor(it)) }
-                StepLink.FLOW_DETAIL -> link.flowId?.let { navController.navigate(AutopRoutes.flowDetail(it)) }
-                StepLink.FLOW_EDIT -> link.flowId?.let { navController.navigate(AutopRoutes.flowEditor(it)) }
+                StepLink.FLOW_DETAIL ->
+                    if (flowsEnabled.value) link.flowId?.let { navController.navigate(AutopRoutes.flowDetail(it)) }
+                StepLink.FLOW_EDIT ->
+                    if (flowsEnabled.value) link.flowId?.let { navController.navigate(AutopRoutes.flowEditor(it)) }
                 StepLink.FLOW_AI ->
-                    if (link.draftId != null || link.flowId != null) {
+                    if (flowsEnabled.value && (link.draftId != null || link.flowId != null)) {
                         navController.navigate(AutopRoutes.flowAuthor(draftId = link.draftId, editFlowId = link.flowId))
                     }
             }
@@ -425,8 +438,14 @@ private fun createChatNavigator(
         }
     }
 
-/** 任务导航回调（docs/tech/08 §4.3）：编辑 / 详情 / Run 详情跳转与返回。 */
-private fun createTasksNavigator(navController: NavHostController): TasksNavigator =
+/**
+ * 任务导航回调（docs/tech/08 §4.3）：编辑 / 详情 / Run 详情跳转与返回。
+ * [flowsEnabled] 关闭时流程创建入口不导航（ADR-0030）。
+ */
+private fun createTasksNavigator(
+    navController: NavHostController,
+    flowsEnabled: State<Boolean>,
+): TasksNavigator =
     object : TasksNavigator {
         override fun openEdit(taskId: String?) {
             navController.navigate(AutopRoutes.taskEdit(taskId ?: NEW_TASK_ID))
@@ -445,7 +464,7 @@ private fun createTasksNavigator(navController: NavHostController): TasksNavigat
         }
 
         override fun openFlowCreate() {
-            navController.navigate(AutopRoutes.FLOW_CREATE)
+            if (flowsEnabled.value) navController.navigate(AutopRoutes.FLOW_CREATE)
         }
 
         override fun navigateBack() {

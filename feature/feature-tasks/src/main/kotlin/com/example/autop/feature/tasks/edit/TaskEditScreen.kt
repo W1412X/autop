@@ -119,6 +119,8 @@ private fun ExecutorSection(
 ) {
     val spacing = LocalSpacing.current
     var picking by remember { mutableStateOf(false) }
+    // 流程功能关闭：整个执行方式区块不显示（ADR-0030）。
+    if (!state.flowsEnabled) return
     SectionTitle(text = stringResource(R.string.task_edit_section_executor))
     OptionRow(
         title = stringResource(R.string.task_edit_executor),

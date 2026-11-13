@@ -13,7 +13,7 @@ import org.junit.Test
 class BallMenuLogicTest {
     @Test
     fun `idle shows create task and open app in order`() {
-        assertThat(deriveBallMenu(null, toolTestEnabled = true))
+        assertThat(deriveBallMenu(null, toolTestEnabled = true, flowsEnabled = true))
             .isEqualTo(
                 listOf(
                     BallMenuAction.CREATE_TASK,
@@ -27,7 +27,7 @@ class BallMenuLogicTest {
 
     @Test
     fun `debug switch off hides tool test entry`() {
-        assertThat(deriveBallMenu(null, toolTestEnabled = false))
+        assertThat(deriveBallMenu(null, toolTestEnabled = false, flowsEnabled = true))
             .isEqualTo(
                 listOf(
                     BallMenuAction.CREATE_TASK,
@@ -41,7 +41,7 @@ class BallMenuLogicTest {
     @Test
     fun `active run offers no ball interaction`() {
         // 执行中交互走顶部控制条＋消息条（N218），悬浮球运行态菜单弃用。
-        assertThat(deriveBallMenu(activeRun(), toolTestEnabled = true)).isEmpty()
+        assertThat(deriveBallMenu(activeRun(), toolTestEnabled = true, flowsEnabled = true)).isEmpty()
     }
 
     @Test

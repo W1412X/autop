@@ -4,6 +4,7 @@
  */
 package com.example.autop.feature.settings.me
 
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.feature.settings.SettingsSection
 
 public sealed interface MeAction {
@@ -79,6 +80,12 @@ public sealed interface MeAction {
 
     /** 条件触发总开关（`task.conditions.enabled`，docs/tech/07 §4.2）。 */
     public data class SetConditionsEnabled(
+        val enabled: Boolean,
+    ) : MeAction
+
+    /** Beta 功能开关（`features.*`，docs/adr/0030-beta-feature-switch.md）。 */
+    public data class SetBetaFeature(
+        val feature: BetaFeature,
         val enabled: Boolean,
     ) : MeAction
 
