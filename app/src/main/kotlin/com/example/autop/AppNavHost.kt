@@ -140,6 +140,7 @@ internal fun AppNavHost(
             memoryGraph(
                 browseRoute = AutopRoutes.MEMORY_BROWSE,
                 nodeRoute = AutopRoutes.MEMORY_NODE,
+                newRoute = AutopRoutes.MEMORY_NEW,
                 changesRoute = AutopRoutes.MEMORY_CHANGES,
                 navigator = memoryNavigator,
             )
@@ -220,6 +221,13 @@ private fun createMemoryNavigator(navController: NavHostController): MemoryNavig
 
         override fun openNode(path: String) {
             navController.navigate(AutopRoutes.memoryNode(path))
+        }
+
+        override fun openNewNode(
+            parent: String,
+            isDirectory: Boolean,
+        ) {
+            navController.navigate(AutopRoutes.memoryNew(parent, isDirectory))
         }
 
         override fun openChanges() {

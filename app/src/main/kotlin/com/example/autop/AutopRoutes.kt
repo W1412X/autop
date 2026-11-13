@@ -12,6 +12,8 @@ import com.example.autop.feature.flows.AUTHOR_EDIT_ARG
 import com.example.autop.feature.flows.FLOW_ID_ARG
 import com.example.autop.feature.flows.FLOW_RUN_ID_ARG
 import com.example.autop.feature.flows.NO_ARG
+import com.example.autop.feature.memory.MEMORY_NEW_DIR_ARG
+import com.example.autop.feature.memory.MEMORY_NEW_PARENT_ARG
 import com.example.autop.feature.memory.MEMORY_PATH_ARG
 import com.example.autop.feature.onboarding.ONBOARDING_MODE_ARG
 import com.example.autop.feature.onboarding.ONBOARDING_MODE_HEALTH
@@ -48,6 +50,10 @@ object AutopRoutes {
 
     /** 记忆条目编辑路由模板（docs/tech/08 §4.4 `memory/node?path=`）。 */
     val MEMORY_NODE: String = "memory/node?path={${MEMORY_PATH_ARG}}"
+
+    /** 新建条目/目录路由模板（直接进编辑页；参数名取自 feature-memory 的 MEMORY_NEW_PARENT_ARG / MEMORY_NEW_DIR_ARG）。 */
+    val MEMORY_NEW: String =
+        "memory/new?${MEMORY_NEW_PARENT_ARG}={${MEMORY_NEW_PARENT_ARG}}&${MEMORY_NEW_DIR_ARG}={${MEMORY_NEW_DIR_ARG}}"
 
     /** 记忆最近变更页（docs/tech/08 §4.4 `memory/changes`）。 */
     const val MEMORY_CHANGES: String = "memory/changes"
@@ -121,6 +127,12 @@ object AutopRoutes {
 
     /** 记忆条目编辑路由：[path] 经 URL 编码（如 `memory/node?path=%2Fpeople`）。 */
     fun memoryNode(path: String): String = "memory/node?path=${Uri.encode(path)}"
+
+    /** 新建条目/目录路由：[parent] 为所在目录路径，经 URL 编码；[isDirectory] 为 true 时新建目录。 */
+    fun memoryNew(
+        parent: String,
+        isDirectory: Boolean,
+    ): String = "memory/new?${MEMORY_NEW_PARENT_ARG}=${Uri.encode(parent)}&${MEMORY_NEW_DIR_ARG}=$isDirectory"
 
     /** "我的"子页路由：[id] 见 feature-settings 的 `SettingsSection.id`。 */
     fun meSection(id: String): String = "me/$id"

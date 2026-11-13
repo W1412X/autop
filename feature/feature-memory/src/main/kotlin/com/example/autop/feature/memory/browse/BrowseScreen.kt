@@ -15,7 +15,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -30,7 +29,6 @@ import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
-import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ErrorState
@@ -56,10 +54,10 @@ public fun BrowseScreen(
     state: BrowseUiState,
     onAction: (BrowseAction) -> Unit,
     onOpenNode: (String) -> Unit,
+    onOpenNew: (parent: String, isDirectory: Boolean) -> Unit,
     onOpenChanges: () -> Unit,
 ) {
     var showCreateSheet by remember { mutableStateOf(false) }
-    var createRequest by remember { mutableStateOf<String?>(null) }
 
     Column(
         modifier =
@@ -90,13 +88,15 @@ public fun BrowseScreen(
         }
     }
 
-    CreateFlow(
-        showSheet = showCreateSheet,
-        pendingKind = createRequest,
-        onAction = onAction,
-        onSheetVisible = { showCreateSheet = it },
-        onPendingKind = { createRequest = it },
-    )
+    if (showCreateSheet) {
+        CreateTypeSheet(
+            onSelect = { isDirectory ->
+                showCreateSheet = false
+                onOpenNew(state.path, isDirectory)
+            },
+            onDismiss = { showCreateSheet = false },
+        )
+    }
     if (state.pendingDelete != null) {
         ConfirmDialog(
             title = stringResource(R.string.memory_delete_title),
@@ -108,55 +108,31 @@ public fun BrowseScreen(
     }
 }
 
-/** 新建流程（类型弹层 → 命名对话框；条目带选填初始内容）。 */
+/** 新建类型选择（条目 / 目录）；选定后直接进入编辑页，名称在编辑页内填写。 */
 @Composable
-private fun CreateFlow(
-    showSheet: Boolean,
-    pendingKind: String?,
-    onAction: (BrowseAction) -> Unit,
-    onSheetVisible: (Boolean) -> Unit,
-    onPendingKind: (String?) -> Unit,
+private fun CreateTypeSheet(
+    onSelect: (isDirectory: Boolean) -> Unit,
+    onDismiss: () -> Unit,
 ) {
-    if (showSheet) {
-        OptionSheet(
-            title = stringResource(R.string.memory_create_new),
-            options =
-                listOf(
-                    OptionItem(
-                        id = CREATE_ITEM_ID,
-                        label = stringResource(R.string.memory_create_item),
-                        icon = OptionIcon.ADD,
-                    ),
-                    OptionItem(
-                        id = CREATE_DIR_ID,
-                        label = stringResource(R.string.memory_create_dir),
-                        icon = OptionIcon.FOLDER,
-                    ),
+    OptionSheet(
+        title = stringResource(R.string.memory_create_new),
+        options =
+            listOf(
+                OptionItem(
+                    id = CREATE_ITEM_ID,
+                    label = stringResource(R.string.memory_create_item),
+                    icon = OptionIcon.ADD,
                 ),
-            selectedId = null,
-            onSelect = { id ->
-                onSheetVisible(false)
-                onPendingKind(id)
-            },
-            onDismiss = { onSheetVisible(false) },
-        )
-    }
-    pendingKind?.let { kind ->
-        CreateNameDialog(
-            isDirectory = kind == CREATE_DIR_ID,
-            onConfirm = { name, content ->
-                onAction(
-                    BrowseAction.Create(
-                        title = if (kind == CREATE_DIR_ID) null else name,
-                        name = name,
-                        content = content,
-                    ),
-                )
-                onPendingKind(null)
-            },
-            onDismiss = { onPendingKind(null) },
-        )
-    }
+                OptionItem(
+                    id = CREATE_DIR_ID,
+                    label = stringResource(R.string.memory_create_dir),
+                    icon = OptionIcon.FOLDER,
+                ),
+            ),
+        selectedId = null,
+        onSelect = { id -> onSelect(id == CREATE_DIR_ID) },
+        onDismiss = onDismiss,
+    )
 }
 
 @Composable
@@ -318,59 +294,6 @@ private fun SearchResults(
                 )
             }
     }
-}
-
-@Composable
-private fun CreateNameDialog(
-    isDirectory: Boolean,
-    onConfirm: (name: String, content: String) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    var name by remember { mutableStateOf("") }
-    var content by remember { mutableStateOf("") }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text =
-                    stringResource(
-                        if (isDirectory) R.string.memory_create_dir else R.string.memory_create_item,
-                    ),
-                style = MaterialTheme.typography.titleLarge,
-            )
-        },
-        text = {
-            Column {
-                AutopInputBar(
-                    value = name,
-                    onValueChange = { name = it },
-                    spec = InputBarSpec(placeholder = stringResource(R.string.memory_name_placeholder)),
-                    modifier = Modifier.fillMaxWidth(),
-                )
-                if (!isDirectory) {
-                    AutopInputBar(
-                        value = content,
-                        onValueChange = { content = it },
-                        spec =
-                            InputBarSpec(
-                                placeholder = stringResource(R.string.memory_content_placeholder),
-                                maxLines = 3,
-                            ),
-                        modifier = Modifier.fillMaxWidth(),
-                    )
-                }
-            }
-        },
-        confirmButton = {
-            AutopTextButton(
-                text = stringResource(R.string.memory_confirm_create),
-                onClick = { if (name.isNotBlank()) onConfirm(name, content) },
-            )
-        },
-        dismissButton = {
-            AutopTextButton(text = stringResource(R.string.memory_cancel), onClick = onDismiss)
-        },
-    )
 }
 
 @Composable

@@ -20,17 +20,25 @@ import com.example.autop.feature.memory.node.NodeViewModel
 /** 浏览与条目路由的路径参数名。 */
 public const val MEMORY_PATH_ARG: String = "path"
 
+/** 新建条目路由的父目录参数名。 */
+public const val MEMORY_NEW_PARENT_ARG: String = "parent"
+
+/** 新建条目路由的类型参数名（`true` 为目录）。 */
+public const val MEMORY_NEW_DIR_ARG: String = "dir"
+
 /**
  * 挂载记忆浏览、条目编辑与最近变更三页（docs/tech/08 §4.4）。
  *
  * @param browseRoute 浏览路由模板（app 的 `AutopRoutes.MEMORY_BROWSE`）。
  * @param nodeRoute 条目路由模板（app 的 `AutopRoutes.MEMORY_NODE`）。
+ * @param newRoute 新建条目路由模板（app 的 `AutopRoutes.MEMORY_NEW`），与条目编辑页共用页面。
  * @param changesRoute 最近变更路由（app 的 `AutopRoutes.MEMORY_CHANGES`）。
  * @param navigator 记忆域导航回调。
  */
 public fun NavGraphBuilder.memoryGraph(
     browseRoute: String,
     nodeRoute: String,
+    newRoute: String,
     changesRoute: String,
     navigator: MemoryNavigator,
 ) {
@@ -38,6 +46,9 @@ public fun NavGraphBuilder.memoryGraph(
         BrowseRoute(navigator = navigator)
     }
     composable(nodeRoute) {
+        NodeRoute(navigator = navigator)
+    }
+    composable(newRoute) {
         NodeRoute(navigator = navigator)
     }
     composable(changesRoute) {
@@ -55,6 +66,7 @@ private fun BrowseRoute(
         state = state,
         onAction = viewModel::onAction,
         onOpenNode = navigator::openNode,
+        onOpenNew = navigator::openNewNode,
         onOpenChanges = navigator::openChanges,
     )
 }

@@ -18,8 +18,6 @@ import com.example.autop.memory.MemoryPath
 import com.example.autop.memory.MemorySearch
 import com.example.autop.memory.MemorySource
 import com.example.autop.memory.MemoryStore
-import com.example.autop.memory.MemoryWrite
-import com.example.autop.memory.WriteMode
 import com.example.autop.memory.isAutomated
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
@@ -72,7 +70,6 @@ public class BrowseViewModel
                     queryFlow.value = action.query
                 }
                 BrowseAction.LoadMore -> loadMore()
-                is BrowseAction.Create -> create(action)
                 is BrowseAction.RequestDelete -> _uiState.value = _uiState.value.copy(pendingDelete = action.path)
                 BrowseAction.ConfirmDelete -> delete()
                 BrowseAction.DismissDelete -> _uiState.value = _uiState.value.copy(pendingDelete = null)
@@ -189,37 +186,6 @@ public class BrowseViewModel
                         pendingDelete = null,
                         error = (result as? Outcome.Err)?.error?.message,
                     )
-            }
-        }
-
-        private fun create(action: BrowseAction.Create) {
-            val name = action.name.trim()
-            val parent = MemoryPath.parse(_uiState.value.path).getOrNull() ?: MemoryPath.ROOT
-            val target =
-                when (val parsed = MemoryPath.parse("${parent.value}/$name")) {
-                    is Outcome.Ok -> parsed.value
-                    is Outcome.Err -> {
-                        _uiState.value = _uiState.value.copy(error = parsed.error.message)
-                        return
-                    }
-                }
-            viewModelScope.launch {
-                val result =
-                    store.write(
-                        MemoryWrite(
-                            path = target,
-                            mode = WriteMode.CREATE,
-                            title = action.title ?: name,
-                            // 目录＝内容空白（行判定 isBlank 即目录）：条目必须落非空内容，
-                            // 选填内容留空时以标题兜底，防止"新建条目"被误建成目录。
-                            content = action.content.ifBlank { if (action.title != null) name else "" },
-                            source = MemorySource.USER,
-                        ),
-                    )
-                when (result) {
-                    is Outcome.Ok -> navigateTo(parent.value)
-                    is Outcome.Err -> _uiState.value = _uiState.value.copy(error = result.error.message)
-                }
             }
         }
 

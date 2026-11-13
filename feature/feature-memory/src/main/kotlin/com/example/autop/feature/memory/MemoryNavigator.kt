@@ -11,6 +11,12 @@ public interface MemoryNavigator {
     /** 打开条目编辑页。 */
     public fun openNode(path: String)
 
+    /** 直接打开新建页（在 [parent] 目录下新建条目或目录；名称在编辑页内填写）。 */
+    public fun openNewNode(
+        parent: String,
+        isDirectory: Boolean,
+    )
+
     /** 打开最近变更页。 */
     public fun openChanges()
 

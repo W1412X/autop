@@ -59,19 +59,21 @@ public fun NodeScreen(
                 .statusBarsPadding(),
     ) {
         SubPageTopBar(
-            title = state.title.ifBlank { state.path },
+            title = heading(state),
             onBack = onBack,
             actions = {
-                AutopIconButton(
-                    icon = AutopIcons.Schedule,
-                    contentDescription = stringResource(R.string.memory_version_history),
-                    onClick = { onAction(NodeAction.ShowVersions) },
-                )
-                AutopIconButton(
-                    icon = AutopIcons.MoreVert,
-                    contentDescription = stringResource(R.string.memory_more),
-                    onClick = { onAction(NodeAction.ShowMore) },
-                )
+                if (!state.isNew) {
+                    AutopIconButton(
+                        icon = AutopIcons.Schedule,
+                        contentDescription = stringResource(R.string.memory_version_history),
+                        onClick = { onAction(NodeAction.ShowVersions) },
+                    )
+                    AutopIconButton(
+                        icon = AutopIcons.MoreVert,
+                        contentDescription = stringResource(R.string.memory_more),
+                        onClick = { onAction(NodeAction.ShowMore) },
+                    )
+                }
             },
         )
         if (state.loading) {
@@ -123,26 +125,24 @@ private fun NodeForm(
             onAction = onAction,
             field = NodeField.TITLE,
         )
-        FieldInput(
-            label = stringResource(R.string.memory_field_summary),
-            value = state.summary,
-            maxLines = 1,
-            onAction = onAction,
-            field = NodeField.SUMMARY,
-        )
-        Text(
-            text = stringResource(R.string.memory_summary_chars, state.summary.length, state.summaryMaxChars),
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = spacing.screenEdge, bottom = NODE_V_PADDING),
-        )
-        FieldInput(
-            label = stringResource(R.string.memory_field_content),
-            value = state.content,
-            maxLines = CONTENT_MAX_LINES,
-            onAction = onAction,
-            field = NodeField.CONTENT,
-        )
+        if (state.titleInvalid) {
+            Text(
+                text = stringResource(R.string.memory_title_invalid),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.error,
+                modifier = Modifier.padding(start = spacing.screenEdge),
+            )
+        }
+        SummaryField(state = state, onAction = onAction)
+        if (!state.creatingDirectory) {
+            FieldInput(
+                label = stringResource(R.string.memory_field_content),
+                value = state.content,
+                maxLines = CONTENT_MAX_LINES,
+                onAction = onAction,
+                field = NodeField.CONTENT,
+            )
+        }
         SectionTitle(text = stringResource(R.string.memory_section_keywords))
         KeywordRow(state = state, onAction = onAction)
         SectionTitle(text = stringResource(R.string.memory_section_info))
@@ -160,7 +160,36 @@ private fun NodeForm(
 }
 
 @Composable
+private fun SummaryField(
+    state: NodeUiState,
+    onAction: (NodeAction) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    FieldInput(
+        label = stringResource(R.string.memory_field_summary),
+        value = state.summary,
+        maxLines = 1,
+        onAction = onAction,
+        field = NodeField.SUMMARY,
+    )
+    Text(
+        text = stringResource(R.string.memory_summary_chars, state.summary.length, state.summaryMaxChars),
+        style = MaterialTheme.typography.labelSmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        modifier = Modifier.padding(start = spacing.screenEdge, bottom = NODE_V_PADDING),
+    )
+}
+
+@Composable
 private fun NodeInfoRows(state: NodeUiState) {
+    if (state.isNew) {
+        InfoRow(
+            title = stringResource(R.string.memory_info_location),
+            subtitle = null,
+            value = state.path,
+        )
+        return
+    }
     InfoRow(
         title = stringResource(R.string.memory_info_source),
         subtitle = null,
@@ -294,6 +323,16 @@ private fun KeywordAddDialog(
         },
     )
 }
+
+@Composable
+private fun heading(state: NodeUiState): String =
+    when {
+        state.isNew ->
+            stringResource(
+                if (state.creatingDirectory) R.string.memory_new_dir_title else R.string.memory_new_item_title,
+            )
+        else -> state.title.ifBlank { state.path }
+    }
 
 @Composable
 private fun sourceLabel(byAgent: Boolean): String =

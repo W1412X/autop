@@ -7,12 +7,12 @@
 
 ## 组件（src/main/kotlin/…/feature/memory/）
 
-- `MemoryNavGraph.kt`：记忆子图入口——`memoryGraph(browseRoute, nodeRoute, changesRoute, navigator)`
-  注册浏览、条目、最近变更三个 composable；路由参数 `path` 经 `SavedStateHandle` 由 ViewModel 读取
-  （Screen 不透传，避免 UnusedParameter）。
-- `MemoryNavigator.kt`：导航端口（openBrowse/openNode/openChanges/navigateBack），app 侧实现。
-- `browse/`：浏览页（`/` 根目录起）——目录/条目列表分页（`PagedList`）、搜索框、新建条目/目录
-  （`CreateNameDialog`，`MemoryPath.parse` 校验段名）、最近变更入口（副标题带变更数）。
+- `MemoryNavGraph.kt`：记忆子图入口——`memoryGraph(browseRoute, nodeRoute, newRoute, changesRoute, navigator)`
+  注册浏览、条目、新建、最近变更四个 composable；路由参数经 `SavedStateHandle` 由 ViewModel 读取
+  （Screen 不透传，避免 UnusedParameter）。新建路由与条目页共用 `NodeRoute`，参数为父目录 `parent` 与类型 `dir`。
+- `MemoryNavigator.kt`：导航端口（openBrowse/openNode/openNewNode/openChanges/navigateBack），app 侧实现。
+- `browse/`：浏览页（`/` 根目录起）——目录/条目列表分页（`PagedList`）、搜索框、新建入口
+  （类型弹层选条目/目录后直接进条目页，名称在条目页内填写）、最近变更入口（副标题带变更数）。
   `BrowseViewModel` 经 SavedStateHandle 读 `path`，子目录浏览是 VM 内部状态切换而非路由跳转
   （questions.md N142）。
 - `node/`：条目页——标题/摘要/正文编辑（`NodeForm`）、tags（FlowRow + 追加对话框）、links、

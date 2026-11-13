@@ -24,13 +24,6 @@ public sealed interface BrowseAction {
     /** 分页加载下一页。 */
     public data object LoadMore : BrowseAction
 
-    /** 新建条目 / 新建目录（title 为 null 时是目录；[content] 为条目初始内容，可空）。 */
-    public data class Create(
-        val title: String?,
-        val name: String,
-        val content: String = "",
-    ) : BrowseAction
-
     /** 删除行（长按/行菜单入口）：弹确认。 */
     public data class RequestDelete(
         val path: String,

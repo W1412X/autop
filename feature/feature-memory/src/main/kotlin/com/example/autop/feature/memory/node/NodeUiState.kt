@@ -29,6 +29,12 @@ public data class NodeUiState(
     val version: Int = 0,
     val updatedAt: Long = 0,
     val summaryMaxChars: Int = 60,
+    /** 新建模式：条目尚未创建，[path] 为所在目录，保存即创建。 */
+    val isNew: Boolean = false,
+    /** 新建模式下是否在创建目录（目录不编辑正文）。 */
+    val creatingDirectory: Boolean = false,
+    /** 新建模式下标题为空或含 `/`，不能作为路径段。 */
+    val titleInvalid: Boolean = false,
     val saving: Boolean = false,
     val error: String? = null,
     val versions: List<VersionRow> = emptyList(),

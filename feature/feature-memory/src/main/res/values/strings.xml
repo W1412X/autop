@@ -5,11 +5,8 @@
     <string name="memory_create_new">新建</string>
     <string name="memory_create_item">新建条目</string>
     <string name="memory_create_dir">新建目录</string>
-    <string name="memory_confirm_create">创建</string>
     <string name="memory_cancel">取消</string>
     <string name="memory_confirm">确认</string>
-    <string name="memory_name_placeholder">名称</string>
-    <string name="memory_content_placeholder">初始内容（选填）</string>
     <string name="memory_search_placeholder">搜索记忆</string>
     <string name="memory_searching">搜索中…</string>
     <string name="memory_search_empty">没有匹配的记忆</string>
@@ -22,6 +19,10 @@
     <string name="memory_root_label">根目录</string>
 
     <!-- 条目编辑页 -->
+    <string name="memory_new_item_title">新建条目</string>
+    <string name="memory_new_dir_title">新建目录</string>
+    <string name="memory_title_invalid">名称不能为空，且不能包含 /</string>
+    <string name="memory_info_location">位置</string>
     <string name="memory_version_history">版本历史</string>
     <string name="memory_more">更多</string>
     <string name="memory_field_title">标题</string>
