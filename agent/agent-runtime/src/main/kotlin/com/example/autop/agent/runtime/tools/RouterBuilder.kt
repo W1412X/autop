@@ -18,6 +18,7 @@ import com.example.autop.core.common.Clock
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.core.config.AgentConfig
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.policy.PolicyEngine
 import kotlinx.serialization.json.JsonObject
@@ -41,9 +42,12 @@ internal class RouterBuilder(
     ): RouterBuild {
         val capabilities = Capability.entries.filterTo(mutableSetOf()) { platform.has(it) }
         val enabled = request.config[AgentConfig.TOOLS].enabled.toSet()
+        val features = request.config[FeaturesConfig.FEATURES]
         val hidden = mutableListOf<HiddenTool>()
         val visible =
             tools.filter { tool ->
+                // Beta 功能关闭时工具整体不存在：不进入状态消息，模型无从得知其存在（ADR-0030）。
+                if (tool.betaFeature?.let { !features.isEnabled(it) } == true) return@filter false
                 val reason = hiddenReasonOf(tool, enabled, toolFilter, capabilities)
                 if (reason == null) {
                     true

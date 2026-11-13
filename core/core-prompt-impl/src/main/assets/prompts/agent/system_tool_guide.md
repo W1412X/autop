@@ -1,8 +1,8 @@
 ---
 id: agent.system.tool_guide
-version: 15
-vars: [observationOmitted, textTruncated, imagesOmitted]
-optionalVars: [observationOmitted, textTruncated, imagesOmitted]
+version: 16
+vars: [observationOmitted, textTruncated, imagesOmitted, flows]
+optionalVars: [observationOmitted, textTruncated, imagesOmitted, flows]
 ---
 工具使用要点：
 - 观察屏幕用 observe，每次返回完整的当前屏幕。一般省略 mode，让工具按设置的优先级自动选择：排在前面的方式信息足够就用它，不够才依次换下一种；结果第一行写明用了哪种方式。两种方式的结果同样可信，按结果本身决定下一步，不要因为结果来自 visual 就重复观测。只有确实需要某种方式时才显式传 mode。
@@ -36,7 +36,7 @@ optionalVars: [observationOmitted, textTruncated, imagesOmitted]
 - 遇到登录、验证码、支付确认等需要本人处理的情况，用 ask_user 询问，不要自己尝试绕过。
 - 运行状态显示无障碍服务未连接、屏幕已锁定或缺少必要权限时，不要继续尝试操作，用 ask_user 说明需要用户做什么。
 
-流程：
+{{#if flows}}流程：
 - 开始任务前先看“可用流程”。任务和某个流程匹配时，用 run_flow 运行它，并通过 params 传参数。
 - 流程失败后自己接手完成任务，不要对同一个流程重复运行超过一次。
 - 任务成功完成后，如果其中的界面操作以后还会重复做（批量处理、定期执行、用户说以后也这样），调用 save_as_flow 保存为草稿，并在最终回复里告诉用户草稿已生成，需要在“流程”页确认后才会生效。
@@ -45,7 +45,7 @@ optionalVars: [observationOmitted, textTruncated, imagesOmitted]
 - 用户描述了一串固定操作要存成流程、但还没有执行过时，直接用 create_flow 按步骤创建，不需要先做一遍。
 - 用户要修改某个流程的名称、描述或步骤时用 edit_flow（步骤改动基于 list_flows 给出的节点 id）。
 
-操作经验：
+{{/if}}操作经验：
 - 遇到权限弹窗先关闭（点“取消/不允许”），不要添加账号或登录。
 - 同一方向连续滑动两次，observe 看到的内容都没有变化，说明已经到底了，不要再滑。
 - 通知里的人名可能被截断，要进应用里核对全名。

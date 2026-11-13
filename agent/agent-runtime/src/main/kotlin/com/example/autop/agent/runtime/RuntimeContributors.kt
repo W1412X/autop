@@ -14,6 +14,8 @@ import com.example.autop.agent.runtime.rules.LongTextTruncateRule
 import com.example.autop.agent.runtime.rules.ObservationDegradeRule
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.AgentConfig
+import com.example.autop.core.config.BetaFeature
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.prompt.PromptRepository
 import java.util.Locale
@@ -75,6 +77,7 @@ internal class ToolGuideContributor(
             "observationOmitted" to flag(history.observation.keepFull > 0 && ObservationDegradeRule.ID in rules),
             "textTruncated" to flag(history.truncate.maxChars > 0 && LongTextTruncateRule.ID in rules),
             "imagesOmitted" to flag(history.image.keep >= 0 && ImageRetentionRule.ID in rules),
+            "flows" to flag(req.config[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS)),
         )
     }
 

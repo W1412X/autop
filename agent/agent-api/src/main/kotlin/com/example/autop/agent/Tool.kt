@@ -11,6 +11,7 @@ import com.example.autop.core.common.Capability
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.llm.Block
 import com.example.autop.policy.PolicySubject
@@ -56,6 +57,13 @@ public interface Tool {
     /** 设备能力要求（如截图需要 API 30+），不满足时不出现在可用工具列表。 */
     public val requiredCapabilities: Set<Capability>
         get() = emptySet()
+
+    /**
+     * 所属的 Beta 功能（docs/adr/0030-beta-feature-switch.md）；null = 始终可见。
+     * 对应功能关闭时，工具不出现在可用工具列表，也不写入运行状态消息。
+     */
+    public val betaFeature: BetaFeature?
+        get() = null
 
     public suspend fun invoke(
         args: JsonObject,
