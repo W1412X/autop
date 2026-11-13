@@ -6,6 +6,7 @@
  */
 package com.example.autop.device.impl.shell
 
+import android.annotation.SuppressLint
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -14,6 +15,8 @@ import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.RemoteInput
+import com.example.autop.core.common.Capability
+import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.device.PairingDiscovery
 import com.example.autop.device.ShellInput
 import com.example.autop.device.impl.R
@@ -35,6 +38,7 @@ public class PairingDiscoveryImpl
     constructor(
         @ApplicationContext private val context: Context,
         private val shellInput: ShellInput,
+        private val capabilities: PlatformCapabilities,
     ) : PairingDiscovery {
         private val manager: NotificationManager =
             context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -138,7 +142,7 @@ public class PairingDiscoveryImpl
                     context,
                     port,
                     intent,
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                    PendingIntent.FLAG_UPDATE_CURRENT or replyPendingFlags(),
                 )
             return NotificationCompat
                 .Action
@@ -146,6 +150,18 @@ public class PairingDiscoveryImpl
                 .addRemoteInput(input)
                 .build()
         }
+
+        /**
+         * 回填动作的 PendingIntent 标志。系统要把用户输入写进 Intent，所以 API 31 起必须可变；
+         * 未标记可变时 notify 会抛 IllegalArgumentException 并拖垮进程。API 30 没有该校验，保持不可变。
+         */
+        @SuppressLint("NewApi") // FLAG_MUTABLE 只在能力闸门为真（SDK ≥ 31）时取用
+        private fun replyPendingFlags(): Int =
+            if (capabilities.has(Capability.MUTABLE_PENDING_INTENT_FOR_REMOTE_INPUT)) {
+                PendingIntent.FLAG_MUTABLE
+            } else {
+                PendingIntent.FLAG_IMMUTABLE
+            }
 
         /** 点按通知：启动应用并深链注入通道子页（路由 extra 由 MainActivity 消费）。 */
         private fun openShellIntent(): PendingIntent {

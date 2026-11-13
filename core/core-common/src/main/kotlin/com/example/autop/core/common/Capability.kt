@@ -33,6 +33,9 @@ public enum class Capability {
 
     /** SDK ≥ 31：动态取色（Monet，docs/tech/08 §1.1）。 */
     DYNAMIC_COLOR,
+
+    /** SDK ≥ 31：挂在带 RemoteInput 的通知动作上的 PendingIntent 必须 FLAG_MUTABLE，否则 notify 抛异常。 */
+    MUTABLE_PENDING_INTENT_FOR_REMOTE_INPUT,
 }
 
 /** 平台能力查询端口。实现不得抛异常，一律返回布尔值。 */
