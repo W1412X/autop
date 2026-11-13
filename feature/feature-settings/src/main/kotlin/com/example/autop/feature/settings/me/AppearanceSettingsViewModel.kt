@@ -222,8 +222,8 @@ public class AppearanceSettingsViewModel
                 MeAction.ExportData -> export()
                 is MeAction.ImportData -> import(action.uri)
                 is MeAction.OpenSection -> if (!action.section.hasPage) notice.value = NoticeKind.PLACEHOLDER
-                // 路由层转 SettingsNavigator.openReminderSound
-                MeAction.OpenReminderSound -> Unit
+                // 路由层转 SettingsNavigator（openReminderSound / openGroup / openSystemSettings）
+                is MeAction.OpenGroup, is MeAction.OpenSystem, MeAction.OpenReminderSound -> Unit
                 MeAction.DismissNotice -> {
                     notice.value = null
                     updateNotice.value = null

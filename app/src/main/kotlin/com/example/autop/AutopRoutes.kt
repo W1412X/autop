@@ -15,6 +15,8 @@ import com.example.autop.feature.flows.NO_ARG
 import com.example.autop.feature.memory.MEMORY_PATH_ARG
 import com.example.autop.feature.onboarding.ONBOARDING_MODE_ARG
 import com.example.autop.feature.onboarding.ONBOARDING_MODE_HEALTH
+import com.example.autop.feature.settings.ME_FOCUS_ARG
+import com.example.autop.feature.settings.ME_GROUP_ARG
 import com.example.autop.feature.settings.ME_SECTION_ARG
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.RUN_ID_ARG
@@ -52,6 +54,12 @@ object AutopRoutes {
 
     /** "我的"子页路由模板（docs/tech/08 §4.5 `me/{id}`；参数名取自 feature-settings 的 [ME_SECTION_ARG]）。 */
     val ME_SECTION: String = "me/{${ME_SECTION_ARG}}"
+
+    /**
+     * "我的"二级页路由模板（docs/tech/08 §4.5 `me/group/{group}?focus={focus}`；参数名取自
+     * feature-settings 的 [ME_GROUP_ARG] / [ME_FOCUS_ARG]）。
+     */
+    val ME_GROUP: String = "me/group/{${ME_GROUP_ARG}}?${ME_FOCUS_ARG}={${ME_FOCUS_ARG}}"
 
     /** 对话页路由模板（docs/tech/08 §4.2 `chat/thread/{threadId}`；参数名取自 feature-chat 的 [THREAD_ARG]）。 */
     val CHAT_THREAD: String = "chat/thread/{${THREAD_ARG}}"
@@ -116,6 +124,12 @@ object AutopRoutes {
 
     /** "我的"子页路由：[id] 见 feature-settings 的 `SettingsSection.id`。 */
     fun meSection(id: String): String = "me/$id"
+
+    /** "我的"二级页路由：[group] 见 feature-settings 的 `MeGroup.id`；[focus] 为可选的定位行 id（`MeFocus.id`）。 */
+    fun meGroup(
+        group: String,
+        focus: String? = null,
+    ): String = if (focus == null) "me/group/$group" else "me/group/$group?$ME_FOCUS_ARG=$focus"
 
     /** 健康检查页路由（docs/tech/08 §4.5 权限检查入口，`onboarding?mode=health`）。 */
     fun onboardingHealth(): String = "onboarding?${ONBOARDING_MODE_ARG}=$ONBOARDING_MODE_HEALTH"

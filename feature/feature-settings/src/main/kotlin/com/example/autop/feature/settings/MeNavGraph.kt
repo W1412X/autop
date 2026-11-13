@@ -17,12 +17,15 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavType
 import androidx.navigation.compose.composable
+import androidx.navigation.navArgument
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.feature.settings.debug.DebugPage
 import com.example.autop.feature.settings.me.AppearanceSettingsViewModel
 import com.example.autop.feature.settings.me.MeAction
+import com.example.autop.feature.settings.me.MeGroupScreen
 import com.example.autop.feature.settings.me.MeScreen
 import com.example.autop.feature.settings.me.advanced.AdvancedScreen
 import com.example.autop.feature.settings.me.advanced.AdvancedViewModel
@@ -52,17 +55,25 @@ import com.example.autop.feature.settings.me.shell.ShellChannelViewModel
 /** `me/{id}` 路由模板的参数名（app 的 `AutopRoutes.ME_SECTION` 组装模板时引用）。 */
 public const val ME_SECTION_ARG: String = "id"
 
+/** `me/group/{group}` 路由模板的分类参数名（app 的 `AutopRoutes.ME_GROUP` 组装模板时引用）。 */
+public const val ME_GROUP_ARG: String = "group"
+
+/** `me/group/{group}?focus={focus}` 路由模板的定位参数名（可选）。 */
+public const val ME_FOCUS_ARG: String = "focus"
+
 /**
  * 挂载"我的"页与其子页（docs/tech/08 §4.5）。
  *
  * @param route 路由（app 的 `AutopRoutes.ME`）。
  * @param sectionRoute 子页路由模板（app 的 `AutopRoutes.ME_SECTION`）。
+ * @param groupRoute 二级分类路由模板（app 的 `AutopRoutes.ME_GROUP`）。
  * @param navigator 子页导航回调。
  * @param debugPage 调试页（debug 源集实现；release 为 null，docs/tech/08 §4.6）。
  */
 public fun NavGraphBuilder.meGraph(
     route: String,
     sectionRoute: String,
+    groupRoute: String,
     navigator: SettingsNavigator,
     debugPage: DebugPage? = null,
 ) {
@@ -76,6 +87,68 @@ public fun NavGraphBuilder.meGraph(
             debugPage = debugPage,
         )
     }
+    composable(
+        route = groupRoute,
+        arguments =
+            listOf(
+                navArgument(ME_GROUP_ARG) { type = NavType.StringType },
+                navArgument(ME_FOCUS_ARG) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+    ) { entry ->
+        GroupRoute(
+            group = MeGroup.fromId(entry.arguments?.getString(ME_GROUP_ARG)),
+            focus = MeFocus.fromId(entry.arguments?.getString(ME_FOCUS_ARG)),
+            navigator = navigator,
+        )
+    }
+}
+
+/** 一级页与二级页共用的导航分发：把页面动作转成导航回调（ViewModel 不接触导航）。 */
+private fun dispatchNavigation(
+    action: MeAction,
+    navigator: SettingsNavigator,
+) {
+    when (action) {
+        is MeAction.OpenSection -> navigator.openSection(action.section)
+        is MeAction.OpenGroup -> navigator.openGroup(action.group, action.focus)
+        is MeAction.OpenSystem -> navigator.openSystemSettings(action.target)
+        MeAction.OpenReminderSound -> navigator.openReminderSound()
+        else -> Unit
+    }
+}
+
+/** 二级分类页：分类 id 非法时显示兜底页（与 `me/{id}` 未知分区一致）。 */
+@Composable
+private fun GroupRoute(
+    group: MeGroup?,
+    focus: MeFocus?,
+    navigator: SettingsNavigator,
+    viewModel: AppearanceSettingsViewModel = hiltViewModel(),
+) {
+    if (group == null) {
+        MissingSectionRoute(navigator = navigator)
+        return
+    }
+    // 回到页面即刷：与一级页一样，状态卡所依赖的权限与服务状态可能已在系统设置里改变。
+    LifecycleResumeEffect(Unit) {
+        viewModel.refresh()
+        onPauseOrDispose { }
+    }
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
+    MeGroupScreen(
+        group = group,
+        state = state,
+        focus = focus,
+        onBack = navigator::navigateBack,
+        onAction = { action ->
+            dispatchNavigation(action, navigator)
+            viewModel.onAction(action)
+        },
+    )
 }
 
 /** 分区 id → 子页（新增分区只加一行，控圈复杂度）。 */
@@ -137,11 +210,7 @@ private fun MeRoute(
     MeScreen(
         state = state,
         onAction = { action ->
-            when (action) {
-                is MeAction.OpenSection -> navigator.openSection(action.section)
-                MeAction.OpenReminderSound -> navigator.openReminderSound()
-                else -> Unit
-            }
+            dispatchNavigation(action, navigator)
             viewModel.onAction(action)
         },
     )

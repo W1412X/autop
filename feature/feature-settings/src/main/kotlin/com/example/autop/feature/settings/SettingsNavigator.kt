@@ -50,10 +50,65 @@ public enum class SettingsSection(
                 this == DEBUG
 }
 
+/**
+ * "我的"页二级分类（docs/tech/08 §4.5 两级结构）：一级列表的每一行进入一个二级页。
+ *
+ * @property id `me/group/{id}` 路由的 id 段。
+ */
+public enum class MeGroup(
+    public val id: String,
+) {
+    MODEL("model"),
+    PERMISSIONS_RUNTIME("runtime"),
+    SECURITY("security"),
+    TASKS("tasks"),
+    APPEARANCE("appearance"),
+    ADVANCED("advanced"),
+    ABOUT("about"),
+    ;
+
+    public companion object {
+        /** 按路由 id 查找分类；未知 id 返回 null，由路由层兜底。 */
+        public fun fromId(id: String?): MeGroup? = entries.firstOrNull { it.id == id }
+    }
+}
+
+/**
+ * 从一级状态卡跳入二级页后需要定位的行（`me/group/{id}?focus={id}`，定位后短暂高亮）。
+ *
+ * @property id 路由查询参数值。
+ */
+public enum class MeFocus(
+    public val id: String,
+) {
+    HOST_PERSISTENT("host_persistent"),
+    ;
+
+    public companion object {
+        /** 按路由参数值查找定位目标；未知值返回 null。 */
+        public fun fromId(id: String?): MeFocus? = entries.firstOrNull { it.id == id }
+    }
+}
+
+/** 系统设置页跳转目标（一级状态卡的无障碍、通知使用权格子）。 */
+public enum class SystemSettingsTarget {
+    ACCESSIBILITY,
+    NOTIFICATION_LISTENER,
+}
+
 /** feature-settings 导航回调接口。 */
 public interface SettingsNavigator {
     /** 打开"我的"子页 [section]（跳 `me/{id}` 路由；PERMISSIONS 由 app 转健康检查，由 app 实现）。 */
     public fun openSection(section: SettingsSection)
+
+    /** 打开"我的"二级页 [group]；[focus] 非空时滚动到对应行并短暂高亮（由 app 实现）。 */
+    public fun openGroup(
+        group: MeGroup,
+        focus: MeFocus?,
+    )
+
+    /** 打开系统设置页 [target]（由 app 实现，失败时不崩溃）。 */
+    public fun openSystemSettings(target: SystemSettingsTarget)
 
     /** 提醒铃声（"任务与提醒"分组的铃声行，app 跳提醒通知渠道的声音设置）。 */
     public fun openReminderSound()

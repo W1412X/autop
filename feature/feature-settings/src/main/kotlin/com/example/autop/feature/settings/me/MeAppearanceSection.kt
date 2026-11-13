@@ -9,11 +9,10 @@ import androidx.compose.ui.res.stringResource
 import com.example.autop.core.config.UiAppearanceSection
 import com.example.autop.core.ui.component.OptionRow
 import com.example.autop.core.ui.component.OptionSheet
-import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.SwitchRow
 import com.example.autop.feature.settings.R
 
-/** 外观分组（docs/tech/08 §4.5）：五个选择行 + 两个开关行。 */
+/** 外观分组内容（二级页顶栏已显示分组名）：五个选择行 + 两个开关行，选择弹层共用 [SheetKind]。 */
 @Composable
 internal fun AppearanceSection(
     appearance: UiAppearanceSection,
@@ -21,7 +20,6 @@ internal fun AppearanceSection(
     onAction: (MeAction) -> Unit,
 ) {
     Column {
-        SectionTitle(text = stringResource(R.string.me_section_appearance))
         OptionRow(
             title = stringResource(R.string.me_appearance_dark_mode),
             subtitle = null,

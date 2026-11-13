@@ -1,407 +1,108 @@
 /**
- * "我的"页（docs/tech/08 §4.5）：一个 LazyColumn、SectionTitle 分组、组间 HorizontalDivider。
+ * "我的"一级页（docs/tech/08 §4.5 两级结构）：健康状态卡 + 七个分类入口。
  *
- * 分组：健康状态卡 / 外观 / 模型 / 权限与运行 / 安全 / 任务与提醒 / Beta 功能 / 高级（含导出导入）/ 关于。
- * 高级配置、提示词、诊断日志、操作记录为子页入口（`me/{id}`）。
+ * 每个分类行的副标题显示当前值（如常驻后台状态、主模型名）；点击进入对应的二级页 [MeGroupScreen]。
  */
 package com.example.autop.feature.settings.me
 
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import com.example.autop.core.ui.component.ActionRow
-import com.example.autop.core.ui.component.InlineBanner
 import com.example.autop.core.ui.component.NavRow
-import com.example.autop.core.ui.component.OptionItem
-import com.example.autop.core.ui.component.OptionSheet
-import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.TopLevelHeader
+import com.example.autop.feature.settings.MeGroup
 import com.example.autop.feature.settings.R
-import com.example.autop.feature.settings.SettingsSection
+
+/** 一级页分类顺序（docs/tech/08 §4.5）。 */
+private val GROUP_ORDER: List<MeGroup> =
+    listOf(
+        MeGroup.MODEL,
+        MeGroup.PERMISSIONS_RUNTIME,
+        MeGroup.SECURITY,
+        MeGroup.TASKS,
+        MeGroup.APPEARANCE,
+        MeGroup.ADVANCED,
+        MeGroup.ABOUT,
+    )
 
 /**
- * "我的"页（无状态，docs/standards/coding-standards §8）。
+ * "我的"一级页（无状态，docs/standards/coding-standards §8）。
  *
  * @param state 页面状态。
- * @param onAction 用户操作回调。
+ * @param onAction 用户操作回调（状态格与分类行都经 [MeAction.OpenGroup] / [MeAction.OpenSection] / [MeAction.OpenSystem]）。
  */
 @Composable
-@Suppress("LongMethod") // “我的”页单屏分区渲染，拆小函数需透传大量状态
 public fun MeScreen(
     state: MeUiState,
     onAction: (MeAction) -> Unit,
 ) {
-    var sheet by remember { mutableStateOf<SheetKind?>(null) }
-    var windowTypeSheet by remember { mutableStateOf(false) }
-    var displayModeSheet by remember { mutableStateOf(false) }
-    var opacitySheet by remember { mutableStateOf(false) }
-    var snoozeSheet by remember { mutableStateOf(false) }
-    var actionDelaySheet by remember { mutableStateOf(false) }
-    var navigationSheet by remember { mutableStateOf(false) }
-    val importLauncher =
-        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
-            uri?.let { onAction(MeAction.ImportData(it.toString())) }
-        }
-    val onOpenSection: (SettingsSection) -> Unit = { onAction(MeAction.OpenSection(it)) }
+    val version = rememberAppVersion()
     Column(
         modifier =
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding(),
     ) {
-        NoticeBanner(state = state, onAction = onAction)
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item { TopLevelHeader(title = stringResource(R.string.me_title)) }
-            item {
-                HealthCard(
-                    state = state,
-                    onOpenHealth = { onOpenSection(SettingsSection.PERMISSIONS) },
+            item { HealthCard(state = state, onAction = onAction) }
+            items(GROUP_ORDER, key = { it.id }) { group ->
+                NavRow(
+                    title = stringResource(groupTitleRes(group)),
+                    subtitle = groupSubtitle(group = group, state = state, version = version),
+                    onClick = { onAction(MeAction.OpenGroup(group)) },
                 )
-            }
-            item {
-                AppearanceSection(
-                    appearance = state.appearance,
-                    onOpenSheet = { kind -> sheet = kind },
-                    onAction = onAction,
-                )
-            }
-            item { ModelLinksSection(state = state, onOpen = onOpenSection) }
-            item {
-                HorizontalDivider()
-                PermissionsSection(
-                    state = state,
-                    onOpen = onOpenSection,
-                    onOpenWindowTypeSheet = { windowTypeSheet = true },
-                    onOpenDisplayModeSheet = { displayModeSheet = true },
-                    onOpenOpacitySheet = { opacitySheet = true },
-                    onOpenNavigationSheet = { navigationSheet = true },
-                    onOpenActionDelaySheet = { actionDelaySheet = true },
-                    onAction = onAction,
-                )
-            }
-            item {
-                HorizontalDivider()
-                SecuritySection(onOpen = onOpenSection)
-            }
-            item {
-                HorizontalDivider()
-                TasksReminderSection(
-                    state = state,
-                    onOpenSnoozeSheet = { snoozeSheet = true },
-                    onAction = onAction,
-                )
-            }
-            item {
-                HorizontalDivider()
-                BetaSection(state = state, onAction = onAction)
-            }
-            item {
-                HorizontalDivider()
-                AdvancedSection(
-                    probeEntryVisible = state.probeEntryVisible,
-                    onOpen = onOpenSection,
-                    onExport = { onAction(MeAction.ExportData) },
-                    onImport = { importLauncher.launch(BACKUP_MIME_TYPES) },
-                )
-            }
-            item {
-                HorizontalDivider()
-                AboutSection(state = state, onAction = onAction)
             }
         }
     }
-    val currentSheet = sheet
-    AppearanceSheetHost(
-        kind = currentSheet,
-        appearance = state.appearance,
-        onSelect = { id ->
-            currentSheet?.let { onAction(it.toAction(id)) }
-            sheet = null
-        },
-        onDismiss = { sheet = null },
-    )
-    if (windowTypeSheet) {
-        WindowTypeSheet(
-            selectedId = state.overlayWindowType,
-            onSelect = { id ->
-                onAction(MeAction.SetOverlayWindowType(id))
-                windowTypeSheet = false
-            },
-            onDismiss = { windowTypeSheet = false },
-        )
-    }
-    if (displayModeSheet) {
-        DisplayModeSheet(
-            selectedId = state.overlayDisplayMode,
-            onSelect = { id ->
-                onAction(MeAction.SetOverlayDisplayMode(id))
-                displayModeSheet = false
-            },
-            onDismiss = { displayModeSheet = false },
-        )
-    }
-    if (navigationSheet) {
-        NavigationSheet(
-            selectedId = state.navigationPreferred,
-            options = state.navigationApps,
-            onSelect = { id ->
-                onAction(MeAction.SetNavigationApp(id))
-                navigationSheet = false
-            },
-            onDismiss = { navigationSheet = false },
-        )
-    }
-    if (opacitySheet) {
-        OpacitySheet(
-            selected = state.overlayOpacity,
-            onSelect = { value ->
-                onAction(MeAction.SetOverlayOpacity(value))
-                opacitySheet = false
-            },
-            onDismiss = { opacitySheet = false },
-        )
-    }
-    if (snoozeSheet) {
-        SnoozeSheet(
-            options = state.snoozeOptions,
-            selected = state.snoozeMinutes,
-            onSelect = { minutes ->
-                onAction(MeAction.SetSnoozeMinutes(minutes))
-                snoozeSheet = false
-            },
-            onDismiss = { snoozeSheet = false },
-        )
-    }
-    if (actionDelaySheet) {
-        ActionDelaySheet(
-            selectedMs = state.actionDelayMs,
-            onSelect = { seconds ->
-                onAction(MeAction.SetActionDelay(seconds))
-                actionDelaySheet = false
-            },
-            onDismiss = { actionDelaySheet = false },
-        )
-    }
 }
 
-/** 占位点击横幅（"即将推出"等提示，ui.banner.durationMs 后消失）。 */
-@Composable
-private fun NoticeBanner(
-    state: MeUiState,
-    onAction: (MeAction) -> Unit,
-) {
-    val kind = state.notice
-    val updateKind = state.updateNotice
-    if (kind != null) {
-        InlineBanner(
-            message = stringResource(noticeMessageRes(kind)),
-            onDismiss = { onAction(MeAction.DismissNotice) },
-            durationMs = state.bannerDurationMs,
-        )
-    }
-    if (updateKind != null) {
-        InlineBanner(
-            message = stringResource(updateNoticeMessageRes(updateKind)),
-            onDismiss = { onAction(MeAction.DismissNotice) },
-            durationMs = state.bannerDurationMs,
-        )
-    }
-}
-
+/** 分类标题（与 docs/tech/08 §4.5 的分组名一致，二级页顶栏同样使用）。 */
 @StringRes
-private fun updateNoticeMessageRes(kind: UpdateNotice): Int =
-    when (kind) {
-        UpdateNotice.UP_TO_DATE -> R.string.me_update_up_to_date
-        UpdateNotice.CHECK_FAILED -> R.string.me_update_check_failed
-        UpdateNotice.DOWNLOAD_FAILED -> R.string.me_update_download_failed
-        UpdateNotice.INSTALL_PERMISSION -> R.string.me_update_install_permission
+internal fun groupTitleRes(group: MeGroup): Int =
+    when (group) {
+        MeGroup.MODEL -> R.string.me_section_model
+        MeGroup.PERMISSIONS_RUNTIME -> R.string.me_section_permissions
+        MeGroup.SECURITY -> R.string.me_section_security
+        MeGroup.TASKS -> R.string.me_section_tasks
+        MeGroup.APPEARANCE -> R.string.me_section_appearance
+        MeGroup.ADVANCED -> R.string.me_section_advanced
+        MeGroup.ABOUT -> R.string.me_section_about
     }
 
-@StringRes
-private fun noticeMessageRes(kind: NoticeKind): Int =
-    when (kind) {
-        NoticeKind.PLACEHOLDER -> R.string.me_placeholder_soon
-        NoticeKind.EXPORTED -> R.string.me_backup_exported
-        NoticeKind.EXPORT_FAILED -> R.string.me_backup_export_failed
-        NoticeKind.IMPORTED -> R.string.me_backup_imported
-        NoticeKind.IMPORT_FAILED -> R.string.me_backup_import_failed
-    }
-
-/** 模型分组（docs/tech/08 §4.5）：模型配置（副标题=主模型名称）与检索向量（副标题=提供方）。 */
+/** 一级行的副标题：显示该分类的当前值，用户不进二级页也能看到异常（如常驻后台未开启）。 */
 @Composable
-private fun ModelLinksSection(
+private fun groupSubtitle(
+    group: MeGroup,
     state: MeUiState,
-    onOpen: (SettingsSection) -> Unit,
-) {
-    Column {
-        HorizontalDivider()
-        SectionTitle(text = stringResource(R.string.me_section_model))
-        NavRow(
-            title = stringResource(R.string.me_nav_models),
-            subtitle = state.defaultModelName ?: stringResource(R.string.me_model_unassigned),
-            onClick = { onOpen(SettingsSection.MODEL) },
-        )
-        NavRow(
-            title = stringResource(R.string.me_nav_observe),
-            subtitle = stringResource(R.string.me_sub_observe),
-            onClick = { onOpen(SettingsSection.OBSERVE) },
-        )
-        NavRow(
-            title = stringResource(R.string.me_nav_embedding),
-            subtitle = embeddingProviderLabel(state.embeddingProviderId),
-            onClick = { onOpen(SettingsSection.EMBEDDING) },
-        )
-    }
-}
-
-/** 向量提供方显示名（docs/tech/03 §7 EmbeddingConfig.provider）。 */
-@Composable
-private fun embeddingProviderLabel(providerId: String): String =
-    when (providerId) {
-        "local" -> stringResource(R.string.me_embedding_local)
-        "none" -> stringResource(R.string.me_embedding_off)
-        "openai" -> stringResource(R.string.me_embedding_openai)
-        else -> providerId
-    }
-
-/** 安全分组（docs/tech/08 §4.5）：安全规则、屏蔽的应用、节点操作、操作记录。 */
-@Composable
-private fun SecuritySection(onOpen: (SettingsSection) -> Unit) {
-    Column {
-        SectionTitle(text = stringResource(R.string.me_section_security))
-        NavRow(
-            title = stringResource(R.string.me_nav_rules),
-            subtitle = null,
-            onClick = { onOpen(SettingsSection.RULES) },
-        )
-        NavRow(
-            title = stringResource(R.string.me_nav_blocked_apps),
-            subtitle = null,
-            onClick = { onOpen(SettingsSection.BLOCKED_APPS) },
-        )
-        NavRow(
-            title = stringResource(R.string.me_nav_audit),
-            subtitle = null,
-            onClick = { onOpen(SettingsSection.AUDIT) },
-        )
-    }
-}
-
-/**
- * 高级分组（docs/tech/08 §4.5）：高级配置 / 提示词 / 调试 / 诊断日志 + 导出/导入数据。
- * "工具测试记录"入口只在调试模式（`ui.debug.verboseLogging`）下显示（tool_optimize D20）。
- */
-@Composable
-private fun AdvancedSection(
-    probeEntryVisible: Boolean,
-    onOpen: (SettingsSection) -> Unit,
-    onExport: () -> Unit,
-    onImport: () -> Unit,
-) {
-    Column {
-        SectionTitle(text = stringResource(R.string.me_section_advanced))
-        NavRow(
-            title = stringResource(R.string.me_nav_advanced_config),
-            subtitle = null,
-            onClick = { onOpen(SettingsSection.ADVANCED) },
-        )
-        NavRow(
-            title = stringResource(R.string.me_nav_prompts),
-            subtitle = null,
-            onClick = { onOpen(SettingsSection.PROMPTS) },
-        )
-        NavRow(
-            title = stringResource(R.string.me_nav_debug),
-            subtitle = null,
-            onClick = { onOpen(SettingsSection.DEBUG) },
-        )
-        NavRow(
-            title = stringResource(R.string.me_nav_logs),
-            subtitle = null,
-            onClick = { onOpen(SettingsSection.LOGS) },
-        )
-        if (probeEntryVisible) {
-            NavRow(
-                title = stringResource(R.string.me_nav_probe_history),
-                subtitle = null,
-                onClick = { onOpen(SettingsSection.PROBE) },
+    version: String,
+): String =
+    when (group) {
+        MeGroup.MODEL -> state.defaultModelName ?: stringResource(R.string.me_model_unassigned)
+        MeGroup.PERMISSIONS_RUNTIME ->
+            stringResource(
+                R.string.me_sub_group_runtime,
+                stringResource(hostStatus(state).first),
+                stringResource(shellStatus(state.shellChannel).first),
             )
-        }
-        ActionRow(
-            title = stringResource(R.string.me_backup_export),
-            subtitle = null,
-            onClick = onExport,
-        )
-        ActionRow(
-            title = stringResource(R.string.me_backup_import),
-            subtitle = null,
-            onClick = onImport,
-        )
+        MeGroup.SECURITY -> stringResource(R.string.me_sub_group_security)
+        MeGroup.TASKS -> stringResource(R.string.me_sub_group_tasks, stringResource(onOffRes(state.conditionsEnabled)))
+        MeGroup.APPEARANCE ->
+            stringResource(
+                R.string.me_sub_group_appearance,
+                SheetKind.DARK_MODE.labelOf(state.appearance.darkMode),
+                SheetKind.SEED.labelOf(state.appearance.seedIndex.toString()),
+            )
+        MeGroup.ADVANCED -> stringResource(R.string.me_sub_group_advanced, stringResource(onOffRes(state.flowsEnabled)))
+        MeGroup.ABOUT -> stringResource(R.string.me_sub_group_about, version)
     }
-}
 
-/** 默认稍后档位选择弹层（`task.reminder.snoozeOptions`）。 */
-@Composable
-private fun SnoozeSheet(
-    options: List<Int>,
-    selected: Int,
-    onSelect: (Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    OptionSheet(
-        title = stringResource(R.string.me_snooze_default),
-        options =
-            options.map { minutes ->
-                OptionItem(
-                    id = minutes.toString(),
-                    label = stringResource(R.string.me_minutes, minutes),
-                )
-            },
-        selectedId = selected.toString(),
-        onSelect = { id -> id.toIntOrNull()?.let(onSelect) },
-        onDismiss = onDismiss,
-    )
-}
-
-/** 动作后等待选择弹层（`device.action.delayMs`，tool_optimize 03 §5.1）：当前值高亮。 */
-@Composable
-internal fun ActionDelaySheet(
-    selectedMs: Long,
-    onSelect: (Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
-    OptionSheet(
-        title = stringResource(R.string.settings_action_delay_title),
-        options =
-            ACTION_DELAY_OPTIONS.map { seconds ->
-                OptionItem(
-                    id = seconds.toString(),
-                    label = stringResource(R.string.settings_action_delay_seconds, seconds),
-                )
-            },
-        selectedId = (selectedMs / MILLIS_PER_SECOND).toString(),
-        onSelect = { id -> id.toIntOrNull()?.let(onSelect) },
-        onDismiss = onDismiss,
-    )
-}
-
-/** 动作后等待可选档位（秒）。 */
-private val ACTION_DELAY_OPTIONS: List<Int> = listOf(1, 2, 3, 5, 8, 10)
-
-/** 毫秒换算（配置 `device.action.delayMs` 存毫秒，选项按秒给）。 */
-internal const val MILLIS_PER_SECOND: Long = 1000
-
-/** 导入文档的 MIME 类型（备份为 JSON）。 */
-private val BACKUP_MIME_TYPES = arrayOf("application/json", "text/json", "*/*")
+/** 开关状态文案。 */
+@StringRes
+internal fun onOffRes(on: Boolean): Int = if (on) R.string.me_state_on else R.string.me_state_off

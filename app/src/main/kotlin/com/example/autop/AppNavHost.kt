@@ -57,8 +57,11 @@ import com.example.autop.feature.memory.MemoryNavigator
 import com.example.autop.feature.memory.memoryGraph
 import com.example.autop.feature.onboarding.OnboardingNavigator
 import com.example.autop.feature.onboarding.onboardingGraph
+import com.example.autop.feature.settings.MeFocus
+import com.example.autop.feature.settings.MeGroup
 import com.example.autop.feature.settings.SettingsNavigator
 import com.example.autop.feature.settings.SettingsSection
+import com.example.autop.feature.settings.SystemSettingsTarget
 import com.example.autop.feature.settings.debug.DebugPage
 import com.example.autop.feature.settings.meGraph
 import com.example.autop.feature.tasks.NEW_TASK_ID
@@ -140,7 +143,7 @@ internal fun AppNavHost(
                 changesRoute = AutopRoutes.MEMORY_CHANGES,
                 navigator = memoryNavigator,
             )
-            meGraph(AutopRoutes.ME, AutopRoutes.ME_SECTION, settingsNavigator, debugPage)
+            meGraph(AutopRoutes.ME, AutopRoutes.ME_SECTION, AutopRoutes.ME_GROUP, settingsNavigator, debugPage)
             onboardingGraph(AutopRoutes.ONBOARDING_ROUTE, onboardingNavigator)
         }
         if (currentRoute in TOP_LEVEL_ROUTES) {
@@ -239,6 +242,22 @@ private fun createSettingsNavigator(
                 section == SettingsSection.PERMISSIONS -> navController.navigate(AutopRoutes.onboardingHealth())
                 section.hasPage -> navController.navigate(AutopRoutes.meSection(section.id))
             }
+        }
+
+        override fun openGroup(
+            group: MeGroup,
+            focus: MeFocus?,
+        ) {
+            navController.navigate(AutopRoutes.meGroup(group.id, focus?.id))
+        }
+
+        override fun openSystemSettings(target: SystemSettingsTarget) {
+            val action =
+                when (target) {
+                    SystemSettingsTarget.ACCESSIBILITY -> Settings.ACTION_ACCESSIBILITY_SETTINGS
+                    SystemSettingsTarget.NOTIFICATION_LISTENER -> Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS
+                }
+            startSettingsSafely(context, Intent(action))
         }
 
         override fun openReminderSound() {

@@ -19,7 +19,6 @@ import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.InfoRow
 import com.example.autop.core.ui.component.NavRow
 import com.example.autop.core.ui.component.OptionRow
-import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SwitchRow
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -28,7 +27,7 @@ import com.example.autop.device.UpdateState
 import com.example.autop.feature.settings.R
 import java.util.Locale
 
-/** 任务与提醒分组（docs/tech/08 §4.5）。 */
+/** 任务与提醒分组内容（二级页顶栏已显示分组名，这里不再重复标题）。 */
 @Composable
 internal fun TasksReminderSection(
     state: MeUiState,
@@ -36,7 +35,6 @@ internal fun TasksReminderSection(
     onAction: (MeAction) -> Unit,
 ) {
     Column {
-        SectionTitle(text = stringResource(R.string.me_section_tasks))
         SwitchRow(
             title = stringResource(R.string.me_conditions_enabled),
             subtitle = stringResource(R.string.me_sub_conditions_enabled),
@@ -73,16 +71,9 @@ internal fun AboutSection(
     state: MeUiState,
     onAction: (MeAction) -> Unit,
 ) {
-    val context = LocalContext.current
     val uriHandler = LocalUriHandler.current
-    val version =
-        remember {
-            runCatching {
-                context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "-"
-            }.getOrDefault("-")
-        }
+    val version = rememberAppVersion()
     Column {
-        SectionTitle(text = stringResource(R.string.me_section_about))
         InfoRow(
             title = stringResource(R.string.me_version),
             subtitle = null,
@@ -92,6 +83,17 @@ internal fun AboutSection(
         AboutLink(R.string.me_about_project, R.string.me_about_project_url, uriHandler)
         AboutLink(R.string.me_about_developer, R.string.me_about_developer_url, uriHandler)
         AboutLink(R.string.me_about_releases, R.string.me_about_releases_url, uriHandler)
+    }
+}
+
+/** 当前应用版本名（读取失败显示 "-"）。 */
+@Composable
+internal fun rememberAppVersion(): String {
+    val context = LocalContext.current
+    return remember {
+        runCatching {
+            context.packageManager.getPackageInfo(context.packageName, 0).versionName ?: "-"
+        }.getOrDefault("-")
     }
 }
 

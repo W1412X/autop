@@ -5,7 +5,10 @@
 package com.example.autop.feature.settings.me
 
 import com.example.autop.core.config.BetaFeature
+import com.example.autop.feature.settings.MeFocus
+import com.example.autop.feature.settings.MeGroup
 import com.example.autop.feature.settings.SettingsSection
+import com.example.autop.feature.settings.SystemSettingsTarget
 
 public sealed interface MeAction {
     /** 深色模式（`SYSTEM` / `LIGHT` / `DARK`）。 */
@@ -123,6 +126,17 @@ public sealed interface MeAction {
     /** 打开"我的"子页（未落地的分组提示"即将推出"，导航回调照常发出）。 */
     public data class OpenSection(
         val section: SettingsSection,
+    ) : MeAction
+
+    /** 打开"我的"二级页 [group]；[focus] 非空时定位到对应行（路由层转 SettingsNavigator.openGroup）。 */
+    public data class OpenGroup(
+        val group: MeGroup,
+        val focus: MeFocus? = null,
+    ) : MeAction
+
+    /** 打开系统设置页 [target]（路由层转 SettingsNavigator.openSystemSettings）。 */
+    public data class OpenSystem(
+        val target: SystemSettingsTarget,
     ) : MeAction
 
     /** 关闭横幅提示。 */

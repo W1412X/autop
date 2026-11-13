@@ -1,10 +1,10 @@
 /**
- * "我的"页权限与运行分组（docs/tech/08 §4.5）：权限检查入口、悬浮窗通道
- * （`ui.overlay.windowType`，docs/tech/05 §10）、常驻后台（`task.host.persistent`）、
- * 任务结束后返回原应用（`task.returnToOriginApp`）与运行预算子页入口
- * （`agent.budget`，me/budget）。
- * 通道选择写配置后由 OverlayChannelResolver 的变化流重建窗口（立即生效）。
- * N186：原"触摸屏幕时暂停任务"开关随触摸盾落地移除（执行期固定屏蔽用户触摸）。
+ * "我的"二级页“权限与运行”（docs/tech/08 §4.5）：三个小分组。
+ * - 权限：权限检查、注入通道（可选）、常驻后台（从一级状态卡跳入时定位高亮）；
+ * - 悬浮球：悬浮窗通道、显示与显示方式、透明度（`ui.overlay.*`，docs/tech/05 §10）；
+ * - 执行：执行期屏蔽触摸（N215）、动作后等待、运行预算、结束后返回原应用、导航应用。
+ *
+ * 选择类设置的弹层开关由 [MeSheetState] 持有，弹层本身由 [MeSheetHost] 渲染。
  */
 package com.example.autop.feature.settings.me
 
@@ -18,39 +18,64 @@ import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.SwitchRow
 import com.example.autop.device.ShellState
+import com.example.autop.feature.settings.MeFocus
 import com.example.autop.feature.settings.R
 import com.example.autop.feature.settings.SettingsSection
 
-/** 权限与运行分组：权限检查入口 + 悬浮窗通道/悬浮球显隐、显示方式与透明度 + 常驻后台/返回原应用开关 + 运行预算入口。 */
+/** 权限与运行二级页内容：权限、悬浮球、执行三个小分组。 */
 @Composable
 internal fun PermissionsSection(
     state: MeUiState,
+    focus: MeFocus?,
     onOpen: (SettingsSection) -> Unit,
-    onOpenWindowTypeSheet: () -> Unit,
-    onOpenDisplayModeSheet: () -> Unit,
-    onOpenOpacitySheet: () -> Unit,
-    onOpenNavigationSheet: () -> Unit,
-    onOpenActionDelaySheet: () -> Unit,
+    sheets: MeSheetState,
+    onAction: (MeAction) -> Unit,
+) {
+    PermissionSubsection(state = state, focus = focus, onOpen = onOpen, onAction = onAction)
+    OverlaySubsection(state = state, sheets = sheets, onAction = onAction)
+    ExecutionSubsection(state = state, onOpen = onOpen, sheets = sheets, onAction = onAction)
+}
+
+/** 权限小分组：权限检查、注入通道（可选）、常驻后台（可从一级状态卡定位高亮）。 */
+@Composable
+private fun PermissionSubsection(
+    state: MeUiState,
+    focus: MeFocus?,
+    onOpen: (SettingsSection) -> Unit,
     onAction: (MeAction) -> Unit,
 ) {
     Column {
-        SectionTitle(text = stringResource(R.string.me_section_permissions))
+        SectionTitle(text = stringResource(R.string.me_sub_section_permission))
         NavRow(
             title = stringResource(R.string.me_nav_permission_check),
             subtitle = null,
             onClick = { onOpen(SettingsSection.PERMISSIONS) },
         )
         NavRow(
-            title = stringResource(R.string.me_nav_budget),
-            subtitle = null,
-            onClick = { onOpen(SettingsSection.BUDGET) },
+            title = stringResource(R.string.me_nav_shell),
+            subtitle = stringResource(shellChannelStatusRes(state.shellChannel)),
+            onClick = { onOpen(SettingsSection.SHELL) },
         )
-        OptionRow(
-            title = stringResource(R.string.me_overlay_channel),
-            subtitle = stringResource(R.string.me_sub_overlay_channel),
-            value = WindowTypeLabel(state.overlayWindowType),
-            onClick = onOpenWindowTypeSheet,
-        )
+        FocusHighlight(focused = focus == MeFocus.HOST_PERSISTENT) {
+            SwitchRow(
+                title = stringResource(R.string.me_host_persistent),
+                subtitle = stringResource(R.string.me_host_persistent_desc),
+                checked = state.hostPersistent,
+                onCheckedChange = { onAction(MeAction.SetHostPersistent(it)) },
+            )
+        }
+    }
+}
+
+/** 悬浮球小分组：显隐、悬浮窗通道、显示方式、透明度（`ui.overlay.*`）。 */
+@Composable
+private fun OverlaySubsection(
+    state: MeUiState,
+    sheets: MeSheetState,
+    onAction: (MeAction) -> Unit,
+) {
+    Column {
+        SectionTitle(text = stringResource(R.string.me_sub_section_overlay))
         SwitchRow(
             title = stringResource(R.string.me_overlay_enabled),
             subtitle = null,
@@ -58,71 +83,70 @@ internal fun PermissionsSection(
             onCheckedChange = { onAction(MeAction.SetOverlayEnabled(it)) },
         )
         OptionRow(
+            title = stringResource(R.string.me_overlay_channel),
+            subtitle = stringResource(R.string.me_sub_overlay_channel),
+            value = WindowTypeLabel(state.overlayWindowType),
+            onClick = { sheets.windowType = true },
+        )
+        OptionRow(
             title = stringResource(R.string.me_overlay_display_mode),
             subtitle = stringResource(R.string.me_sub_display_mode),
             value = DisplayModeLabel(state.overlayDisplayMode),
-            onClick = onOpenDisplayModeSheet,
+            onClick = { sheets.displayMode = true },
         )
         OptionRow(
             title = stringResource(R.string.me_overlay_opacity),
             subtitle = null,
             value = opacityLabel(state.overlayOpacity),
-            onClick = onOpenOpacitySheet,
+            onClick = { sheets.opacity = true },
+        )
+    }
+}
+
+/** 执行小分组：触摸盾、动作后等待、运行预算、结束后返回原应用、导航应用。 */
+@Composable
+private fun ExecutionSubsection(
+    state: MeUiState,
+    onOpen: (SettingsSection) -> Unit,
+    sheets: MeSheetState,
+    onAction: (MeAction) -> Unit,
+) {
+    Column {
+        SectionTitle(text = stringResource(R.string.me_sub_section_execution))
+        SwitchRow(
+            title = stringResource(R.string.me_shield_enabled),
+            subtitle = stringResource(R.string.me_shield_enabled_desc),
+            checked = state.shieldEnabled,
+            onCheckedChange = { onAction(MeAction.SetShieldEnabled(it)) },
+        )
+        OptionRow(
+            title = stringResource(R.string.settings_action_delay_title),
+            subtitle = stringResource(R.string.settings_action_delay_subtitle),
+            value =
+                stringResource(
+                    R.string.settings_action_delay_seconds,
+                    (state.actionDelayMs / MILLIS_PER_SECOND).toInt(),
+                ),
+            onClick = { sheets.actionDelay = true },
         )
         NavRow(
-            title = stringResource(R.string.me_nav_shell),
-            subtitle = stringResource(shellChannelStatusRes(state.shellChannel)),
-            onClick = { onOpen(SettingsSection.SHELL) },
+            title = stringResource(R.string.me_nav_budget),
+            subtitle = null,
+            onClick = { onOpen(SettingsSection.BUDGET) },
+        )
+        SwitchRow(
+            title = stringResource(R.string.me_return_to_origin),
+            subtitle = null,
+            checked = state.returnToOriginApp,
+            onCheckedChange = { onAction(MeAction.SetReturnToOriginApp(it)) },
         )
         OptionRow(
             title = stringResource(R.string.me_nav_navigation_app),
             subtitle = stringResource(R.string.me_sub_navigation_app),
             value = navigationLabel(state.navigationPreferred, state.navigationApps),
-            onClick = onOpenNavigationSheet,
-        )
-        BehaviorRows(
-            state = state,
-            onOpenActionDelaySheet = onOpenActionDelaySheet,
-            onAction = onAction,
+            onClick = { sheets.navigation = true },
         )
     }
-}
-
-/** 运行行为开关：常驻后台 / 结束后返回原应用 / 执行期触摸盾 + 动作后等待。 */
-@Composable
-private fun BehaviorRows(
-    state: MeUiState,
-    onOpenActionDelaySheet: () -> Unit,
-    onAction: (MeAction) -> Unit,
-) {
-    SwitchRow(
-        title = stringResource(R.string.me_host_persistent),
-        subtitle = stringResource(R.string.me_host_persistent_desc),
-        checked = state.hostPersistent,
-        onCheckedChange = { onAction(MeAction.SetHostPersistent(it)) },
-    )
-    SwitchRow(
-        title = stringResource(R.string.me_return_to_origin),
-        subtitle = null,
-        checked = state.returnToOriginApp,
-        onCheckedChange = { onAction(MeAction.SetReturnToOriginApp(it)) },
-    )
-    SwitchRow(
-        title = stringResource(R.string.me_shield_enabled),
-        subtitle = stringResource(R.string.me_shield_enabled_desc),
-        checked = state.shieldEnabled,
-        onCheckedChange = { onAction(MeAction.SetShieldEnabled(it)) },
-    )
-    OptionRow(
-        title = stringResource(R.string.settings_action_delay_title),
-        subtitle = stringResource(R.string.settings_action_delay_subtitle),
-        value =
-            stringResource(
-                R.string.settings_action_delay_seconds,
-                (state.actionDelayMs / MILLIS_PER_SECOND).toInt(),
-            ),
-        onClick = onOpenActionDelaySheet,
-    )
 }
 
 /** 悬浮窗通道选择弹层。 */
@@ -218,7 +242,6 @@ private fun WindowTypeLabel(value: String): String =
     }
 
 /** shell 注入通道状态文案（N200）。 */
-@Composable
 private fun shellChannelStatusRes(state: ShellState): Int =
     when (state) {
         ShellState.Disconnected -> R.string.me_shell_status_off

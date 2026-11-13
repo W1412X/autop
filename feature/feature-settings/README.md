@@ -45,3 +45,9 @@
   已随 N186 触摸盾落地删除（执行期固定屏蔽用户触摸，docs/tech/05 §8.1）。
 - `MeScreen` 结构调整：外观分组拆至 `MeAppearanceSection.kt`、弹层宿主拆至
   `AppearanceSheetHost`/`WindowTypeSheet`，满足 detekt LongMethod/TooManyFunctions 阈值。
+
+## “我的”两级结构（docs/tech/08 §4.5）
+
+- 一级 `MeScreen`：健康状态卡（2×3 网格，前四项为必需项决定卡片颜色，注入通道为可选项）与七个分类行。分类行副标题显示当前值。状态格和分类行都可点击跳转。
+- 二级 `MeGroupScreen`，路由 `me/group/{group}?focus={focus}`。`meGraph` 新增 `groupRoute` 参数。分类内容复用既有分组组件。选择弹层的开关由 `MeSheetState` 持有，`MeSheetHost` 渲染。
+- `SettingsNavigator` 新增 `openGroup(group, focus)` 与 `openSystemSettings(target)`，由 app 实现。
