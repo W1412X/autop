@@ -70,11 +70,13 @@ public data class LlmProbeSection(
  */
 @Serializable
 public data class LlmEmbeddingSection(
-    @SerialName("provider") val provider: String = "none",
+    @SerialName("provider") val provider: String = "local",
     @SerialName("profileId") val profileId: String? = null,
     @SerialName("model") val model: String? = null,
     @SerialName("dimension") val dimension: Int? = null,
     @SerialName("batchSize") val batchSize: Int = 16,
+    /** 端侧模型的分词长度上限（含 [CLS]/[SEP]），超出部分截断。 */
+    @SerialName("maxSeqLen") val maxSeqLen: Int = 64,
 ) : ConfigSection
 
 /** `llm` 领域全部配置键的登记（DI 多绑定与测试用）。 */

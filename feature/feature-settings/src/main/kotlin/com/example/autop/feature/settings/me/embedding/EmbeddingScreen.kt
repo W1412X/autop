@@ -38,6 +38,7 @@ import kotlinx.coroutines.delay
 /** 提供方 id（docs/tech/03 §7 EmbeddingConfig.provider）。 */
 private const val PROVIDER_NONE: String = "none"
 private const val PROVIDER_OPENAI: String = "openai"
+private const val PROVIDER_LOCAL: String = "local"
 
 /** 模型名输入防抖（逐键写配置太频繁）。 */
 private const val MODEL_DEBOUNCE_MS: Long = 400
@@ -95,6 +96,7 @@ public fun EmbeddingScreen(
 @Composable
 private fun providerLabel(provider: String): String =
     when (provider) {
+        PROVIDER_LOCAL -> stringResource(R.string.embedding_provider_local)
         PROVIDER_NONE -> stringResource(R.string.embedding_provider_none)
         PROVIDER_OPENAI -> stringResource(R.string.embedding_provider_openai)
         else -> provider
@@ -115,7 +117,7 @@ private fun ProviderSection(
             value = providerLabel(state.section.provider),
             onClick = { onOpenSheet(EmbeddingSheet.Provider) },
         )
-        if (state.section.provider != PROVIDER_NONE) {
+        if (state.section.provider == PROVIDER_OPENAI) {
             OptionRow(
                 title = stringResource(R.string.embedding_profile),
                 subtitle = null,
@@ -238,6 +240,7 @@ private fun EmbeddingSheetContent(
                 title = stringResource(R.string.embedding_provider),
                 options =
                     listOf(
+                        OptionItem(id = PROVIDER_LOCAL, label = stringResource(R.string.embedding_provider_local)),
                         OptionItem(id = PROVIDER_NONE, label = stringResource(R.string.embedding_provider_none)),
                         OptionItem(id = PROVIDER_OPENAI, label = stringResource(R.string.embedding_provider_openai)),
                     ),

@@ -8,6 +8,15 @@ public object LlmErrorCodes {
     /** 角色未分配模型（retryable=false）。 */
     public const val NOT_CONFIGURED: String = "llm.not_configured"
 
+    /** 端侧 embedding 模型资产缺失（retryable=false，重装或更新应用可修复）。 */
+    public const val EMBEDDING_MODEL_MISSING: String = "llm.embedding_model_missing"
+
+    /** 端侧 embedding 模型校验失败（sha256 不符或文件损坏，retryable=false）。 */
+    public const val EMBEDDING_MODEL_CORRUPT: String = "llm.embedding_model_corrupt"
+
+    /** 端侧 embedding 推理失败（retryable=true）。 */
+    public const val EMBEDDING_FAILED: String = "llm.embedding_failed"
+
     /** 401 / 403（retryable=false）。 */
     public const val AUTH: String = "llm.auth"
 

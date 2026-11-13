@@ -40,7 +40,7 @@ object ModuleTypes {
             // 文档缺口（见 questions.md N2）：llm-http 是适配器共享的传输层，视为 llm 领域 CORE；
             // llm-openai / llm-anthropic 是 llm-api 端口的适配器实现，视为 llm 领域 IMPL。
             path == ":llm:llm-http" -> ModuleType.CORE
-            path == ":llm:llm-openai" || path == ":llm:llm-anthropic" -> ModuleType.IMPL
+            path == ":llm:llm-openai" || path == ":llm:llm-anthropic" || path == ":llm:llm-onnx" -> ModuleType.IMPL
             else -> error("无法按 docs/tech/01 第 4 节推断模块类型：$path")
         }
         return ModuleInfo(path, name, type, domainOf(path, name, type))

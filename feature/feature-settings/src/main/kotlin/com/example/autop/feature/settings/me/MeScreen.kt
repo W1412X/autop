@@ -270,6 +270,7 @@ private fun ModelLinksSection(
 @Composable
 private fun embeddingProviderLabel(providerId: String): String =
     when (providerId) {
+        "local" -> stringResource(R.string.me_embedding_local)
         "none" -> stringResource(R.string.me_embedding_off)
         "openai" -> stringResource(R.string.me_embedding_openai)
         else -> providerId

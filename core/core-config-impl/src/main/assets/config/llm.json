@@ -26,11 +26,12 @@
       "timeoutMs": 30000
     },
     "embedding": {
-      "provider": "none",
+      "provider": "local",
       "profileId": null,
       "model": null,
       "dimension": null,
-      "batchSize": 16
+      "batchSize": 16,
+      "maxSeqLen": 64
     }
   }
 }

@@ -73,6 +73,7 @@ public class DefaultEmbeddingGateway
                         model = section.model,
                         dimension = section.dimension,
                         batchSize = section.batchSize,
+                        maxSeqLen = section.maxSeqLen,
                     ),
                 )
             }

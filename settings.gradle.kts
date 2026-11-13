@@ -37,6 +37,7 @@ include(":llm:llm-api")
 include(":llm:llm-http")
 include(":llm:llm-openai")
 include(":llm:llm-anthropic")
+include(":llm:llm-onnx")
 
 include(":agent:agent-api")
 include(":agent:agent-runtime")

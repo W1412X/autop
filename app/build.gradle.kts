@@ -46,6 +46,7 @@ dependencies {
     implementation(project(":llm:llm-http"))
     implementation(project(":llm:llm-openai"))
     implementation(project(":llm:llm-anthropic"))
+    implementation(project(":llm:llm-onnx"))
     implementation(project(":agent:agent-runtime"))
     implementation(project(":agent:agent-store"))
     implementation(project(":domain:device-impl"))

@@ -26,6 +26,7 @@
     <string name="observe_status_available">当前可用</string>
     <string name="me_nav_embedding">检索向量</string>
     <string name="me_model_unassigned">未配置</string>
+    <string name="me_embedding_local">端侧模型</string>
     <string name="me_embedding_off">未启用</string>
     <string name="me_embedding_openai">OpenAI 兼容</string>
     <string name="me_nav_permission_check">权限检查</string>
@@ -183,6 +184,7 @@
     <string name="embedding_title">检索向量</string>
     <string name="embedding_section_provider">提供方</string>
     <string name="embedding_provider">提供方</string>
+    <string name="embedding_provider_local">端侧模型（离线，随应用提供）</string>
     <string name="embedding_provider_none">不使用</string>
     <string name="embedding_provider_openai">OpenAI 兼容</string>
     <string name="embedding_shared_note">记忆检索与对话历史检索共用同一向量模型</string>

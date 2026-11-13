@@ -65,7 +65,7 @@ public class EmbeddingViewModel
             when (action) {
                 is EmbeddingAction.SetProvider ->
                     write { section ->
-                        if (action.id == PROVIDER_NONE) {
+                        if (action.id == PROVIDER_NONE || action.id == PROVIDER_LOCAL) {
                             section.copy(provider = action.id, profileId = null, model = null, dimension = null)
                         } else {
                             section.copy(provider = action.id, dimension = null)
@@ -138,5 +138,8 @@ public class EmbeddingViewModel
 
             /** 未启用（docs/tech/03 §7 EmbeddingConfig.provider 的 `none`）。 */
             const val PROVIDER_NONE = "none"
+
+            /** 端侧模型（ADR-0028）：不需要 profile，模型随应用分发。 */
+            const val PROVIDER_LOCAL = "local"
         }
     }

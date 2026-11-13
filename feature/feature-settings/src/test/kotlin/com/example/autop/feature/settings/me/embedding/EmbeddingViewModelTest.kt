@@ -58,7 +58,7 @@ class EmbeddingViewModelTest {
             store.upsert(testProfile("p1", displayName = "向量源"))
             val viewModel = createViewModel()
             val state = viewModel.uiState.value
-            assertThat(state.section.provider).isEqualTo("none")
+            assertThat(state.section.provider).isEqualTo("local")
             assertThat(state.profiles.single().displayName).isEqualTo("向量源")
             assertThat(state.reindex).isEqualTo(ReindexUiState())
         }

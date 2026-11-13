@@ -1,0 +1,39 @@
+{
+  "id": "local:bge-small-zh-v1.5-int8",
+  "version": 1,
+  "source": {
+    "model": "BAAI/bge-small-zh-v1.5",
+    "onnx": "onnx-community/bge-small-zh-v1.5-ONNX (onnx/model_quantized.onnx + model_quantized.onnx_data, merged into one file)",
+    "license": "MIT",
+    "downloadedAt": "2026-11-13"
+  },
+  "files": [
+    {
+      "name": "bge-small-zh-v1.5-int8.onnx",
+      "bytes": 23937398,
+      "sha256": "277740d23747fa6dbe5b3afa74fca21d818fb89556ce5c819ce1d3896e6e4c25"
+    },
+    {
+      "name": "vocab.txt",
+      "bytes": 109540,
+      "sha256": "45bbac6b341c319adc98a532532882e91a9cefc0329aa57bac9ae761c27b291c"
+    },
+    {
+      "name": "config.json",
+      "bytes": 776,
+      "sha256": "3853a7979202c348751b753e36f579c41d8da7d36af617d3d907e1fc9b441f2a"
+    },
+    {
+      "name": "README-upstream.md",
+      "bytes": 1057,
+      "sha256": "cb22054df1a98f7ee9d5b281d023e67c27cc316e1733baf03fc994d95c3048ab"
+    }
+  ],
+  "model": "bge-small-zh-v1.5-int8.onnx",
+  "vocab": "vocab.txt",
+  "inputs": ["input_ids", "attention_mask", "token_type_ids"],
+  "output": "sentence_embedding",
+  "dimension": 512,
+  "normalized": true,
+  "tokenizer": "bert-wordpiece (vocab.txt, 21128 tokens, [CLS]=101, [SEP]=102, [UNK]=100)"
+}

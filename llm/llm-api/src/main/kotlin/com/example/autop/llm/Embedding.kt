@@ -43,4 +43,6 @@ public data class EmbeddingConfig(
     @SerialName("model") val model: String? = null,
     @SerialName("dimension") val dimension: Int? = null,
     @SerialName("batchSize") val batchSize: Int = 16,
+    /** 端侧模型的分词长度上限（含特殊符号）。 */
+    @SerialName("maxSeqLen") val maxSeqLen: Int = 64,
 )
