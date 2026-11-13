@@ -234,23 +234,21 @@ public class AppearanceSettingsViewModel
             }
         }
 
-        /** 手动检查更新：发现新版本由状态流驱动横幅；无更新/失败给一次性提示。 */
+        /**
+         * 手动检查更新：发现新版本与失败原因由状态流驱动展示；已是最新版本时给一次性提示。
+         */
         private fun checkUpdate() {
             viewModelScope.launch {
                 updateNotice.value = null
-                when (val result = updateChecker.checkNow()) {
-                    is Outcome.Ok -> if (result.value == null) updateNotice.value = UpdateNotice.UP_TO_DATE
-                    is Outcome.Err -> updateNotice.value = UpdateNotice.CHECK_FAILED
-                }
+                val result = updateChecker.checkNow()
+                if (result is Outcome.Ok && result.value == null) updateNotice.value = UpdateNotice.UP_TO_DATE
             }
         }
 
-        /** 后台下载新版本 APK（进度经状态流上报）。 */
+        /** 后台下载新版本 APK（进度、速度与失败原因经状态流上报，不随页面销毁取消）。 */
         private fun downloadUpdate() {
-            viewModelScope.launch {
-                updateNotice.value = null
-                updateChecker.download().onErr { updateNotice.value = UpdateNotice.DOWNLOAD_FAILED }
-            }
+            updateNotice.value = null
+            updateChecker.download()
         }
 
         /** 拉起系统安装器；未授权时已跳授权页并提示。 */

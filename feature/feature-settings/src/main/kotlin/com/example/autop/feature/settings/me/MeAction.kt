@@ -142,7 +142,7 @@ public sealed interface MeAction {
     /** 一次性提示（Toast）已发出，清空对应状态。 */
     public data object DismissNotice : MeAction
 
-    /** 手动检查更新（忽略 24h 节流）。 */
+    /** 手动检查更新。 */
     public data object CheckUpdate : MeAction
 
     /** 下载新版本 APK（后台进行，进度见关于分组）。 */

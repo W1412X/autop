@@ -439,11 +439,21 @@ private class UnusedTaskRepository : TaskRepository {
 private class FakeUpdateChecker : UpdateChecker {
     override val state: StateFlow<UpdateState> = MutableStateFlow(UpdateState.Idle)
 
+    override val promptedVersion: StateFlow<String?> = MutableStateFlow(null)
+
+    override fun markPrompted(versionName: String) = Unit
+
+    override val autoInstallVersion: StateFlow<String?> = MutableStateFlow(null)
+
+    override fun markAutoInstallAttempted(versionName: String) = Unit
+
+    override fun canRequestInstall(): Boolean = false
+
     override fun start(scope: CoroutineScope) = Unit
 
     override suspend fun checkNow(): Outcome<UpdateInfo?> = Outcome.Ok(null)
 
-    override suspend fun download(): Outcome<java.io.File> = error("unused")
+    override fun download(): Outcome<Unit> = error("unused")
 
     override fun install(): Outcome<Unit> = error("unused")
 }

@@ -19,6 +19,7 @@ import com.example.autop.core.config.UiConfig
 import com.example.autop.core.ui.theme.AutopTheme
 import com.example.autop.core.ui.theme.toAppearanceSettings
 import com.example.autop.feature.settings.debug.DebugPage
+import com.example.autop.feature.settings.me.update.UpdatePromptHost
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.Optional
 import javax.inject.Inject
@@ -69,6 +70,8 @@ class MainActivity : ComponentActivity() {
                     openRoute = openRoute,
                     debugPage = debugPage.orElse(null),
                 )
+                // 新版本提示弹窗：全局挂载，任何页面都可能弹出（Run 执行期间不弹，见 UpdatePromptViewModel）。
+                UpdatePromptHost()
             }
         }
     }

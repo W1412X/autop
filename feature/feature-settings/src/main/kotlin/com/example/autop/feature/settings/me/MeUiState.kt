@@ -100,12 +100,6 @@ public enum class UpdateNotice {
     /** 已是最新版本。 */
     UP_TO_DATE,
 
-    /** 检测失败（网络不可达等）。 */
-    CHECK_FAILED,
-
-    /** 下载失败。 */
-    DOWNLOAD_FAILED,
-
     /** 需先授权"安装未知应用"（已跳系统授权页）。 */
     INSTALL_PERMISSION,
 }

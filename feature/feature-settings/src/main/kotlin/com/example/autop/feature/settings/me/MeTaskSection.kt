@@ -23,6 +23,8 @@ import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SwitchRow
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
+import com.example.autop.device.UpdateFailure
+import com.example.autop.device.UpdateStage
 import com.example.autop.device.UpdateState
 import com.example.autop.feature.settings.R
 import java.util.Locale
@@ -97,7 +99,10 @@ internal fun rememberAppVersion(): String {
     }
 }
 
-/** 更新区：检查更新行 + 新版本横幅（下载/安装按钮与进度）。 */
+/**
+ * 更新区：检查更新行（检测中 / 下载进度与平均速度 / 检测失败原因）+ 横幅
+ * （可下载、已下载待安装、下载失败可重试）。
+ */
 @Composable
 private fun UpdateSection(
     state: MeUiState,
@@ -108,20 +113,7 @@ private fun UpdateSection(
     val busy = update is UpdateState.Checking || update is UpdateState.Downloading
     ActionRow(
         title = stringResource(R.string.me_check_update),
-        subtitle =
-            when (update) {
-                UpdateState.Checking -> stringResource(R.string.me_update_checking)
-                is UpdateState.Downloading ->
-                    if (update.progress >= 0f) {
-                        stringResource(
-                            R.string.me_update_downloading,
-                            String.format(Locale.US, "%.0f%%", update.progress * PERCENT_SCALE),
-                        )
-                    } else {
-                        stringResource(R.string.me_update_downloading_unknown)
-                    }
-                else -> null
-            },
+        subtitle = updateSubtitle(update),
         onClick = { if (!busy) onAction(MeAction.CheckUpdate) },
     )
     when (update) {
@@ -151,9 +143,80 @@ private fun UpdateSection(
                     )
                 },
             )
+        is UpdateState.Failed -> {
+            val failedInfo = update.info
+            if (update.stage == UpdateStage.DOWNLOAD && failedInfo != null) {
+                StatusBanner(
+                    tone = StatusTone.BLOCKED,
+                    title = stringResource(R.string.me_update_available_title, failedInfo.versionName),
+                    message = stringResource(R.string.me_update_download_failed, failureReason(update.failure)),
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.screenEdge),
+                    actions = {
+                        AutopTonalButton(
+                            text = stringResource(R.string.me_update_retry),
+                            onClick = { onAction(MeAction.DownloadUpdate) },
+                        )
+                    },
+                )
+            }
+        }
         else -> Unit
     }
 }
+
+/** 检查更新行的副标题：检测中、下载进度与速度、检测失败原因；其余状态不显示副标题。 */
+@Composable
+private fun updateSubtitle(update: UpdateState): String? =
+    when (update) {
+        UpdateState.Checking -> stringResource(R.string.me_update_checking)
+        is UpdateState.Downloading -> downloadingText(update)
+        is UpdateState.Failed ->
+            if (update.stage == UpdateStage.CHECK) {
+                stringResource(R.string.me_update_check_failed, failureReason(update.failure))
+            } else {
+                null
+            }
+        else -> null
+    }
+
+@Composable
+private fun downloadingText(update: UpdateState.Downloading): String {
+    val speed = speedText(update.bytesPerSecond)
+    return if (update.progress >= 0f) {
+        val percent = String.format(Locale.US, "%.0f%%", update.progress * PERCENT_SCALE)
+        stringResource(R.string.me_update_downloading, percent, speed)
+    } else {
+        stringResource(R.string.me_update_downloading_unknown, speed)
+    }
+}
+
+/** 平均速度文字：0 时显示"计算中"，超过 1 MB/s 用 MB/s，否则用 KB/s。 */
+@Composable
+private fun speedText(bytesPerSecond: Long): String =
+    when {
+        bytesPerSecond <= 0L -> stringResource(R.string.me_update_speed_pending)
+        bytesPerSecond >= BYTES_PER_MB ->
+            stringResource(
+                R.string.me_update_speed_value,
+                String.format(Locale.US, "%.1f MB/s", bytesPerSecond.toDouble() / BYTES_PER_MB),
+            )
+        else ->
+            stringResource(
+                R.string.me_update_speed_value,
+                String.format(Locale.US, "%.0f KB/s", bytesPerSecond.toDouble() / BYTES_PER_KB),
+            )
+    }
+
+@Composable
+private fun failureReason(failure: UpdateFailure): String =
+    when (failure) {
+        UpdateFailure.Network -> stringResource(R.string.me_update_reason_network)
+        is UpdateFailure.Http -> stringResource(R.string.me_update_reason_http, failure.code)
+        UpdateFailure.NoApk -> stringResource(R.string.me_update_reason_no_apk)
+        UpdateFailure.Storage -> stringResource(R.string.me_update_reason_storage)
+        UpdateFailure.Incomplete -> stringResource(R.string.me_update_reason_incomplete)
+        UpdateFailure.Unknown -> stringResource(R.string.me_update_reason_unknown)
+    }
 
 /** 外链行：副标题显示去掉协议头的地址；设备上没有浏览器时点击不做任何事（不崩溃）。 */
 @Composable
@@ -174,3 +237,6 @@ private const val URL_SCHEME: String = "https://"
 
 /** 进度 0..1 → 百分比数值。 */
 private const val PERCENT_SCALE: Int = 100
+
+private const val BYTES_PER_KB: Double = 1024.0
+private const val BYTES_PER_MB: Long = 1024L * 1024L

@@ -164,8 +164,6 @@ private fun NoticeToasts(
 private fun updateNoticeMessageRes(kind: UpdateNotice): Int =
     when (kind) {
         UpdateNotice.UP_TO_DATE -> R.string.me_update_up_to_date
-        UpdateNotice.CHECK_FAILED -> R.string.me_update_check_failed
-        UpdateNotice.DOWNLOAD_FAILED -> R.string.me_update_download_failed
         UpdateNotice.INSTALL_PERMISSION -> R.string.me_update_install_permission
     }
 
