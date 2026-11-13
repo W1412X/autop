@@ -49,12 +49,16 @@ class TaskToolSchemaTest {
     @Test
     fun `update_task accepts the same fields as create_task plus the target`() {
         val create =
-            TaskToolSpecs.createTask().parameters["properties"]
+            TaskToolSpecs
+                .createTask()
+                .parameters["properties"]
                 ?.jsonObject
                 ?.keys
                 .orEmpty()
         val update =
-            TaskToolSpecs.updateTask().parameters["properties"]
+            TaskToolSpecs
+                .updateTask()
+                .parameters["properties"]
                 ?.jsonObject
                 ?.keys
                 .orEmpty()

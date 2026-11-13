@@ -5,6 +5,7 @@ package com.example.autop.feature.tasks.list
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.autop.core.common.RunId
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.feature.tasks.NEW_TASK_ID
@@ -75,42 +76,58 @@ public class TasksListViewModel
                 is TasksListAction.SetPage ->
                     if (action.page == TasksPage.TASKS || flowsEnabled.value) page.value = action.page
                 TasksListAction.CreateFlow -> if (flowsEnabled.value) navigator.openFlowCreate()
+                is TasksListAction.OpenDetail,
+                is TasksListAction.OpenEdit,
+                TasksListAction.CreateTask,
+                TasksListAction.CreateTaskAi,
+                -> navigate(action, navigator)
+                is TasksListAction.ToggleEnabled,
+                is TasksListAction.RequestDelete,
+                TasksListAction.ConfirmDelete,
+                TasksListAction.DismissDelete,
+                -> manage(action)
+                is TasksListAction.ExecuteWaiting,
+                is TasksListAction.SnoozeWaiting,
+                is TasksListAction.SkipWaiting,
+                -> handleWaiting(action)
+            }
+        }
+
+        private fun navigate(
+            action: TasksListAction,
+            navigator: TasksNavigator,
+        ) {
+            when (action) {
                 is TasksListAction.OpenDetail -> navigator.openDetail(action.taskId)
                 is TasksListAction.OpenEdit -> navigator.openEdit(action.taskId)
                 TasksListAction.CreateTask -> navigator.openEdit(NEW_TASK_ID)
                 TasksListAction.CreateTaskAi -> navigator.openTaskAuthor()
+                else -> Unit
+            }
+        }
+
+        private fun manage(action: TasksListAction) {
+            when (action) {
                 is TasksListAction.ToggleEnabled ->
-                    launch {
-                        taskRepository.setEnabled(
-                            TaskId(action.taskId),
-                            action.enabled,
-                        )
-                    }
+                    launch { taskRepository.setEnabled(TaskId(action.taskId), action.enabled) }
                 is TasksListAction.RequestDelete -> pendingDeleteId.value = action.taskId
                 TasksListAction.ConfirmDelete -> confirmDelete()
                 TasksListAction.DismissDelete -> pendingDeleteId.value = null
+                else -> Unit
+            }
+        }
+
+        private fun handleWaiting(action: TasksListAction) {
+            when (action) {
                 is TasksListAction.ExecuteWaiting ->
-                    launch {
-                        runService.requeueWaiting(
-                            com.example.autop.core.common
-                                .RunId(action.runId),
-                        )
-                    }
+                    launch { runService.requeueWaiting(RunId(action.runId)) }
                 is TasksListAction.SnoozeWaiting ->
                     launch {
-                        runService.snoozeWaiting(
-                            com.example.autop.core.common
-                                .RunId(action.runId),
-                            SNOOZE_MINUTES,
-                        )
+                        runService.snoozeWaiting(RunId(action.runId), SNOOZE_MINUTES)
                     }
                 is TasksListAction.SkipWaiting ->
-                    launch {
-                        runService.skipWaiting(
-                            com.example.autop.core.common
-                                .RunId(action.runId),
-                        )
-                    }
+                    launch { runService.skipWaiting(RunId(action.runId)) }
+                else -> Unit
             }
         }
 

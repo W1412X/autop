@@ -19,9 +19,9 @@ import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.PermissionChecks
 import com.example.autop.core.common.onErr
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigEditor
 import com.example.autop.core.config.ConfigProvider
-import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.FeaturesConfig

@@ -99,6 +99,21 @@ public class CreateTaskTool
         override fun specFor(ctx: ToolContext): ToolSpec =
             TaskToolSpecs.createTask(flowsEnabled = ctx.config.flowsEnabled())
 
+        /** 解析触发器与流程绑定；任一项非法即返回对应错误。 */
+        private suspend fun bindings(args: JsonObject): Outcome<Pair<Trigger, FlowBinding?>> {
+            val trigger =
+                when (val built = TaskArgs.trigger(args, sources)) {
+                    is Outcome.Ok -> built.value
+                    is Outcome.Err -> return built
+                }
+            val flow =
+                when (val resolved = TaskArgs.flow(args, parent = null, flows = flows)) {
+                    is Outcome.Ok -> resolved.value
+                    is Outcome.Err -> return resolved
+                }
+            return Outcome.Ok(trigger to flow)
+        }
+
         override suspend fun invoke(
             args: JsonObject,
             ctx: ToolContext,
@@ -111,15 +126,10 @@ public class CreateTaskTool
             if (!ctx.config.flowsEnabled() && args.hasFlowArg() && !args.text("flow").isNullOrBlank()) {
                 return flowDisabledFailure()
             }
-            val trigger =
-                when (val built = TaskArgs.trigger(args, sources)) {
-                    is Outcome.Ok -> built.value
-                    is Outcome.Err -> return failure(built.error.code, built.error.message, built.error.hint)
-                }
-            val flow =
-                when (val resolved = TaskArgs.flow(args, parent = null, flows = flows)) {
-                    is Outcome.Ok -> resolved.value
-                    is Outcome.Err -> return failure(resolved.error.code, resolved.error.message, resolved.error.hint)
+            val (trigger, flow) =
+                when (val bound = bindings(args)) {
+                    is Outcome.Ok -> bound.value
+                    is Outcome.Err -> return failure(bound.error.code, bound.error.message, bound.error.hint)
                 }
             val now = clock.nowMillis()
             val task =
