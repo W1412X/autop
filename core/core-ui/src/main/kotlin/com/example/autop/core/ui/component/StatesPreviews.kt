@@ -1,5 +1,5 @@
 /**
- * 状态块与横幅提示预览（docs/tech/08 §7）：每个公共组件亮/暗各一例，取 [PreviewData] 样本。
+ * 状态块预览（docs/tech/08 §7）：每个公共组件亮/暗各一例，取 [PreviewData] 样本。
  * 预览函数保持 internal：detekt 的 UnusedPrivateMember 会误报私有预览。
  */
 package com.example.autop.core.ui.component
@@ -8,9 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.autop.core.ui.preview.PreviewData
 import com.example.autop.core.ui.preview.PreviewTheme
-
-/** 横幅自动消失时长样本（对应 ui.banner.durationMs）。 */
-private const val SAMPLE_BANNER_DURATION_MS: Long = 3000L
 
 @Preview(name = "light")
 @Composable
@@ -52,23 +49,4 @@ internal fun LoadingStatePreview() =
 internal fun LoadingStateDarkPreview() =
     PreviewTheme(dark = true) {
         LoadingState(text = PreviewData.BODY)
-    }
-
-@Preview(name = "light")
-@Composable
-internal fun InlineBannerPreview() =
-    PreviewTheme {
-        InlineBanner(message = PreviewData.BANNER, onDismiss = {}, durationMs = SAMPLE_BANNER_DURATION_MS)
-    }
-
-@Preview(name = "dark")
-@Composable
-internal fun InlineBannerDarkPreview() =
-    PreviewTheme(dark = true) {
-        InlineBanner(
-            message = PreviewData.BANNER,
-            onDismiss = {},
-            durationMs = SAMPLE_BANNER_DURATION_MS,
-            icon = AutopIcons.Warning,
-        )
     }

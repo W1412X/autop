@@ -64,7 +64,7 @@ private const val ATTACH_EDGE_MAX = 4096
 private const val ATTACH_QUALITY_MIN = 30
 private const val ATTACH_QUALITY_MAX = 100
 
-/** `ui.banner`：顶部横幅提示。 */
+/** `ui.banner`：一次性提示（Toast）的显示时长。 */
 @Serializable
 public data class UiBannerSection(
     @SerialName("durationMs") val durationMs: Long = 3000,

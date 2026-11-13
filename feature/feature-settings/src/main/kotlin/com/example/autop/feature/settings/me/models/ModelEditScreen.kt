@@ -31,7 +31,6 @@ import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.ActionRow
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopTextButton
-import com.example.autop.core.ui.component.InlineBanner
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.LoadingState
 import com.example.autop.core.ui.component.OptionItem
@@ -39,13 +38,14 @@ import com.example.autop.core.ui.component.OptionRow
 import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.component.ToastEffect
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.settings.R
 
 /**
  * 模型新建/编辑页（无状态）。
  *
- * @param state 页面状态（错误/提示横幅、远端模型列表、删除确认）。
+ * @param state 页面状态（错误/通知以 Toast 提示、远端模型列表、删除确认）。
  * @param draft 当前草稿。
  * @param onBack 返回列表。
  * @param onAction 用户操作回调。
@@ -74,7 +74,7 @@ public fun ModelEditScreen(
                 )
             },
         )
-        Banners(state = state, onAction = onAction)
+        Toasts(state = state, onAction = onAction)
         ModelForm(state = state, draft = draft, onAction = onAction, onOpenProtocol = { protocolSheet = true })
     }
     if (protocolSheet) {
@@ -143,25 +143,22 @@ private fun ModelForm(
     }
 }
 
+/** 错误与通知以 Toast 呈现（不占布局空间），发出后由对应的 Dismiss 动作清空状态。 */
 @Composable
-private fun Banners(
+private fun Toasts(
     state: ModelsUiState,
     onAction: (ModelsAction) -> Unit,
 ) {
-    if (state.error != null) {
-        InlineBanner(
-            message = errorText(state.error),
-            onDismiss = { onAction(ModelsAction.Dismiss(DismissKind.ERROR)) },
-            durationMs = state.bannerDurationMs,
-        )
-    }
-    if (state.notice != null) {
-        InlineBanner(
-            message = noticeText(state.notice),
-            onDismiss = { onAction(ModelsAction.Dismiss(DismissKind.NOTICE)) },
-            durationMs = state.bannerDurationMs,
-        )
-    }
+    ToastEffect(
+        message = state.error?.let { errorText(it) },
+        durationMs = state.bannerDurationMs,
+        onConsumed = { onAction(ModelsAction.Dismiss(DismissKind.ERROR)) },
+    )
+    ToastEffect(
+        message = state.notice?.let { noticeText(it) },
+        durationMs = state.bannerDurationMs,
+        onConsumed = { onAction(ModelsAction.Dismiss(DismissKind.NOTICE)) },
+    )
 }
 
 /** 表单字段区（docs/tech/08 §4.5 顺序：协议、名称、baseUrl、API Key）。 */

@@ -97,7 +97,7 @@ public data class ModelsUiState(
     val notice: ModelsNoticeKind? = null,
     /** 删除确认对话框是否显示。 */
     val confirmDelete: Boolean = false,
-    /** 横幅显示时长（`ui.banner.durationMs`，错误提示共用）。 */
+    /** 一次性提示（Toast）显示时长（`ui.banner.durationMs`，错误与通知共用）。 */
     val bannerDurationMs: Long = UiBannerSection().durationMs,
 )
 

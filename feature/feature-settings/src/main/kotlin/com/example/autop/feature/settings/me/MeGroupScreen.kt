@@ -29,10 +29,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.ActionRow
-import com.example.autop.core.ui.component.InlineBanner
 import com.example.autop.core.ui.component.NavRow
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.component.ToastEffect
 import com.example.autop.feature.settings.MeFocus
 import com.example.autop.feature.settings.MeGroup
 import com.example.autop.feature.settings.R
@@ -74,7 +74,7 @@ public fun MeGroupScreen(
                 .statusBarsPadding(),
     ) {
         SubPageTopBar(title = stringResource(groupTitleRes(group)), onBack = onBack)
-        NoticeBanner(state = state, onAction = onAction)
+        NoticeToasts(state = state, onAction = onAction)
         Column(
             modifier =
                 Modifier
@@ -139,28 +139,25 @@ private fun GroupContent(
     }
 }
 
-/** 通知横幅：导出导入结果、占位提示与更新检查结果（ui.banner.durationMs 后消失）。 */
+/**
+ * 一次性提示（Toast）：导出导入结果、占位提示与更新检查结果。
+ * 两类提示共用 [MeAction.DismissNotice]，它会同时清空两个状态。
+ */
 @Composable
-private fun NoticeBanner(
+private fun NoticeToasts(
     state: MeUiState,
     onAction: (MeAction) -> Unit,
 ) {
-    val kind = state.notice
-    val updateKind = state.updateNotice
-    if (kind != null) {
-        InlineBanner(
-            message = stringResource(noticeMessageRes(kind)),
-            onDismiss = { onAction(MeAction.DismissNotice) },
-            durationMs = state.bannerDurationMs,
-        )
-    }
-    if (updateKind != null) {
-        InlineBanner(
-            message = stringResource(updateNoticeMessageRes(updateKind)),
-            onDismiss = { onAction(MeAction.DismissNotice) },
-            durationMs = state.bannerDurationMs,
-        )
-    }
+    ToastEffect(
+        message = state.notice?.let { stringResource(noticeMessageRes(it)) },
+        durationMs = state.bannerDurationMs,
+        onConsumed = { onAction(MeAction.DismissNotice) },
+    )
+    ToastEffect(
+        message = state.updateNotice?.let { stringResource(updateNoticeMessageRes(it)) },
+        durationMs = state.bannerDurationMs,
+        onConsumed = { onAction(MeAction.DismissNotice) },
+    )
 }
 
 @StringRes

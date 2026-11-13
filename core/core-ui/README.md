@@ -31,7 +31,7 @@
   尾部加载/错误/到底三态，状态 `PagedListState`）。
 - 输入：`AutopInputBar`（BasicTextField 自绘，规格 `InputBarSpec`）。
 - 顶栏：`SubPageTopBar`（手写，不用 Scaffold/TopAppBar）；`TopLevelHeader`。
-- 状态与提示：`EmptyState`/`ErrorState`/`LoadingState`；`InlineBanner`（替代 Snackbar）；
+- 状态与提示：`EmptyState`/`ErrorState`/`LoadingState`；`ToastEffect`（一次性提示，系统 Toast，替代原 InlineBanner 与 Snackbar）；
   `SkeletonRow`/`Modifier.shimmer`（`ui.motion.shimmerMs` 覆盖默认 900）。
 - 弹层：`ConfirmDialog`；`OptionSheet`（选项 `OptionItem`）。
 - 图标：`AutopIcons` 统一入口；tint 回落 `LocalContentColor`（沿用 LimeTV 修过的深色黑图标方案，

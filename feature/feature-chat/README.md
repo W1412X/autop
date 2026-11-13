@@ -16,7 +16,7 @@
 - 对话列表页（`list/`，docs/tech/08 §4.1）：运行中卡片（进度 = stepCount/预算）+ 分页列表行
   （标题/预览/RunOutcome/相对时间 `ageOf`）+ 长按菜单（重命名/删除）+ 无障碍未连接提示；
   `ChatListViewModel` 从 ThreadStore 分页观察、RunService 观察活跃 Run。
-- 对话页（`thread/`，docs/tech/08 §4.2）：顶栏（标题/更多菜单/无障碍提示/一次性 InlineBanner）+
+- 对话页（`thread/`，docs/tech/08 §4.2）：顶栏（标题/更多菜单/无障碍提示/一次性 Toast）+
   LazyColumn 时间线 + AskCard（等待回答选项）+ InputArea（附屏幕 chip/输入框/发送/停止）。
 - 时间线归并：`TimelineMerger` 把 ThreadEvent 持久化事件 + AgentEvent 实时增量归并为
   `TimelineEntry`（流式文本合并一条、ToolResult 就地更新 StepRow、连续读步骤按

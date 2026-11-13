@@ -139,7 +139,7 @@ public sealed interface MeAction {
         val target: SystemSettingsTarget,
     ) : MeAction
 
-    /** 关闭横幅提示。 */
+    /** 一次性提示（Toast）已发出，清空对应状态。 */
     public data object DismissNotice : MeAction
 
     /** 手动检查更新（忽略 24h 节流）。 */

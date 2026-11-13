@@ -30,9 +30,9 @@ import com.example.autop.core.config.UiBannerSection
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTonalButton
-import com.example.autop.core.ui.component.InlineBanner
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.component.ToastEffect
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
@@ -86,7 +86,7 @@ public fun ChatThreadScreen(
     ThreadSheets(state = state, onAction = onAction)
 }
 
-/** 顶栏（更多菜单）+ 无障碍未开启横幅 + 一次性提示横幅。 */
+/** 顶栏（更多菜单）+ 无障碍未开启横幅；一次性提示走 Toast（[ToastEffect]）。 */
 @Composable
 private fun ThreadHeader(
     state: ChatThreadUiState,
@@ -117,18 +117,11 @@ private fun ThreadHeader(
                 ),
         )
     }
-    state.notice?.let { notice ->
-        InlineBanner(
-            message = noticeText(notice),
-            onDismiss = { onAction(ChatThreadAction.DismissNotice) },
-            durationMs = UiBannerSection().durationMs,
-            modifier =
-                Modifier.padding(
-                    horizontal = LocalSpacing.current.screenEdge,
-                    vertical = LocalSpacing.current.sm,
-                ),
-        )
-    }
+    ToastEffect(
+        message = state.notice?.let { noticeText(it) },
+        durationMs = UiBannerSection().durationMs,
+        onConsumed = { onAction(ChatThreadAction.DismissNotice) },
+    )
 }
 
 /** 时间线：新条目到达时若在底部则自动滚底（docs/tech/08 §4.2），上滑后显示"回到底部"。 */

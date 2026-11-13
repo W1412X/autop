@@ -30,9 +30,9 @@ public enum class NoticeKind {
 public data class MeUiState(
     /** `ui.appearance` 当前段（配置默认 + 用户覆盖）。 */
     val appearance: UiAppearanceSection = UiAppearanceSection(),
-    /** 横幅显示时长（`ui.banner.durationMs`）。 */
+    /** 一次性提示（Toast）显示时长（`ui.banner.durationMs`）。 */
     val bannerDurationMs: Long = UiBannerSection().durationMs,
-    /** 当前横幅提示；null 表示无。 */
+    /** 当前待显示的一次性提示（Toast）；null 表示无。 */
     val notice: NoticeKind? = null,
     /** 主模型显示名（模型分组"模型配置"入口副标题；null=未分配）。 */
     val defaultModelName: String? = null,

@@ -61,9 +61,6 @@ public object AutopDimens {
     public val statePadding: Dp = 32.dp
     public val stateGap: Dp = 12.dp
 
-    /** InlineBanner 关闭按钮触控区。 */
-    public val bannerCloseSize: Dp = 24.dp
-
     /** 工具自测调试图（N208）：缩略与点选放大高度。 */
     public val debugImageThumbHeight: Dp = 96.dp
     public val debugImageExpandedHeight: Dp = 420.dp

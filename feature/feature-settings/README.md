@@ -14,7 +14,7 @@
 - 外观分组完整实现：深色模式 / 动态取色 / 主题色 / 文字大小 / 图标大小 / 布局密度 / 动效，
   经 `AppearanceSettingsViewModel` 写 `ui.appearance.<字段>` 用户覆盖，主题即时生效。
 - 其余分组（模型、权限与运行、安全、任务与提醒、高级）为占位 NavRow，点击显示
-  "即将推出" InlineBanner（时长 `ui.banner.durationMs`）。
+  "即将推出" Toast（时长 `ui.banner.durationMs`，经 `ToastEffect` 显示）。
 - 导航：`NavGraphBuilder.meGraph(route, navigator: SettingsNavigator)`（docs/tech/08 §3），
   子页（me/models 等）在后续 WP 扩展。
 - 文件：`SettingsNavigator` / `MeNavGraph`；`me/` 下 `MeScreen`（无状态）+ `MeUiState` +
