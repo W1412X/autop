@@ -76,6 +76,12 @@ private data class ChatMeta(
     val notice: ThreadNotice? = null,
 )
 
+/** 模型选项与全局默认（输入区芯片展示默认模型名 + "默认"标记用）。 */
+private data class ModelChoices(
+    val options: List<OptionItem> = emptyList(),
+    val defaultId: String? = null,
+)
+
 @OptIn(ExperimentalCoroutinesApi::class, FlowPreview::class) // flatMapLatest 为实验 API，debounce 为 FlowPreview
 @HiltViewModel
 @Suppress("LongParameterList", "TooManyFunctions") // 对话页装配面与操作面（DI 注入/全部用户动作处理）
@@ -127,18 +133,26 @@ public class ChatThreadViewModel
                 initialValue = ChatThreadUiState(),
             )
 
+        /** 模型选项 + 全局默认 id（默认被删/未设置时按 null 处理）。 */
+        private val modelChoices: StateFlow<ModelChoices> =
+            combine(modelProfiles.profiles, modelProfiles.defaultProfileId) { profiles, defaultId ->
+                ModelChoices(
+                    options = profiles.map { OptionItem(id = it.id, label = it.displayName) },
+                    defaultId = defaultId?.takeIf { id -> profiles.any { profile -> profile.id == id } },
+                )
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, ModelChoices())
+
         /**
          * 标题以线程库为准（占位/LLM 精炼/列表改名都走 rename，事件流不带标题变更），
          * 事件流状态之上再叠一层。
          */
-        private val modelOptions: StateFlow<List<OptionItem>> =
-            modelProfiles.profiles
-                .map { profiles -> profiles.map { OptionItem(id = it.id, label = it.displayName) } }
-                .stateIn(viewModelScope, SharingStarted.Eagerly, emptyList())
-
         public val uiState: StateFlow<ChatThreadUiState> =
-            combine(baseState, threadTitle, modelOptions) { state, title, options ->
-                state.copy(title = title ?: state.title, modelOptions = options)
+            combine(baseState, threadTitle, modelChoices) { state, title, choices ->
+                state.copy(
+                    title = title ?: state.title,
+                    modelOptions = choices.options,
+                    defaultModelId = choices.defaultId,
+                )
             }.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,

@@ -84,6 +84,7 @@ internal fun InputArea(
                 profiles = state.modelOptions,
                 enabled = !state.running,
                 onSelect = { onAction(ChatThreadAction.SetModel(it)) },
+                defaultProfileId = state.defaultModelId,
             )
             Spacer(modifier = Modifier.weight(1f))
             if (!state.running && state.images.size < state.maxImages) AddImageButton(onAction)

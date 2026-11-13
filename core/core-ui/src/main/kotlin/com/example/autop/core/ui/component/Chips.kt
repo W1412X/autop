@@ -44,17 +44,24 @@ public fun AutopChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
+    labelTrailing: (@Composable () -> Unit)? = null,
 ) {
     FilterChip(
         selected = selected,
         onClick = onClick,
         label = {
-            Text(
-                text = text,
-                style = MaterialTheme.typography.labelLarge,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = text,
+                    style = MaterialTheme.typography.labelLarge,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                if (labelTrailing != null) {
+                    Spacer(modifier = Modifier.width(LocalSpacing.current.xs))
+                    labelTrailing()
+                }
+            }
         },
         modifier = modifier.height(AutopDimens.chipHeight),
         shape = MaterialTheme.shapes.small,

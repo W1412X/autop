@@ -10,6 +10,7 @@
     <string name="core_ui_loading">加载中…</string>
     <string name="core_ui_cd_selected">已选中</string>
     <string name="core_ui_model_default">跟随默认模型</string>
+    <string name="core_ui_model_default_tag">默认</string>
     <string name="core_ui_model_none">未配置模型</string>
     <string name="core_ui_model_title">选择模型</string>
 </resources>

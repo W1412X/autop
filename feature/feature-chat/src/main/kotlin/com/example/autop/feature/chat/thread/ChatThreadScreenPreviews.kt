@@ -8,6 +8,7 @@ package com.example.autop.feature.chat.thread
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
+import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.preview.PreviewTheme
 
 @Preview(name = "Thread running light")
@@ -48,6 +49,8 @@ private fun previewRunningState(): ChatThreadUiState =
         title = "订去上海的高铁票",
         entries = previewRunningEntries(),
         running = true,
+        modelOptions = PREVIEW_MODELS,
+        defaultModelId = PREVIEW_MODELS.first().id,
     )
 
 private fun previewAskState(): ChatThreadUiState =
@@ -56,9 +59,17 @@ private fun previewAskState(): ChatThreadUiState =
         title = "订去上海的高铁票",
         entries = previewAskEntries(),
         running = false,
+        modelOptions = PREVIEW_MODELS,
+        defaultModelId = PREVIEW_MODELS.first().id,
         waitingQuestion =
             WaitingQuestion(
                 question = "下午 2 点的车次要一等座还是二等座？",
                 options = listOf("二等座", "一等座", "商务座"),
             ),
+    )
+
+private val PREVIEW_MODELS: List<OptionItem> =
+    listOf(
+        OptionItem(id = "m1", label = "GPT-4o"),
+        OptionItem(id = "m2", label = "Claude 4.5 Sonnet"),
     )

@@ -56,6 +56,8 @@ public data class ChatThreadUiState(
     /** 会话级模型覆盖（null = 跟随默认）与可选模型。 */
     val modelProfileId: String? = null,
     val modelOptions: List<OptionItem> = emptyList(),
+    /** 全局默认模型 id（输入区芯片跟随默认时显示其名称与"默认"标记）。 */
+    val defaultModelId: String? = null,
     /** 待发送的图片（已压缩，发送后清空）。 */
     val images: List<ImageAttachment> = emptyList(),
     /** 单条消息可附图片数上限（`ui.chat.attachMaxImages`）。 */
