@@ -66,14 +66,12 @@ public class ObserveViewModel
         }
 
         public fun onAction(action: ObserveAction) {
-            if (action is ObserveAction.OpenModelSettings) return
             val current = section.value
             val next =
                 when (action) {
                     is ObserveAction.SetEnabled -> setEnabled(current, action.modeId, action.enabled)
                     is ObserveAction.MoveUp -> move(current, action.modeId, -1)
                     is ObserveAction.MoveDown -> move(current, action.modeId, 1)
-                    ObserveAction.OpenModelSettings -> current
                 }
             if (next == current) return
             section.value = next
@@ -99,7 +97,7 @@ public class ObserveViewModel
         }
 
         private fun reasonsOf(section: DeviceObserveSection): Map<String, String?> =
-            section.priority.associateWith { id ->
+            activeModesOf(section).associateWith { id ->
                 ObserveMode.parse(id)?.let { availability.unavailableReason(it) }
             }
 
@@ -114,7 +112,7 @@ private fun toUiState(
 ): ObserveUiState =
     ObserveUiState(
         items =
-            section.priority.map { id ->
+            activeModesOf(section).map { id ->
                 ObserveModeItem(
                     id = id,
                     enabled = enabledOf(section, id),
@@ -122,6 +120,10 @@ private fun toUiState(
                 )
             },
     )
+
+/** 只保留当前有效的模式 id（旧配置里残留的 `llm` 等条目不展示）。 */
+private fun activeModesOf(section: DeviceObserveSection): List<String> =
+    section.priority.filter { it in DeviceObserveSection.MODE_IDS }
 
 private fun enabledOf(
     section: DeviceObserveSection,
@@ -152,7 +154,7 @@ private fun move(
     modeId: String,
     offset: Int,
 ): DeviceObserveSection {
-    val priority = section.priority.toMutableList()
+    val priority = activeModesOf(section).toMutableList()
     val from = priority.indexOf(modeId)
     val to = from + offset
     if (from < 0 || to !in priority.indices) return section

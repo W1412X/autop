@@ -1,6 +1,6 @@
 /**
  * 观测方式页（docs/design/observation-modes-coordinate-actions §2.3、§7.1）：
- * 三种模式的启用开关与推荐顺序（越靠上越优先）。
+ * 两种模式的启用开关与推荐顺序（越靠上越优先）。
  */
 package com.example.autop.feature.settings.me.observe
 
@@ -87,20 +87,6 @@ private fun ObserveModeRow(
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        if (item.id == MODE_LLM && item.unavailableReason != null) {
-            Row(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp),
-                horizontalArrangement = Arrangement.End,
-            ) {
-                AutopTextButton(
-                    text = stringResource(R.string.observe_action_model_settings),
-                    onClick = { onAction(ObserveAction.OpenModelSettings) },
-                )
-            }
-        }
         Row(
             modifier =
                 Modifier
@@ -135,7 +121,6 @@ private fun modeTitle(modeId: String): String =
     when (modeId) {
         "a11y" -> stringResource(R.string.observe_mode_a11y)
         "visual" -> stringResource(R.string.observe_mode_visual)
-        "llm" -> stringResource(R.string.observe_mode_llm)
         else -> modeId
     }
 
@@ -144,9 +129,5 @@ private fun modeDescription(modeId: String): String =
     when (modeId) {
         "a11y" -> stringResource(R.string.observe_mode_a11y_desc)
         "visual" -> stringResource(R.string.observe_mode_visual_desc)
-        "llm" -> stringResource(R.string.observe_mode_llm_desc)
         else -> ""
     }
-
-/** llm 模式 id（不可用时给出跳转模型配置的入口）。 */
-private const val MODE_LLM: String = "llm"

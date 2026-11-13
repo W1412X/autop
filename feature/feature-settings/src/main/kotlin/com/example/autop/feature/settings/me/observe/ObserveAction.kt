@@ -19,7 +19,4 @@ public sealed interface ObserveAction {
     public data class MoveDown(
         val modeId: String,
     ) : ObserveAction
-
-    /** 跳到模型配置页（llm 模式不可用时的入口）。 */
-    public data object OpenModelSettings : ObserveAction
 }

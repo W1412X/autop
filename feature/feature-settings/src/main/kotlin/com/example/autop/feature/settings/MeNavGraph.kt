@@ -38,7 +38,6 @@ import com.example.autop.feature.settings.me.logs.LogsScreen
 import com.example.autop.feature.settings.me.logs.LogsViewModel
 import com.example.autop.feature.settings.me.models.ModelsScreen
 import com.example.autop.feature.settings.me.models.ModelsViewModel
-import com.example.autop.feature.settings.me.observe.ObserveAction
 import com.example.autop.feature.settings.me.observe.ObserveScreen
 import com.example.autop.feature.settings.me.observe.ObserveViewModel
 import com.example.autop.feature.settings.me.probe.ProbeHistoryScreen
@@ -175,12 +174,7 @@ private fun ObserveRoute(
     ObserveScreen(
         state = state,
         onBack = navigator::navigateBack,
-        onAction = { action ->
-            if (action is ObserveAction.OpenModelSettings) {
-                navigator.openSection(SettingsSection.MODEL)
-            }
-            viewModel.onAction(action)
-        },
+        onAction = viewModel::onAction,
     )
 }
 

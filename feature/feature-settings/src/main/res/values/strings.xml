@@ -18,12 +18,9 @@
     <string name="observe_move_down">下移</string>
     <string name="observe_mode_a11y">无障碍（a11y）</string>
     <string name="observe_mode_visual">本地视觉（visual）</string>
-    <string name="observe_mode_llm">视觉大模型（llm）</string>
     <string name="observe_mode_a11y_desc">读取系统无障碍信息，最快，文字和结构最准确。</string>
     <string name="observe_mode_visual_desc">用手机本地模型识别截图，较慢，不产生费用。</string>
-    <string name="observe_mode_llm_desc">用视觉大模型识别截图，最慢，会产生费用，理解能力最强。</string>
     <string name="observe_status_available">当前可用</string>
-    <string name="observe_action_model_settings">去设置视觉模型</string>
     <string name="me_nav_embedding">检索向量</string>
     <string name="me_model_unassigned">未配置</string>
     <string name="me_embedding_off">未启用</string>
@@ -42,7 +39,7 @@
     <string name="me_sub_overlay_channel">悬浮球所在窗口类型，显示异常时切换</string>
     <string name="me_sub_display_mode">静置自动收成贴边小条，可改为常开或即收</string>
     <string name="me_sub_conditions_enabled">满足条件（时间、电量等）自动跑流程</string>
-    <string name="me_sub_observe">无障碍 / 视觉 / 大模型的优先级</string>
+    <string name="me_sub_observe">无障碍 / 视觉的优先级</string>
     <string name="me_nav_shell">注入通道（无线调试）</string>
     <string name="me_shell_title">注入通道（无线调试）</string>
     <string name="me_shell_status_off">未连接（手势注入回落无障碍通道）</string>
