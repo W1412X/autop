@@ -23,6 +23,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.InputBarSpec
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionRow
 import com.example.autop.core.ui.component.OptionSheet
@@ -549,7 +550,14 @@ private fun JsonField(
     if (picking) {
         OptionSheet(
             title = label,
-            options = templates.map { OptionItem(it.first, stringByName("flow_tpl_${it.first}", it.first)) },
+            options =
+                templates.map {
+                    OptionItem(
+                        it.first,
+                        stringByName("flow_tpl_${it.first}", it.first),
+                        icon = OptionIcon.TEMPLATE,
+                    )
+                },
             selectedId = null,
             onSelect = { id ->
                 picking = false

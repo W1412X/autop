@@ -36,6 +36,7 @@ import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ErrorState
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.ListRow
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.PagedList
@@ -121,8 +122,16 @@ private fun CreateFlow(
             title = stringResource(R.string.memory_create_new),
             options =
                 listOf(
-                    OptionItem(id = CREATE_ITEM_ID, label = stringResource(R.string.memory_create_item)),
-                    OptionItem(id = CREATE_DIR_ID, label = stringResource(R.string.memory_create_dir)),
+                    OptionItem(
+                        id = CREATE_ITEM_ID,
+                        label = stringResource(R.string.memory_create_item),
+                        icon = OptionIcon.ADD,
+                    ),
+                    OptionItem(
+                        id = CREATE_DIR_ID,
+                        label = stringResource(R.string.memory_create_dir),
+                        icon = OptionIcon.FOLDER,
+                    ),
                 ),
             selectedId = null,
             onSelect = { id ->

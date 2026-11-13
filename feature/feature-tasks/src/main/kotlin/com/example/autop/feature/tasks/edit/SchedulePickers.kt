@@ -186,7 +186,7 @@ private fun WheelColumn(
                         .fillMaxWidth()
                         .height(itemHeight)
                         .background(
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = AutopAlpha.OPTION_FILL),
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = AutopAlpha.SELECTION_TILE_FILL),
                             shape = MaterialTheme.shapes.small,
                         ),
             )

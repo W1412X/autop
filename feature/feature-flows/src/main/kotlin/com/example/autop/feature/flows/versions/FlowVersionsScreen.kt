@@ -37,6 +37,7 @@ import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ListRow
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.StatusBanner
@@ -120,8 +121,16 @@ public fun FlowVersionsScreen(
             title = stringResource(R.string.versions_row_title, version),
             options =
                 listOf(
-                    OptionItem(OPT_VIEW, stringResource(R.string.versions_view)),
-                    OptionItem(OPT_RESTORE, stringResource(R.string.versions_restore)),
+                    OptionItem(
+                        OPT_VIEW,
+                        stringResource(R.string.versions_view),
+                        icon = OptionIcon.VIEW,
+                    ),
+                    OptionItem(
+                        OPT_RESTORE,
+                        stringResource(R.string.versions_restore),
+                        icon = OptionIcon.RESTORE,
+                    ),
                 ),
             selectedId = null,
             onSelect = { selected ->

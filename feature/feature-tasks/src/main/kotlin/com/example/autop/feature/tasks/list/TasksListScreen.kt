@@ -31,8 +31,10 @@ import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ListRow
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionSheet
+import com.example.autop.core.ui.component.OptionTone
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.TopLevelHeader
@@ -108,8 +110,16 @@ private fun CreateSheet(
         title = null,
         options =
             listOf(
-                OptionItem(id = CREATE_AI, label = stringResource(R.string.task_create_ai)),
-                OptionItem(id = CREATE_MANUAL, label = stringResource(R.string.task_create_manual)),
+                OptionItem(
+                    id = CREATE_AI,
+                    label = stringResource(R.string.task_create_ai),
+                    icon = OptionIcon.AI,
+                ),
+                OptionItem(
+                    id = CREATE_MANUAL,
+                    label = stringResource(R.string.task_create_manual),
+                    icon = OptionIcon.EDIT,
+                ),
             ),
         selectedId = null,
         onSelect = onSelect,
@@ -154,8 +164,17 @@ private fun TaskDialogs(
             title = null,
             options =
                 listOf(
-                    OptionItem(id = MENU_EDIT, label = stringResource(R.string.tasks_action_edit)),
-                    OptionItem(id = MENU_DELETE, label = stringResource(R.string.tasks_action_delete)),
+                    OptionItem(
+                        id = MENU_EDIT,
+                        label = stringResource(R.string.tasks_action_edit),
+                        icon = OptionIcon.EDIT,
+                    ),
+                    OptionItem(
+                        id = MENU_DELETE,
+                        label = stringResource(R.string.tasks_action_delete),
+                        icon = OptionIcon.DELETE,
+                        tone = OptionTone.DESTRUCTIVE,
+                    ),
                 ),
             selectedId = null,
             onSelect = { selected -> onSelectMenu(selected, id) },

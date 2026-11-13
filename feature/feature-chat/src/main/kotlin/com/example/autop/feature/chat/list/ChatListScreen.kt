@@ -38,8 +38,10 @@ import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.ListRow
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionSheet
+import com.example.autop.core.ui.component.OptionTone
 import com.example.autop.core.ui.component.PagedList
 import com.example.autop.core.ui.component.PagedListState
 import com.example.autop.core.ui.component.TopLevelHeader
@@ -177,8 +179,17 @@ private fun Sheets(
             title = null,
             options =
                 listOf(
-                    OptionItem(id = "rename", label = stringResource(R.string.chat_menu_rename)),
-                    OptionItem(id = "delete", label = stringResource(R.string.chat_menu_delete)),
+                    OptionItem(
+                        id = "rename",
+                        label = stringResource(R.string.chat_menu_rename),
+                        icon = OptionIcon.EDIT,
+                    ),
+                    OptionItem(
+                        id = "delete",
+                        label = stringResource(R.string.chat_menu_delete),
+                        icon = OptionIcon.DELETE,
+                        tone = OptionTone.DESTRUCTIVE,
+                    ),
                 ),
             selectedId = null,
             onSelect = { id ->

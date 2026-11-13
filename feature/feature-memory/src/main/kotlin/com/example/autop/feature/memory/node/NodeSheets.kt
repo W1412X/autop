@@ -25,8 +25,10 @@ import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.InputBarSpec
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionSheet
+import com.example.autop.core.ui.component.OptionTone
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.feature.memory.R
 
@@ -63,8 +65,17 @@ public fun NodeSheets(
             title = stringResource(R.string.memory_more),
             options =
                 listOf(
-                    OptionItem(id = "move", label = stringResource(R.string.memory_move)),
-                    OptionItem(id = "delete", label = stringResource(R.string.memory_delete_title)),
+                    OptionItem(
+                        id = "move",
+                        label = stringResource(R.string.memory_move),
+                        icon = OptionIcon.MOVE,
+                    ),
+                    OptionItem(
+                        id = "delete",
+                        label = stringResource(R.string.memory_delete_title),
+                        icon = OptionIcon.DELETE,
+                        tone = OptionTone.DESTRUCTIVE,
+                    ),
                 ),
             selectedId = null,
             onSelect = { id ->

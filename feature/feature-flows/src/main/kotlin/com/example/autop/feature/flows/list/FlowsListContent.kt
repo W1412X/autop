@@ -26,8 +26,10 @@ import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ListRow
 import com.example.autop.core.ui.component.NavRow
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionSheet
+import com.example.autop.core.ui.component.OptionTone
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.feature.flows.FlowsNavigator
 import com.example.autop.feature.flows.R
@@ -133,6 +135,43 @@ private fun subtitleOf(row: FlowRowUi): String {
 }
 
 @Composable
+private fun flowMenuOptions(): List<OptionItem> =
+    listOf(
+        OptionItem(
+            MENU_EDIT,
+            stringResource(R.string.flows_action_edit),
+            icon = OptionIcon.EDIT,
+        ),
+        OptionItem(
+            MENU_DUPLICATE,
+            stringResource(R.string.flows_action_duplicate),
+            icon = OptionIcon.COPY,
+        ),
+        OptionItem(
+            MENU_EXPORT,
+            stringResource(R.string.flows_action_export),
+            icon = OptionIcon.EXPORT,
+        ),
+        OptionItem(
+            MENU_DELETE,
+            stringResource(R.string.flows_action_delete),
+            icon = OptionIcon.DELETE,
+            tone = OptionTone.DESTRUCTIVE,
+        ),
+    )
+
+@Composable
+private fun draftMenuOptions(): List<OptionItem> =
+    listOf(
+        OptionItem(
+            MENU_DELETE,
+            stringResource(R.string.flows_action_delete_draft),
+            icon = OptionIcon.DELETE,
+            tone = OptionTone.DESTRUCTIVE,
+        ),
+    )
+
+@Composable
 private fun FlowMenus(
     menuFlowId: String?,
     menuDraftId: String?,
@@ -144,13 +183,7 @@ private fun FlowMenus(
     menuFlowId?.let { id ->
         OptionSheet(
             title = null,
-            options =
-                listOf(
-                    OptionItem(MENU_EDIT, stringResource(R.string.flows_action_edit)),
-                    OptionItem(MENU_DUPLICATE, stringResource(R.string.flows_action_duplicate)),
-                    OptionItem(MENU_EXPORT, stringResource(R.string.flows_action_export)),
-                    OptionItem(MENU_DELETE, stringResource(R.string.flows_action_delete)),
-                ),
+            options = flowMenuOptions(),
             selectedId = null,
             onSelect = { selected ->
                 onDismissFlow()
@@ -167,7 +200,7 @@ private fun FlowMenus(
     menuDraftId?.let { id ->
         OptionSheet(
             title = null,
-            options = listOf(OptionItem(MENU_DELETE, stringResource(R.string.flows_action_delete_draft))),
+            options = draftMenuOptions(),
             selectedId = null,
             onSelect = {
                 onDismissDraft()

@@ -38,8 +38,10 @@ import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.ListRow
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionSheet
+import com.example.autop.core.ui.component.OptionTone
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.SwitchRow
@@ -395,7 +397,27 @@ private fun NodeMenu(
     val visible = labels.filter { advanced || it.first !in ADVANCED_ONLY }
     OptionSheet(
         title = null,
-        options = visible.map { OptionItem(it.first, stringResource(it.second)) },
+        options =
+            visible.map { (id, labelRes) ->
+                OptionItem(
+                    id = id,
+                    label = stringResource(labelRes),
+                    icon =
+                        when (id) {
+                            MenuItems.EDIT -> OptionIcon.EDIT
+                            MenuItems.UP -> OptionIcon.UP
+                            MenuItems.DOWN -> OptionIcon.DOWN
+                            MenuItems.ADD_AFTER -> OptionIcon.ADD
+                            MenuItems.DUPLICATE -> OptionIcon.COPY
+                            MenuItems.TOGGLE_ENABLED -> OptionIcon.TOGGLE
+                            MenuItems.BREAKPOINT -> OptionIcon.BREAKPOINT
+                            MenuItems.RUN_FROM, MenuItems.RUN_ONLY -> OptionIcon.RUN
+                            MenuItems.DELETE -> OptionIcon.DELETE
+                            else -> null
+                        },
+                    tone = if (id == MenuItems.DELETE) OptionTone.DESTRUCTIVE else OptionTone.NEUTRAL,
+                )
+            },
         selectedId = null,
         onSelect = { onAction(FlowEditorAction.Menu(id, it)) },
         onDismiss = { onAction(FlowEditorAction.DismissMenu) },

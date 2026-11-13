@@ -25,8 +25,10 @@ import androidx.compose.ui.window.DialogProperties
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.ConfirmDialog
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.OptionSheet
+import com.example.autop.core.ui.component.OptionTone
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.chat.R
 
@@ -41,9 +43,22 @@ internal fun ThreadSheets(
             title = null,
             options =
                 listOf(
-                    OptionItem(id = "save_task", label = stringResource(R.string.thread_menu_save_task)),
-                    OptionItem(id = "export", label = stringResource(R.string.thread_menu_export)),
-                    OptionItem(id = "delete", label = stringResource(R.string.thread_menu_delete)),
+                    OptionItem(
+                        id = "save_task",
+                        label = stringResource(R.string.thread_menu_save_task),
+                        icon = OptionIcon.SAVE_TASK,
+                    ),
+                    OptionItem(
+                        id = "export",
+                        label = stringResource(R.string.thread_menu_export),
+                        icon = OptionIcon.EXPORT,
+                    ),
+                    OptionItem(
+                        id = "delete",
+                        label = stringResource(R.string.thread_menu_delete),
+                        icon = OptionIcon.DELETE,
+                        tone = OptionTone.DESTRUCTIVE,
+                    ),
                 ),
             selectedId = null,
             onSelect = { id ->
@@ -87,9 +102,21 @@ private fun EntryMenu(
         options =
             buildList {
                 if (forkable) {
-                    add(OptionItem(id = "fork", label = stringResource(R.string.thread_menu_fork)))
+                    add(
+                        OptionItem(
+                            id = "fork",
+                            label = stringResource(R.string.thread_menu_fork),
+                            icon = OptionIcon.FORK,
+                        ),
+                    )
                 }
-                add(OptionItem(id = "raw", label = stringResource(R.string.thread_menu_raw)))
+                add(
+                    OptionItem(
+                        id = "raw",
+                        label = stringResource(R.string.thread_menu_raw),
+                        icon = OptionIcon.RAW,
+                    ),
+                )
             },
         selectedId = null,
         onSelect = { id ->
