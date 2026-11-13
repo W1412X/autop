@@ -4,6 +4,8 @@
  */
 package com.example.autop.device.impl.vision
 
+import com.example.autop.device.Rect
+
 /** 控件检测引擎（YOLO）。框几何可信、类别标签为弱先验；叶子逐框 OCR/图标不依赖标签。 */
 internal interface VisualDetector {
     /** 模型是否可用（assets 缺失/加载失败/labels_version 不认识为 false）。 */
@@ -19,7 +21,22 @@ internal interface VisualDetector {
     fun detect(image: VisionImage): List<VisualDetection>
 }
 
-/** 文本识别器（PP-OCR rec，逐叶子裁剪识别；长行内部切窗拼接）。 */
+/** 文字行定位器（PP-OCR DB det，在叶子裁剪内找文字行；ADR-0026）。 */
+internal interface TextDetector {
+    /** 模型是否可用（assets 缺失/校验失败/加载失败为 false）。 */
+    val ready: Boolean
+
+    /**
+     * 在 [region]（整图坐标）内定位文字行，返回整图坐标的行框，阅读序（行中心 y 再 x）。
+     * 未就绪返回空列表；推理异常向上抛（WP7.6：失败不伪装成空结果）。
+     */
+    fun locate(
+        image: VisionImage,
+        region: Rect,
+    ): List<OcrBox>
+}
+
+/** 文本识别器（PP-OCR rec，逐文字行裁剪识别；长行内部切窗拼接）。 */
 internal interface TextRecognizer {
     /** 模型与字符集是否可用（类数校验失败为 false）。 */
     val ready: Boolean

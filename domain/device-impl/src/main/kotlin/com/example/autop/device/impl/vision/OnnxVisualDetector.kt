@@ -71,10 +71,11 @@ internal class OnnxVisualDetector(
         return raw to anchors
     }
 
-    private companion object {
+    internal companion object {
+        /** 控件检测模型（整图单次推理，ORT 线程数用默认；其余裁剪类模型见 `device.vision.parallel.cropOrtThreads`）。 */
         const val MODEL = "gui_detect.onnx"
 
         /** 单类档内部噪声下限（真正的截断阈值由管线按配置施加）。 */
-        const val DET_FLOOR: Double = 0.05
+        private const val DET_FLOOR: Double = 0.05
     }
 }

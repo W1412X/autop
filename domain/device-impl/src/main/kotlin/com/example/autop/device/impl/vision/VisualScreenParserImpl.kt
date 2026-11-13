@@ -1,6 +1,6 @@
 /**
  * [com.example.autop.device.VisualScreenParser] 实现（docs/design/visual-screen-parsing §5.1）：
- * 解码截图 → YOLO 检测＋状态分类＋建树分析＋逐叶子 OCR/图标 → 伪树合成。
+ * 解码截图 → YOLO 检测＋状态分类＋建树分析＋逐叶子（文字定位 det → 识别 rec ∥ 图标分类，并行）→ 伪树合成。
  * 引擎未就绪返回 null；推理异常向上抛（ScreenPreparer 转 visual_parse_failed，WP7.6）。
  */
 package com.example.autop.device.impl.vision
@@ -47,9 +47,11 @@ public class VisualScreenParserImpl
         private val debug: VisualDebugCapture,
     ) : VisualScreenParser,
         VisualAvailability {
-        private val store = VisionModelStore(context.assets)
+        private val store = VisionModelStore(context.assets, ortThreads = { model -> ortThreadsOf(model) })
         private val detector: VisualDetector = OnnxVisualDetector(store)
+        private val textDetector: TextDetector = OnnxTextDetector(store)
         private val recognizer: TextRecognizer = OnnxTextRecognizer(store)
+        private val cpuCores: Int = Runtime.getRuntime().availableProcessors()
         private val states: VisualStateClassifier = OnnxStateClassifier(store)
         private val iconTable: IconLabelTable by lazy {
             val text =
@@ -71,11 +73,20 @@ public class VisualScreenParserImpl
             if (ocrDisabled != null) return VisualUnavailable.OcrDisabled(ocrDisabled)
             val iconCfg = configProvider.current()[DeviceConfig.VISION_ICON]
             val iconReady = !iconCfg.enabled || iconClassifier.ready
-            return if (detector.ready && recognizer.ready && iconReady) null else VisualUnavailable.NotReady
+            val ready = detector.ready && textDetector.ready && recognizer.ready && iconReady
+            return if (ready) null else VisualUnavailable.NotReady
         }
 
+        /** 会话的 ORT 线程数（ADR-0026）：整图检测用 ORT 默认，其余裁剪类模型用 `cropOrtThreads`。 */
+        private fun ortThreadsOf(model: String): Int =
+            if (model == OnnxVisualDetector.MODEL) {
+                0
+            } else {
+                configProvider.current()[DeviceConfig.VISION_PARALLEL].cropOrtThreads
+            }
+
         /**
-         * 预热：把 ONNX 会话（检测/OCR 识别/状态/图标）的加载挪到空闲期。
+         * 预热：把 ONNX 会话（检测/文字定位/OCR 识别/状态/图标）的加载挪到空闲期。
          * 首次加载要读资产＋校验 SHA-256＋建会话（含 NNAPI 编译），放在观测调用里会撞穿解析预算。
          */
         override suspend fun warmUp() {
@@ -85,6 +96,7 @@ public class VisualScreenParserImpl
             withContext(dispatchers.io) {
                 runCatching {
                     detector.ready
+                    textDetector.ready
                     recognizer.ready
                     states.ready
                     if (iconCfg.enabled) iconClassifier.ready
@@ -98,15 +110,24 @@ public class VisualScreenParserImpl
             return withContext(dispatchers.default) {
                 val image = decode(frame.imageBytes) ?: return@withContext null
                 val iconCfg = configProvider.current()[DeviceConfig.VISION_ICON]
-                val result =
-                    VisualParsePipeline.parse(
-                        image = image,
+                val parallel = configProvider.current()[DeviceConfig.VISION_PARALLEL]
+                val engines =
+                    VisionEngines(
                         detector = detector,
+                        textDetector = textDetector,
                         recognizer = recognizer,
                         states = states,
-                        options = parseOptions(cfg, frame),
                         icons = if (iconCfg.enabled) iconClassifier else null,
-                    ) ?: return@withContext null
+                    )
+                // 每帧按当前配置新建闸门：并发上限改了下一次观测即生效（ORT 线程数除外，会话创建时固定）。
+                val gate =
+                    InferenceGate(
+                        VisionParallelism.maxInflight(parallel.maxThreads, cpuCores),
+                        dispatchers.default,
+                    )
+                val result =
+                    VisualParsePipeline.parse(image, engines, parseOptions(cfg, frame), gate)
+                        ?: return@withContext null
                 if (debug.isActive) debug.record(image, result)
                 result.tree
             }

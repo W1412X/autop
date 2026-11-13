@@ -1,7 +1,9 @@
 /**
  * ONNX 文本识别器（vp9 §4.4）：PP-OCRv5 rec，单框裁剪识别一行文字。
+ * 输入是 [OnnxTextDetector] 在叶子内定位出的文字行框（ADR-0026），一次识别一行。
  * 解码走 [CtcDecoder]（beam search＋词典重打分，ocr-accuracy-uplift 阶段 A）；
  * 行置信度＝CTC 贪心路径逐字概率均值（阶段 B 级联选行依据，替代 det 框分）。
+ * 并发安全：会话可同时 run；本类可变状态只有 [charsetOk]/[disabled]（volatile），其余为 lazy 只读。
  * 字典类数校验（vp9 §4.1）：rec 输出类数＝字典行数（含末尾空格行）＋1，不符即停用并记 error。
  */
 package com.example.autop.device.impl.vision
@@ -22,10 +24,12 @@ internal class OnnxTextRecognizer(
     }
     private val lexicon: Set<String> by lazy { CtcDecoder.lexiconOf(store.text(LEXICON)) }
 
-    /** 类数校验失败（字典与模型不匹配）后保持 false，不再尝试。 */
+    /** 类数校验失败（字典与模型不匹配）后保持 false，不再尝试。多协程并发推理，写入线程与读取线程不同，故 volatile。 */
+    @Volatile
     private var charsetOk: Boolean = true
 
     /** 永久停用原因（WP7.6：对外可查，供“视觉不可用原因”细化）；未停用为 null。 */
+    @Volatile
     private var disabled: String? = null
 
     override val disabledReason: String?

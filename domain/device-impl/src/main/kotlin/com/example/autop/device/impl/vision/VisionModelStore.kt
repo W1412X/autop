@@ -11,12 +11,18 @@ import ai.onnxruntime.OrtSession.SessionOptions
 import android.content.res.AssetManager
 import java.security.MessageDigest
 
-/** 视觉模型资产仓库（会话惰性创建，进程内缓存）。装载函数注入以便纯 JVM 测试校验逻辑。 */
+/**
+ * 视觉模型资产仓库（会话惰性创建，进程内缓存）。装载函数注入以便纯 JVM 测试校验逻辑。
+ * [ortThreads]：按模型名给出 ORT intra-op 线程数（≤0 用 ORT 默认），在会话创建时读取一次（ADR-0026）。
+ * [openAsset] 放最后，便于 `VisionModelStore { name -> … }` 写法。
+ */
 internal class VisionModelStore(
+    private val ortThreads: (String) -> Int = { 0 },
     private val openAsset: (String) -> ByteArray?,
 ) {
     /** AssetManager 装载（assets/vision/ 前缀）。委托参数中的 runCatching 会隐式捕获构造中的 this，故抽辅助函数。 */
-    constructor(assets: AssetManager) : this({ name -> readAsset(assets, name) })
+    constructor(assets: AssetManager, ortThreads: (String) -> Int = { 0 }) :
+        this(ortThreads, { name -> readAsset(assets, name) })
 
     private val sessions = mutableMapOf<String, OrtSession?>()
 
@@ -30,7 +36,7 @@ internal class VisionModelStore(
     @Synchronized
     fun session(name: String): OrtSession? {
         if (sessions.containsKey(name)) return sessions[name]
-        val created = bytes(name)?.let { createSession(it) }
+        val created = bytes(name)?.let { createSession(it, ortThreads(name)) }
         sessions[name] = created
         return created
     }
@@ -55,16 +61,23 @@ internal class VisionModelStore(
     private fun bytesRaw(name: String): ByteArray? = openAsset(name)
 
     /** NNAPI 会话，失败回退 CPU 会话（§12）。 */
-    private fun createSession(data: ByteArray): OrtSession? {
+    private fun createSession(
+        data: ByteArray,
+        threads: Int,
+    ): OrtSession? {
         val env = OrtEnvironment.getEnvironment()
-        return runCatching { env.createSession(data, options(nnapi = true)) }
-            .recoverCatching { env.createSession(data, options(nnapi = false)) }
+        return runCatching { env.createSession(data, options(nnapi = true, threads = threads)) }
+            .recoverCatching { env.createSession(data, options(nnapi = false, threads = threads)) }
             .getOrNull()
     }
 
-    private fun options(nnapi: Boolean): SessionOptions =
+    private fun options(
+        nnapi: Boolean,
+        threads: Int,
+    ): SessionOptions =
         SessionOptions().apply {
             setOptimizationLevel(SessionOptions.OptLevel.ALL_OPT)
+            if (threads > 0) setIntraOpNumThreads(threads)
             if (nnapi) addNnapi()
         }
 

@@ -12,3 +12,7 @@
 - 依赖规则：可依赖 COMMON、API、同领域（device）CORE（device-core）、白名单 IMPL（docs/tech/01 第 4 节）。
 - 扩展方式：运行状态来源在 `di/` 里 `@Provides @IntoSet` 注册为 `RuntimeStateSource`（与注册
   `ContextContributor`/`Tool` 的写法一致）。
+- 视觉解析（`vision/`，ADR-0026）：YOLO 控件框 → 叶子内 det 定位文字行 → 逐行 rec，图标分类并行；
+  所有推理经 `InferenceGate` 共用 `device.vision.parallel.maxThreads` 个并发名额。新增一个推理引擎
+  时实现 `vision/VisionEngines.kt` 里对应端口，并在 `VisualScreenParserImpl` 装配；模型资产放
+  `assets/vision/` 并写入 `manifest.json`（`VisionAssetsManifestTest` 会核对清单与哈希）。
