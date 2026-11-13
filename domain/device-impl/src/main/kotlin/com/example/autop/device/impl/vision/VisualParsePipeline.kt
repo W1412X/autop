@@ -98,10 +98,11 @@ internal object VisualParsePipeline {
             leafIdx.associateWith { i ->
                 val line = lines[i]
                 val hint = isHint(analysis.boxes[i], line, image, options)
+                val iconLabel = iconLabels[i]
                 if (hint) {
-                    VisualTreeBuilder.LeafInput(hint = line?.text)
+                    VisualTreeBuilder.LeafInput(hint = line?.text, iconLabel = iconLabel)
                 } else {
-                    VisualTreeBuilder.LeafInput(text = line?.text)
+                    VisualTreeBuilder.LeafInput(text = line?.text, iconLabel = iconLabel)
                 }
             }
         return Collected(leaves, lines.values.toList(), iconLabels, iconRegions)
