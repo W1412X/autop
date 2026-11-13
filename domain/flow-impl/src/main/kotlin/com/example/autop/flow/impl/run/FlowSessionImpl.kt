@@ -265,6 +265,7 @@ internal class FlowSessionImpl(
                 mode = if (node == null) WriteMode.CREATE else WriteMode.UPDATE,
                 title = flow.name,
                 content = lines.joinToString("\n"),
+                keywords = listOf(flow.name),
                 source = MemorySource.FLOW,
                 runId = request.runId,
                 reason = "flow:${flow.name}",

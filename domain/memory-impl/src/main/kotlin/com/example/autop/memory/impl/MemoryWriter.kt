@@ -1,7 +1,8 @@
 /**
- * 写入执行（docs/tech/06 §2.4）：CREATE/UPDATE/APPEND 三模式与用户内容保护的 SUPPLEMENT 降级。
+ * 写入执行（docs/tech/06 §2.4，ADR-0027/0028）：CREATE/UPDATE/APPEND 三模式与用户内容保护的
+ * SUPPLEMENT 降级；字段校验（关键词、摘要）；agent 新建的同名检查。
  *
- * 一个事务内完成：版本 +1、写 `memory_versions`、同步 `memory_fts`、path 入向量索引队列。
+ * 事务与写锁由 [MemoryStoreImpl] 包裹，本类只负责单次写入的业务规则。
  */
 package com.example.autop.memory.impl
 
@@ -30,50 +31,70 @@ import java.util.Date
 import java.util.Locale
 
 /** 写入执行器。 */
-@Suppress("LongParameterList") // 装配类：依赖都是写入事务的正交能力
+@Suppress("LongParameterList") // 装配类：依赖都是写入规则的正交能力
 internal class MemoryWriter(
     private val db: MemoryDb,
-    private val fts: MemoryFtsSync,
     private val prompts: PromptRepository,
     private val configProvider: ConfigProvider,
-    private val indexer: EmbeddingIndexer,
+    /** 节点内容或关键词变化后登记向量索引待更新的路径（提交后执行）。 */
+    private val onIndexed: (String) -> Unit,
     private val onMutated: suspend () -> Unit,
     private val clock: Clock,
 ) {
     /** 按模式分派写入（docs/tech/06 §2.4）。 */
-    suspend fun apply(w: MemoryWrite): Outcome<WriteResult> {
-        val summary = configProvider.current()[MemoryConfig.SUMMARY]
-        val maxContent = configProvider.current()[MemoryConfig.NODE].maxContentChars
-        if (w.content.length > maxContent) {
+    suspend fun apply(input: MemoryWrite): Outcome<WriteResult> {
+        val cfg = configProvider.current()
+        val maxContent = cfg[MemoryConfig.NODE].maxContentChars
+        if (input.content.length > maxContent) {
             return Outcome.Err(AppError(MemoryErrorCodes.TOO_LARGE, "正文超过 $maxContent 字上限"))
         }
+        val w =
+            when (val checked = normalizeFields(input)) {
+                is Outcome.Err -> return checked
+                is Outcome.Ok -> checked.value
+            }
         val existing = db.nodeDao().get(w.path.value)
         return when {
-            existing == null -> createNode(w, summary.maxChars)
+            existing == null -> createNode(w)
             w.mode == WriteMode.CREATE ->
                 Outcome.Err(AppError(MemoryErrorCodes.ALREADY_EXISTS, "路径已存在：${w.path.value}"))
             w.mode == WriteMode.UPDATE &&
                 existing.source == MemorySource.USER.name &&
                 w.source.isAutomated -> supplementNode(w, existing)
-            w.mode == WriteMode.APPEND -> appendNode(w, existing, summary.maxChars)
-            else -> updateNode(w, existing, summary.maxChars)
+            w.mode == WriteMode.APPEND -> appendNode(w, existing)
+            else -> updateNode(w, existing)
         }
     }
 
-    private suspend fun createNode(
-        w: MemoryWrite,
-        summaryMaxChars: Int,
-    ): Outcome<WriteResult> {
+    /** 规范化关键词并校验长度、数量与摘要长度。返回规范化后的写入请求。 */
+    private fun normalizeFields(input: MemoryWrite): Outcome<MemoryWrite> {
+        val cfg = configProvider.current()
+        val keywords = input.keywords?.let(MemoryKeywords::normalizeList)
+        keywords?.let { list ->
+            val section = cfg[MemoryConfig.KEYWORDS]
+            MemoryKeywords.validate(list, section.maxCount, section.maxChars)?.let { return invalid(it) }
+        }
+        val maxSummary = cfg[MemoryConfig.SUMMARY].maxChars
+        input.summary?.let { if (it.length > maxSummary) return invalid("摘要最多 $maxSummary 字") }
+        return Outcome.Ok(input.copy(keywords = keywords))
+    }
+
+    private suspend fun createNode(w: MemoryWrite): Outcome<WriteResult> {
+        if (w.source == MemorySource.AGENT) {
+            missingFieldsError(w)?.let { return Outcome.Err(it) }
+            if (!w.forceNew) duplicateError(w)?.let { return Outcome.Err(it) }
+        }
         ensureParents(w.path, w.source)
         val now = clock.nowMillis()
+        val maxSummary = configProvider.current()[MemoryConfig.SUMMARY].maxChars
         val node =
             MemoryNodeEntity(
                 path = w.path.value,
                 parentPath = w.path.parent?.value,
                 title = w.title ?: w.path.name,
-                summary = w.summary ?: MemoryText.summarize(w.content, summaryMaxChars),
+                summary = w.summary ?: MemoryText.summarize(w.content, maxSummary),
                 content = w.content,
-                tagsJson = encodeList(w.tags.orEmpty()),
+                keywordsJson = encodeList(w.keywords.orEmpty()),
                 linksJson = encodeList(w.links.orEmpty().map { it.value }),
                 source = w.source.name,
                 version = 1,
@@ -83,21 +104,58 @@ internal class MemoryWriter(
                 lastAccessAt = null,
             )
         db.nodeDao().insert(node)
-        return finishWrite(w, node, AppliedMode.CREATED, beforeTitle = null, beforeContent = null)
+        return finishWrite(
+            w,
+            node,
+            AppliedMode.CREATED,
+            beforeTitle = null,
+            beforeContent = null,
+            beforeKeywords = null,
+        )
+    }
+
+    /** agent 新建必须有摘要（用于注入与列表）和至少一个关键词（用于检索）。 */
+    private fun missingFieldsError(w: MemoryWrite): AppError? {
+        val message =
+            when {
+                w.summary.isNullOrBlank() -> "新建条目需要摘要（summary），用一句话说明它是什么"
+                w.keywords.isNullOrEmpty() -> "新建条目需要至少一个关键词（keywords），写用户以后可能提到的名字或说法"
+                else -> return null
+            }
+        return AppError(code = MemoryErrorCodes.INVALID_FIELDS, message = message)
+    }
+
+    /**
+     * agent 新建时，同一父目录下已有同名条目（标题忽略大小写与首尾空白），或关键词集合完全相同，
+     * 则拒绝，避免同一对象被建成多条。确实是另一个对象时由调用方传 `forceNew`。
+     */
+    private suspend fun duplicateError(w: MemoryWrite): AppError? {
+        val parent = w.path.parent?.value ?: return null
+        val title = MemoryKeywords.normalize(w.title ?: w.path.name)
+        val keywords = w.keywords.orEmpty().toSet()
+        val sibling =
+            db.nodeDao().childrenAll(parent).firstOrNull { row ->
+                MemoryKeywords.normalize(row.title) == title ||
+                    (keywords.isNotEmpty() && decodeList(row.keywordsJson).toSet() == keywords)
+            } ?: return null
+        return AppError(
+            code = MemoryErrorCodes.POSSIBLE_DUPLICATE,
+            message = "同一目录下已有相同的条目：${sibling.path}",
+            hint = "请改用 UPDATE 更新 ${sibling.path}；确实是另一个对象时，传 force_new=true 再写入",
+        )
     }
 
     private suspend fun updateNode(
         w: MemoryWrite,
         existing: MemoryNodeEntity,
-        summaryMaxChars: Int,
     ): Outcome<WriteResult> {
         val updated =
             existing.copy(
                 title = w.title ?: existing.title,
-                summary = w.summary ?: MemoryText.summarize(w.content, summaryMaxChars),
+                summary = w.summary ?: existing.summary,
                 content = w.content,
-                tagsJson = w.tags?.let { encodeList(it) } ?: existing.tagsJson,
-                linksJson = w.links?.let { links -> encodeList(links.map { p -> p.value }) } ?: existing.linksJson,
+                keywordsJson = w.keywords?.let { encodeList(it) } ?: existing.keywordsJson,
+                linksJson = w.links?.let { links -> encodeList(links.map { it.value }) } ?: existing.linksJson,
                 version = existing.version + 1,
                 updatedAt = clock.nowMillis(),
             )
@@ -108,19 +166,20 @@ internal class MemoryWriter(
             AppliedMode.UPDATED,
             beforeTitle = existing.title,
             beforeContent = existing.content,
+            beforeKeywords = existing.keywordsJson,
         )
     }
 
     private suspend fun appendNode(
         w: MemoryWrite,
         existing: MemoryNodeEntity,
-        summaryMaxChars: Int,
     ): Outcome<WriteResult> {
         val merged = existing.content + "\n\n" + w.content
         val appended =
             existing.copy(
-                summary = w.summary ?: MemoryText.summarize(merged, summaryMaxChars),
+                summary = w.summary ?: existing.summary,
                 content = merged,
+                keywordsJson = w.keywords?.let { encodeList(it) } ?: existing.keywordsJson,
                 version = existing.version + 1,
                 updatedAt = clock.nowMillis(),
             )
@@ -131,16 +190,16 @@ internal class MemoryWriter(
             AppliedMode.APPENDED,
             beforeTitle = existing.title,
             beforeContent = existing.content,
+            beforeKeywords = existing.keywordsJson,
         )
     }
 
-    /** 用户内容保护：agent 的 UPDATE 降级为补充段落，title/summary 不变。 */
+    /** 用户内容保护：agent 的 UPDATE 降级为补充段落，title、摘要与关键词不变。 */
     private suspend fun supplementNode(
         w: MemoryWrite,
         existing: MemoryNodeEntity,
     ): Outcome<WriteResult> {
-        val supplement = renderSupplement(w)
-        val merged = existing.content + supplement
+        val merged = existing.content + renderSupplement(w)
         val supplemented =
             existing.copy(
                 content = merged,
@@ -154,6 +213,7 @@ internal class MemoryWriter(
             AppliedMode.APPENDED_AS_SUPPLEMENT,
             beforeTitle = existing.title,
             beforeContent = existing.content,
+            beforeKeywords = existing.keywordsJson,
         )
     }
 
@@ -176,6 +236,7 @@ internal class MemoryWriter(
         applied: AppliedMode,
         beforeTitle: String?,
         beforeContent: String?,
+        beforeKeywords: String?,
     ): Outcome<WriteResult> {
         val changeType =
             when (applied) {
@@ -185,17 +246,19 @@ internal class MemoryWriter(
                 AppliedMode.APPENDED_AS_SUPPLEMENT -> ChangeType.SUPPLEMENT
             }
         val versionId =
-            newVersion(
-                node = node,
-                changeType = changeType,
-                titleBefore = beforeTitle,
-                contentBefore = beforeContent,
-                runId = w.runId,
-                reason = w.reason,
-                evidence = w.evidence,
-            ).let { db.versionDao().insert(it) }
-        fts.syncNode(node)
-        indexer.enqueue(node.path)
+            db.versionDao().insert(
+                newVersion(
+                    node = node,
+                    changeType = changeType,
+                    titleBefore = beforeTitle,
+                    contentBefore = beforeContent,
+                    keywordsBefore = beforeKeywords,
+                    runId = w.runId,
+                    reason = w.reason,
+                    evidence = w.evidence,
+                ),
+            )
+        onIndexed(node.path)
         onMutated()
         return Outcome.Ok(WriteResult(node = toModel(node), versionId = versionId, appliedMode = applied))
     }
@@ -219,7 +282,7 @@ internal class MemoryWriter(
                         title = seg,
                         summary = "",
                         content = "",
-                        tagsJson = "[]",
+                        keywordsJson = "[]",
                         linksJson = "[]",
                         source = source.name,
                         version = 1,
@@ -239,6 +302,7 @@ internal class MemoryWriter(
         changeType: ChangeType,
         titleBefore: String?,
         contentBefore: String?,
+        keywordsBefore: String?,
         runId: RunId?,
         reason: String?,
         evidence: MemoryEvidence?,
@@ -251,10 +315,13 @@ internal class MemoryWriter(
             titleAfter = node.title,
             contentBefore = contentBefore,
             contentAfter = node.content,
+            keywordsBefore = keywordsBefore,
             source = node.source,
             runId = runId?.value,
             reason = reason,
             evidenceJson = evidence?.let { encodeEvidence(it) },
             createdAt = clock.nowMillis(),
         )
+
+    private fun invalid(message: String): Outcome.Err = Outcome.Err(AppError(MemoryErrorCodes.INVALID_FIELDS, message))
 }

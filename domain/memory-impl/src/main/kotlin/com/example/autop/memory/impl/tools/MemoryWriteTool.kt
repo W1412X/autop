@@ -60,12 +60,13 @@ public class MemoryWriteTool
                     title = args.str("title"),
                     summary = args.str("summary"),
                     content = args.str("content").orEmpty(),
-                    tags = args.strings("tags"),
+                    keywords = args.strings("keywords"),
                     source = sourceOf(ctx),
                     runId = ctx.runId,
                     // 流程写入 reason 默认补 flow:<流程名>（docs/tech/06 §3）；模型给了 reason 用模型的。
                     reason = args.str("reason") ?: ctx.originTag,
                     evidence = evidenceOf(args["evidence"] as? JsonObject),
+                    forceNew = args.boolOrNull("force_new") ?: false,
                 )
             return when (val r = store.write(write)) {
                 is Outcome.Ok -> textOutput(describe(r.value.node, r.value.appliedMode, r.value.versionId))
@@ -90,8 +91,9 @@ public class MemoryWriteTool
                     path = packageDir,
                     mode = WriteMode.CREATE,
                     title = appName,
-                    summary = "",
+                    summary = appName,
                     content = "",
+                    keywords = listOf(segments[1], appName),
                     source = sourceOf(ctx),
                     runId = ctx.runId,
                     reason = "auto-create app dir",

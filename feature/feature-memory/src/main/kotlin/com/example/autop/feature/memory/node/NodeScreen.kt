@@ -143,8 +143,8 @@ private fun NodeForm(
             onAction = onAction,
             field = NodeField.CONTENT,
         )
-        SectionTitle(text = stringResource(R.string.memory_section_tags))
-        TagRow(state = state, onAction = onAction)
+        SectionTitle(text = stringResource(R.string.memory_section_keywords))
+        KeywordRow(state = state, onAction = onAction)
         SectionTitle(text = stringResource(R.string.memory_section_info))
         NodeInfoRows(state = state)
         AutopButton(
@@ -225,7 +225,7 @@ private fun FieldInput(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun TagRow(
+private fun KeywordRow(
     state: NodeUiState,
     onAction: (NodeAction) -> Unit,
 ) {
@@ -236,24 +236,24 @@ private fun TagRow(
                 .fillMaxWidth()
                 .padding(horizontal = LocalSpacing.current.screenEdge),
     ) {
-        state.tags.forEach { tag ->
+        state.keywords.forEach { keyword ->
             AutopChip(
-                text = tag,
+                text = keyword,
                 selected = true,
-                onClick = { onAction(NodeAction.TagRemoved(tag)) },
+                onClick = { onAction(NodeAction.KeywordRemoved(keyword)) },
                 modifier = Modifier.padding(end = NODE_V_PADDING / 2f),
             )
         }
         AutopChip(
-            text = stringResource(R.string.memory_tag_add),
+            text = stringResource(R.string.memory_keyword_add),
             selected = false,
             onClick = { showAddDialog = true },
         )
     }
     if (showAddDialog) {
-        TagAddDialog(
-            onConfirm = { tag ->
-                onAction(NodeAction.TagAdded(tag))
+        KeywordAddDialog(
+            onConfirm = { keyword ->
+                onAction(NodeAction.KeywordAdded(keyword))
                 showAddDialog = false
             },
             onDismiss = { showAddDialog = false },
@@ -262,31 +262,31 @@ private fun TagRow(
 }
 
 @Composable
-private fun TagAddDialog(
+private fun KeywordAddDialog(
     onConfirm: (String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var tag by remember { mutableStateOf("") }
+    var keyword by remember { mutableStateOf("") }
     AlertDialog(
         onDismissRequest = onDismiss,
         title = {
             Text(
-                text = stringResource(R.string.memory_tag_add),
+                text = stringResource(R.string.memory_keyword_add),
                 style = MaterialTheme.typography.titleLarge,
             )
         },
         text = {
             AutopInputBar(
-                value = tag,
-                onValueChange = { tag = it },
-                spec = InputBarSpec(placeholder = stringResource(R.string.memory_tag_name_placeholder)),
+                value = keyword,
+                onValueChange = { keyword = it },
+                spec = InputBarSpec(placeholder = stringResource(R.string.memory_keyword_name_placeholder)),
                 modifier = Modifier.fillMaxWidth(),
             )
         },
         confirmButton = {
             AutopTextButton(
                 text = stringResource(R.string.memory_confirm),
-                onClick = { if (tag.isNotBlank()) onConfirm(tag.trim()) },
+                onClick = { if (keyword.isNotBlank()) onConfirm(keyword.trim()) },
             )
         },
         dismissButton = {

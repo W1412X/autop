@@ -1,10 +1,10 @@
 /**
- * `memory.db` 实体（docs/tech/06 §2.1）：节点、版本、FTS4 分词列、向量块。
+ * `memory.db` 实体（docs/tech/06 §2.1，ADR-0028）：节点、版本、向量块。
+ * 检索不再使用 FTS 表；关键词存在节点的 `keywordsJson` 列中。
  */
 package com.example.autop.memory.impl.db
 
 import androidx.room.Entity
-import androidx.room.Fts4
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
@@ -19,7 +19,8 @@ public data class MemoryNodeEntity(
     val title: String,
     val summary: String,
     val content: String,
-    val tagsJson: String,
+    /** 规范化后的关键词，JSON 数组。 */
+    val keywordsJson: String,
     val linksJson: String,
     val source: String,
     val version: Int,
@@ -43,6 +44,8 @@ public data class MemoryVersionEntity(
     val titleAfter: String?,
     val contentBefore: String?,
     val contentAfter: String?,
+    /** 变更前的关键词（JSON 数组），撤销时恢复用；创建时为 null。 */
+    val keywordsBefore: String? = null,
     val source: String,
     val runId: String?,
     val reason: String?,
@@ -50,16 +53,9 @@ public data class MemoryVersionEntity(
     val createdAt: Long,
 )
 
-/** FTS4 分词索引（应用侧 bigram 分词，见 `BigramTokenizer`）。 */
-@Fts4(notIndexed = ["path"])
-@Entity(tableName = "memory_fts")
-public data class MemoryFtsEntity(
-    val path: String,
-    val titleTokens: String,
-    val bodyTokens: String,
-)
-
-/** 向量块（float32 小端字节）。 */
+/**
+ * 向量块（float32 小端字节）。一个节点只有一个向量（chunk 恒为 0），输入为"标题 + 关键词"。
+ */
 @Entity(
     tableName = "memory_vectors",
     primaryKeys = ["path", "chunk", "modelId"],

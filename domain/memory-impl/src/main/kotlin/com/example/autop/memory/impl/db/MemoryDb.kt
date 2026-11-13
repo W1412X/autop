@@ -1,5 +1,6 @@
 /**
- * `memory.db` 数据库（docs/tech/06 §2）：`exportSchema = true`，版本 1 起每次变更配迁移。
+ * `memory.db` 数据库（docs/tech/06 §2，ADR-0028）：`exportSchema = true`。
+ * 尚未发布，表结构直接以版本 1 为准，不保留历史迁移。
  */
 package com.example.autop.memory.impl.db
 
@@ -11,7 +12,6 @@ import androidx.room.RoomDatabase
     entities = [
         MemoryNodeEntity::class,
         MemoryVersionEntity::class,
-        MemoryFtsEntity::class,
         MemoryVectorEntity::class,
     ],
     version = 1,
@@ -21,8 +21,6 @@ public abstract class MemoryDb : RoomDatabase() {
     public abstract fun nodeDao(): MemoryNodeDao
 
     public abstract fun versionDao(): MemoryVersionDao
-
-    public abstract fun ftsDao(): MemoryFtsDao
 
     public abstract fun vectorDao(): MemoryVectorDao
 }

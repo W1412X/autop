@@ -36,7 +36,7 @@ internal fun toModel(e: MemoryNodeEntity): MemoryNode =
         title = e.title,
         summary = e.summary,
         content = e.content,
-        tags = decodeList(e.tagsJson),
+        keywords = decodeList(e.keywordsJson),
         links = decodeList(e.linksJson).mapNotNull { MemoryPath.parse(it).getOrNull() },
         source = MemorySource.valueOf(e.source),
         version = e.version,
@@ -79,3 +79,7 @@ internal fun decodeEvidence(json: String): MemoryEvidence? =
     runCatching {
         AutopJson.default.decodeFromString(MemoryEvidence.serializer(), json)
     }.getOrNull()
+
+/** 路径 [this] 是否等于 [ancestor] 或位于其子树中。按路径段边界判断，不做字符串前缀匹配。 */
+internal fun String.isWithinPath(ancestor: String): Boolean =
+    this == ancestor || ancestor == "/" || startsWith("$ancestor/")

@@ -31,8 +31,6 @@ import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.ScreenLease
 import com.example.autop.device.TouchShield
 import com.example.autop.device.UserActivityMonitor
-import com.example.autop.memory.ExperienceExtractor
-import com.example.autop.memory.ExperienceRequest
 import com.example.autop.task.RunRecord
 import com.example.autop.task.Task
 import com.example.autop.task.TaskRepository
@@ -346,15 +344,4 @@ public class FakeTaskRepository(
         taskId: TaskId?,
         limit: Int,
     ): Flow<List<RunRecord>> = MutableStateFlow(emptyList())
-}
-
-/** fake 经验提炼：记录收到的请求（供断言）。 */
-public class FakeExperienceExtractor : ExperienceExtractor {
-    /** 收到的提炼请求（按调用顺序）。 */
-    public val requests: MutableList<ExperienceRequest> = mutableListOf()
-
-    override suspend fun extract(request: ExperienceRequest): Boolean {
-        requests += request
-        return true
-    }
 }

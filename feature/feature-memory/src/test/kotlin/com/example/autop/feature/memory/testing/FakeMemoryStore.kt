@@ -85,7 +85,7 @@ internal fun memoryNode(
         title = title,
         summary = "摘要",
         content = content,
-        tags = emptyList(),
+        keywords = emptyList(),
         links = emptyList(),
         source = MemorySource.USER,
         version = 1,

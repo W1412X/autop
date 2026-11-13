@@ -12,8 +12,8 @@
         "context.output",
         "context.flow_directory",
         "context.trigger",
-        "context.trigger_memory",
-        "context.goal"
+        "context.goal",
+        "context.memory_prefetch"
       ]
     },
     "tools": {
@@ -133,8 +133,7 @@
     "recall": {
       "maxChars": 4000,
       "channels": [
-        "recall.fts",
-        "recall.vector"
+        "recall.fts"
       ],
       "weights": {
         "recall.fts": 1.0,

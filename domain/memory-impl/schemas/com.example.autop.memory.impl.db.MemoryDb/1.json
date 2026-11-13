@@ -2,11 +2,11 @@
   "formatVersion": 1,
   "database": {
     "version": 1,
-    "identityHash": "128b53b03ba0a41eed4dc4b4114227f9",
+    "identityHash": "32e75247704e3ccefa9002c55009e87e",
     "entities": [
       {
         "tableName": "memory_nodes",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`path` TEXT NOT NULL, `parentPath` TEXT, `title` TEXT NOT NULL, `summary` TEXT NOT NULL, `content` TEXT NOT NULL, `tagsJson` TEXT NOT NULL, `linksJson` TEXT NOT NULL, `source` TEXT NOT NULL, `version` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `accessCount` INTEGER NOT NULL, `lastAccessAt` INTEGER, PRIMARY KEY(`path`))",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`path` TEXT NOT NULL, `parentPath` TEXT, `title` TEXT NOT NULL, `summary` TEXT NOT NULL, `content` TEXT NOT NULL, `keywordsJson` TEXT NOT NULL, `linksJson` TEXT NOT NULL, `source` TEXT NOT NULL, `version` INTEGER NOT NULL, `createdAt` INTEGER NOT NULL, `updatedAt` INTEGER NOT NULL, `accessCount` INTEGER NOT NULL, `lastAccessAt` INTEGER, PRIMARY KEY(`path`))",
         "fields": [
           {
             "fieldPath": "path",
@@ -38,8 +38,8 @@
             "notNull": true
           },
           {
-            "fieldPath": "tagsJson",
-            "columnName": "tagsJson",
+            "fieldPath": "keywordsJson",
+            "columnName": "keywordsJson",
             "affinity": "TEXT",
             "notNull": true
           },
@@ -114,7 +114,7 @@
       },
       {
         "tableName": "memory_versions",
-        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `path` TEXT NOT NULL, `version` INTEGER NOT NULL, `changeType` TEXT NOT NULL, `titleBefore` TEXT, `titleAfter` TEXT, `contentBefore` TEXT, `contentAfter` TEXT, `source` TEXT NOT NULL, `runId` TEXT, `reason` TEXT, `evidenceJson` TEXT, `createdAt` INTEGER NOT NULL)",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `path` TEXT NOT NULL, `version` INTEGER NOT NULL, `changeType` TEXT NOT NULL, `titleBefore` TEXT, `titleAfter` TEXT, `contentBefore` TEXT, `contentAfter` TEXT, `keywordsBefore` TEXT, `source` TEXT NOT NULL, `runId` TEXT, `reason` TEXT, `evidenceJson` TEXT, `createdAt` INTEGER NOT NULL)",
         "fields": [
           {
             "fieldPath": "id",
@@ -158,6 +158,11 @@
           {
             "fieldPath": "contentAfter",
             "columnName": "contentAfter",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "keywordsBefore",
+            "columnName": "keywordsBefore",
             "affinity": "TEXT"
           },
           {
@@ -223,48 +228,6 @@
             "createSql": "CREATE INDEX IF NOT EXISTS `index_memory_versions_createdAt` ON `${TABLE_NAME}` (`createdAt`)"
           }
         ]
-      },
-      {
-        "tableName": "memory_fts",
-        "createSql": "CREATE VIRTUAL TABLE IF NOT EXISTS `${TABLE_NAME}` USING FTS4(`path` TEXT NOT NULL, `titleTokens` TEXT NOT NULL, `bodyTokens` TEXT NOT NULL, notindexed=`path`)",
-        "fields": [
-          {
-            "fieldPath": "path",
-            "columnName": "path",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "titleTokens",
-            "columnName": "titleTokens",
-            "affinity": "TEXT",
-            "notNull": true
-          },
-          {
-            "fieldPath": "bodyTokens",
-            "columnName": "bodyTokens",
-            "affinity": "TEXT",
-            "notNull": true
-          }
-        ],
-        "primaryKey": {
-          "autoGenerate": false,
-          "columnNames": []
-        },
-        "ftsVersion": "FTS4",
-        "ftsOptions": {
-          "tokenizer": "simple",
-          "tokenizerArgs": [],
-          "contentTable": "",
-          "languageIdColumnName": "",
-          "matchInfo": "FTS4",
-          "notIndexedColumns": [
-            "path"
-          ],
-          "prefixSizes": [],
-          "preferredOrder": "ASC"
-        },
-        "contentSyncTriggers": []
       },
       {
         "tableName": "memory_vectors",
@@ -336,7 +299,7 @@
     ],
     "setupQueries": [
       "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
-      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '128b53b03ba0a41eed4dc4b4114227f9')"
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, '32e75247704e3ccefa9002c55009e87e')"
     ]
   }
 }

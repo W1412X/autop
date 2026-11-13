@@ -99,4 +99,10 @@ private class FakeMemorySearch : MemorySearch {
         prefix: MemoryPath?,
         k: Int,
     ): List<SearchHit> = emptyList()
+
+    override suspend fun prefetch(
+        query: String,
+        k: Int,
+        minKeywordScore: Double,
+    ): List<SearchHit> = emptyList()
 }

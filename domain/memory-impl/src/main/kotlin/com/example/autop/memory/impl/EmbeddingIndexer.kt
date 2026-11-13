@@ -93,17 +93,19 @@ public class EmbeddingIndexer
         @Suppress("ReturnCount") // 出口按“未配置/无变更/批量完成”分支，是流程语义
         private suspend fun index(path: String) {
             val provider = gateway.current() ?: return
-            val node = db.nodeDao().get(path) ?: return
+            val node = db.nodeDao().get(path)
+            if (node == null) {
+                // 节点已删除（或撤销创建）：清掉它的向量，否则检索会返回已不存在的路径
+                db.vectorDao().deleteByPath(path)
+                vectorCache.removePath(path)
+                return
+            }
             val cfg = configProvider.current()[MemoryConfig.EMBEDDING]
-            val chunks = MemoryText.chunkForEmbedding(node.title, node.path, node.content, cfg.chunkChars)
+            // 一个节点一个向量，输入为标题与关键词（ADR-0028）；正文与摘要变化不触发重新向量化
+            val text = MemoryText.embeddingText(node.title, decodeList(node.keywordsJson))
             val existing = db.vectorDao().byPath(path, provider.modelId)
-            val pending =
-                chunks
-                    .mapIndexed { chunk, text -> chunk to text }
-                    .filter { (chunk, text) ->
-                        existing.none { it.chunk == chunk && it.textHash == MemoryText.textHash(text) }
-                    }
-            if (pending.isEmpty()) return
+            if (existing.any { it.chunk == 0 && it.textHash == MemoryText.textHash(text) }) return
+            val pending = listOf(0 to text)
             val batchSize = configProvider.current()[LlmConfig.EMBEDDING].batchSize
             pending.chunked(batchSize).forEach { batch ->
                 val vectors = embedWithRetry(provider, batch.map { it.second }, cfg.retryMax, cfg.retryBaseMs) ?: return

@@ -9,6 +9,7 @@ import com.example.autop.agent.ThreadRecallRetriever
 import com.example.autop.agent.runtime.recall.DefaultThreadRecall
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeConfigProvider
+import com.example.autop.core.testing.recallChannelsOverride
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import org.junit.Test
@@ -27,7 +28,11 @@ class RecallFusionTest {
                     "recall.vector",
                     listOf(RecallCandidate(20, 1, "乙"), RecallCandidate(30, 2, "丙")),
                 )
-            val recall = DefaultThreadRecall(setOf(fts, vector), FakeConfigProvider())
+            val recall =
+                DefaultThreadRecall(
+                    setOf(fts, vector),
+                    FakeConfigProvider(recallChannelsOverride("recall.fts", "recall.vector")),
+                )
 
             val hits = recall.search(THREAD, "查询", k = 10)
 

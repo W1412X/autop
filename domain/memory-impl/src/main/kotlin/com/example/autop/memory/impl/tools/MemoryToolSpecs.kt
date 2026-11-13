@@ -42,11 +42,12 @@ public object MemoryToolSpecs {
             string("content", required = true)
             string("title")
             string("summary")
-            array("tags")
+            array("keywords")
             string("reason", required = true)
             obj("evidence") {
                 string("package")
                 string("excerpt")
             }
+            boolean("force_new")
         }
 }

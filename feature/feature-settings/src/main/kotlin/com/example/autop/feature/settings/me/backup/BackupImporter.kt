@@ -59,7 +59,7 @@ public class BackupImporter(
                     title = node.title,
                     summary = node.summary,
                     content = node.content,
-                    tags = node.tags,
+                    keywords = node.keywords,
                     links = node.links,
                     source = MemorySource.IMPORT,
                     reason = "backup import",

@@ -18,14 +18,14 @@ public sealed interface NodeAction {
         val value: String,
     ) : NodeAction
 
-    /** 添加标签。 */
-    public data class TagAdded(
-        val tag: String,
+    /** 添加关键词（只用于检索）。 */
+    public data class KeywordAdded(
+        val keyword: String,
     ) : NodeAction
 
-    /** 删除标签。 */
-    public data class TagRemoved(
-        val tag: String,
+    /** 删除关键词。 */
+    public data class KeywordRemoved(
+        val keyword: String,
     ) : NodeAction
 
     /** 保存（新建走 CREATE，已存在走 UPDATE）。 */

@@ -27,7 +27,6 @@ import com.example.autop.flow.FlowSession
 import com.example.autop.flow.FlowStore
 import com.example.autop.flow.FlowValidationService
 import com.example.autop.llm.LlmGateway
-import com.example.autop.memory.ExperienceExtractor
 import com.example.autop.task.AgentHostStatus
 import com.example.autop.task.ChatTitleGenerator
 import com.example.autop.task.RunService
@@ -150,7 +149,6 @@ public object TaskModule {
         notifier: UserNotifierImpl,
         taskStore: TaskRepository,
         threadStore: ThreadStore,
-        experience: ExperienceExtractor,
         configProvider: ConfigProvider,
         prompts: PromptRepository,
         clock: Clock,
@@ -172,7 +170,6 @@ public object TaskModule {
             notifier = notifier,
             taskStore = taskStore,
             threadStore = threadStore,
-            experience = experience,
             configProvider = configProvider,
             prompts = prompts,
             clock = clock,
@@ -231,10 +228,10 @@ public object TaskModule {
         scheduler: RunScheduler,
         titleGenerator: ChatTitleGenerator,
         ids: IdGenerator,
-        configProvider: ConfigProvider,
         clock: Clock,
         logger: Logger,
         @AppScope scope: CoroutineScope,
+        configProvider: ConfigProvider,
     ): RunExecutor =
         RunExecutor(
             agentSession = agentSession,
@@ -244,10 +241,10 @@ public object TaskModule {
             scheduler = scheduler,
             titleGenerator = titleGenerator,
             ids = ids,
-            configProvider = configProvider,
             clock = clock,
             logger = logger,
             scope = scope,
+            configProvider = configProvider,
         )
 
     @Provides

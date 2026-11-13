@@ -1,5 +1,8 @@
 /**
  * 记忆领域模型（docs/tech/06 §1）：节点、写入请求、版本与检索命中。
+ *
+ * 字段分工（ADR-0028）：`keywords` 只用于检索（关键词通道与向量输入）；`summary` 用于自动注入与
+ * 列表展示；`content` 只在 `memory_read` 时返回。
  */
 package com.example.autop.memory
 
@@ -34,7 +37,8 @@ public data class MemoryNode(
     val summary: String,
     /** Markdown 正文。 */
     val content: String,
-    val tags: List<String>,
+    /** 检索关键词（规范化后的小写形式）。 */
+    val keywords: List<String>,
     val links: List<MemoryPath>,
     val source: MemorySource,
     val version: Int,
@@ -68,19 +72,23 @@ public enum class AppliedMode {
     APPENDED_AS_SUPPLEMENT,
 }
 
-/** 一次写入请求。 */
+/**
+ * 一次写入请求。`keywords` 为 null 表示保留原值（UPDATE/APPEND），空列表表示清空。
+ */
 public data class MemoryWrite(
     val path: MemoryPath,
     val mode: WriteMode,
     val title: String? = null,
     val summary: String? = null,
     val content: String,
-    val tags: List<String>? = null,
+    val keywords: List<String>? = null,
     val links: List<MemoryPath>? = null,
     val source: MemorySource,
     val runId: RunId? = null,
     val reason: String? = null,
     val evidence: MemoryEvidence? = null,
+    /** CREATE 时跳过同名条目检查（确实是另一个对象时才传）。仅对 agent 写入生效。 */
+    val forceNew: Boolean = false,
 )
 
 /** 写入结果。 */
@@ -125,16 +133,10 @@ public data class MemoryVersion(
 public data class SearchHit(
     val path: MemoryPath,
     val title: String,
+    /** 摘要（用于注入与列表展示），附关联条目的一行摘要。 */
     val snippet: String,
     val score: Double,
     val channels: Set<String>,
     /** 条目来源（USER/AGENT/FLOW/IMPORT），供读工具区分是谁写的。 */
     val source: MemorySource,
-)
-
-/** 单通道排名项。 */
-public data class RankedPath(
-    val path: MemoryPath,
-    val rank: Int,
-    val snippet: String?,
 )

@@ -28,10 +28,10 @@
     <string name="memory_field_summary">摘要</string>
     <string name="memory_field_content">正文</string>
     <string name="memory_section_content">内容</string>
-    <string name="memory_section_tags">标签</string>
+    <string name="memory_section_keywords">关键词（只用于检索）</string>
     <string name="memory_section_info">信息</string>
-    <string name="memory_tag_add">添加</string>
-    <string name="memory_tag_name_placeholder">标签名</string>
+    <string name="memory_keyword_add">添加关键词</string>
+    <string name="memory_keyword_name_placeholder">用户以后可能提到的名字或说法</string>
     <string name="memory_summary_chars">摘要 %1$d / %2$d 字</string>
     <string name="memory_version_value">v%1$d</string>
     <string name="memory_deleted_hint">这条记忆已删除</string>

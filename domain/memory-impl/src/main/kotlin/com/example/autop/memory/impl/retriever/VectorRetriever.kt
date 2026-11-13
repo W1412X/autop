@@ -1,6 +1,7 @@
 /**
- * `retriever.vector` 通道（docs/tech/06 §2.6）：query 向量化后与内存缓存暴力计算余弦，
- * 取 top `k × vectorOverfetch`；同一 path 多块取最高分。未配置 embedding 时返回空。
+ * `retriever.vector` 通道（ADR-0028）：查询向量化后与内存缓存暴力计算余弦相似度。
+ * 每个节点只有一个向量，输入为标题与关键词；低于 `memory.vector.minScore` 的结果丢弃。
+ * 未配置 embedding 时返回空，检索退化为只用关键词。
  */
 package com.example.autop.memory.impl.retriever
 
@@ -10,10 +11,12 @@ import com.example.autop.core.config.MemoryConfig
 import com.example.autop.llm.EmbeddingGateway
 import com.example.autop.memory.MemoryPath
 import com.example.autop.memory.MemoryRetriever
-import com.example.autop.memory.RankedPath
+import com.example.autop.memory.RetrievalHit
+import com.example.autop.memory.impl.MemoryKeywords
 import com.example.autop.memory.impl.VectorCache
 import com.example.autop.memory.impl.VectorEntry
 import com.example.autop.memory.impl.db.MemoryDb
+import com.example.autop.memory.impl.isWithinPath
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import javax.inject.Inject
@@ -36,23 +39,21 @@ public class VectorRetriever
             query: String,
             prefix: MemoryPath?,
             limit: Int,
-        ): List<RankedPath> {
+        ): List<RetrievalHit> {
             val provider = gateway.current() ?: return emptyList()
             if (cache.modelId != provider.modelId) reload(provider.modelId)
-            val queryVector =
-                provider.embed(listOf(query)).getOrNull()?.firstOrNull() ?: return emptyList()
-            val overfetch = configProvider.current()[MemoryConfig.SEARCH].vectorOverfetch
+            val text = MemoryKeywords.normalize(query)
+            if (text.isEmpty()) return emptyList()
+            val queryVector = provider.embed(listOf(text)).getOrNull()?.firstOrNull() ?: return emptyList()
+            val cfg = configProvider.current()[MemoryConfig.VECTOR]
             return cache
-                .topK(queryVector, limit * overfetch)
-                .filter { prefix == null || it.path.startsWith(prefix.value) }
+                .topK(queryVector, cfg.topN)
+                .asSequence()
+                .filter { it.score >= cfg.minScore }
+                .filter { prefix == null || it.path.isWithinPath(prefix.value) }
                 .take(limit)
-                .mapIndexed { i, scored ->
-                    RankedPath(
-                        path = MemoryPath.parse(scored.path).getOrNull() ?: MemoryPath.ROOT,
-                        rank = i + 1,
-                        snippet = null,
-                    )
-                }
+                .mapNotNull { hit -> MemoryPath.parse(hit.path).getOrNull()?.let { RetrievalHit(it, hit.score) } }
+                .toList()
         }
 
         /** 从表中全量加载当前 modelId 的向量到缓存。 */
@@ -60,14 +61,12 @@ public class VectorRetriever
             val rows = db.vectorDao().byModel(modelId)
             cache.load(
                 modelId,
-                rows.map {
-                    VectorEntry(path = it.path, chunk = it.chunk, vector = it.vector.toFloatArray())
-                },
+                rows.map { VectorEntry(path = it.path, chunk = it.chunk, vector = it.vector.toFloatArray()) },
             )
         }
 
-        private companion object {
-            const val ID: String = "retriever.vector"
+        public companion object {
+            public const val ID: String = "retriever.vector"
         }
     }
 

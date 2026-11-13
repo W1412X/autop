@@ -24,8 +24,8 @@ public data class AgentContextSection(
                 "context.output",
                 "context.flow_directory",
                 "context.trigger",
-                "context.trigger_memory",
                 "context.goal",
+                "context.memory_prefetch",
             )
     }
 }
@@ -298,7 +298,7 @@ public data class AgentRecallSection(
     )
 
     public companion object {
-        public val DEFAULT_CHANNELS: List<String> = listOf("recall.fts", "recall.vector")
+        public val DEFAULT_CHANNELS: List<String> = listOf("recall.fts")
     }
 }
 

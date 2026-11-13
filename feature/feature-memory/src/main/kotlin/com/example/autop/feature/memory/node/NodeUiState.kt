@@ -23,7 +23,7 @@ public data class NodeUiState(
     val title: String = "",
     val summary: String = "",
     val content: String = "",
-    val tags: List<String> = emptyList(),
+    val keywords: List<String> = emptyList(),
     val links: List<String> = emptyList(),
     val byAgent: Boolean = false,
     val version: Int = 0,

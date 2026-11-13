@@ -9,6 +9,7 @@ import com.example.autop.llm.Block
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 /** 失败输出：错误进 [ToolOutput.error]，正文给模型看（含 hint，模型才拿得到纠错建议）。 */
 internal fun toolError(
@@ -37,6 +38,8 @@ internal fun textOutput(text: String): ToolOutput = ToolOutput(ok = true, conten
 internal fun JsonObject.str(name: String): String? = (this[name] as? JsonPrimitive)?.content
 
 internal fun JsonObject.intOrNull(name: String): Int? = str(name)?.toIntOrNull()
+
+internal fun JsonObject.boolOrNull(name: String): Boolean? = (this[name] as? JsonPrimitive)?.booleanOrNull
 
 internal fun JsonObject.strings(name: String): List<String>? =
     (this[name] as? JsonArray)

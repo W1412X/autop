@@ -21,6 +21,9 @@ import com.example.autop.llm.EmbeddingGateway
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+/** 历史检索向量通道的 id（`memory`/`recall.channels` 配置里启用时才建索引）。 */
+private const val RECALL_VECTOR: String = "recall.vector"
+
 /** float32 小端向量字节转换。 */
 public object VectorCodec {
     fun encode(vector: FloatArray): ByteArray {
@@ -51,6 +54,8 @@ public class VectorIndexer(
         event: ThreadEvent,
         text: String,
     ) {
+        // 向量通道默认关闭（ADR-0028）：未启用时不做推理，避免每条消息都占用端侧模型
+        if (RECALL_VECTOR !in config.current()[AgentConfig.RECALL].channels) return
         val provider = embedding.current()
         val chunks = text.chunked(config.current()[AgentConfig.RECALL].vector.chunkChars)
         val embedded = if (provider == null || chunks.isEmpty()) null else provider.embed(chunks).getOrNull()

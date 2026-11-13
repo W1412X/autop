@@ -20,6 +20,7 @@ import com.example.autop.memory.MemorySource
 import com.example.autop.memory.MemoryWrite
 import com.example.autop.memory.WriteMode
 import com.example.autop.memory.impl.db.MemoryDb
+import com.example.autop.memory.impl.db.MemoryNodeEntity
 import com.example.autop.memory.impl.testing.FakeEmbeddingGateway
 import com.example.autop.memory.impl.testing.FakeEmbeddingProvider
 import com.example.autop.memory.impl.testing.NoopLogger
@@ -216,6 +217,145 @@ public class MemoryStoreImplTest {
             assertThat(confirm.changeType.name).isEqualTo("CONFIRM")
         }
 
+    @Test
+    public fun `recursive delete leaves siblings whose names share a prefix or contain underscore`(): Unit =
+        runBlocking {
+            val parent = MemoryPath.parse("/tasks/报_告").getOrNull()!!
+            val similarName = MemoryPath.parse("/tasks/报X告").getOrNull()!!
+            val nameSibling = MemoryPath.parse("/tasks/报_告丰").getOrNull()!!
+            store.write(write(parent, WriteMode.CREATE, content = "父", source = MemorySource.USER))
+            store.write(write(similarName, WriteMode.CREATE, content = "下划线通配", source = MemorySource.USER))
+            store.write(write(nameSibling, WriteMode.CREATE, content = "前缀相同", source = MemorySource.USER))
+
+            store.delete(parent, recursive = true, source = MemorySource.USER, runId = null)
+
+            assertThat(store.get(parent)).isNull()
+            assertThat(store.get(similarName)).isNotNull()
+            assertThat(store.get(nameSibling)).isNotNull()
+        }
+
+    @Test
+    public fun `agent create with a same-named sibling is rejected unless force_new`(): Unit =
+        runBlocking {
+            val first = MemoryPath.parse("/people/李四").getOrNull()!!
+            store.write(write(first, WriteMode.CREATE, content = "同学", title = "李四", source = MemorySource.USER))
+            val dupPath = MemoryPath.parse("/people/李四二").getOrNull()!!
+
+            val rejected =
+                store.write(write(dupPath, WriteMode.CREATE, content = "又一条", title = " 李四 "))
+
+            assertThat((rejected as Outcome.Err).error.code).isEqualTo(MemoryErrorCodes.POSSIBLE_DUPLICATE)
+            assertThat(store.get(dupPath)).isNull()
+
+            val forced =
+                store.write(
+                    write(dupPath, WriteMode.CREATE, content = "确实是另一个人", title = "李四").copy(forceNew = true),
+                )
+            assertThat(forced).isInstanceOf(Outcome.Ok::class.java)
+        }
+
+    @Test
+    public fun `user create with a same-named sibling is allowed`(): Unit =
+        runBlocking {
+            val first = MemoryPath.parse("/people/王五").getOrNull()!!
+            store.write(write(first, WriteMode.CREATE, content = "甲", title = "王五", source = MemorySource.USER))
+            val second = MemoryPath.parse("/people/王五二").getOrNull()!!
+
+            val result =
+                store.write(write(second, WriteMode.CREATE, content = "乙", title = "王五", source = MemorySource.USER))
+
+            assertThat(result).isInstanceOf(Outcome.Ok::class.java)
+        }
+
+    @Test
+    public fun `ensureRoots adds a missing root to an existing database`(): Unit =
+        runBlocking {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val legacy = Room.inMemoryDatabaseBuilder(context, MemoryDb::class.java).build()
+            legacy.nodeDao().insertIfAbsent(
+                MemoryNodeEntity(
+                    path = "/tasks/旧数据",
+                    parentPath = "/tasks",
+                    title = "旧数据",
+                    summary = "",
+                    content = "保留",
+                    keywordsJson = "[]",
+                    linksJson = "[]",
+                    source = "AGENT",
+                    version = 1,
+                    createdAt = 1,
+                    updatedAt = 1,
+                    accessCount = 0,
+                    lastAccessAt = null,
+                ),
+            )
+
+            MemorySeeder(legacy, TestSeed, clock).ensureRoots()
+
+            assertThat(legacy.nodeDao().get("/events")?.title).isEqualTo("事件")
+            assertThat(legacy.nodeDao().get("/tasks/旧数据")?.content).isEqualTo("保留")
+            legacy.close()
+        }
+
+    @Test
+    public fun `agent create without summary or keywords is rejected`(): Unit =
+        runBlocking {
+            val noSummary =
+                store.write(
+                    write(MemoryPath.parse("/tasks/无摘要").getOrNull()!!, WriteMode.CREATE, content = "x")
+                        .copy(summary = null),
+                )
+            val noKeywords =
+                store.write(
+                    write(MemoryPath.parse("/tasks/无关键词").getOrNull()!!, WriteMode.CREATE, content = "x")
+                        .copy(keywords = emptyList()),
+                )
+
+            assertThat((noSummary as Outcome.Err).error.code).isEqualTo(MemoryErrorCodes.INVALID_FIELDS)
+            assertThat((noKeywords as Outcome.Err).error.code).isEqualTo(MemoryErrorCodes.INVALID_FIELDS)
+        }
+
+    @Test
+    public fun `keywords are normalized and deduplicated when stored`(): Unit =
+        runBlocking {
+            val path = MemoryPath.parse("/people/小红").getOrNull()!!
+
+            val result =
+                store.write(
+                    write(path, WriteMode.CREATE, content = "同事", source = MemorySource.USER)
+                        .copy(keywords = listOf("  张三 ", "ZhangSan", "张三")),
+                )
+
+            assertThat((result as Outcome.Ok).value.node.keywords).containsExactly("张三", "zhangsan").inOrder()
+        }
+
+    @Test
+    public fun `too many keywords are rejected`(): Unit =
+        runBlocking {
+            val path = MemoryPath.parse("/people/多词").getOrNull()!!
+            val tooMany = (1..13).map { "词$it" }
+
+            val result =
+                store.write(
+                    write(path, WriteMode.CREATE, content = "x", source = MemorySource.USER).copy(keywords = tooMany),
+                )
+
+            assertThat((result as Outcome.Err).error.code).isEqualTo(MemoryErrorCodes.INVALID_FIELDS)
+        }
+
+    @Test
+    public fun `revert of an update restores the previous keywords`(): Unit =
+        runBlocking {
+            val path = MemoryPath.parse("/tasks/关键词撤销").getOrNull()!!
+            store.write(write(path, WriteMode.CREATE, content = "原").copy(keywords = listOf("旧词")))
+            val update =
+                store.write(write(path, WriteMode.UPDATE, content = "改").copy(keywords = listOf("新词")))
+
+            store.revert((update as Outcome.Ok).value.versionId)
+
+            assertThat(store.get(path)!!.keywords).containsExactly("旧词")
+        }
+
     private fun write(
         path: MemoryPath,
         mode: WriteMode,
@@ -227,7 +367,10 @@ public class MemoryStoreImplTest {
             path = path,
             mode = mode,
             title = title,
+            // agent 新建必须带摘要与关键词（ADR-0027），测试默认补齐
+            summary = "摘要",
             content = content,
+            keywords = listOf(title ?: path.name),
             source = source,
         )
 }

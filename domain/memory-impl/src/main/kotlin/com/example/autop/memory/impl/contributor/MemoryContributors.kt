@@ -1,7 +1,7 @@
 /**
- * 记忆上下文贡献者（docs/tech/06 §3）：
+ * 记忆上下文贡献者（docs/tech/06 §3，ADR-0028）：
  * `context.memory_index`（L0 索引）、`context.user_profile`（用户画像）、
- * `context.trigger_memory`（事件触发时预取记忆）。
+ * `context.memory_prefetch`（goal 与触发文本的关键词预取，只注入摘要）。
  */
 package com.example.autop.memory.impl.contributor
 
@@ -17,6 +17,7 @@ import com.example.autop.memory.MemoryIndexRenderer
 import com.example.autop.memory.MemoryPath
 import com.example.autop.memory.MemorySearch
 import com.example.autop.memory.MemoryStore
+import com.example.autop.memory.SearchHit
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -45,7 +46,7 @@ public class MemoryIndexContributor
         }
     }
 
-/** `context.user_profile`：`/profile` 下各节点 summary 拼接（SYSTEM_DYNAMIC）。 */
+/** `context.user_profile`：`/profile` 下、来源为用户的条目摘要拼接（SYSTEM_DYNAMIC）。 */
 @Singleton
 public class UserProfileContributor
     @Inject
@@ -89,44 +90,71 @@ public class UserProfileContributor
         }
     }
 
-/** `context.trigger_memory`：Run 变量含 `trigger.*` 时预取相关记忆（FIRST_USER）。 */
+/**
+ * `context.memory_prefetch`：用 goal 与 `trigger.*` 变量的文本做关键词预取（FIRST_USER）。
+ * 只注入每条的路径、标题与一行摘要，总长受 `memory.prefetch.maxChars` 限制；
+ * 没有命中就不注入。
+ */
 @Singleton
-public class TriggerMemoryContributor
+public class MemoryPrefetchContributor
     @Inject
     constructor(
         private val search: MemorySearch,
         private val prompts: PromptRepository,
         private val configProvider: ConfigProvider,
     ) : ContextContributor {
-        override val id: String = "context.trigger_memory"
+        override val id: String = "context.memory_prefetch"
 
-        @Suppress("ReturnCount") // 出口按“无 trigger/无命中/渲染失败”分支，是流程语义
+        @Suppress("ReturnCount") // 出口按“无查询文本/无命中/渲染失败”分支，是流程语义
         override suspend fun contribute(req: ContextRequest): ContextPart? {
-            val triggerText =
-                req.vars
-                    .filterKeys { it.startsWith("trigger.") }
-                    .values
-                    .joinToString(separator = "\n")
-                    .ifBlank { return null }
-            val k = configProvider.current()[MemoryConfig.TRIGGER_PREFETCH].k
-            val hits = search.search(query = triggerText, prefix = null, k = k)
+            val parts = listOfNotNull(req.goal) + req.vars.filterKeys { it.startsWith(TRIGGER_PREFIX) }.values
+            val query = parts.joinToString(separator = "\n").trim()
+            if (query.isEmpty()) return null
+            val cfg = configProvider.current()[MemoryConfig.PREFETCH]
+            val hits = search.prefetch(query, cfg.k, cfg.minKeywordScore)
             if (hits.isEmpty()) return null
-            val body = hits.joinToString(separator = "\n") { "${it.path.value}  ${it.title} — ${it.snippet}" }
-            val rendered =
+            val body = clip(hits.map(::oneLine), cfg.maxChars)
+            if (body.isEmpty()) return null
+            val text =
                 when (val r = prompts.render(ID_TEMPLATE, mapOf("hits" to body))) {
                     is Outcome.Ok -> r.value.text
                     is Outcome.Err -> return null
                 }
             return ContextPart(
                 placement = Placement.FIRST_USER,
-                text = rendered,
+                text = text,
                 promptIds =
                     runCatching { mapOf(ID_TEMPLATE to prompts.get(ID_TEMPLATE).version) }
                         .getOrDefault(emptyMap()),
             )
         }
 
+        private fun oneLine(hit: SearchHit): String {
+            val summary =
+                hit.snippet
+                    .lineSequence()
+                    .firstOrNull()
+                    ?.trim()
+                    .orEmpty()
+            return "${hit.path.value}  ${hit.title}：$summary"
+        }
+
+        /** 按行累加，超出总长上限即停止，不截断单行。 */
+        private fun clip(
+            lines: List<String>,
+            maxChars: Int,
+        ): String {
+            val out = StringBuilder()
+            for (line in lines) {
+                val piece = if (out.isEmpty()) line else "\n$line"
+                if (out.length + piece.length > maxChars) break
+                out.append(piece)
+            }
+            return out.toString()
+        }
+
         private companion object {
-            const val ID_TEMPLATE: String = "memory.context.trigger_prefetch"
+            const val ID_TEMPLATE: String = "memory.context.prefetch"
+            const val TRIGGER_PREFIX: String = "trigger."
         }
     }

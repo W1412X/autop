@@ -1,5 +1,5 @@
 /**
- * 记忆文本纯函数（docs/tech/06 §2.4/§2.5）：摘要截取、embedding 切块、内容指纹。
+ * 记忆文本纯函数（docs/tech/06 §2.4/§2.5，ADR-0028）：摘要截取、向量输入文本、内容指纹。
  */
 package com.example.autop.memory.impl
 
@@ -7,9 +7,7 @@ import java.security.MessageDigest
 
 /** 记忆文本处理（纯函数，JVM 可测）。 */
 public object MemoryText {
-    /**
-     * 摘要：去掉 Markdown 标记后取前 [maxChars] 字。
-     */
+    /** 摘要：去掉 Markdown 标记后取前 [maxChars] 字。 */
     public fun summarize(
         content: String,
         maxChars: Int,
@@ -19,34 +17,15 @@ public object MemoryText {
     }
 
     /**
-     * embedding 切块（docs/tech/06 §2.5）：按段落累计，单块正文不超过 [chunkChars]，
-     * 每块前缀为标题与路径。
+     * 向量化输入：标题与关键词（规范化后空格连接）。摘要与正文不参与向量化，
+     * 避免变化频繁、语义分散的文本稀释关键词信号。
      */
-    public fun chunkForEmbedding(
+    public fun embeddingText(
         title: String,
-        path: String,
-        content: String,
-        chunkChars: Int,
-    ): List<String> {
-        val prefix = "[$title]($path)\n"
-        val paragraphs = content.split(Regex("\\n\\s*\\n")).filter { it.isNotBlank() }
-        if (paragraphs.isEmpty()) return listOf(prefix + content.trim())
-        val chunks = mutableListOf<String>()
-        val current = StringBuilder()
-        for (p in paragraphs) {
-            val para = p.trim()
-            if (current.isNotEmpty() && current.length + para.length + 2 > chunkChars) {
-                chunks += current.toString()
-                current.clear()
-            }
-            if (current.isNotEmpty()) current.append("\n\n")
-            current.append(para)
-        }
-        if (current.isNotEmpty()) chunks += current.toString()
-        return chunks.map { prefix + it }
-    }
+        keywords: List<String>,
+    ): String = (listOf(title) + keywords).map(MemoryKeywords::normalize).filter { it.isNotEmpty() }.joinToString(" ")
 
-    /** 内容指纹（sha-256 hex）：块未变化则跳过重新向量化。 */
+    /** 内容指纹（sha-256 hex）：向量化输入未变化则跳过重新向量化。 */
     public fun textHash(text: String): String {
         val digest = MessageDigest.getInstance("SHA-256").digest(text.toByteArray(Charsets.UTF_8))
         return digest.joinToString(separator = "") { "%02x".format(it) }

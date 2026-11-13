@@ -21,12 +21,15 @@ import com.example.autop.agent.store.testing.SeqIdGenerator
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
+import com.example.autop.core.testing.recallChannelsOverride
 import com.example.autop.llm.Block
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import org.junit.After
@@ -57,7 +60,7 @@ public class RecallChannelsTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
         db = Room.inMemoryDatabaseBuilder(context, ThreadsDb::class.java).build()
         filesDir = Files.createTempDirectory("recall-test").toFile()
-        config = FakeConfigProvider()
+        config = FakeConfigProvider(recallChannelsOverride("recall.fts", "recall.vector"))
         embedding = FakeEmbeddingGateway()
         val files = ThreadFiles(filesDir)
         snippets = SnippetReader(db.eventDao(), files, config)
@@ -130,7 +133,19 @@ public class RecallChannelsTest {
                     put(
                         "agent",
                         buildJsonObject {
-                            put("recall", buildJsonObject { put("vector", buildJsonObject { put("chunkChars", 4) }) })
+                            put(
+                                "recall",
+                                buildJsonObject {
+                                    put(
+                                        "channels",
+                                        buildJsonArray {
+                                            add(JsonPrimitive("recall.fts"))
+                                            add(JsonPrimitive("recall.vector"))
+                                        },
+                                    )
+                                    put("vector", buildJsonObject { put("chunkChars", 4) })
+                                },
+                            )
                         },
                     )
                 },

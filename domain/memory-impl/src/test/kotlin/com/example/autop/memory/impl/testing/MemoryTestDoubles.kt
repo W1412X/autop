@@ -31,6 +31,7 @@ public object TestSeed : MemorySeed {
             MemoryRootSeed("/people", "人物", "用户认识的人"),
             MemoryRootSeed("/apps", "应用", "应用的使用手册"),
             MemoryRootSeed("/tasks", "任务", "进行中的任务"),
+            MemoryRootSeed("/events", "事件", "发生过的事情，按日期记录"),
         )
 }
 

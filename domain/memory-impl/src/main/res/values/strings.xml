@@ -9,4 +9,6 @@
     <string name="memory_root_apps_summary">各应用的操作说明与经验</string>
     <string name="memory_root_tasks_title">任务经验</string>
     <string name="memory_root_tasks_summary">任务相关的做法与结论</string>
+    <string name="memory_root_events_title">事件</string>
+    <string name="memory_root_events_summary">发生过的事情，按日期记录：谁、什么时候、说了什么、结果如何</string>
 </resources>

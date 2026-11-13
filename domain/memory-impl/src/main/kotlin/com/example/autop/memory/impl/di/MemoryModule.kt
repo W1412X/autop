@@ -16,15 +16,12 @@ import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppLauncher
 import com.example.autop.llm.EmbeddingGateway
-import com.example.autop.llm.LlmGateway
-import com.example.autop.memory.ExperienceExtractor
 import com.example.autop.memory.MemoryIndexMaintenance
 import com.example.autop.memory.MemoryIndexRenderer
 import com.example.autop.memory.MemoryRetriever
 import com.example.autop.memory.MemorySearch
 import com.example.autop.memory.MemoryStore
 import com.example.autop.memory.impl.EmbeddingIndexer
-import com.example.autop.memory.impl.ExperienceExtractorImpl
 import com.example.autop.memory.impl.HybridMemorySearch
 import com.example.autop.memory.impl.MemoryIndexRendererImpl
 import com.example.autop.memory.impl.MemorySeed
@@ -34,11 +31,10 @@ import com.example.autop.memory.impl.ResourceMemorySeed
 import com.example.autop.memory.impl.VectorCache
 import com.example.autop.memory.impl.contributor.AppManualEnricher
 import com.example.autop.memory.impl.contributor.MemoryIndexContributor
-import com.example.autop.memory.impl.contributor.TriggerMemoryContributor
+import com.example.autop.memory.impl.contributor.MemoryPrefetchContributor
 import com.example.autop.memory.impl.contributor.UserProfileContributor
 import com.example.autop.memory.impl.db.MemoryDb
-import com.example.autop.memory.impl.retriever.FtsRetriever
-import com.example.autop.memory.impl.retriever.PathRetriever
+import com.example.autop.memory.impl.retriever.KeywordRetriever
 import com.example.autop.memory.impl.retriever.VectorRetriever
 import com.example.autop.memory.impl.tools.MemoryListTool
 import com.example.autop.memory.impl.tools.MemoryReadTool
@@ -118,28 +114,14 @@ public object MemoryModule {
     @Singleton
     public fun provideMemoryIndexMaintenance(indexer: EmbeddingIndexer): MemoryIndexMaintenance = indexer
 
-    /** 经验提炼（docs/design/agent-design.md §8，开关 `features.experienceExtraction`）。 */
-    @Provides
-    @Singleton
-    @Suppress("LongParameterList") // 装配函数：依赖都是提炼链路的正交能力
-    public fun provideExperienceExtractor(
-        store: MemoryStore,
-        gateway: LlmGateway,
-        prompts: PromptRepository,
-        appLauncher: AppLauncher,
-        config: ConfigProvider,
-        logger: Logger,
-    ): ExperienceExtractor = ExperienceExtractorImpl(store, gateway, prompts, appLauncher, config, logger)
-
     // ---- 检索通道（docs/tech/06 §2.6）----
 
     @Provides
     @IntoSet
-    public fun providePathRetriever(db: MemoryDb): MemoryRetriever = PathRetriever(db)
-
-    @Provides
-    @IntoSet
-    public fun provideFtsRetriever(db: MemoryDb): MemoryRetriever = FtsRetriever(db)
+    public fun provideKeywordRetriever(
+        db: MemoryDb,
+        config: ConfigProvider,
+    ): MemoryRetriever = KeywordRetriever(db, config)
 
     @Provides
     @IntoSet
@@ -197,11 +179,11 @@ public object MemoryModule {
 
     @Provides
     @IntoSet
-    public fun provideTriggerMemoryContributor(
+    public fun provideMemoryPrefetchContributor(
         search: MemorySearch,
         prompts: PromptRepository,
         config: ConfigProvider,
-    ): ContextContributor = TriggerMemoryContributor(search, prompts, config)
+    ): ContextContributor = MemoryPrefetchContributor(search, prompts, config)
 
     @Provides
     @IntoSet

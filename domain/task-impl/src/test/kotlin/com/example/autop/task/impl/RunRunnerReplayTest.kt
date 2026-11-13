@@ -34,7 +34,6 @@ import com.example.autop.task.impl.store.RunStore
 import com.example.autop.task.impl.testing.FakeAgentSession
 import com.example.autop.task.impl.testing.FakeAppLauncher
 import com.example.autop.task.impl.testing.FakeDeviceStateProvider
-import com.example.autop.task.impl.testing.FakeExperienceExtractor
 import com.example.autop.task.impl.testing.FakeLogger
 import com.example.autop.task.impl.testing.FakeScreenLease
 import com.example.autop.task.impl.testing.FakeTaskRepository
@@ -175,7 +174,6 @@ private class ReplayFixture(
             notifier = UserNotifierImpl(context, config),
             taskStore = tasks,
             threadStore = FakeThreadStore(items = events),
-            experience = FakeExperienceExtractor(),
             configProvider = config,
             prompts = FakePromptRepository(),
             clock = clock,

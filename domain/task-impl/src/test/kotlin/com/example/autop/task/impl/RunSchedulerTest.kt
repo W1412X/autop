@@ -34,7 +34,6 @@ import com.example.autop.task.impl.testing.FakeAccessibilityStatus
 import com.example.autop.task.impl.testing.FakeAgentSession
 import com.example.autop.task.impl.testing.FakeAppLauncher
 import com.example.autop.task.impl.testing.FakeDeviceStateProvider
-import com.example.autop.task.impl.testing.FakeExperienceExtractor
 import com.example.autop.task.impl.testing.FakeLogger
 import com.example.autop.task.impl.testing.FakeScreenLease
 import com.example.autop.task.impl.testing.FakeTaskRepository
@@ -278,7 +277,6 @@ private class Fixture(
             notifier = notifier,
             taskStore = FakeTaskRepository(),
             threadStore = threads,
-            experience = FakeExperienceExtractor(),
             configProvider = config,
             prompts = FakePromptRepository(),
             clock = clock,

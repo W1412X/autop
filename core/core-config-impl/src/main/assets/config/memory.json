@@ -6,8 +6,7 @@
       "maxDepth": 8
     },
     "summary": {
-      "maxChars": 60,
-      "autoGenerate": true
+      "maxChars": 60
     },
     "node": {
       "maxContentChars": 20000
@@ -15,22 +14,28 @@
     "write": {
       "supplementPromptId": "memory.write.supplement"
     },
+    "keywords": {
+      "maxCount": 12,
+      "maxChars": 20
+    },
     "embedding": {
-      "chunkChars": 400,
       "retryMax": 3,
       "retryBaseMs": 2000
     },
     "search": {
-      "channels": ["retriever.path", "retriever.fts", "retriever.vector"],
+      "channels": ["retriever.keyword", "retriever.vector"],
       "weights": {
-        "retriever.path": 1.2,
-        "retriever.fts": 1.0,
-        "retriever.vector": 1.0
+        "retriever.keyword": 0.6,
+        "retriever.vector": 0.4
       },
-      "rrfK": 60,
       "perChannelLimit": 30,
-      "vectorOverfetch": 3,
-      "defaultK": 8
+      "defaultK": 8,
+      "minCjkChars": 2,
+      "minAsciiChars": 3
+    },
+    "vector": {
+      "minScore": 0.55,
+      "topN": 20
     },
     "l0": {
       "maxTokens": 1500,
@@ -42,8 +47,10 @@
     "list": {
       "maxDepth": 3
     },
-    "triggerPrefetch": {
-      "k": 3
+    "prefetch": {
+      "k": 3,
+      "maxChars": 300,
+      "minKeywordScore": 2.0
     }
   }
 }

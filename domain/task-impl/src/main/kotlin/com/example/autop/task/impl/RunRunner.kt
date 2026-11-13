@@ -35,17 +35,15 @@ import com.example.autop.flow.FlowRunRequest
 import com.example.autop.flow.FlowSession
 import com.example.autop.flow.FlowStore
 import com.example.autop.llm.Block
-import com.example.autop.memory.ExperienceExtractor
-import com.example.autop.memory.ExperienceRequest
 import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
 import com.example.autop.task.TaskErrorCodes
 import com.example.autop.task.TaskExecutor
-import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.TaskRepository
 import com.example.autop.task.core.OutputSchemaValidator
+import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.impl.notify.UserNotifierImpl
 import com.example.autop.task.impl.store.RunStore
 import kotlinx.coroutines.CoroutineScope
@@ -76,7 +74,6 @@ public class RunRunner(
     private val notifier: UserNotifierImpl,
     private val taskStore: TaskRepository,
     private val threadStore: ThreadStore,
-    private val experience: ExperienceExtractor,
     private val configProvider: ConfigProvider,
     private val prompts: PromptRepository,
     private val clock: Clock,
@@ -90,14 +87,14 @@ public class RunRunner(
         task: Task?,
     ) {
         val startedAt = clock.nowMillis()
+        if (!launchRecord(record, startedAt)) return
+        val entry = pending.take(record.id)
+        val flowLaunch = flowLaunchOf(entry, task)
         // 兜底（调度门已先拦截）：流程功能关闭时在取屏幕租约与调用流程会话之前收口（ADR-0030）。
         if (flowLaunch != null && !configProvider.current().flowsEnabled()) {
             failFlowDisabled(record)
             return
         }
-        if (!launchRecord(record, startedAt)) return
-        val entry = pending.take(record.id)
-        val flowLaunch = flowLaunchOf(entry, task)
         val needsScreen = flowLaunch?.needsScreen ?: task?.needsScreen ?: true
         val originPkg = if (needsScreen) deviceState.current().foregroundPackage else null
         val request = if (flowLaunch == null && !isFlowTask(task)) buildRequest(record, task, entry) else null
@@ -130,18 +127,26 @@ public class RunRunner(
             }
         observer.finish(record.id, finished)
         observer.clear(record.id)
-        val final = runStore.get(record.id)
-        if (final != null) {
-            val outputsValid = validateOutputs(task, finished, final)
-            if (outputsValid && !isFlowRun(flowLaunch, task)) {
-                val events = threadStore.events(record.threadId).filter { it.runId == record.id }
-                recordReplayScript(task, record, finished, events)
-                extractExperience(record, finished, events)
-                suggestFlowIfRepeatable(record, finished, events)
-            }
-            notifyIfBackground(final)
-            returnToOrigin(task, originPkg)
+        val final = runStore.get(record.id) ?: return
+        settle(record, task, flowLaunch, finished, final, originPkg)
+    }
+
+    /** 收口后的沉淀与通知：回放脚本、流程建议、后台通知、回到原 App。 */
+    private suspend fun settle(
+        record: RunRecord,
+        task: Task?,
+        flowLaunch: FlowLaunch?,
+        finished: RunFinished,
+        final: RunRecord,
+        originPkg: String?,
+    ) {
+        if (validateOutputs(task, finished, final) && !isFlowRun(flowLaunch, task)) {
+            val events = threadStore.events(record.threadId).filter { it.runId == record.id }
+            recordReplayScript(task, record, finished, events)
+            suggestFlowIfRepeatable(record, finished, events)
         }
+        notifyIfBackground(final)
+        returnToOrigin(task, originPkg)
     }
 
     /**
@@ -166,6 +171,10 @@ public class RunRunner(
             logger.d(TAG, "run_closed_before_start", "runId" to record.id.value)
         }
         return launched
+    }
+
+    private fun isFlowTask(task: Task?): Boolean = task?.executor == TaskExecutor.FLOW && task.flow != null
+
     /** 流程功能关闭（ADR-0030）：流程运行不占屏幕、不调用流程会话，直接以 `task.flow_disabled` 收口。 */
     private suspend fun failFlowDisabled(record: RunRecord) {
         val finished =
@@ -180,10 +189,6 @@ public class RunRunner(
         observer.clear(record.id)
         runStore.get(record.id)?.let { notifyIfBackground(it) }
     }
-
-    }
-
-    private fun isFlowTask(task: Task?): Boolean = task?.executor == TaskExecutor.FLOW && task.flow != null
 
     private fun isFlowRun(
         launch: FlowLaunch?,
@@ -381,12 +386,12 @@ public class RunRunner(
      */
     private fun suggestFlowIfRepeatable(
         record: RunRecord,
-        // 流程功能关闭时不再提示保存为流程（ADR-0030）。
-        if (!configProvider.current().flowsEnabled()) return
         finished: RunFinished,
         events: List<ThreadEvent>,
     ) {
         if (finished.status != RunOutcome.SUCCEEDED) return
+        // 流程功能关闭时不再提示保存为流程（ADR-0030）。
+        if (!configProvider.current().flowsEnabled()) return
         val minSteps = configProvider.current()[FlowConfig.SAVE].suggestMinSteps
         val steps = events.count { (it.payload as? ToolResultEvent)?.let { r -> r.ok && r.replay != null } == true }
         if (steps < minSteps) return
@@ -416,43 +421,6 @@ public class RunRunner(
         logger.i(TAG, "replay_script_recorded", "runId" to record.id.value, "steps" to script.steps.size)
     }
 
-    /** 成功 Run 收口后经验提炼（docs/design/agent-design.md §8，开关 `features.experienceExtraction`）。 */
-    private suspend fun extractExperience(
-        record: RunRecord,
-        finished: RunFinished,
-        events: List<ThreadEvent>,
-    ) {
-        if (finished.status != RunOutcome.SUCCEEDED) return
-        val packageName =
-            events
-                .map { it.payload }
-                .filterIsInstance<ToolResultEvent>()
-                .mapNotNull { it.observation?.packageName }
-                .lastOrNull() ?: return
-        experience.extract(
-            ExperienceRequest(runId = record.id, packageName = packageName, steps = stepsOf(events)),
-        )
-    }
-
-    /** 本次 Run 的步骤摘要：每个工具结果一行（序号 + 工具 + 结果首行）。 */
-    private fun stepsOf(events: List<ThreadEvent>): String =
-        events
-            .map { it.payload }
-            .filterIsInstance<ToolResultEvent>()
-            .mapIndexed { index, result ->
-                val head =
-                    result.blocks
-                        .filterIsInstance<Block.Text>()
-                        .firstOrNull()
-                        ?.text
-                        ?.lineSequence()
-                        ?.firstOrNull()
-                        ?.take(STEP_TEXT_CHARS)
-                val status = if (result.ok) STEP_OK else STEP_ERROR
-                "${index + 1}. ${result.toolId} [$status]${head?.let { " $it" } ?: ""}"
-            }.takeLast(STEPS_MAX_LINES)
-            .joinToString("\n")
-
     /** 后台 Run 结束通知（docs/tech/07 §4.3/§7）。 */
     private fun notifyIfBackground(record: RunRecord) {
         if (record.origin == RunOrigin.CHAT) return
@@ -479,11 +447,5 @@ public class RunRunner(
         const val TRIGGER_PREFIX = "trigger."
         const val EXTRACTED_PREFIX = "extracted."
         const val EXTRACTED_KEY = "extracted"
-
-        /** 步骤摘要：每行结果首行截断长度与最大行数。 */
-        const val STEP_TEXT_CHARS = 60
-        const val STEPS_MAX_LINES = 40
-        const val STEP_OK = "ok"
-        const val STEP_ERROR = "error"
     }
 }

@@ -24,7 +24,8 @@ public interface MemorySeed {
 
     public companion object {
         /** 受保护的内置目录路径（含 "/"）。 */
-        public val PROTECTED_ROOTS: List<String> = listOf("/", "/profile", "/people", "/apps", "/tasks")
+        public val PROTECTED_ROOTS: List<String> =
+            listOf("/", "/profile", "/people", "/apps", "/tasks", "/events")
     }
 }
 
@@ -34,8 +35,11 @@ public class MemorySeeder(
     private val seed: MemorySeed,
     private val clock: Clock,
 ) {
+    /**
+     * 逐个补齐缺失的根目录。不能只在空库时播种：已有数据库升级后新增的根（如 `/events`）
+     * 必须能补进来；每个根是否存在单独判断，已存在的不覆盖。
+     */
     suspend fun ensureRoots() {
-        if (db.nodeDao().count() > 0) return
         val now = clock.nowMillis()
         insertIfAbsent(MEMORY_PATH_ROOT, parent = null, title = "", summary = "", now = now)
         for (root in seed.roots()) {
@@ -58,7 +62,7 @@ public class MemorySeeder(
                 title = title,
                 summary = summary,
                 content = "",
-                tagsJson = "[]",
+                keywordsJson = "[]",
                 linksJson = "[]",
                 source = "USER",
                 version = 1,
@@ -84,6 +88,7 @@ public class ResourceMemorySeed(
             root("/people", R.string.memory_root_people_title, R.string.memory_root_people_summary),
             root("/apps", R.string.memory_root_apps_title, R.string.memory_root_apps_summary),
             root("/tasks", R.string.memory_root_tasks_title, R.string.memory_root_tasks_summary),
+            root("/events", R.string.memory_root_events_title, R.string.memory_root_events_summary),
         )
 
     private fun root(

@@ -1,5 +1,5 @@
 /**
- * `memory.db` DAO（docs/tech/06 §2）。FTS 匹配用 `@RawQuery`，AND→OR 退化由调用方换查询串。
+ * `memory.db` DAO（docs/tech/06 §2，ADR-0028）。
  */
 package com.example.autop.memory.impl.db
 
@@ -7,9 +7,7 @@ import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
-import androidx.room.RawQuery
 import androidx.room.Update
-import androidx.sqlite.db.SupportSQLiteQuery
 
 /** 节点表访问。 */
 @Dao
@@ -34,8 +32,19 @@ public interface MemoryNodeDao {
     @Query("SELECT * FROM memory_nodes WHERE parentPath = :parent ORDER BY title")
     public suspend fun childrenAll(parent: String): List<MemoryNodeEntity>
 
-    @Query("SELECT path FROM memory_nodes WHERE path LIKE :prefix || '%'")
+    /**
+     * 子树（含自身）的全部路径。按路径段边界匹配，不用 LIKE：LIKE 中 `_` 与 `%` 是通配符，
+     * 删除 `/people/张三` 不能连带 `/people/张三丰`。调用方不得传入根 "/"（根受保护）。
+     */
+    @Query(
+        "SELECT path FROM memory_nodes WHERE path = :prefix " +
+            "OR substr(path, 1, length(:prefix) + 1) = :prefix || '/'",
+    )
     public suspend fun pathsUnder(prefix: String): List<String>
+
+    /** 关键词通道的全量扫描输入（条目数在千级，整表读取后在内存中匹配）。 */
+    @Query("SELECT path, title, summary, keywordsJson, length(content) AS contentLength FROM memory_nodes")
+    public suspend fun searchRows(): List<SearchRow>
 
     @Insert(onConflict = OnConflictStrategy.ABORT)
     public suspend fun insert(node: MemoryNodeEntity)
@@ -49,9 +58,6 @@ public interface MemoryNodeDao {
 
     @Query("DELETE FROM memory_nodes WHERE path = :path")
     public suspend fun delete(path: String)
-
-    @Query("DELETE FROM memory_nodes WHERE path LIKE :prefix || '%'")
-    public suspend fun deleteUnder(prefix: String): Int
 
     @Query(
         "UPDATE memory_nodes SET path = :newPath, parentPath = :newParent WHERE path = :oldPath",
@@ -71,17 +77,17 @@ public interface MemoryNodeDao {
     @Query("SELECT COUNT(*) FROM memory_nodes")
     public suspend fun count(): Int
 
-    @Query("SELECT path, title FROM memory_nodes")
-    public suspend fun allTitles(): List<TitleRow>
-
     @Query("SELECT path FROM memory_nodes")
     public suspend fun allPaths(): List<String>
 }
 
-/** 轻量行：path + title（路径匹配通道用）。 */
-public data class TitleRow(
+/** 关键词通道的扫描行。`contentLength` 只用于判断是否为空目录，不读正文。 */
+public data class SearchRow(
     val path: String,
     val title: String,
+    val summary: String,
+    val keywordsJson: String,
+    val contentLength: Int,
 )
 
 /** 版本表访问。 */
@@ -118,34 +124,6 @@ public interface MemoryVersionDao {
         source: String?,
     ): List<MemoryVersionEntity>
 }
-
-/** FTS4 表访问。 */
-@Dao
-public interface MemoryFtsDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    public suspend fun upsert(entry: MemoryFtsEntity)
-
-    @Query("DELETE FROM memory_fts WHERE path = :path")
-    public suspend fun delete(path: String)
-
-    @Query("DELETE FROM memory_fts WHERE path LIKE :prefix || '%'")
-    public suspend fun deleteUnder(prefix: String)
-
-    /** 任意 MATCH 查询串（AND 或 OR 组合），返回命中行与 matchinfo（'pcnalx'）供 [FtsRanker] 评分。 */
-    @RawQuery
-    public suspend fun match(query: SupportSQLiteQuery): List<FtsMatchRow>
-
-    @Query("SELECT * FROM memory_fts WHERE path = :path")
-    public suspend fun byPath(path: String): MemoryFtsEntity?
-}
-
-/** FTS 匹配行：命中文档的列长度与 matchinfo('pcnalx') 原始块，供 [FtsRanker] 解析评分。 */
-public data class FtsMatchRow(
-    val path: String,
-    val titleLen: Int,
-    val bodyLen: Int,
-    val info: ByteArray,
-)
 
 /** 向量表访问。 */
 @Dao

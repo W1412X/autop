@@ -5,6 +5,7 @@
  */
 package com.example.autop.memory.impl
 
+import androidx.room.withTransaction
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.DispatcherProvider
@@ -32,6 +33,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -51,10 +54,14 @@ public class MemoryStoreImpl
         private val logger: Logger,
     ) : MemoryStore {
         private val treeChanges = MutableSharedFlow<Unit>(extraBufferCapacity = CHANGE_BUFFER)
-        private val fts = MemoryFtsSync(db)
-        private val reverter = MemoryReverter(db, fts, ::onMutated, clock)
-        private val writer =
-            MemoryWriter(db, fts, prompts, configProvider, indexer, ::onMutated, clock)
+
+        /** 所有写操作串行执行（单用户应用，写入量小），保证事务之间不交错。 */
+        private val writeLock = Mutex()
+
+        /** 本次写操作中待索引的路径；只在 [writeLock] 内访问。 */
+        private val indexPending = mutableListOf<String>()
+        private val reverter = MemoryReverter(db, ::onMutated, ::enqueueIndex, clock)
+        private val writer = MemoryWriter(db, prompts, configProvider, ::enqueueIndex, ::onMutated, clock)
         private val scope =
             CoroutineScope(SupervisorJob() + dispatchers.default + logger.exceptionHandler("MemoryStore"))
 
@@ -72,13 +79,19 @@ public class MemoryStoreImpl
 
         override fun observeTree(): Flow<Unit> = treeChanges.asSharedFlow()
 
-        override suspend fun write(w: MemoryWrite): Outcome<WriteResult> = writer.apply(w)
+        override suspend fun write(w: MemoryWrite): Outcome<WriteResult> = commit { writer.apply(w) }
 
         @Suppress("ReturnCount") // 出口按错误码分支（根保护/不存在/非空），是业务语义
         override suspend fun delete(
             path: MemoryPath,
             recursive: Boolean,
             source: MemorySource,
+            runId: RunId?,
+        ): Outcome<Int> = commit { deleteNodes(path, recursive, runId) }
+
+        private suspend fun deleteNodes(
+            path: MemoryPath,
+            recursive: Boolean,
             runId: RunId?,
         ): Outcome<Int> {
             if (path.isProtectedRoot()) {
@@ -95,8 +108,7 @@ public class MemoryStoreImpl
             targets.forEach { p ->
                 db.nodeDao().get(p)?.let { recordDelete(it, runId) }
                 db.nodeDao().delete(p)
-                fts.remove(p)
-                indexer.enqueue(p)
+                enqueueIndex(p)
             }
             onMutated()
             return Outcome.Ok(targets.size)
@@ -104,6 +116,11 @@ public class MemoryStoreImpl
 
         @Suppress("ReturnCount") // 出口按错误码分支（根保护/不存在/已存在/缺父目录），是业务语义
         override suspend fun move(
+            from: MemoryPath,
+            to: MemoryPath,
+        ): Outcome<Unit> = commit { moveNodes(from, to) }
+
+        private suspend fun moveNodes(
             from: MemoryPath,
             to: MemoryPath,
         ): Outcome<Unit> {
@@ -126,9 +143,7 @@ public class MemoryStoreImpl
             targets.forEach { old ->
                 val new = to.value + old.removePrefix(node.path)
                 db.nodeDao().moveNode(oldPath = old, newPath = new, newParent = parentPathOf(new))
-                fts.remove(old)
-                db.nodeDao().get(new)?.let { fts.syncNode(it) }
-                indexer.enqueue(new)
+                enqueueIndex(new)
             }
             recordMove(node, to)
             onMutated()
@@ -140,7 +155,7 @@ public class MemoryStoreImpl
             limit: Int,
         ): List<MemoryVersion> = db.versionDao().byPath(path.value, limit).map { toVersion(it) }
 
-        override suspend fun revert(versionId: Long): Outcome<WriteResult> = reverter.revert(versionId)
+        override suspend fun revert(versionId: Long): Outcome<WriteResult> = commit { reverter.revert(versionId) }
 
         override suspend fun recentChanges(
             offset: Int,
@@ -151,9 +166,13 @@ public class MemoryStoreImpl
         override suspend fun changesOfRun(runId: RunId): List<MemoryVersion> =
             db.versionDao().byRun(runId.value).map { toVersion(it) }
 
-        override suspend fun revertRun(runId: RunId): Outcome<Int> = reverter.revertRun(runId)
+        override suspend fun revertRun(runId: RunId): Outcome<Int> = commit { reverter.revertRun(runId) }
 
         override suspend fun markConfirmed(path: MemoryPath) {
+            commit { confirmNode(path) }
+        }
+
+        private suspend fun confirmNode(path: MemoryPath) {
             val node = db.nodeDao().get(path.value) ?: return
             if (node.source != MemorySource.AGENT.name && node.source != MemorySource.FLOW.name) return
             val confirmed = node.copy(source = MemorySource.USER.name, updatedAt = clock.nowMillis())
@@ -190,6 +209,7 @@ public class MemoryStoreImpl
                     titleAfter = null,
                     contentBefore = node.content,
                     contentAfter = null,
+                    keywordsBefore = node.keywordsJson,
                     source = node.source,
                     runId = runId?.value,
                     reason = null,
@@ -224,6 +244,23 @@ public class MemoryStoreImpl
         private suspend fun onMutated() {
             treeChanges.tryEmit(Unit)
         }
+
+        private fun enqueueIndex(path: String) {
+            indexPending += path
+        }
+
+        /**
+         * 一次写操作：串行化，整体放进一个数据库事务（读-校验-写节点-写版本作为一个原子单元）。
+         * 向量索引在提交之后才入队，避免索引任务读到事务提交前的旧内容。
+         */
+        private suspend fun <T> commit(block: suspend () -> T): T =
+            writeLock.withLock {
+                indexPending.clear()
+                val result = db.withTransaction { block() }
+                indexPending.forEach(indexer::enqueue)
+                indexPending.clear()
+                result
+            }
 
         private companion object {
             const val CHANGE_BUFFER: Int = 16

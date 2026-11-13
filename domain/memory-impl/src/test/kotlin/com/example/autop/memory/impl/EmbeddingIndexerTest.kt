@@ -1,6 +1,6 @@
 /**
- * EmbeddingIndexer 测试（docs/tech/06 §2.5/§7）：向量缓存增量更新——
- * 文本指纹未变的块跳过、写入后入缓存、modelId 变化全量重建（FakeEmbeddingProvider）。
+ * EmbeddingIndexer 测试（docs/tech/06 §2.5/§7，ADR-0028）：向量输入为标题与关键词——
+ * 输入未变不重算、正文变化不重算、关键词变化重算、modelId 变化全量重建（FakeEmbeddingProvider）。
  */
 package com.example.autop.memory.impl
 
@@ -42,6 +42,7 @@ public class EmbeddingIndexerTest {
     private lateinit var cache: VectorCache
     private lateinit var store: MemoryStoreImpl
     private lateinit var indexer: EmbeddingIndexer
+    private var replacementCalls: Int = 0
 
     @Before
     public fun setUp() {
@@ -73,18 +74,18 @@ public class EmbeddingIndexerTest {
     }
 
     @Test
-    public fun `write indexes node and fills vector cache`(): Unit =
+    public fun `write indexes title and keywords into the vector cache`(): Unit =
         runBlocking {
-            writeNode("/tasks/向量", "正文内容")
+            write("/people/向量", content = "正文内容", keywords = listOf("同事"))
             awaitCachePaths(1)
 
-            assertThat(cache.topK(provider.vectorOf("正文内容"), 5).map { it.path }).contains("/tasks/向量")
+            assertThat(cache.topK(provider.vectorOf("向量 同事"), 5).map { it.path }).contains("/people/向量")
         }
 
     @Test
     public fun `unchanged text is not re-embedded`(): Unit =
         runBlocking {
-            writeNode("/tasks/幂等", "相同的正文")
+            write("/tasks/幂等", content = "相同的正文")
             awaitCachePaths(1)
             settle()
             val callsAfterFirst = provider.calls.sumOf { it.size }
@@ -96,21 +97,35 @@ public class EmbeddingIndexerTest {
         }
 
     @Test
-    public fun `content change re-embeds and updates cache`(): Unit =
+    public fun `content change does not re-embed because content is not indexed`(): Unit =
         runBlocking {
-            writeNode("/tasks/变更", "旧正文")
+            write("/tasks/正文", content = "旧正文")
+            awaitCachePaths(1)
+            settle()
+            val callsAfterFirst = provider.calls.sumOf { it.size }
+
+            write("/tasks/正文", content = "完全不同的新正文", mode = WriteMode.UPDATE)
+            settle()
+
+            assertThat(provider.calls.sumOf { it.size }).isEqualTo(callsAfterFirst)
+        }
+
+    @Test
+    public fun `keyword change re-embeds and updates cache`(): Unit =
+        runBlocking {
+            write("/tasks/变更", content = "正文", keywords = listOf("旧词"))
             awaitCachePaths(1)
 
-            writeNodeContent("/tasks/变更", "完全不同的新正文", WriteMode.UPDATE)
+            write("/tasks/变更", content = "正文", keywords = listOf("新词"), mode = WriteMode.UPDATE)
             waitUntil {
-                cache.topK(provider.vectorOf("完全不同的新正文"), 5).any { it.path == "/tasks/变更" }
+                cache.topK(provider.vectorOf("变更 新词"), 5).any { it.path == "/tasks/变更" }
             }
         }
 
     @Test
     public fun `provider switch rebuilds all vectors under new model`(): Unit =
         runBlocking {
-            writeNode("/tasks/重建", "重建正文")
+            write("/tasks/重建", content = "重建正文")
             awaitCachePaths(1)
             settle()
 
@@ -119,7 +134,7 @@ public class EmbeddingIndexerTest {
             try {
                 waitUntil {
                     cache.modelId == "m2" &&
-                        cache.topK(replacement.vectorOf("重建正文"), 5).any { it.path == "/tasks/重建" }
+                        cache.topK(replacement.vectorOf("重建"), 5).any { it.path == "/tasks/重建" }
                 }
             } finally {
                 replacementCalls = replacement.calls.sumOf { it.size }
@@ -128,21 +143,18 @@ public class EmbeddingIndexerTest {
             assertThat(replacement.calls.sumOf { it.size }).isGreaterThan(0)
         }
 
-    private suspend fun writeNode(
+    private suspend fun write(
         path: String,
         content: String,
-    ) = writeNodeContent(path, content, WriteMode.CREATE)
-
-    private suspend fun writeNodeContent(
-        path: String,
-        content: String,
-        mode: WriteMode,
+        keywords: List<String> = emptyList(),
+        mode: WriteMode = WriteMode.CREATE,
     ) {
         store.write(
             MemoryWrite(
                 path = MemoryPath.parse(path).getOrNull()!!,
                 mode = mode,
                 content = content,
+                keywords = keywords,
                 source = MemorySource.USER,
             ),
         )
@@ -176,8 +188,6 @@ public class EmbeddingIndexerTest {
                 "embedCalls=${provider.calls} replacementCalls=$replacementCalls"
         }
     }
-
-    private var replacementCalls: Int = 0
 
     private fun emptySeed(): MemorySeed =
         object : MemorySeed {

@@ -56,10 +56,10 @@ public class NodeViewModel
         public fun onAction(action: NodeAction) {
             when (action) {
                 is NodeAction.FieldChanged -> changeField(action)
-                is NodeAction.TagAdded ->
-                    update { it.copy(tags = (it.tags + action.tag.trim()).distinct()) }
-                is NodeAction.TagRemoved ->
-                    update { it.copy(tags = it.tags - action.tag) }
+                is NodeAction.KeywordAdded ->
+                    update { it.copy(keywords = (it.keywords + action.keyword.trim()).distinct()) }
+                is NodeAction.KeywordRemoved ->
+                    update { it.copy(keywords = it.keywords - action.keyword) }
                 NodeAction.Save -> save()
                 NodeAction.ShowVersions -> showVersions()
                 NodeAction.HideVersions -> update { it.copy(showVersions = false, diffVersion = null) }
@@ -102,7 +102,7 @@ public class NodeViewModel
                     title = node?.title.orEmpty(),
                     summary = node?.summary.orEmpty(),
                     content = node?.content.orEmpty(),
-                    tags = node?.tags.orEmpty(),
+                    keywords = node?.keywords.orEmpty(),
                     links = node?.links?.map { link -> link.value }.orEmpty(),
                     byAgent = node?.source?.isAutomated == true,
                     version = node?.version ?: 0,
@@ -132,7 +132,7 @@ public class NodeViewModel
                             title = s.title.ifBlank { null },
                             summary = s.summary.ifBlank { null },
                             content = s.content,
-                            tags = s.tags,
+                            keywords = s.keywords,
                             source = MemorySource.USER,
                         ),
                     )

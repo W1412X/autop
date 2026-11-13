@@ -79,7 +79,7 @@ public class MemoryReadTool
                 buildString {
                     appendLine("标题：${node.title}")
                     appendLine("来源：${sourceLabel(node.source)}")
-                    if (node.tags.isNotEmpty()) appendLine("标签：${node.tags.joinToString("、")}")
+                    if (node.keywords.isNotEmpty()) appendLine("关键词：${node.keywords.joinToString("、")}")
                     if (node.links.isNotEmpty()) appendLine("关联：${node.links.joinToString("、")}")
                     appendLine()
                 }
