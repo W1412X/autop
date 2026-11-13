@@ -147,7 +147,8 @@ internal class NodeTreeBuilder(
             depth: Int,
         ) {
             for (v in byParent[parent].orEmpty()) {
-                val output = outputs(v, consumed, visual)
+                val leaf = byParent[v.node.idx].isNullOrEmpty()
+                val output = outputs(v, consumed, visual, leaf)
                 if (output) {
                     out += Entry(v.node, v.category, labelOf(v.node, labels, visual), depth)
                 }
@@ -158,16 +159,20 @@ internal class NodeTreeBuilder(
         return out
     }
 
-    /** 输出判定：非 CONTAINER 行输出；视觉模式下 keepContainerTags 的 CONTAINER 也输出。 */
+    /**
+     * 输出判定：非 CONTAINER 行输出；视觉模式下 keepContainerTags 的 CONTAINER 与无可见子节点的
+     * 视觉叶子也输出（叶子是否有文字不决定它存在，ADR-0009 决策 3：视觉叶子不因无文字丢失）。
+     */
     private fun outputs(
         v: Vis,
         consumed: Set<Int>,
         visual: Boolean,
+        leaf: Boolean,
     ): Boolean =
         when {
             v.node.idx in consumed -> false
             v.category != NodeCategory.CONTAINER -> true
-            else -> visual && keptContainer(v.node)
+            else -> visual && (leaf || keptContainer(v.node))
         }
 
     /** 视觉模式：className 映射出的标签名命中 rules `keepContainerTags`。 */
