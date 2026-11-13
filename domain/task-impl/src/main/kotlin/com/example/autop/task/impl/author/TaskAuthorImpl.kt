@@ -48,6 +48,8 @@ import com.example.autop.task.TaskErrorCodes
 import com.example.autop.task.TaskExecutor
 import com.example.autop.task.TaskRepository
 import com.example.autop.task.Trigger
+import com.example.autop.task.impl.flowsEnabled
+import com.example.autop.task.impl.flowsPromptVars
 import com.example.autop.task.TriggerSource
 import com.example.autop.task.core.Cron
 import kotlinx.coroutines.CancellationException
@@ -141,12 +143,17 @@ internal class TaskAuthorImpl(
             timezone = timezone,
             source = source,
             condition = condition,
+            // 流程关闭时草稿只按智能体展示；保存时既有绑定由 assemble 原样保留。
             executorFlow =
-                task.flow?.let {
-                    d.flows
-                        .get(it.flowId)
-                        ?.definition
-                        ?.name
+                if (d.configProvider.current().flowsEnabled()) {
+                    task.flow?.let {
+                        d.flows
+                            .get(it.flowId)
+                            ?.definition
+                            ?.name
+                    }
+                } else {
+                    null
                 },
             needsScreen = task.needsScreen,
         )
@@ -277,9 +284,9 @@ internal class TaskAuthorSessionImpl(
         val schemas = tools.schemas()
         val system =
             buildList {
-                add(SystemPart(render(SYSTEM, emptyMap())))
+                add(SystemPart(render(SYSTEM, flowsPromptVars(config.flowsEnabled()))))
                 add(SystemPart(render(OUTPUT, mapOf("lang" to languageLabel()))))
-                add(SystemPart(render(SPEC, emptyMap())))
+                add(SystemPart(render(SPEC, flowsPromptVars(config.flowsEnabled()))))
                 base?.let { task ->
                     val taskJson = json.encodeToString(Task.serializer(), task)
                     add(SystemPart(render(EDIT_CONTEXT, mapOf("task" to taskJson))))
@@ -480,11 +487,11 @@ internal class TaskAuthorSessionImpl(
                 AppError(code = TaskErrorCodes.INVALID, message = "trigger 无法装配（at/cron/source 不合法）"),
             )
         }
-        val flowName = draft.executorFlow?.trim().orEmpty()
-        val flow = if (flowName.isEmpty()) null else d.flows.resolve(flowName)
-        if (flowName.isNotEmpty() && flow == null) {
-            return Outcome.Err(AppError(code = TaskErrorCodes.INVALID, message = "找不到流程：$flowName"))
-        }
+        val binding =
+            when (val resolved = resolveBinding(draft, base)) {
+                is Outcome.Ok -> resolved.value
+                is Outcome.Err -> return resolved
+            }
         val now = d.clock.nowMillis()
         val edited =
             base?.copy(
@@ -492,8 +499,8 @@ internal class TaskAuthorSessionImpl(
                 goal = goalOf(draft),
                 trigger = trigger,
                 needsScreen = draft.needsScreen,
-                executor = if (flow != null) TaskExecutor.FLOW else TaskExecutor.AGENT,
-                flow = flow?.let { FlowBinding(FlowId(it.definition.id)) },
+                executor = binding.executor,
+                flow = binding.flow,
                 updatedAt = now,
             )
         return Outcome.Ok(
@@ -503,10 +510,40 @@ internal class TaskAuthorSessionImpl(
                 goal = goalOf(draft),
                 trigger = trigger,
                 needsScreen = draft.needsScreen,
-                executor = if (flow != null) TaskExecutor.FLOW else TaskExecutor.AGENT,
-                flow = flow?.let { FlowBinding(FlowId(it.definition.id)) },
+                executor = binding.executor,
+                flow = binding.flow,
                 createdAt = now,
                 updatedAt = now,
+            ),
+        )
+    }
+
+    /**
+     * 执行方式与流程绑定。流程功能关闭（ADR-0030）时：草稿的 executorFlow 不采纳；新任务按智能体执行，
+     * 既有任务保留原执行方式与绑定，不因为编辑而丢失数据。
+     */
+    private suspend fun resolveBinding(
+        draft: TaskDraft,
+        base: Task?,
+    ): Outcome<ExecutorBinding> {
+        if (!d.configProvider.current().flowsEnabled()) {
+            val kept =
+                if (base != null) {
+                    ExecutorBinding(base.executor, base.flow)
+                } else {
+                    ExecutorBinding(TaskExecutor.AGENT, null)
+                }
+            return Outcome.Ok(kept)
+        }
+        val flowName = draft.executorFlow?.trim().orEmpty()
+        val flow = if (flowName.isEmpty()) null else d.flows.resolve(flowName)
+        if (flowName.isNotEmpty() && flow == null) {
+            return Outcome.Err(AppError(code = TaskErrorCodes.INVALID, message = "找不到流程：$flowName"))
+        }
+        return Outcome.Ok(
+            ExecutorBinding(
+                executor = if (flow != null) TaskExecutor.FLOW else TaskExecutor.AGENT,
+                flow = flow?.let { FlowBinding(FlowId(it.definition.id)) },
             ),
         )
     }
@@ -614,6 +651,12 @@ internal class TaskAuthorSessionImpl(
         val TIME_FORMAT: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm")
     }
 }
+
+/** 保存时写入任务的执行方式与流程绑定。 */
+private data class ExecutorBinding(
+    val executor: TaskExecutor,
+    val flow: FlowBinding?,
+)
 
 /** 一次创作会话的协议装配快照（能力判定在会话开始时固定）。 */
 private class TaskPipeline(

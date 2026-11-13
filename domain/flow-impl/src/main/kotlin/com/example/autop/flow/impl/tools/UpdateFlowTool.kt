@@ -13,6 +13,7 @@ import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.ToolSpec
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.FlowConfig
 import com.example.autop.flow.FlowAnalysisRequest
@@ -42,6 +43,8 @@ public class UpdateFlowTool
     ) : Tool {
         override val id: String = "tool.update_flow"
         override val spec: ToolSpec = FlowToolSpecs.updateFlow
+        override val betaFeature: BetaFeature?
+            get() = BetaFeature.FLOWS
 
         // 写入草稿表：与其他写系统工具串行。
         override val access: ToolAccess = ToolAccess.WRITE_SYSTEM

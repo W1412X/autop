@@ -171,13 +171,19 @@ class TaskToolsTest {
     private fun updateTool(repo: FakeTaskRepository): UpdateTaskTool =
         UpdateTaskTool(repo, MapFlowStore(emptyList()), emptySet(), FakeClock(start = 1_000L))
 
+    /** 流程 Beta 功能默认关闭（ADR-0030）；绑定流程的用例需要显式开启。 */
+    private fun flowsEnabledOverride(): JsonObject =
+        buildJsonObject {
+            put("features", buildJsonObject { put("flows", true) })
+        }
+
     private fun ctx(): ToolContext =
         object : ToolContext {
             override val runId: RunId = RunId("run-tools")
 
             override val threadId: ThreadId = ThreadId("thread-tools")
 
-            override val config = FakeConfigProvider().current()
+            override val config = FakeConfigProvider(flowsEnabledOverride()).current()
 
             override val runScope: RunScopedValues =
                 object : RunScopedValues {

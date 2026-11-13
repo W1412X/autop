@@ -9,6 +9,7 @@ import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.USER_IMAGE_NAME_PREFIX
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
+import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Logger
@@ -16,6 +17,7 @@ import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.flatMap
+import com.example.autop.core.config.ConfigProvider
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.llm.Block
@@ -25,6 +27,8 @@ import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
+import com.example.autop.task.TaskErrorCodes
+import com.example.autop.task.TaskExecutor
 import com.example.autop.task.impl.store.RunStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -43,6 +47,7 @@ public class RunExecutor(
     private val clock: Clock,
     private val logger: Logger,
     private val scope: CoroutineScope,
+    private val configProvider: ConfigProvider,
 ) {
     /**
      * 发起对话（[threadId] 为 null 时新建线程）：首条消息截断做占位标题（列表立刻可读），
@@ -91,6 +96,10 @@ public class RunExecutor(
         origin: RunOrigin,
         vars: Map<String, String>,
     ): Outcome<RunRecord> {
+        // 流程功能关闭（ADR-0030）：含流程的任务处于失效状态，不建线程、不入队、不发通知。
+        if (task.executor == TaskExecutor.FLOW && !configProvider.current().flowsEnabled()) {
+            return Outcome.Err(AppError(code = TaskErrorCodes.FLOW_DISABLED, message = "flow feature disabled"))
+        }
         val thread = threadStore.createThread(title = task.name, parent = null)
         return enqueue(origin, thread, emptyList(), null, vars, task)
     }

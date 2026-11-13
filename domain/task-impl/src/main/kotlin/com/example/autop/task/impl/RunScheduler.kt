@@ -24,6 +24,7 @@ import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
 import com.example.autop.task.TaskErrorCodes
 import com.example.autop.task.core.RunQueue
+import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.impl.notify.UserNotifierImpl
 import com.example.autop.task.impl.reminder.LockReminder
 import com.example.autop.task.impl.store.RunStore
@@ -71,6 +72,12 @@ public class RunScheduler(
                 val record = runStore.get(next.runId)
                 if (record == null) {
                     queue.remove(next)
+                    return@withLock
+                }
+                // 流程功能关闭（ADR-0030）：最早拦截，不等屏幕、不提醒锁屏、不取租约。
+                if (pending.isFlowRun(record.id) && !configProvider.current().flowsEnabled()) {
+                    failFlowDisabled(record)
+                    trySchedule()
                     return@withLock
                 }
                 val task = pending.taskOf(record.id)
@@ -197,6 +204,7 @@ public class RunScheduler(
         val outcome =
             when (status) {
                 RunStatus.EXPIRED -> RunOutcome.EXPIRED
+                RunStatus.FAILED -> RunOutcome.FAILED
                 else -> RunOutcome.CANCELLED
             }
         try {
@@ -224,6 +232,15 @@ public class RunScheduler(
         if (status != RunStatus.RUNNING && status != RunStatus.PAUSED) return
         pending.markCancelled(runId)
         logger.d(TAG, "cancel_intent_marked", "runId" to runId.value, "status" to status.name)
+    }
+
+    /**
+     * 流程功能关闭时的流程运行（ADR-0030）：不排队、不等屏幕，以 `task.flow_disabled` 失败收口；
+     * 后台 Run 照常发结果通知，让用户知道定时任务为什么没有执行。
+     */
+    private suspend fun failFlowDisabled(record: RunRecord) {
+        closeWaitingRun(record.id, RunStatus.FAILED, TaskErrorCodes.FLOW_DISABLED)
+        runStore.get(record.id)?.takeIf { it.origin != RunOrigin.CHAT }?.let { notifier.notifyResult(it) }
     }
 
     /** 锁屏门：SKIP → CANCELLED；REMIND → 提醒并等待（docs/tech/07 §4.3/§4.4）。 */

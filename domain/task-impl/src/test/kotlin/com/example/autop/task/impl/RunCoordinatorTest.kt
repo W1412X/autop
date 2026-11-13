@@ -154,6 +154,7 @@ private class CoordinatorFixture(
             titleGenerator = NoopSteerTitleGenerator,
             ids = UuidV7IdGenerator(clock),
             clock = clock,
+            configProvider = config,
             logger = FakeLogger,
             scope = scope,
         )

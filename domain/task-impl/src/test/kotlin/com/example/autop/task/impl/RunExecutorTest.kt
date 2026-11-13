@@ -191,6 +191,7 @@ private class ExecutorFixture(
             titleGenerator = NoopExecTitleGenerator,
             ids = UuidV7IdGenerator(clock),
             clock = clock,
+            configProvider = config,
             logger = FakeLogger,
             scope = scope,
         )

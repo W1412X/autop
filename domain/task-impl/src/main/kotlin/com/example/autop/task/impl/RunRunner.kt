@@ -43,6 +43,7 @@ import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
 import com.example.autop.task.TaskErrorCodes
 import com.example.autop.task.TaskExecutor
+import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.TaskRepository
 import com.example.autop.task.core.OutputSchemaValidator
 import com.example.autop.task.impl.notify.UserNotifierImpl
@@ -89,6 +90,11 @@ public class RunRunner(
         task: Task?,
     ) {
         val startedAt = clock.nowMillis()
+        // 兜底（调度门已先拦截）：流程功能关闭时在取屏幕租约与调用流程会话之前收口（ADR-0030）。
+        if (flowLaunch != null && !configProvider.current().flowsEnabled()) {
+            failFlowDisabled(record)
+            return
+        }
         if (!launchRecord(record, startedAt)) return
         val entry = pending.take(record.id)
         val flowLaunch = flowLaunchOf(entry, task)
@@ -160,6 +166,21 @@ public class RunRunner(
             logger.d(TAG, "run_closed_before_start", "runId" to record.id.value)
         }
         return launched
+    /** 流程功能关闭（ADR-0030）：流程运行不占屏幕、不调用流程会话，直接以 `task.flow_disabled` 收口。 */
+    private suspend fun failFlowDisabled(record: RunRecord) {
+        val finished =
+            RunFinished(
+                status = RunOutcome.FAILED,
+                summary = null,
+                errorCode = TaskErrorCodes.FLOW_DISABLED,
+                liveNote = prompts.runEndedNote(RunOutcome.FAILED),
+            )
+        ensureRunFinished(record, finished)
+        observer.finish(record.id, finished)
+        observer.clear(record.id)
+        runStore.get(record.id)?.let { notifyIfBackground(it) }
+    }
+
     }
 
     private fun isFlowTask(task: Task?): Boolean = task?.executor == TaskExecutor.FLOW && task.flow != null
@@ -360,6 +381,8 @@ public class RunRunner(
      */
     private fun suggestFlowIfRepeatable(
         record: RunRecord,
+        // 流程功能关闭时不再提示保存为流程（ADR-0030）。
+        if (!configProvider.current().flowsEnabled()) return
         finished: RunFinished,
         events: List<ThreadEvent>,
     ) {

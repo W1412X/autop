@@ -16,6 +16,7 @@ import com.example.autop.core.common.AppError
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.FlowStore
@@ -48,6 +49,8 @@ public class CreateFlowTool
     ) : Tool {
         override val id: String = "tool.create_flow"
         override val spec: ToolSpec = FlowToolSpecs.createFlow
+        override val betaFeature: BetaFeature?
+            get() = BetaFeature.FLOWS
         override val access: ToolAccess = ToolAccess.WRITE_SYSTEM
 
         override suspend fun invoke(
@@ -97,6 +100,8 @@ public class EditFlowTool
     ) : Tool {
         override val id: String = "tool.edit_flow"
         override val spec: ToolSpec = FlowToolSpecs.editFlow
+        override val betaFeature: BetaFeature?
+            get() = BetaFeature.FLOWS
         override val access: ToolAccess = ToolAccess.WRITE_SYSTEM
 
         @Suppress("ReturnCount") // 逐条早退：缺参 / 找不到 / 步骤改法不合法 / 无变更

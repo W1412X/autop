@@ -19,6 +19,7 @@ import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.RunId
 import com.example.autop.core.config.AgentConfig
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.FlowProgressFeed
 import com.example.autop.flow.FlowRunOptions
@@ -136,6 +137,8 @@ public class RunFlowTool
     ) : Tool {
         override val id: String = "tool.run_flow"
         override val spec: ToolSpec = FlowToolSpecs.runFlow
+        override val betaFeature: BetaFeature?
+            get() = BetaFeature.FLOWS
 
         // 流程内部有自己的工具路由与锁；这里按"写系统"串行化，避免与其他写工具并行。
         override val access: ToolAccess = ToolAccess.WRITE_SYSTEM
@@ -246,6 +249,8 @@ public class ListFlowsTool
     ) : Tool {
         override val id: String = "tool.list_flows"
         override val spec: ToolSpec = FlowToolSpecs.listFlows
+        override val betaFeature: BetaFeature?
+            get() = BetaFeature.FLOWS
         override val access: ToolAccess = ToolAccess.READ_SYSTEM
 
         override suspend fun invoke(

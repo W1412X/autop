@@ -225,6 +225,7 @@ private class RecoveryFixture(
             titleGenerator = NoopTitleGenerator,
             ids = UuidV7IdGenerator(clock),
             clock = clock,
+            configProvider = config,
             logger = FakeLogger,
             scope = scope,
         )

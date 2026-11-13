@@ -94,7 +94,11 @@ class TaskAuthorToolsTest {
         val tools =
             TaskAuthorTools(
                 invokerFactory = { factory },
-                configProvider = FakeConfigProvider(),
+                // 流程 Beta 功能默认关闭（ADR-0030）；这些用例覆盖流程开启时的行为。
+                configProvider =
+                    FakeConfigProvider(
+                        buildJsonObject { put("features", buildJsonObject { put("flows", true) }) },
+                    ),
                 prompts = FakePromptRepository(),
                 ids = FixedIds,
                 threadStore = UnusedThreadStore,

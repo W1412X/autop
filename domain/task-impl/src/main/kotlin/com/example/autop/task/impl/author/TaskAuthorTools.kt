@@ -25,6 +25,8 @@ import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.llm.Block
 import com.example.autop.llm.ToolSchema
 import com.example.autop.task.TaskDraft
+import com.example.autop.task.impl.flowsEnabled
+import com.example.autop.task.impl.flowsPromptVars
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
@@ -56,39 +58,46 @@ internal class TaskAuthorTools(
             toolFilter = TOOL_FILTER,
         )
 
-    /** 工具声明：说明取自模板 `task.author.tools`（每行 `名称|说明`）。 */
+    /** 工具声明：说明取自模板 `task.author.tools`（每行 `名称|说明`）；流程关闭时不含流程相关工具与参数。 */
     fun schemas(): List<ToolSchema> {
+        val flows = configProvider.current().flowsEnabled()
         val descriptions =
-            ((prompts.render(TOOLS_TEMPLATE) as? Outcome.Ok)?.value?.text.orEmpty())
+            ((prompts.render(TOOLS_TEMPLATE, flowsPromptVars(flows)) as? Outcome.Ok)?.value?.text.orEmpty())
                 .lines()
                 .mapNotNull { line ->
                     line.split('|', limit = 2).takeIf { it.size == 2 }?.let { it[0].trim() to it[1].trim() }
                 }.toMap()
         val specs =
-            listOf(
-                toolSpec("ask_user", "task.author.tools") {
-                    string("question", required = true)
-                    array("options")
-                },
-                toolSpec("memory_search", "task.author.tools") { string("query", required = true) },
-                toolSpec("list_flows", "task.author.tools") {},
-                toolSpec("inspect_screen", "task.author.tools") {
-                    string("mode", enum = listOf("a11y", "visual", "llm"))
-                },
-                toolSpec("propose_task", "task.author.tools") {
-                    string("name", required = true)
-                    string("goal", required = true)
-                    string("triggerType", enum = listOf("manual", "once", "cron", "condition"))
-                    string("at")
-                    string("cron")
-                    string("timezone")
-                    string("source")
-                    string("condition")
-                    string("executorFlow")
-                    boolean("needsScreen")
-                    string("hint")
-                },
-            )
+            buildList {
+                add(
+                    toolSpec("ask_user", "task.author.tools") {
+                        string("question", required = true)
+                        array("options")
+                    },
+                )
+                add(toolSpec("memory_search", "task.author.tools") { string("query", required = true) })
+                if (flows) add(toolSpec("list_flows", "task.author.tools") {})
+                add(
+                    toolSpec("inspect_screen", "task.author.tools") {
+                        string("mode", enum = listOf("a11y", "visual", "llm"))
+                    },
+                )
+                add(
+                    toolSpec("propose_task", "task.author.tools") {
+                        string("name", required = true)
+                        string("goal", required = true)
+                        string("triggerType", enum = listOf("manual", "once", "cron", "condition"))
+                        string("at")
+                        string("cron")
+                        string("timezone")
+                        string("source")
+                        string("condition")
+                        if (flows) string("executorFlow")
+                        boolean("needsScreen")
+                        string("hint")
+                    },
+                )
+            }
         return specs.map { ToolSchema(it.name, descriptions[it.name].orEmpty(), it.parameters) }
     }
 
@@ -110,11 +119,19 @@ internal class TaskAuthorTools(
             }
             "memory_search" ->
                 call("memory_search", buildJsonObject { put("query", args.str("query").orEmpty()) })
-            "list_flows" -> call("list_flows", buildJsonObject { })
-            else -> """{"error":"unknown tool $name"}"""
+            // 流程功能关闭时 list_flows 不可用（ADR-0030），与 schemas() 的过滤保持一致。
+            "list_flows" ->
+                if (configProvider.current().flowsEnabled()) {
+                    call("list_flows", buildJsonObject { })
+                } else {
+                    unknownTool(name)
+                }
+            else -> unknownTool(name)
         }
 
-    /** 组装草稿（字段口径见 `task.author.spec`）。 */
+    private fun unknownTool(name: String): String = """{"error":"unknown tool $name"}"""
+
+    /** 组装草稿（字段口径见 `task.author.spec`）；流程关闭时模型给的 executorFlow 不采纳，草稿按智能体执行。 */
     fun propose(args: JsonObject): TaskDraft =
         TaskDraft(
             name = args.str("name").orEmpty(),
@@ -125,7 +142,7 @@ internal class TaskAuthorTools(
             timezone = args.str("timezone"),
             source = args.str("source"),
             condition = args.str("condition"),
-            executorFlow = args.str("executorFlow"),
+            executorFlow = if (configProvider.current().flowsEnabled()) args.str("executorFlow") else null,
             needsScreen = args.str("needsScreen")?.toBooleanStrictOrNull() ?: true,
             hint = args.str("hint").orEmpty(),
         )

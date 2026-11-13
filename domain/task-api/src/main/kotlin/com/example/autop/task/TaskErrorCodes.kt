@@ -21,4 +21,7 @@ public object TaskErrorCodes {
 
     /** 通知权限未授予，通知不会显示（notify_user）。 */
     public const val NOTIFICATION_DENIED: String = "task.notification_denied"
+
+    /** 流程 Beta 功能关闭（docs/adr/0030-beta-feature-switch.md）：不能绑定或运行流程。 */
+    public const val FLOW_DISABLED: String = "task.flow_disabled"
 }

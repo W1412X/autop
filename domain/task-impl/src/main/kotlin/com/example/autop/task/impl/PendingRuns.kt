@@ -8,6 +8,7 @@ import com.example.autop.core.common.RunId
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.task.Task
+import com.example.autop.task.TaskExecutor
 import kotlinx.serialization.json.JsonObject
 import java.util.concurrent.ConcurrentHashMap
 
@@ -63,4 +64,11 @@ public class PendingRuns {
 
     /** 查询（调度门条件用）。 */
     public fun taskOf(runId: RunId): Task? = entries[runId]?.task
+
+    /** 是否为流程运行：独立流程，或任务绑定了流程（流程功能关闭时据此拦截，ADR-0030）。 */
+    public fun isFlowRun(runId: RunId): Boolean {
+        val entry = entries[runId] ?: return false
+        val bound = entry.task?.let { it.executor == TaskExecutor.FLOW && it.flow != null } == true
+        return entry.flow != null || bound
+    }
 }

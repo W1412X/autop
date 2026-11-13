@@ -9,7 +9,9 @@ import com.example.autop.agent.ContextPart
 import com.example.autop.agent.ContextRequest
 import com.example.autop.agent.Placement
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.config.FlowConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.flow.FlowDefinition
@@ -31,9 +33,12 @@ public class FlowDirectoryContributor
         override val id: String = ID
 
         override suspend fun contribute(req: ContextRequest): ContextPart? {
+            val snapshot = configProvider.current()
+            // 流程是 Beta 功能（ADR-0030）：关闭时不向系统上下文贡献目录。
+            if (!snapshot[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS)) return null
             val all = store.listAll()
             if (all.isEmpty()) return null
-            val cfg = configProvider.current()[FlowConfig.DIRECTORY]
+            val cfg = snapshot[FlowConfig.DIRECTORY]
             val ranked =
                 all
                     .map { it.definition to runs.stats(it.id.value).successRate }

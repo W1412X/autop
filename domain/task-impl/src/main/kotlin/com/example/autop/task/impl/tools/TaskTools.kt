@@ -30,7 +30,9 @@ import com.example.autop.task.TaskRepository
 import com.example.autop.task.Trigger
 import com.example.autop.task.TriggerSource
 import com.example.autop.task.core.Cron
+import com.example.autop.task.impl.flowsEnabled
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -60,7 +62,8 @@ public class ListTasksTool
             ctx: ToolContext,
         ): ToolOutput {
             val all = tasks.observeTasks().first().sortedByDescending { it.updatedAt }
-            val list = buildJsonArray { all.forEach { add(taskSummary(it)) } }
+            val flowsOn = ctx.config.flowsEnabled()
+            val list = buildJsonArray { all.forEach { add(taskSummary(it, flowsOn)) } }
             // 快捷入口只给最近修改的几条，避免任务多时对话里铺满 chip。
             val links =
                 buildJsonArray {
@@ -90,8 +93,11 @@ public class CreateTaskTool
         private val ids: IdGenerator,
     ) : Tool {
         override val id: String = "tool.create_task"
-        override val spec: ToolSpec = TaskToolSpecs.createTask
+        override val spec: ToolSpec = TaskToolSpecs.createTask()
         override val access: ToolAccess = ToolAccess.WRITE_SYSTEM
+
+        override fun specFor(ctx: ToolContext): ToolSpec =
+            TaskToolSpecs.createTask(flowsEnabled = ctx.config.flowsEnabled())
 
         override suspend fun invoke(
             args: JsonObject,
@@ -101,6 +107,9 @@ public class CreateTaskTool
             val goal = args.text("goal")?.trim().orEmpty()
             if (name.isEmpty() || goal.isEmpty()) {
                 return failure(TaskErrorCodes.INVALID, "name 与 goal 必填", "用一句话写清任务名与要做什么")
+            }
+            if (!ctx.config.flowsEnabled() && args.hasFlowArg() && !args.text("flow").isNullOrBlank()) {
+                return flowDisabledFailure()
             }
             val trigger =
                 when (val built = TaskArgs.trigger(args, sources)) {
@@ -141,8 +150,11 @@ public class UpdateTaskTool
         private val clock: Clock,
     ) : Tool {
         override val id: String = "tool.update_task"
-        override val spec: ToolSpec = TaskToolSpecs.updateTask
+        override val spec: ToolSpec = TaskToolSpecs.updateTask()
         override val access: ToolAccess = ToolAccess.WRITE_SYSTEM
+
+        override fun specFor(ctx: ToolContext): ToolSpec =
+            TaskToolSpecs.updateTask(flowsEnabled = ctx.config.flowsEnabled())
 
         override suspend fun invoke(
             args: JsonObject,
@@ -154,6 +166,8 @@ public class UpdateTaskTool
                 tasks.observeTasks().first().firstOrNull {
                     it.id.value == reference || it.name.equals(reference, ignoreCase = true)
                 } ?: return failure(TaskErrorCodes.NOT_FOUND, "找不到任务：$reference", "先调用 list_tasks 查看任务")
+            // 流程关闭时任何 flow 参数（含解绑的空串）都拒绝，保留既有绑定（ADR-0030）。
+            if (!ctx.config.flowsEnabled() && args.hasFlowArg()) return flowDisabledFailure()
             return patch(args, current)
         }
 
@@ -191,14 +205,20 @@ public class UpdateTaskTool
     }
 
 /** 列表里单条任务的摘要。 */
-private fun taskSummary(task: Task): JsonObject =
+private fun taskSummary(
+    task: Task,
+    flowsEnabled: Boolean,
+): JsonObject =
     buildJsonObject {
         put("id", task.id.value)
         put("name", task.name)
         put("goal", task.goal.take(MAX_GOAL_CHARS))
         put("trigger", triggerLabel(task.trigger))
-        put("executor", if (task.executor == TaskExecutor.FLOW) "flow" else "agent")
-        task.flow?.let { put("flowId", it.flowId.value) }
+        // 流程功能关闭（ADR-0030）时不输出执行方式与流程 id，模型不会感知流程的存在。
+        if (flowsEnabled) {
+            put("executor", if (task.executor == TaskExecutor.FLOW) "flow" else "agent")
+            task.flow?.let { put("flowId", it.flowId.value) }
+        }
         put("enabled", task.enabled)
         put("updatedAt", task.updatedAt)
     }
@@ -371,6 +391,13 @@ private fun triggerLabel(trigger: Trigger): String =
 private fun JsonObject.text(key: String): String? = (this[key] as? JsonPrimitive)?.content
 
 private fun JsonObject.bool(key: String): Boolean? = text(key)?.toBooleanStrictOrNull()
+
+/** 参数里是否给了 `flow`（JSON null 视为未给）。 */
+private fun JsonObject.hasFlowArg(): Boolean = get("flow").let { it != null && it !is JsonNull }
+
+/** 流程功能关闭时拒绝流程绑定（错误码见 [TaskErrorCodes.FLOW_DISABLED]）。 */
+private fun flowDisabledFailure(): ToolOutput =
+    failure(TaskErrorCodes.FLOW_DISABLED, "流程功能已关闭，不能绑定流程", "去掉 flow 参数，改由智能体按 goal 执行")
 
 private const val MAX_GOAL_CHARS: Int = 300
 private const val MAX_LINK_COUNT: Int = 5

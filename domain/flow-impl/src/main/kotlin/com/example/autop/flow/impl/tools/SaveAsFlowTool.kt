@@ -14,6 +14,7 @@ import com.example.autop.agent.ToolSpec
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.FlowConfig
 import com.example.autop.flow.FlowAnalysisRequest
@@ -42,6 +43,8 @@ public class SaveAsFlowTool
     ) : Tool {
         override val id: String = "tool.save_as_flow"
         override val spec: ToolSpec = FlowToolSpecs.saveAsFlow
+        override val betaFeature: BetaFeature?
+            get() = BetaFeature.FLOWS
 
         // 写入流程草稿表：属于“写系统”，与其他写工具串行。
         override val access: ToolAccess = ToolAccess.WRITE_SYSTEM
