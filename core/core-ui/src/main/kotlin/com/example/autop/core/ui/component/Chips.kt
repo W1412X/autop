@@ -28,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSemanticColors
@@ -87,10 +88,47 @@ public fun AutopChip(
             ),
         colors =
             FilterChipDefaults.filterChipColors(
-                selectedContainerColor = MaterialTheme.colorScheme.primaryContainer,
-                selectedLabelColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                selectedContainerColor =
+                    MaterialTheme.colorScheme.primary.copy(alpha = AutopAlpha.CHIP_SELECTED_FILL),
+                selectedLabelColor = MaterialTheme.colorScheme.primary,
             ),
     )
+}
+
+/** 小标签：高 20、6dp 圆角；中性底或主题色强调（选项行「默认」等）。 */
+@Composable
+public fun AutopTag(
+    text: String,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false,
+) {
+    Row(
+        modifier =
+            modifier
+                .height(AutopDimens.optionTagHeight)
+                .background(
+                    color =
+                        if (emphasized) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = AutopAlpha.SELECTION_TILE_FILL)
+                        } else {
+                            MaterialTheme.colorScheme.surfaceContainerHighest
+                        },
+                    shape = RoundedCornerShape(AutopDimens.statusChipCornerRadius),
+                ).padding(horizontal = LocalSpacing.current.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color =
+                if (emphasized) {
+                    MaterialTheme.colorScheme.primary
+                } else {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                },
+            maxLines = 1,
+        )
+    }
 }
 
 /** 状态徽标：高 24、6dp 圆角、横向内边距 8、labelSmall、语义色、前置 Xs 图标。 */

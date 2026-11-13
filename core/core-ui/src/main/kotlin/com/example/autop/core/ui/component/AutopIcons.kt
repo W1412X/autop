@@ -19,7 +19,10 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
 import androidx.compose.material.icons.outlined.Add
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.ArrowDownward
+import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Block
+import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.CallSplit
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
@@ -28,12 +31,15 @@ import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentPaste
+import androidx.compose.material.icons.outlined.DataObject
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.EventRepeat
+import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Link
@@ -97,6 +103,12 @@ public object AutopIcons {
     public val Edit: ImageVector = Icons.Outlined.Edit
     public val Copy: ImageVector = Icons.Outlined.ContentCopy
     public val Settings: ImageVector = Icons.Outlined.Settings
+    public val History: ImageVector = Icons.Outlined.History
+    public val Export: ImageVector = Icons.Outlined.FileDownload
+    public val Bug: ImageVector = Icons.Outlined.BugReport
+    public val DataObject: ImageVector = Icons.Outlined.DataObject
+    public val ArrowUp: ImageVector = Icons.Outlined.ArrowUpward
+    public val ArrowDown: ImageVector = Icons.Outlined.ArrowDownward
 
     // ── 状态与内容 ─────────────────────────────────────────────
     public val Play: ImageVector = Icons.Outlined.PlayArrow

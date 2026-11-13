@@ -26,6 +26,20 @@ internal fun AutopChipDarkPreview() =
 
 @Preview(name = "light")
 @Composable
+internal fun AutopTagPreview() =
+    PreviewTheme {
+        AutopTag(text = PreviewData.CHIP)
+    }
+
+@Preview(name = "dark")
+@Composable
+internal fun AutopTagDarkPreview() =
+    PreviewTheme(dark = true) {
+        AutopTag(text = PreviewData.CHIP, emphasized = true)
+    }
+
+@Preview(name = "light")
+@Composable
 internal fun StatusChipPreview() =
     PreviewTheme {
         StatusChip(text = PreviewData.STATUS, tone = StatusTone.RUNNING)

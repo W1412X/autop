@@ -6,11 +6,16 @@ package com.example.autop.core.ui.component
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
@@ -26,12 +31,18 @@ import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import com.example.autop.core.ui.R
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.AutopDimens
+import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSpacing
+import com.example.autop.core.ui.theme.scaled
 
 /** 确认对话框：确认实心按钮、取消文字按钮、正文 onSurfaceVariant；破坏性确认用 error 色。 */
 @Composable
@@ -116,7 +127,7 @@ public fun InfoDialog(
     )
 }
 
-/** 选项弹层：选项行 16×10，选中项文字 primary + 18dp 勾；选项区可滚动（模型列表可达上百项）。 */
+/** 选项弹层：静默列表行（图标块 / 尾标签可选），选中行浅洗底 + 主题色文字 + 18dp 勾；可滚动（模型列表可达上百项）。 */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 public fun OptionSheet(
@@ -138,6 +149,7 @@ public fun OptionSheet(
                     .fillMaxWidth()
                     .verticalScroll(rememberScrollState())
                     .padding(bottom = LocalSpacing.current.xl),
+            verticalArrangement = Arrangement.spacedBy(AutopDimens.optionRowGap),
         ) {
             if (title != null) {
                 Text(
@@ -175,45 +187,42 @@ private fun OptionSheetRow(
     onClick: () -> Unit,
 ) {
     val spacing = LocalSpacing.current
+    val palette = rowPalette(tone = item.tone, selected = selected)
+    val shape = MaterialTheme.shapes.medium
     Row(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .padding(horizontal = spacing.lg, vertical = spacing.xs)
+                .padding(horizontal = spacing.sm)
+                .clip(shape)
                 .background(
                     color =
-                        MaterialTheme.colorScheme.primary.copy(
-                            alpha = if (selected) AutopAlpha.OPTION_FILL_SELECTED else AutopAlpha.OPTION_FILL,
-                        ),
-                    shape = MaterialTheme.shapes.small,
+                        if (selected) {
+                            MaterialTheme.colorScheme.primary.copy(alpha = AutopAlpha.SELECTION_WASH)
+                        } else {
+                            Color.Transparent
+                        },
+                    shape = shape,
                 ).clickable(onClick = onClick)
-                .padding(horizontal = spacing.md, vertical = spacing.sm),
+                .heightIn(min = AutopDimens.minTouchTarget)
+                .padding(horizontal = spacing.sm, vertical = spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val icon = item.icon
+        if (icon != null) {
+            OptionRowIcon(icon = icon, palette = palette, shape = shape)
+            Spacer(modifier = Modifier.width(spacing.sm))
+        }
         Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = item.label,
-                style = MaterialTheme.typography.labelLarge,
-                color =
-                    if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.onSurface
-                    },
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (item.description != null) {
-                Text(
-                    text = item.description,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
+            OptionRowText(item = item, titleColor = palette.title)
+        }
+        val tag = item.tag
+        if (tag != null) {
+            Spacer(modifier = Modifier.width(spacing.xs))
+            AutopTag(text = tag, emphasized = selected)
         }
         if (selected) {
+            Spacer(modifier = Modifier.width(spacing.xs))
             Icon(
                 imageVector = AutopIcons.Check,
                 contentDescription = stringResource(R.string.core_ui_cd_selected),
@@ -223,3 +232,111 @@ private fun OptionSheetRow(
         }
     }
 }
+
+/** 选项行的标题与说明（父级负责占满剩余宽度）。 */
+@Composable
+private fun OptionRowText(
+    item: OptionItem,
+    titleColor: Color,
+) {
+    Text(
+        text = item.label,
+        style = MaterialTheme.typography.labelLarge,
+        color = titleColor,
+        maxLines = 1,
+        overflow = TextOverflow.Ellipsis,
+    )
+    item.description?.let { description ->
+        Text(
+            text = description,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
+}
+
+/** 选项行的文字 / 图标 / 图标块配色。 */
+private data class OptionRowPalette(
+    val title: Color,
+    val icon: Color,
+    val tile: Color,
+)
+
+@Composable
+private fun rowPalette(
+    tone: OptionTone,
+    selected: Boolean,
+): OptionRowPalette {
+    val colors = MaterialTheme.colorScheme
+    val danger = tone == OptionTone.DESTRUCTIVE
+    return OptionRowPalette(
+        title =
+            when {
+                danger -> colors.error
+                selected -> colors.primary
+                else -> colors.onSurface
+            },
+        icon =
+            when {
+                danger -> colors.error
+                selected -> colors.primary
+                else -> colors.onSurfaceVariant
+            },
+        tile =
+            when {
+                danger -> colors.error.copy(alpha = AutopAlpha.DANGER_TILE_FILL)
+                selected -> colors.primary.copy(alpha = AutopAlpha.SELECTION_TILE_FILL)
+                else -> colors.surfaceContainerHigh
+            },
+    )
+}
+
+@Composable
+private fun OptionRowIcon(
+    icon: OptionIcon,
+    palette: OptionRowPalette,
+    shape: Shape,
+) {
+    Box(
+        modifier =
+            Modifier
+                .size(AutopDimens.optionIconTile)
+                .background(color = palette.tile, shape = shape),
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = icon.vector(),
+            contentDescription = null,
+            modifier = Modifier.size(IconSize.Sm.scaled()),
+            tint = palette.icon,
+        )
+    }
+}
+
+/** 选项图标枚举 → 统一图标入口（纯一一映射）。 */
+@Suppress("CyclomaticComplexMethod")
+private fun OptionIcon.vector(): ImageVector =
+    when (this) {
+        OptionIcon.EDIT -> AutopIcons.Edit
+        OptionIcon.COPY -> AutopIcons.Copy
+        OptionIcon.DELETE -> AutopIcons.Delete
+        OptionIcon.MOVE -> AutopIcons.OpenWith
+        OptionIcon.UP -> AutopIcons.ArrowUp
+        OptionIcon.DOWN -> AutopIcons.ArrowDown
+        OptionIcon.HISTORY -> AutopIcons.History
+        OptionIcon.EXPORT -> AutopIcons.Export
+        OptionIcon.ADD -> AutopIcons.Add
+        OptionIcon.FOLDER -> AutopIcons.Folder
+        OptionIcon.VIEW -> AutopIcons.Visibility
+        OptionIcon.RESTORE -> AutopIcons.Refresh
+        OptionIcon.RUN -> AutopIcons.Play
+        OptionIcon.TOGGLE -> AutopIcons.CheckCircle
+        OptionIcon.BREAKPOINT -> AutopIcons.Bug
+        OptionIcon.FORK -> AutopIcons.Branch
+        OptionIcon.RAW -> AutopIcons.DataObject
+        OptionIcon.TEMPLATE -> AutopIcons.Description
+        OptionIcon.AI -> AutopIcons.Psychology
+        OptionIcon.SAVE_TASK -> AutopIcons.ListAlt
+    }

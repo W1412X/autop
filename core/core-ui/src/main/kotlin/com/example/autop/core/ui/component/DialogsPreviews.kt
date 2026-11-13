@@ -98,7 +98,19 @@ internal fun SkeletonRowDarkPreview() =
 
 private fun sampleOptions(): List<OptionItem> =
     listOf(
-        OptionItem(id = "option-a", label = PreviewData.TITLE, description = PreviewData.SUBTITLE),
-        OptionItem(id = "option-b", label = PreviewData.VALUE),
-        OptionItem(id = "option-c", label = PreviewData.CHIP, description = PreviewData.SUBTITLE),
+        OptionItem(
+            id = "option-a",
+            label = PreviewData.TITLE,
+            description = PreviewData.SUBTITLE,
+            icon = OptionIcon.EDIT,
+            tag = PreviewData.CHIP,
+        ),
+        OptionItem(id = "option-b", label = PreviewData.VALUE, icon = OptionIcon.COPY),
+        OptionItem(
+            id = "option-c",
+            label = PreviewData.CHIP,
+            description = PreviewData.SUBTITLE,
+            icon = OptionIcon.DELETE,
+            tone = OptionTone.DESTRUCTIVE,
+        ),
     )

@@ -175,11 +175,17 @@ public object AutopAlpha {
     /** 半透明底块（surfaceVariant 底等）。 */
     public const val BLOCK_FILL: Float = 0.55f
 
-    /** 选项按钮行主题色半透明底（未选中）。 */
-    public const val OPTION_FILL: Float = 0.1f
+    /** 选中行浅洗底（选项行 / 滚轮高亮）。 */
+    public const val SELECTION_WASH: Float = 0.07f
 
-    /** 选项按钮行主题色半透明底（选中）。 */
-    public const val OPTION_FILL_SELECTED: Float = 0.2f
+    /** 选中态的图标块与标签底色。 */
+    public const val SELECTION_TILE_FILL: Float = 0.12f
+
+    /** 破坏性动作的图标块底色。 */
+    public const val DANGER_TILE_FILL: Float = 0.09f
+
+    /** Chip 选中态浅洗底。 */
+    public const val CHIP_SELECTED_FILL: Float = 0.08f
 
     /** 禁用态底块。 */
     public const val BLOCK_FILL_DISABLED: Float = 0.35f

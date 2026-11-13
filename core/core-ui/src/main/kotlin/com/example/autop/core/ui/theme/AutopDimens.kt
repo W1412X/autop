@@ -39,6 +39,11 @@ public object AutopDimens {
     /** OptionSheet 选中勾。 */
     public val optionCheckSize: Dp = 18.dp
 
+    /** OptionSheet 选项前置图标块与行间距。 */
+    public val optionIconTile: Dp = 36.dp
+    public val optionTagHeight: Dp = 20.dp
+    public val optionRowGap: Dp = 2.dp
+
     /** 加载圈与 PagedList 尾部行高。 */
     public val loadingIndicatorSize: Dp = 28.dp
     public val pagedFooterHeight: Dp = 56.dp
