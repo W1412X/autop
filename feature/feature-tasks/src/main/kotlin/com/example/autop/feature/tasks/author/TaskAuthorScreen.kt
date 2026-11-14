@@ -153,13 +153,15 @@ public fun TaskAuthorScreen(
             author.errorCode?.let { item { ErrorBanner(it) } }
             state.saveError?.let { item { ErrorBanner(it) } }
         }
-        AutopModelSelector(
-            selectedId = state.modelProfileId,
-            profiles = state.modelOptions,
-            enabled = !state.author.busy,
-            onSelect = { onAction(TaskAuthorAction.SetModel(it)) },
-            defaultProfileId = state.defaultModelId,
-        )
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge)) {
+            AutopModelSelector(
+                selectedId = state.modelProfileId,
+                profiles = state.modelOptions,
+                enabled = !state.author.busy,
+                onSelect = { onAction(TaskAuthorAction.SetModel(it)) },
+                defaultProfileId = state.defaultModelId,
+            )
+        }
         AutopInputBar(
             value = state.input,
             onValueChange = { onAction(TaskAuthorAction.SetInput(it)) },

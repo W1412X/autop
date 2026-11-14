@@ -160,13 +160,15 @@ public fun FlowAuthorScreen(
             state.saveError?.let { item { ErrorBanner(it) } }
         }
         author.pendingDemonstration?.let { goal -> DemoConfirm(goal = goal, onAction = onAction) }
-        AutopModelSelector(
-            selectedId = state.modelProfileId,
-            profiles = state.modelOptions,
-            enabled = !author.busy,
-            onSelect = { onAction(FlowAuthorAction.SetModel(it)) },
-            defaultProfileId = state.defaultModelId,
-        )
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge)) {
+            AutopModelSelector(
+                selectedId = state.modelProfileId,
+                profiles = state.modelOptions,
+                enabled = !author.busy,
+                onSelect = { onAction(FlowAuthorAction.SetModel(it)) },
+                defaultProfileId = state.defaultModelId,
+            )
+        }
         AutopInputBar(
             value = state.input,
             onValueChange = { onAction(FlowAuthorAction.SetInput(it)) },
