@@ -2,3 +2,5 @@
 # 所以不做换行转换。否则 Windows（autocrlf）与 Linux CI 检出的 ppocr_keys.txt 哈希不同，
 # VisionModelStore 会静默拒绝它，OCR 字符字典失效。
 domain/device-impl/src/main/assets/vision/** -text
+# 嵌入模型资产必须按二进制检出，否则 Windows autocrlf 会改写字节，清单校验失败。
+llm/llm-onnx/src/main/assets/embedding/** -text
