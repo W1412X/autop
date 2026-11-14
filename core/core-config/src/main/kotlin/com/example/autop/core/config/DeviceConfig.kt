@@ -527,6 +527,7 @@ public object DeviceConfig {
 
     public val ALL: List<ConfigKey<*>> =
         listOf(
+            SCREEN_LEASE,
             CAPTURE,
             EVENTS,
             STABILIZE,

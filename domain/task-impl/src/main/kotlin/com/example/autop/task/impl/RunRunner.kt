@@ -99,52 +99,70 @@ public class RunRunner(
         val needsScreen = flowLaunch?.needsScreen ?: task?.needsScreen ?: true
         val request = if (flowLaunch == null && !isFlowTask(task)) buildRequest(record, task, entry) else null
         // ADR-0035：智能体 Run 按需占用屏幕（首次屏幕工具调用时取得），不在开始时整段取租约。
-        val gate =
-            request?.let {
-                RunScreenGate(
-                    owner = record.id.value,
-                    lease = screenLease,
-                    deviceState = deviceState,
-                    acquireTimeoutMs = configProvider.current()[DeviceConfig.SCREEN_LEASE].acquireTimeoutMs,
-                )
-            }
+        val gate = screenGateFor(record, request)
         // 流程与任务的流程运行仍在开始时持有租约（屏幕需求在定义里已知）。
         val originPkg = if (gate == null && needsScreen) deviceState.current().foregroundPackage else null
-        val finished =
-            try {
-                val run = request?.copy(screenGate = gate)
-                if (gate == null && needsScreen) {
-                    screenLease.withLease(record.id.value) { runBlock(record, run, flowLaunch, task, entry) }
-                } else {
-                    runBlock(record, run, flowLaunch, task, entry)
-                }
-            } catch (e: CancellationException) {
-                // 取消也要收口：不 finish/clear 会让进度页永远停在「运行中」。
-                observer.finish(
-                    record.id,
-                    RunFinished(status = RunOutcome.CANCELLED, summary = null, errorCode = null),
-                )
-                observer.clear(record.id)
-                throw e
-            } catch (e: Exception) {
-                logger.e(TAG, "run_crashed", "runId" to record.id.value, error = e)
-                val failed =
-                    RunFinished(
-                        status = RunOutcome.FAILED,
-                        summary = null,
-                        errorCode = CommonErrorCodes.UNKNOWN,
-                        liveNote = prompts.runEndedNote(RunOutcome.FAILED),
-                    )
-                ensureRunFinished(record, failed)
-                failed
-            } finally {
-                gate?.release()
-            }
+        val finished = runAndCatch(record, task, flowLaunch, entry, request, gate, needsScreen)
         observer.finish(record.id, finished)
         observer.clear(record.id)
         val final = runStore.get(record.id) ?: return
         settle(record, task, flowLaunch, finished, final, gate?.originPackage ?: originPkg)
     }
+
+    /** 智能体 Run 的屏幕门（ADR-0035）；非智能体 Run 为 null。 */
+    private fun screenGateFor(
+        record: RunRecord,
+        request: RunRequest?,
+    ): RunScreenGate? =
+        request?.let {
+            RunScreenGate(
+                owner = record.id.value,
+                lease = screenLease,
+                deviceState = deviceState,
+                acquireTimeoutMs = configProvider.current()[DeviceConfig.SCREEN_LEASE].acquireTimeoutMs,
+            )
+        }
+
+    /** 执行 Run 并把异常统一收口为 [RunFinished]；取消照常上抛（收口后）。 */
+    @Suppress("TooGenericExceptionCaught") // 统一兜底转换为 RunFinished(FAILED)，异常不外传
+    private suspend fun runAndCatch(
+        record: RunRecord,
+        task: Task?,
+        flowLaunch: FlowLaunch?,
+        entry: PendingEntry?,
+        request: RunRequest?,
+        gate: RunScreenGate?,
+        needsScreen: Boolean,
+    ): RunFinished =
+        try {
+            val run = request?.copy(screenGate = gate)
+            if (gate == null && needsScreen) {
+                screenLease.withLease(record.id.value) { runBlock(record, run, flowLaunch, task, entry) }
+            } else {
+                runBlock(record, run, flowLaunch, task, entry)
+            }
+        } catch (e: CancellationException) {
+            // 取消也要收口：不 finish/clear 会让进度页永远停在「运行中」。
+            observer.finish(
+                record.id,
+                RunFinished(status = RunOutcome.CANCELLED, summary = null, errorCode = null),
+            )
+            observer.clear(record.id)
+            throw e
+        } catch (e: Exception) {
+            logger.e(TAG, "run_crashed", "runId" to record.id.value, error = e)
+            val failed =
+                RunFinished(
+                    status = RunOutcome.FAILED,
+                    summary = null,
+                    errorCode = CommonErrorCodes.UNKNOWN,
+                    liveNote = prompts.runEndedNote(RunOutcome.FAILED),
+                )
+            ensureRunFinished(record, failed)
+            failed
+        } finally {
+            gate?.release()
+        }
 
     /** 收口后的沉淀与通知：回放脚本、流程建议、后台通知、回到原 App。 */
     private suspend fun settle(

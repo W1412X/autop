@@ -212,7 +212,6 @@ public class ChatThreadViewModel
         public fun onAction(action: ChatThreadAction) {
             when (action) {
                 is ChatThreadAction.SetInput -> meta.update { it.copy(input = action.text) }
-                is ChatThreadAction.SetChatOnly -> meta.update { it.copy(chatOnly = action.enabled) }
                 is ChatThreadAction.AddImages,
                 is ChatThreadAction.RemoveImage,
                 is ChatThreadAction.SetModel,
@@ -229,8 +228,16 @@ public class ChatThreadViewModel
                     viewModelScope.launch { navChannel.send(ChatNavEvent.ReplaceThread(action.threadId)) }
                 is ChatThreadAction.OpenLink ->
                     viewModelScope.launch { navChannel.send(ChatNavEvent.OpenLink(action.link)) }
-                else -> handleSheet(action)
+                else -> {
+                    updateChatOption(action)
+                    handleSheet(action)
+                }
             }
+        }
+
+        /** 只聊天开关（ADR-0035）：只改页面内存状态，下一次发送时生效。 */
+        private fun updateChatOption(action: ChatThreadAction) {
+            if (action is ChatThreadAction.SetChatOnly) meta.update { it.copy(chatOnly = action.enabled) }
         }
 
         private fun handleAttachments(action: ChatThreadAction) {
