@@ -12,6 +12,9 @@ public interface PairingDiscovery {
     /** 已发现的配对端口（未发现为 null；配对成功后清空）。 */
     public val discoveredPort: StateFlow<Int?>
 
+    /** 配对通知是否已交给系统展示（true 时悬浮配对卡不弹；false 时走悬浮卡）。 */
+    public val notificationShown: StateFlow<Boolean>
+
     /** 启动后台发现（幂等；已配对时自动停用，监听开销仅为 mDNS 被动收包）。 */
     public fun start(scope: CoroutineScope)
 

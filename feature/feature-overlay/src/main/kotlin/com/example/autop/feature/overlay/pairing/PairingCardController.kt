@@ -81,9 +81,15 @@ public class PairingCardController
 
         /** 卡片状态（端口来自发现登记；用户主动关闭后同端口不再打扰）。 */
         private val uiState: StateFlow<PairingCardUiState> =
-            combine(discovery.discoveredPort, codeText, busy, notice) { port, code, running, hint ->
+            combine(
+                discovery.discoveredPort,
+                discovery.notificationShown,
+                codeText,
+                busy,
+                notice,
+            ) { port, notified, code, running, hint ->
                 PairingCardUiState(
-                    port = port?.takeIf { it != dismissedPort },
+                    port = port?.takeIf { !notified && it != dismissedPort },
                     code = code,
                     busy = running,
                     notice = hint,

@@ -2,7 +2,7 @@
  * [PairingDiscovery] 实现：未配对时用 [AdbMdns] 监听 `_adb-tls-pairing._tcp`
  * （系统无线调试「使用配对码配对设备」窗口开启时广播），发现即发通知——
  * 通知点按深链到注入通道页（端口自动就绪），或直接在通知栏内联回填 6 位配对码
- * （[PairingReplyReceiver]）。配对成功后停用监听并撤掉通知。
+ * （[PairingReplyService]）。配对成功后停用监听并撤掉通知。
  */
 package com.example.autop.device.impl.shell
 
@@ -14,6 +14,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.app.RemoteInput
 import com.example.autop.core.common.Capability
 import com.example.autop.core.common.PlatformCapabilities
@@ -53,6 +54,9 @@ public class PairingDiscoveryImpl
         /** 已通知过的端口（同端口不重复打扰；配对成功后清空）。 */
         private val notifiedPorts = mutableSetOf<Int>()
 
+        private val _notificationShown = MutableStateFlow(false)
+        override val notificationShown: StateFlow<Boolean> = _notificationShown.asStateFlow()
+
         @Synchronized
         override fun start(scope: CoroutineScope) {
             if (job?.isActive == true) return
@@ -91,6 +95,7 @@ public class PairingDiscoveryImpl
             mdns = null
             _discoveredPort.value = null
             notifiedPorts.clear()
+            _notificationShown.value = false
             manager.cancel(NOTIF_PAIRING)
         }
 
@@ -115,6 +120,8 @@ public class PairingDiscoveryImpl
         /** 发现通知：点按深链到注入通道页；通知栏内联回填配对码即可完成配对。 */
         private fun notifyPairing(port: Int) {
             ensureChannel()
+            _notificationShown.value = false
+            if (!canNotify()) return
             val builder =
                 NotificationCompat
                     .Builder(context, CHANNEL_PAIRING)
@@ -124,7 +131,17 @@ public class PairingDiscoveryImpl
                     .setContentText(context.getString(R.string.pairing_notif_text, port))
                     .setContentIntent(openShellIntent())
                     .addAction(replyAction(port))
-            manager.notify(NOTIF_PAIRING, builder.build())
+            _notificationShown.value = runCatching { manager.notify(NOTIF_PAIRING, builder.build()) }.isSuccess
+        }
+
+        /**
+         * 通知能否展示：应用通知总开关（含 Android 13+ 的 POST_NOTIFICATIONS）与配对渠道都未被关闭。
+         * 不满足时 notify 会静默丢弃，所以先判断，不满足就留给悬浮配对卡。
+         */
+        private fun canNotify(): Boolean {
+            val enabled = NotificationManagerCompat.from(context).areNotificationsEnabled()
+            val importance = manager.getNotificationChannel(CHANNEL_PAIRING)?.importance
+            return enabled && importance != NotificationManager.IMPORTANCE_NONE
         }
 
         /** 内联回填配对码动作（RemoteInput）。 */
@@ -135,10 +152,10 @@ public class PairingDiscoveryImpl
                     .setLabel(context.getString(R.string.pairing_reply_hint))
                     .build()
             val intent =
-                Intent(context, PairingReplyReceiver::class.java)
-                    .putExtra(PairingReplyReceiver.EXTRA_PORT, port)
+                Intent(context, PairingReplyService::class.java)
+                    .putExtra(PairingReplyService.EXTRA_PORT, port)
             val pending =
-                PendingIntent.getBroadcast(
+                PendingIntent.getForegroundService(
                     context,
                     port,
                     intent,
@@ -193,7 +210,7 @@ public class PairingDiscoveryImpl
             /** 通知通道 id。 */
             public const val CHANNEL_PAIRING: String = "adb_pairing"
 
-            /** RemoteInput 配对码键（与 [PairingReplyReceiver] 共用）。 */
+            /** RemoteInput 配对码键（与 [PairingReplyService] 共用）。 */
             public const val KEY_PAIR_CODE: String = "pairCode"
         }
     }
