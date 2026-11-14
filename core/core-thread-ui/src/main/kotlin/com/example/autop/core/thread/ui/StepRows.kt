@@ -10,7 +10,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -115,20 +114,12 @@ private fun StepSummary(step: TimelineItem.StepRow) {
                 .padding(vertical = LocalSpacing.current.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .background(color = tone.container, shape = MaterialTheme.shapes.extraSmall)
-                    .padding(LocalSpacing.current.xs),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = toolIconOf(step.toolId),
-                contentDescription = null,
-                modifier = Modifier.size(IconSize.Sm.scaled()),
-                tint = tone.foreground,
-            )
-        }
+        Icon(
+            imageVector = toolIconOf(step.toolId),
+            contentDescription = null,
+            modifier = Modifier.size(IconSize.Sm.scaled()),
+            tint = tone.foreground,
+        )
         if (step.stepNo > 0) {
             Text(
                 text = stringResource(R.string.thread_step_no, step.stepNo),
