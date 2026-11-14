@@ -120,14 +120,7 @@ private fun StepSummary(step: TimelineItem.StepRow) {
             modifier = Modifier.size(IconSize.Sm.scaled()),
             tint = tone.foreground,
         )
-        if (step.stepNo > 0) {
-            Text(
-                text = stringResource(R.string.thread_step_no, step.stepNo),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.padding(start = LocalSpacing.current.sm),
-            )
-        }
+
         Text(
             text = stepDesc(step),
             style = MaterialTheme.typography.bodyMedium,

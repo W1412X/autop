@@ -46,7 +46,7 @@
     <string name="thread_meta_copy">复制回复</string>
     <string name="thread_meta_more">更多</string>
     <string name="thread_plan_title">计划</string>
-    <string name="thread_result_stats">%1$d 步 · %2$s · %3$d token</string>
+    <string name="thread_result_stats">%1$s · %2$s token</string>
     <string name="thread_steer_tag">补充指令</string>
     <string name="thread_step_no">#%1$d</string>
     <string name="thread_step_secs">%1$.1f 秒</string>
