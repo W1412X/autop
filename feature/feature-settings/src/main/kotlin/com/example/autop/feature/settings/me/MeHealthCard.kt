@@ -11,9 +11,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.Icon
@@ -100,7 +103,7 @@ internal fun HealthCard(
         }
         tiles.chunked(TILES_PER_ROW).forEach { rowTiles ->
             Row(
-                modifier = Modifier.fillMaxWidth().padding(top = spacing.xs),
+                modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min).padding(top = spacing.xs),
                 horizontalArrangement = Arrangement.spacedBy(spacing.xs),
             ) {
                 rowTiles.forEach { tile ->
@@ -145,7 +148,7 @@ private fun healthTiles(state: MeUiState): List<HealthTileSpec> =
         HealthTileSpec(
             label = stringResource(R.string.me_nav_permission_check),
             status = stringResource(R.string.me_health_check_all),
-            tone = null,
+            tone = StatusTone.NEUTRAL,
             action = MeAction.OpenSection(SettingsSection.PERMISSIONS),
         ),
     )
@@ -221,6 +224,7 @@ private fun HealthTile(
     Row(
         modifier =
             modifier
+                .fillMaxHeight()
                 .defaultMinSize(minHeight = AutopDimens.minTouchTarget)
                 .background(
                     color = MaterialTheme.colorScheme.surface,
