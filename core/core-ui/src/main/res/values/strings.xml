@@ -22,4 +22,26 @@
     <string name="error_llm_context_exceeded">对话内容太长，超出了模型的处理上限。</string>
     <string name="error_llm_not_configured">还没有配置模型，请到设置里选择模型。</string>
     <string name="error_generic">出错了，请稍后再试。</string>
+    <string name="legal_close">关闭</string>
+    <string name="legal_privacy_title">隐私政策</string>
+    <string name="legal_agreement_title">使用协议</string>
+    <string-array name="legal_privacy_body">
+        <item>本应用（AutoP）是一个在手机上运行的操作代理。为完成你下达的任务，应用会读取屏幕内容、通知和截图。</item>
+        <item>屏幕文本、截图和通知内容，会发送到你在应用里配置的大模型服务地址。这些内容只发往你自己配置的端点，项目方不接收，也不经过项目方的服务器。</item>
+        <item>API Key 使用 Android Keystore 加密后保存在本机。</item>
+        <item>应用不包含统计、崩溃上报或其他第三方数据上报的 SDK。</item>
+        <item>运行记录、记忆、流程和任务数据都保存在本机的应用数据目录中。你可以在「我的」里查看操作记录，也可以清除应用数据。</item>
+        <item>加入「屏蔽的应用」的应用，在前台时不会被读取屏幕内容。</item>
+        <item>如果你配置的大模型服务由第三方提供，它们如何处理你发送的数据，适用其自身的隐私政策。</item>
+        <item>本政策可能随版本更新。更新后，应用会重新请你确认。</item>
+    </string-array>
+    <string-array name="legal_agreement_body">
+        <item>本应用仅供开发学习使用。</item>
+        <item>你不得将本应用用于任何违法违规活动，包括但不限于：未经授权获取他人数据，侵犯他人隐私或财产，进行违规的支付或转账操作，攻击或干扰他人的软件与服务。</item>
+        <item>你不得利用本应用对其他软件进行未经授权的自动化操作，绕过其安全措施，或破坏其正常运行。</item>
+        <item>运行中，应用会在你的手机上执行点击、滑动、输入等操作。请在确认任务内容后再运行，并注意可能产生的不可撤销操作（例如发送消息）。</item>
+        <item>因违反本协议或违法使用造成的任何后果，由使用者自行承担。</item>
+        <item>本应用按现状提供，不作任何明示或暗示的保证，包括对准确性、可用性和适用性的保证。开发者不对使用本应用造成的直接或间接损失承担责任。</item>
+        <item>继续使用即表示你已阅读并同意本协议。如果你不同意，请退出应用并停止使用。</item>
+    </string-array>
 </resources>

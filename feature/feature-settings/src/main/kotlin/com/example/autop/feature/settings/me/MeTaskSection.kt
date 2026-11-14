@@ -8,7 +8,10 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
@@ -17,10 +20,14 @@ import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.ActionRow
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.InfoRow
+import com.example.autop.core.ui.component.LegalDialog
+import com.example.autop.core.ui.component.LegalDoc
 import com.example.autop.core.ui.component.NavRow
 import com.example.autop.core.ui.component.OptionRow
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SwitchRow
+import com.example.autop.core.ui.component.legalDocParagraphs
+import com.example.autop.core.ui.component.legalDocTitle
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.device.UpdateFailure
@@ -75,6 +82,7 @@ internal fun AboutSection(
 ) {
     val uriHandler = LocalUriHandler.current
     val version = rememberAppVersion()
+    var legalDoc by remember { mutableStateOf<LegalDoc?>(null) }
     Column {
         InfoRow(
             title = stringResource(R.string.me_version),
@@ -85,6 +93,23 @@ internal fun AboutSection(
         AboutLink(R.string.me_about_project, R.string.me_about_project_url, uriHandler)
         AboutLink(R.string.me_about_developer, R.string.me_about_developer_url, uriHandler)
         AboutLink(R.string.me_about_releases, R.string.me_about_releases_url, uriHandler)
+        NavRow(
+            title = legalDocTitle(LegalDoc.PRIVACY),
+            subtitle = null,
+            onClick = { legalDoc = LegalDoc.PRIVACY },
+        )
+        NavRow(
+            title = legalDocTitle(LegalDoc.AGREEMENT),
+            subtitle = null,
+            onClick = { legalDoc = LegalDoc.AGREEMENT },
+        )
+        legalDoc?.let { doc ->
+            LegalDialog(
+                title = legalDocTitle(doc),
+                paragraphs = legalDocParagraphs(doc),
+                onDismiss = { legalDoc = null },
+            )
+        }
     }
 }
 

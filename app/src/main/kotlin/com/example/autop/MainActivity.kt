@@ -73,7 +73,11 @@ class MainActivity : ComponentActivity() {
                         flowsEnabled = snapshot[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS),
                         // 首次未完成引导进引导页（docs/tech/08 §4.7，N159）。
                         startDestination =
-                            if (snapshot[UiConfig.ONBOARDING].completed) {
+                            if (snapshot[UiConfig.ONBOARDING].let {
+                                    it.completed &&
+                                        it.agreedVersion >= UiConfig.LEGAL_AGREEMENT_VERSION
+                                }
+                            ) {
                                 AutopRoutes.CHAT_LIST
                             } else {
                                 AutopRoutes.ONBOARDING

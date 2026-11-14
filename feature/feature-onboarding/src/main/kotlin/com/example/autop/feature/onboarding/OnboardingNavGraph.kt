@@ -5,9 +5,13 @@
  */
 package com.example.autop.feature.onboarding
 
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -57,8 +61,10 @@ private fun OnboardingRoute(
     navigator: OnboardingNavigator,
     healthMode: Boolean,
     viewModel: OnboardingViewModel = hiltViewModel(),
+    agreementViewModel: AgreementViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val agreement by agreementViewModel.uiState.collectAsStateWithLifecycle()
     // 回到前台（ON_RESUME）重新检测所有状态（docs/tech/08 §4.7）。
     LifecycleResumeEffect(Unit) {
         viewModel.refresh()
@@ -67,19 +73,41 @@ private fun OnboardingRoute(
     LaunchedEffect(state.completed) {
         if (state.completed) navigator.finishOnboarding()
     }
-    OnboardingScreen(
-        state = state,
-        healthMode = healthMode,
-        onAction = { action ->
-            when (action) {
-                is OnboardingAction.OpenCheck -> openCheck(navigator, action.id, state)
-                OnboardingAction.Complete -> viewModel.onAction(action)
-            }
-        },
-    )
+    // 老用户（引导已完成）升级后只需再同意一次协议，同意后直接进入主界面（ADR-0033）。
+    LaunchedEffect(agreement) {
+        val current = agreement ?: return@LaunchedEffect
+        if (current.agreed && current.completedBefore) navigator.finishOnboarding()
+    }
+    val activity = LocalContext.current.findActivity()
+    val current = agreement
+    when {
+        current == null -> Unit
+        !current.agreed ->
+            AgreementScreen(
+                onAgree = agreementViewModel::accept,
+                onDecline = { activity?.finish() },
+            )
+        else ->
+            OnboardingScreen(
+                state = state,
+                healthMode = healthMode,
+                onAction = { action ->
+                    when (action) {
+                        is OnboardingAction.OpenCheck -> openCheck(navigator, action.id, state)
+                        OnboardingAction.Complete -> viewModel.onAction(action)
+                    }
+                },
+            )
+    }
 }
 
-/** 检查项 → 导航回调（厂商跳转描述取自状态）。 */
+private tailrec fun Context.findActivity(): Activity? =
+    when (this) {
+        is Activity -> this
+        is ContextWrapper -> baseContext.findActivity()
+        else -> null
+    }
+
 private fun openCheck(
     navigator: OnboardingNavigator,
     id: CheckId,

@@ -152,10 +152,15 @@ public data class UiDebugSection(
 @Serializable
 public data class UiOnboardingSection(
     @SerialName("completed") val completed: Boolean = false,
+    /** 已同意的协议版本（0 = 未同意；见 [UiConfig.LEGAL_AGREEMENT_VERSION]）。 */
+    @SerialName("agreedVersion") val agreedVersion: Int = 0,
 ) : ConfigSection
 
 /** `ui` 领域全部配置键的登记（DI 多绑定与测试用）。 */
 public object UiConfig {
+    /** 当前隐私政策与使用协议版本；协议内容变化时递增，已同意的用户会再次看到协议。 */
+    public const val LEGAL_AGREEMENT_VERSION: Int = 1
+
     public val APPEARANCE: ConfigKey<UiAppearanceSection> =
         ConfigKey("ui.appearance", UiAppearanceSection.serializer()) { UiAppearanceSection() }
     public val NAV: ConfigKey<UiNavSection> =

@@ -53,7 +53,8 @@
       "verboseLogging": false
     },
     "onboarding": {
-      "completed": false
+      "completed": false,
+      "agreedVersion": 0
     }
   }
 }

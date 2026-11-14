@@ -27,4 +27,9 @@
     <string name="onboarding_check_battery_desc">避免后台任务被系统休眠中断。</string>
     <string name="onboarding_check_vendor_title">厂商后台设置</string>
     <string name="onboarding_check_vendor_desc">允许 AutoP 后台自启动，定时任务才能按时执行。</string>
+    <string name="agreement_title">使用协议与隐私政策</string>
+    <string name="agreement_hint_scroll">请阅读到底部后再同意</string>
+    <string name="agreement_hint_done">已阅读完毕，可以同意</string>
+    <string name="agreement_agree">同意并继续</string>
+    <string name="agreement_decline">不同意并退出</string>
 </resources>
