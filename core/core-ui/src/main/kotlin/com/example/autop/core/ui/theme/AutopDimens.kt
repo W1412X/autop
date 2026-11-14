@@ -26,6 +26,12 @@ public object AutopDimens {
 
     /** 对话附图缩略图边长（输入区待发送图与气泡内已发送图）。 */
     public val attachThumb: Dp = 72.dp
+
+    /** 用户发送图片的展示区缩略图边长（独立于气泡，比输入区略大）。 */
+    public val chatImageThumb: Dp = 120.dp
+
+    /** 运行过程截图展开后的显示宽度（高度按原图比例）。 */
+    public val stepScreenshotWidth: Dp = 220.dp
     public val overlayBall: Dp = 52.dp
     public val overlayPanelWidth: Dp = 300.dp
     public val minTouchTarget: Dp = 48.dp

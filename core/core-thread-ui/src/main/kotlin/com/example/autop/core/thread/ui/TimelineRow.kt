@@ -34,12 +34,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.PlanStatus
@@ -52,7 +52,6 @@ import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.scaled
-import java.io.File
 
 /** 时间线条目分派（长按菜单只对带 seq 的 AssistantText / StepRow 开放，docs/tech/08 §4.2）。 */
 @Composable
@@ -103,59 +102,59 @@ private fun UserBubbleRow(
     item: TimelineItem.UserBubble,
     modifier: Modifier = Modifier,
 ) {
+    val spacing = LocalSpacing.current
     val bubbleMaxWidth = LocalConfiguration.current.screenWidthDp.dp * USER_BUBBLE_WIDTH_FRACTION
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.End,
+        horizontalAlignment = Alignment.End,
+        verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .widthIn(max = bubbleMaxWidth)
-                    .background(
-                        color = MaterialTheme.colorScheme.primaryContainer,
-                        shape = userBubbleShape(),
-                    ).padding(all = LocalSpacing.current.md),
-        ) {
-            if (item.isSteer) {
-                Text(
-                    text = stringResource(R.string.thread_steer_tag),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
-            }
-            if (item.images.isNotEmpty()) BubbleImages(fileRefs = item.images)
-            if (item.text.isNotBlank()) {
-                Text(
-                    text = item.text,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onPrimaryContainer,
-                )
+        if (item.images.isNotEmpty()) {
+            UserImages(fileRefs = item.images, maxWidth = bubbleMaxWidth)
+        }
+        if (item.isSteer || item.text.isNotBlank()) {
+            Column(
+                modifier =
+                    Modifier
+                        .widthIn(max = bubbleMaxWidth)
+                        .background(
+                            color = MaterialTheme.colorScheme.primaryContainer,
+                            shape = userBubbleShape(),
+                        ).padding(all = spacing.md),
+            ) {
+                if (item.isSteer) {
+                    Text(
+                        text = stringResource(R.string.thread_steer_tag),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
+                if (item.text.isNotBlank()) {
+                    Text(
+                        text = item.text,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                    )
+                }
             }
         }
     }
 }
 
-/** 气泡内的图片缩略图：横向排布、超宽自动换行；fileRef 相对应用 files 目录解析。 */
+/** 用户发送的图片：独立于文字气泡，靠右横向排列，超宽换行；点击全屏查看。 */
 @OptIn(ExperimentalLayoutApi::class) // FlowRow 在当前 Compose 版本仍为实验 API
 @Composable
-private fun BubbleImages(fileRefs: List<String>) {
-    val filesDir = LocalContext.current.filesDir
+private fun UserImages(
+    fileRefs: List<String>,
+    maxWidth: Dp,
+) {
     val spacing = LocalSpacing.current
-    val description = stringResource(R.string.thread_image_description)
     FlowRow(
-        horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+        horizontalArrangement = Arrangement.spacedBy(spacing.xs, Alignment.End),
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
-        modifier = Modifier.padding(bottom = spacing.xs),
+        modifier = Modifier.widthIn(max = maxWidth),
     ) {
-        fileRefs.forEach { ref ->
-            Thumbnail(
-                key = ref,
-                size = AutopDimens.attachThumb,
-                contentDescription = description,
-                decode = { px -> decodeSampledFile(File(filesDir, ref), px) },
-            )
-        }
+        fileRefs.forEach { ref -> FileImage(fileRef = ref, size = AutopDimens.chatImageThumb) }
     }
 }
 

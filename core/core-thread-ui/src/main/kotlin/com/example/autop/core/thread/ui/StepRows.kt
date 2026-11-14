@@ -318,13 +318,7 @@ private fun StepDetail(step: TimelineItem.StepRow) {
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
-        if (step.imageRef != null) {
-            Text(
-                text = stringResource(R.string.thread_image_missing),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
+        step.imageRef?.let { ref -> FileScreenshot(fileRef = ref) }
     }
 }
 
