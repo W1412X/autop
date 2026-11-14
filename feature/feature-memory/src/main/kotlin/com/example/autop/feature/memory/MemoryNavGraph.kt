@@ -4,12 +4,14 @@
  */
 package com.example.autop.feature.memory
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.compose.composable
+import com.example.autop.feature.memory.browse.BrowseAction
 import com.example.autop.feature.memory.browse.BrowseScreen
 import com.example.autop.feature.memory.browse.BrowseViewModel
 import com.example.autop.feature.memory.changes.ChangesScreen
@@ -62,6 +64,10 @@ private fun BrowseRoute(
     viewModel: BrowseViewModel = hiltViewModel(),
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    // 目录切换在页面内完成（不入导航栈）：返回键先回到上一级目录，根目录才交给系统返回。
+    BackHandler(enabled = state.crumbs.size > 1) {
+        viewModel.onAction(BrowseAction.OpenCrumb(state.crumbs.size - 2))
+    }
     BrowseScreen(
         state = state,
         onAction = viewModel::onAction,
