@@ -173,6 +173,7 @@ class TemplateCatalogTest {
                 "agent.tool.cancelled_result",
                 "agent.tool.error_result",
                 "agent.tool.timeout_write_hint",
+                "agent.screen.busy_hint",
                 "agent.tool.trace_header",
                 "chat.title.generate",
                 "device.hint.coord_out_of_range",
