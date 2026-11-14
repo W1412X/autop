@@ -19,6 +19,7 @@ import androidx.compose.ui.res.stringResource
 import com.example.autop.agent.RunOutcome
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.overlay.R
+import java.util.Locale
 
 /** 状态与统计文本之间的分隔符。 */
 private const val META_SEPARATOR: String = " · "
@@ -58,9 +59,8 @@ internal fun FinishedRow(
                 text =
                     stringResource(
                         R.string.progress_result_stats,
-                        row.stepCount,
                         durationText(row.durationMs),
-                        row.outputTokens,
+                        tokenText(row.outputTokens),
                     ),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -68,6 +68,16 @@ internal fun FinishedRow(
         }
     }
 }
+
+/** token 数：小于 1000 原样显示，否则以 k 为单位保留一位小数（3240 → 3.2k）。 */
+private fun tokenText(tokens: Int): String =
+    if (tokens < TOKENS_PER_K) {
+        tokens.toString()
+    } else {
+        String.format(Locale.ROOT, "%.1fk", tokens / TOKENS_PER_K.toDouble())
+    }
+
+private const val TOKENS_PER_K: Int = 1000
 
 /** 任务状态小字颜色：成功 primary、失败 error、其余灰（同对话页 RunMetaRow）。 */
 @Composable

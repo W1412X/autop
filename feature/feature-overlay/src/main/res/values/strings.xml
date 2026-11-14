@@ -123,7 +123,7 @@
     <string name="progress_outcome_breaker">熔断停止</string>
     <string name="progress_outcome_interrupted">已中断</string>
     <string name="progress_outcome_expired">已过期</string>
-    <string name="progress_result_stats">%1$d 步 · %2$s · %3$d token</string>
+    <string name="progress_result_stats">%1$s · %2$s token</string>
     <string name="progress_hint_waiting">正在等待你的回答</string>
     <string name="progress_hint_paused">已暂停，处理完后可继续</string>
     <string name="progress_hint_blocked">被安全规则拦截，等待你的决定</string>
