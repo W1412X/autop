@@ -6,37 +6,29 @@
 package com.example.autop.feature.settings.me
 
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
+import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.NavRow
 import com.example.autop.core.ui.component.TopLevelHeader
-import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.settings.MeGroup
 import com.example.autop.feature.settings.R
 
-/** 一级页分组：每组一个小标题与一张卡片（分类顺序见 docs/tech/08 §4.5）。 */
-private data class GroupSection(
-    @param:StringRes val labelRes: Int,
-    val groups: List<MeGroup>,
-)
-
-private val GROUP_SECTIONS: List<GroupSection> =
+/** 一级页分类顺序（docs/tech/08 §4.5）。 */
+private val GROUP_ORDER: List<MeGroup> =
     listOf(
-        GroupSection(R.string.me_group_section_model, listOf(MeGroup.MODEL, MeGroup.TASKS)),
-        GroupSection(R.string.me_group_section_runtime, listOf(MeGroup.PERMISSIONS_RUNTIME, MeGroup.SECURITY)),
-        GroupSection(R.string.me_group_section_look, listOf(MeGroup.APPEARANCE, MeGroup.ADVANCED)),
-        GroupSection(R.string.me_section_about, listOf(MeGroup.ABOUT)),
+        MeGroup.MODEL,
+        MeGroup.PERMISSIONS_RUNTIME,
+        MeGroup.SECURITY,
+        MeGroup.TASKS,
+        MeGroup.APPEARANCE,
+        MeGroup.ADVANCED,
+        MeGroup.ABOUT,
     )
 
 /**
@@ -60,42 +52,7 @@ public fun MeScreen(
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item { TopLevelHeader(title = stringResource(R.string.me_title)) }
             item { AppStatusSection(state = state, onAction = onAction) }
-            GROUP_SECTIONS.forEach { section ->
-                item(key = section.labelRes) {
-                    GroupCard(section = section, state = state, version = version, onAction = onAction)
-                }
-            }
-        }
-    }
-}
-
-/** 一组设置：小标题（灰色小字）+ 圆角卡片，卡片内每行之间用细分割线。 */
-@Composable
-private fun GroupCard(
-    section: GroupSection,
-    state: MeUiState,
-    version: String,
-    onAction: (MeAction) -> Unit,
-) {
-    val spacing = LocalSpacing.current
-    Column(modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge, vertical = spacing.xs)) {
-        Text(
-            text = stringResource(section.labelRes),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier = Modifier.padding(start = spacing.sm, top = spacing.sm, bottom = spacing.xs),
-        )
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .background(
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = CARD_ALPHA),
-                        shape = MaterialTheme.shapes.medium,
-                    ),
-        ) {
-            section.groups.forEachIndexed { index, group ->
-                if (index > 0) HorizontalDivider()
+            items(GROUP_ORDER, key = { it.id }) { group ->
                 NavRow(
                     title = stringResource(groupTitleRes(group)),
                     subtitle = groupSubtitle(group = group, state = state, version = version),
@@ -105,8 +62,6 @@ private fun GroupCard(
         }
     }
 }
-
-private const val CARD_ALPHA: Float = 0.6f
 
 /** 分类标题（与 docs/tech/08 §4.5 的分组名一致，二级页顶栏同样使用）。 */
 @StringRes
