@@ -144,6 +144,8 @@ public sealed interface CoreRow {
     public data class Banner(
         val kind: BannerKind,
         val detail: String?,
+        /** 暂停已恢复：保留为历史分割线（未决的暂停横幅为 false）。 */
+        val resolved: Boolean = false,
     ) : CoreRow
 
     /** 分叉来源标记（仅分叉线程的 ThreadCreated 出行）。 */
@@ -234,8 +236,7 @@ private fun appendPayload(
             unpaired
         }
         is RunResumed -> {
-            // 移除本轮所有未决横幅：暂停后又恢复时，之前的暂停横幅不得残留（含按钮）。
-            entries.removeAll { isUnresolvedBanner(it.row) }
+            resolvePauseBanners(entries)
             unpaired
         }
         is Baseline -> unpaired
@@ -509,10 +510,23 @@ private fun bannerKindOf(reason: PauseReason): BannerKind? =
         PauseReason.ASK_USER -> null
     }
 
-/** 未决横幅（RunResumed 到达时移除；中断横幅保留作历史提示）。 */
+/** 恢复：未决的暂停横幅转为已解决（保留为历史分割线）；拦截横幅随恢复移除（其按钮已失效）。 */
+private fun resolvePauseBanners(entries: MutableList<CoreEntry>) {
+    entries.removeAll { (it.row as? CoreRow.Banner)?.kind == BannerKind.BLOCKED }
+    entries.replaceAll { entry ->
+        val banner = entry.row as? CoreRow.Banner
+        if (banner != null && banner.kind == BannerKind.PAUSED && !banner.resolved) {
+            entry.copy(row = banner.copy(resolved = true))
+        } else {
+            entry
+        }
+    }
+}
+
+/** 未决横幅（RunFinished 时移除；已解决的暂停分割线与中断横幅保留作历史提示）。 */
 private fun isUnresolvedBanner(row: CoreRow): Boolean {
     val banner = row as? CoreRow.Banner ?: return false
-    return banner.kind == BannerKind.PAUSED || banner.kind == BannerKind.BLOCKED
+    return !banner.resolved && (banner.kind == BannerKind.PAUSED || banner.kind == BannerKind.BLOCKED)
 }
 
 /** 工具结果 `data.links` → 快捷入口（宽松解析：结构不对的条目跳过，不影响时间线）。 */

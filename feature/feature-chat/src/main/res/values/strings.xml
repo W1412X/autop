@@ -62,4 +62,6 @@
     <string name="thread_raw_close">关闭</string>
 
     <!-- 步骤描述（docs/tech/08 §4.2 StepDescriber：动词 + 参数拼接模板） -->
+    <string name="chat_paused_title">运行已暂停</string>
+    <string name="chat_paused_continue">继续</string>
 </resources>

@@ -83,6 +83,8 @@ public sealed interface TimelineItem {
     public data class Banner(
         val kind: BannerKind,
         val detail: String?,
+        /** 暂停已恢复：渲染为分割线（未决暂停横幅为 false）。 */
+        val resolved: Boolean = false,
     ) : TimelineItem
 
     /**

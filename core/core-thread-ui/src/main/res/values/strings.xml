@@ -54,4 +54,5 @@
     <string name="thread_banner_blocked">操作被策略拦截，可继续或结束本次运行</string>
     <string name="thread_banner_interrupted">运行已中断，可重新发送继续</string>
     <string name="thread_banner_paused">运行已暂停，点“继续”恢复</string>
+    <string name="thread_pause_divider">用户暂停运行</string>
 </resources>

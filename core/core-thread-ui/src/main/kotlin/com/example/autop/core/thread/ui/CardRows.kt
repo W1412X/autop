@@ -4,18 +4,25 @@
  */
 package com.example.autop.core.thread.ui
 
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.thread.ui.R
 import com.example.autop.core.ui.component.AutopButton
 import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.StatusBanner
+import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 
 /**
@@ -28,6 +35,10 @@ internal fun BannerRow(
     onAction: (TimelineAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    if (banner.kind == BannerKind.PAUSED && banner.resolved) {
+        PauseDivider(text = banner.detail ?: stringResource(R.string.thread_pause_divider), modifier = modifier)
+        return
+    }
     val actions: (@Composable RowScope.() -> Unit)? =
         when (banner.kind) {
             BannerKind.PAUSED ->
@@ -78,3 +89,25 @@ private fun bannerText(kind: BannerKind): Int =
         BannerKind.BLOCKED -> R.string.thread_banner_blocked
         BannerKind.INTERRUPTED -> R.string.thread_banner_interrupted
     }
+
+/** 暂停已恢复后的历史分割线：一条细线中间夹着说明文字，不带底色和按钮。 */
+@Composable
+internal fun PauseDivider(
+    text: String,
+    modifier: Modifier = Modifier,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        modifier = modifier.fillMaxWidth().padding(vertical = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        HorizontalDivider(modifier = Modifier.weight(1f))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(horizontal = spacing.sm),
+        )
+        HorizontalDivider(modifier = Modifier.weight(1f))
+    }
+}

@@ -179,14 +179,23 @@ class TimelineCoreTest {
     }
 
     @Test
-    fun `pause banners are replaced on resume`() {
+    fun `unresolved pause banner stays until resume`() {
+        val history = listOf(event(1, 0, RunPaused(reason = PauseReason.MANUAL, detail = "停一下")))
+
+        assertThat(mergeCore(history, emptyList()).map { it.row })
+            .containsExactly(CoreRow.Banner(BannerKind.PAUSED, "停一下"))
+    }
+
+    @Test
+    fun `pause banner becomes resolved divider on resume`() {
         val history =
             listOf(
                 event(1, 0, RunPaused(reason = PauseReason.MANUAL, detail = "停一下")),
                 event(2, 100, RunResumed(userNote = "继续")),
             )
 
-        assertThat(mergeCore(history, emptyList())).isEmpty()
+        assertThat(mergeCore(history, emptyList()).map { it.row })
+            .containsExactly(CoreRow.Banner(BannerKind.PAUSED, "停一下", resolved = true))
     }
 
     @Test

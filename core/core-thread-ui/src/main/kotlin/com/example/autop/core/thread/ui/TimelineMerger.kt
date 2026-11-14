@@ -44,7 +44,7 @@ private fun CoreRow.toItem(): TimelineItem =
         is CoreRow.Step -> toStepRow()
         is CoreRow.Plan -> TimelineItem.PlanCard(items, explanation)
         is CoreRow.RunMeta -> toMeta()
-        is CoreRow.Banner -> TimelineItem.Banner(kind, detail)
+        is CoreRow.Banner -> TimelineItem.Banner(kind, detail, resolved)
         is CoreRow.ForkMarker -> TimelineItem.ForkMarker(parentThreadId, parentSeq, title)
     }
 

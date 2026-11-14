@@ -27,7 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.config.UiBannerSection
+import com.example.autop.core.thread.ui.BannerKind
 import com.example.autop.core.thread.ui.TimelineEntry
+import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.core.thread.ui.TimelineRow
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
@@ -63,10 +65,16 @@ public fun ChatThreadScreen(
     ) {
         ThreadHeader(state = state, onAction = onAction, onBack = onBack)
         ThreadTimeline(
-            entries = state.entries,
+            entries = state.entries.filterNot { (it.item as? TimelineItem.Banner)?.isLivePause() == true },
             onAction = onAction,
             modifier = Modifier.weight(1f),
         )
+        livePauseOf(state)?.let { pause ->
+            PausedBar(
+                detail = pause.detail,
+                onResume = { onAction(ChatThreadAction.Resume) },
+            )
+        }
         state.waitingQuestion?.let { question ->
             AskCard(
                 question = question,
@@ -205,3 +213,9 @@ private fun noticeText(notice: ThreadNotice): String =
             ThreadNotice.STEER_FAILED -> R.string.thread_notice_steer_failed
         },
     )
+
+/** 未决的暂停横幅（暂停中、未恢复）；显示在输入区上方，不进消息列表。 */
+private fun livePauseOf(state: ChatThreadUiState): TimelineItem.Banner? =
+    state.entries.firstNotNullOfOrNull { entry -> (entry.item as? TimelineItem.Banner)?.takeIf { it.isLivePause() } }
+
+private fun TimelineItem.Banner.isLivePause(): Boolean = kind == BannerKind.PAUSED && !resolved

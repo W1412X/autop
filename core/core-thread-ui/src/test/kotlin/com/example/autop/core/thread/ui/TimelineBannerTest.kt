@@ -14,14 +14,16 @@ import org.junit.Test
 /** 暂停横幅的生命周期：恢复或运行结束后，未决的暂停/拦截横幅必须消失（含其按钮）。 */
 class TimelineBannerTest {
     @Test
-    fun `resume removes the pause banner`() {
+    fun `resume keeps the pause as a resolved divider`() {
         val entries =
             mergeTimeline(
                 listOf(event(1, RunPaused(reason = PauseReason.MANUAL, detail = null)), event(2, RunResumed())),
                 emptyList(),
                 GROUP_THRESHOLD,
             )
-        assertThat(banners(entries)).isEmpty()
+        val items = entries.map { it.item }
+        val divider = TimelineItem.Banner(BannerKind.PAUSED, null, resolved = true)
+        assertThat(items).containsExactly(divider)
     }
 
     @Test
