@@ -75,6 +75,8 @@ private data class ChatMeta(
     val images: List<ImageAttachment> = emptyList(),
     /** 会话级模型覆盖（null = 跟随默认）。 */
     val modelProfileId: String? = null,
+    /** 只聊天（ADR-0035）：本页内存状态，发送时决定本轮是否提供屏幕工具。 */
+    val chatOnly: Boolean = false,
     val sheet: ChatThreadSheet = ChatThreadSheet(),
     val notice: ThreadNotice? = null,
 )
@@ -210,6 +212,7 @@ public class ChatThreadViewModel
         public fun onAction(action: ChatThreadAction) {
             when (action) {
                 is ChatThreadAction.SetInput -> meta.update { it.copy(input = action.text) }
+                is ChatThreadAction.SetChatOnly -> meta.update { it.copy(chatOnly = action.enabled) }
                 is ChatThreadAction.AddImages,
                 is ChatThreadAction.RemoveImage,
                 is ChatThreadAction.SetModel,
@@ -326,6 +329,7 @@ public class ChatThreadViewModel
                         text = text,
                         images = images,
                         modelProfileId = meta.value.modelProfileId,
+                        screenTools = !meta.value.chatOnly,
                     )
                 outcome.getOrNull()?.let { record ->
                     if (fresh) {
@@ -419,6 +423,7 @@ public class ChatThreadViewModel
                 accessibilityConnected = connected,
                 input = metaState.input,
                 modelProfileId = metaState.modelProfileId,
+                chatOnly = metaState.chatOnly,
                 images = metaState.images,
                 maxImages = chatConfig.attachMaxImages,
                 inputMaxLines = chatConfig.inputMaxLines,

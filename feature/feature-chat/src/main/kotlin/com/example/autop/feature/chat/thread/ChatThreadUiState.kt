@@ -60,6 +60,8 @@ public data class ChatThreadUiState(
     val modelOptions: List<OptionItem> = emptyList(),
     /** 全局默认模型 id（输入区芯片跟随默认时显示其名称与"默认"标记）。 */
     val defaultModelId: String? = null,
+    /** ADR-0035「只聊天」：开启时本轮发送不提供屏幕工具，不占用手机。 */
+    val chatOnly: Boolean = false,
     /** 待发送的图片（已压缩，发送后清空）。 */
     val images: List<ImageAttachment> = emptyList(),
     /** 单条消息可附图片数上限（`ui.chat.attachMaxImages`）。 */

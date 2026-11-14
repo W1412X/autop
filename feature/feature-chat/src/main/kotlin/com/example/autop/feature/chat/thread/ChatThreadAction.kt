@@ -29,6 +29,11 @@ public sealed interface ChatThreadAction {
         val profileId: String?,
     ) : ChatThreadAction
 
+    /** ADR-0035「只聊天」：开启后本轮发送不提供屏幕工具（不占用手机）。 */
+    public data class SetChatOnly(
+        val enabled: Boolean,
+    ) : ChatThreadAction
+
     /** 发送：空闲=发起对话；运行中=补充指令（steer）。 */
     public data object Send : ChatThreadAction
 
