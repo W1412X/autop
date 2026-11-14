@@ -52,6 +52,7 @@ import com.example.autop.core.ui.component.MarkdownText
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.component.llmErrorTextRes
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.flows.R
@@ -238,7 +239,7 @@ private fun Intro(onAction: (FlowAuthorAction) -> Unit) {
 private fun ErrorBanner(code: String) {
     StatusBanner(
         tone = StatusTone.BLOCKED,
-        message = stringResource(R.string.flow_error_generic, code),
+        message = stringResource(llmErrorTextRes(code)),
         modifier = Modifier.fillMaxWidth(),
     )
 }

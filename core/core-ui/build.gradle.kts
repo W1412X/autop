@@ -13,6 +13,7 @@ android {
 
 dependencies {
     implementation(project(":core:core-config"))
+    implementation(project(":llm:llm-api"))
     implementation(platform(libs.compose.bom))
     api(libs.compose.ui)
     api(libs.compose.foundation)

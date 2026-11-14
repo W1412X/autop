@@ -25,6 +25,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import com.example.autop.agent.RunOutcome
 import com.example.autop.core.thread.ui.R
 import com.example.autop.core.ui.component.AutopIcons
+import com.example.autop.core.ui.component.llmErrorTextRes
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.scaled
@@ -50,7 +51,7 @@ internal fun RunMetaRow(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.xs),
     ) {
-        result.summary?.let { summary ->
+        (result.summary ?: failureText(result))?.let { summary ->
             Text(
                 text = summary,
                 style = MaterialTheme.typography.bodySmall,
@@ -177,6 +178,15 @@ private fun durationText(millis: Long): String {
             )
     }
 }
+
+/** 失败且没有摘要时，用错误码对应的提示文案说明原因（不展示原始错误码）。 */
+@Composable
+private fun failureText(result: TimelineItem.RunMeta): String? =
+    if (result.outcome == RunOutcome.FAILED) {
+        result.errorCode?.let { stringResource(llmErrorTextRes(it)) }
+    } else {
+        null
+    }
 
 private const val MS_PER_SECOND: Long = 1000L
 private const val SECONDS_PER_MINUTE: Long = 60L

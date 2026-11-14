@@ -24,14 +24,30 @@ public fun mapHttpError(
         when {
             status in contextStatus && matchesContextExceeded(bodySnippet, contextPatterns) ->
                 LlmErrorCodes.CONTEXT_EXCEEDED
+            status == HTTP_PAYMENT_REQUIRED -> LlmErrorCodes.QUOTA_EXHAUSTED
+            status in QUOTA_BODY_STATUS && matchesQuotaExhausted(bodySnippet) -> LlmErrorCodes.QUOTA_EXHAUSTED
             status == HTTP_UNAUTHORIZED || status == HTTP_FORBIDDEN -> LlmErrorCodes.AUTH
             status == HTTP_TOO_MANY_REQUESTS -> LlmErrorCodes.RATE_LIMITED
             status in HTTP_SERVER_ERROR_MIN..HTTP_SERVER_ERROR_MAX -> LlmErrorCodes.SERVER
             status in HTTP_BAD_REQUEST..HTTP_CLIENT_ERROR_MAX -> LlmErrorCodes.BAD_REQUEST
             else -> LlmErrorCodes.BAD_RESPONSE
         }
-    val retryable = code != LlmErrorCodes.CONTEXT_EXCEEDED && status in retryStatus
+    val retryable =
+        code != LlmErrorCodes.CONTEXT_EXCEEDED && code != LlmErrorCodes.QUOTA_EXHAUSTED && status in retryStatus
     return error(code, status, bodySnippet, retryable)
+}
+
+/** 余额或额度不足的响应说明（小写子串匹配）：OpenAI 的 insufficient_quota、Anthropic 的 credit balance 等。 */
+private val QUOTA_BODY_MARKERS: List<String> =
+    listOf("insufficient_quota", "insufficient balance", "credit balance", "balance is too low")
+
+/** 响应体里出现余额说明时才视为余额不足的状态码（402 不看内容）。 */
+private val QUOTA_BODY_STATUS: Set<Int> = setOf(400, 429)
+
+/** 响应体是否说明余额或额度不足。 */
+public fun matchesQuotaExhausted(bodySnippet: String): Boolean {
+    val lower = bodySnippet.lowercase()
+    return QUOTA_BODY_MARKERS.any { lower.contains(it) }
 }
 
 /** 上下文超长识别：body 含任一子串（大小写不敏感，docs/tech/03 §4.3）。 */
@@ -85,6 +101,7 @@ private const val MS_PER_SECOND = 1000L
 private const val BODY_SNIPPET_LIMIT = 200
 private const val HTTP_BAD_REQUEST = 400
 private const val HTTP_UNAUTHORIZED = 401
+private const val HTTP_PAYMENT_REQUIRED = 402
 private const val HTTP_FORBIDDEN = 403
 private const val HTTP_TOO_MANY_REQUESTS = 429
 private const val HTTP_SERVER_ERROR_MIN = 500

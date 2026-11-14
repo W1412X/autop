@@ -95,6 +95,7 @@ public sealed interface TimelineItem {
         val stepCount: Int,
         val durationMs: Long,
         val outputTokens: Int,
+        val errorCode: String? = null,
     ) : TimelineItem
 
     /** 分叉来源标记（ForkMarker）。 */

@@ -13,4 +13,13 @@
     <string name="core_ui_model_default_tag">默认</string>
     <string name="core_ui_model_none">未配置模型</string>
     <string name="core_ui_model_title">选择模型</string>
+    <string name="error_llm_quota_exhausted">模型余额不足或额度已用完，请到服务商后台充值后再试。</string>
+    <string name="error_llm_auth">API Key 无效或没有访问权限，请到模型设置里检查。</string>
+    <string name="error_llm_rate_limited">请求太频繁，请稍后再试。</string>
+    <string name="error_llm_server">模型服务暂时不可用，请稍后再试。</string>
+    <string name="error_llm_network">网络连接失败，请检查网络后再试。</string>
+    <string name="error_llm_timeout">模型响应超时，请稍后再试。</string>
+    <string name="error_llm_context_exceeded">对话内容太长，超出了模型的处理上限。</string>
+    <string name="error_llm_not_configured">还没有配置模型，请到设置里选择模型。</string>
+    <string name="error_generic">出错了，请稍后再试。</string>
 </resources>

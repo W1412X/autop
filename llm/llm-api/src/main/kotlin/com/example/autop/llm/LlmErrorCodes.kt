@@ -23,6 +23,9 @@ public object LlmErrorCodes {
     /** 429 重试耗尽（retryable=true）。 */
     public const val RATE_LIMITED: String = "llm.rate_limited"
 
+    /** 余额不足或额度用完（HTTP 402，或 429/400 且响应说明余额/额度不足；retryable=false，充值前重试无意义）。 */
+    public const val QUOTA_EXHAUSTED: String = "llm.quota_exhausted"
+
     /** 上下文超长（retryable=false）。 */
     public const val CONTEXT_EXCEEDED: String = "llm.context_exceeded"
 

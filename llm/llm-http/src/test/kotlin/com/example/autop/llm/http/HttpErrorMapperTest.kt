@@ -22,6 +22,41 @@ class HttpErrorMapperTest {
     }
 
     @Test
+    fun `402 maps to quota exhausted and is not retryable`() {
+        val error = mapHttpError(402, "payment required", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
+        assertThat(error.code).isEqualTo(LlmErrorCodes.QUOTA_EXHAUSTED)
+        assertThat(error.retryable).isFalse()
+    }
+
+    @Test
+    fun `429 with insufficient_quota maps to quota exhausted and is not retryable`() {
+        val error =
+            mapHttpError(
+                429,
+                "{\"error\":{\"code\":\"insufficient_quota\"}}",
+                emptyList(),
+                CONTEXT_STATUS,
+                RETRY_STATUS,
+            )
+        assertThat(error.code).isEqualTo(LlmErrorCodes.QUOTA_EXHAUSTED)
+        assertThat(error.retryable).isFalse()
+    }
+
+    @Test
+    fun `plain 429 stays rate limited and retryable`() {
+        val error = mapHttpError(429, "slow down", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
+        assertThat(error.code).isEqualTo(LlmErrorCodes.RATE_LIMITED)
+        assertThat(error.retryable).isTrue()
+    }
+
+    @Test
+    fun `400 with credit balance message maps to quota exhausted`() {
+        val error =
+            mapHttpError(400, "Your credit balance is too low", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
+        assertThat(error.code).isEqualTo(LlmErrorCodes.QUOTA_EXHAUSTED)
+    }
+
+    @Test
     fun `401 and 403 map to auth`() {
         val unauthorized = mapHttpError(401, "no", emptyList(), CONTEXT_STATUS, RETRY_STATUS)
         val forbidden = mapHttpError(403, "no", emptyList(), CONTEXT_STATUS, RETRY_STATUS)

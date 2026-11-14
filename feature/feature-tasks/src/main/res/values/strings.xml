@@ -216,4 +216,5 @@
     <string name="run_entry_menu_raw">查看原始数据</string>
     <string name="run_raw_title">原始数据</string>
     <string name="run_raw_close">关闭</string>
+    <string name="task_author_llm_unavailable">模型暂时不可用，请到设置里检查模型后再试。</string>
 </resources>

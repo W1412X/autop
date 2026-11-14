@@ -50,6 +50,7 @@ import com.example.autop.core.ui.component.MarkdownText
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.component.llmErrorTextRes
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.tasks.R
@@ -227,10 +228,21 @@ private fun Intro(
 }
 
 @Composable
+private fun authorErrorText(code: String): String =
+    if (code == AUTHOR_LLM_UNAVAILABLE) {
+        stringResource(R.string.task_author_llm_unavailable)
+    } else {
+        stringResource(llmErrorTextRes(code))
+    }
+
+/** 任务创建页自身的错误码（TaskAuthorImpl.ERROR_LLM_UNAVAILABLE）。 */
+private const val AUTHOR_LLM_UNAVAILABLE: String = "task.author_llm_unavailable"
+
+@Composable
 private fun ErrorBanner(code: String) {
     StatusBanner(
         tone = StatusTone.BLOCKED,
-        message = code,
+        message = authorErrorText(code),
         modifier = Modifier.fillMaxWidth(),
     )
 }

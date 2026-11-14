@@ -136,6 +136,8 @@ public sealed interface CoreRow {
         val stepCount: Int,
         val durationMs: Long,
         val outputTokens: Int,
+        /** 失败时的错误码（RunFinished.errorCode），用于结果卡显示原因。 */
+        val errorCode: String? = null,
     ) : CoreRow
 
     /** 暂停 / 拦截 / 中断状态横幅。 */
@@ -399,6 +401,7 @@ private fun appendResult(
             stepCount = window.count { it.row is CoreRow.Step },
             durationMs = finished.createdAt - (startedAt ?: finished.createdAt),
             outputTokens = outputTokens,
+            errorCode = payload.errorCode,
         )
     val last = window.lastOrNull()
     val lastText = last?.row as? CoreRow.Assistant

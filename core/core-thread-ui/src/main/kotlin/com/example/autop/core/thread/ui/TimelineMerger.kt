@@ -55,6 +55,7 @@ private fun CoreRow.RunMeta.toMeta(): TimelineItem.RunMeta =
         stepCount = stepCount,
         durationMs = durationMs,
         outputTokens = outputTokens,
+        errorCode = errorCode,
     )
 
 private fun CoreRow.Step.toStepRow(): TimelineItem.StepRow =
