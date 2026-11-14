@@ -113,8 +113,9 @@ public class PairingDiscoveryImpl
                 _discoveredPort.value = null
                 return
             }
-            _discoveredPort.value = port
+            // 先决定通知是否展示，再发布端口：否则悬浮卡会先出现一帧，随后才因通知已展示而隐藏。
             if (notifiedPorts.add(port)) notifyPairing(port)
+            _discoveredPort.value = port
         }
 
         /** 发现通知：点按深链到注入通道页；通知栏内联回填配对码即可完成配对。 */
