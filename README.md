@@ -271,6 +271,11 @@ push 到 `main`、打 `v*` tag 或手动触发 `.github/workflows/release.yml`�
 ## 下载安装包
 
 统一在 [GitHub Releases](https://github.com/W1412X/autop/releases) 下载最新的 `app-release.apk`。侧载安装时，Android 13 及以上需要先在应用信息里「允许受限设置」，再开启无障碍服务，详见[首次使用](#首次使用)。
+## 第三方代码
+
+- **[Shizuku](https://github.com/RikkaApps/Shizuku)**（Apache License 2.0，版权归 RikkaApps 所有）：ADB 注入通道搬运了 Shizuku 的 ADB 协议栈（`domain/device-impl/.../impl/adb/`，含 AdbClient、AdbProtocol、AdbMessage、AdbKey、AdbMdns、AdbPairingClient 等），以及无线调试 SPAKE2 配对所用的 native 代码（`libadb.so`，来自 Shizuku 的 `jni/`，依赖 BoringSSL prefab）。搬运文件保留了原有的来源与许可头注释，仅去掉了调试日志。
+
+使用上述代码须遵守 Apache License 2.0。
 ## 许可
 
 仅供开发学习使用。仓库目前没有声明许可证；如需使用或二次开发，请先联系作者。
