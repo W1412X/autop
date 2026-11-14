@@ -30,8 +30,9 @@ import com.example.autop.core.ui.R
 import com.example.autop.core.ui.theme.LocalSpacing
 
 /**
- * 协议正文（可滚动）。[onReachedEnd] 在滚动到底部时回调；内容未超出屏幕时不会触发，
- * 因此调用方不能把它当作"已阅读"的唯一依据以外的手段（正文较长，实际不会出现）。
+ * 协议正文（可滚动）。[onReachedEnd] 在滚动到底部时回调；正文一屏放得下时（maxValue 为 0）
+ * 立即视为已到底部，否则同意按钮会永远无法点击。
+ * 布局前 ScrollState.maxValue 为 Int.MAX_VALUE，不会误判为已到底部。
  */
 @Composable
 public fun LegalDocument(
@@ -41,7 +42,7 @@ public fun LegalDocument(
 ) {
     val spacing = LocalSpacing.current
     val scroll = rememberScrollState()
-    val atEnd by remember { derivedStateOf { scroll.maxValue > 0 && scroll.value >= scroll.maxValue } }
+    val atEnd by remember { derivedStateOf { scroll.value >= scroll.maxValue } }
     LaunchedEffect(atEnd) {
         if (atEnd) onReachedEnd?.invoke()
     }
