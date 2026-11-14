@@ -27,6 +27,7 @@ import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlayHost
 import com.example.autop.device.OverlaySpec
+import com.example.autop.device.ScreenLease
 import com.example.autop.feature.overlay.OverlayWindowIds
 import com.example.autop.feature.overlay.composeOverlayView
 import com.example.autop.feature.overlay.panel.PanelRunActions
@@ -60,6 +61,7 @@ public class IndicatorController
         private val host: OverlayHost,
         private val runService: RunService,
         private val configProvider: ConfigProvider,
+        private val screenLease: ScreenLease,
         private val actions: PanelRunActions,
         private val progress: ProgressController,
         private val flowFeed: FlowProgressFeed,
@@ -95,8 +97,16 @@ public class IndicatorController
         public fun start() {
             scope.launch {
                 val indicator = configProvider.observe().map { it[UiConfig.INDICATOR] }
-                combine(runService.observeActive(), indicator) { active, ind ->
-                    VisibilityInput(active = active, enabled = ind.enabled, barOn = ind.capsule, glowOn = ind.edgeGlow)
+                combine(runService.observeActive(), indicator, screenLease.holder) { active, ind, holder ->
+                    // ADR-0035：边缘光只在本 Run 持有屏幕（真正操作手机）时显示；纯问答不亮。
+                    val operating = active?.run?.id?.value == holder
+                    VisibilityInput(
+                        active = active,
+                        enabled = ind.enabled,
+                        barOn = ind.capsule,
+                        glowOn =
+                            ind.edgeGlow && operating,
+                    )
                 }.collect { input -> applyVisibility(input) }
             }
             scope.launch { autoExpandOnInteraction() }

@@ -8,6 +8,7 @@ public object AgentErrorCodes {
     public const val INVALID_ARGS_JSON: String = "agent.invalid_args_json"
     public const val INVALID_ARGS: String = "agent.invalid_args"
     public const val TOOL_TIMEOUT: String = "agent.tool_timeout"
+    public const val SCREEN_BUSY: String = "agent.screen_busy"
     public const val TOOL_CRASHED: String = "agent.tool_crashed"
     public const val SKIPPED_PREVIOUS_FAILED: String = "agent.skipped_previous_failed"
     public const val SKIPPED_AFTER_CONTROL: String = "agent.skipped_after_control"

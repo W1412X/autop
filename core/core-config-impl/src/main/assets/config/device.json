@@ -1,6 +1,9 @@
 {
   "schemaVersion": 7,
   "device": {
+    "screenLease": {
+      "acquireTimeoutMs": 3000
+    },
     "capture": {
       "timeoutMs": 1500,
       "maxNodes": 3000,

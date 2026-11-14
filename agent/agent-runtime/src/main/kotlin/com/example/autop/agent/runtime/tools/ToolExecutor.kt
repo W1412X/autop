@@ -7,6 +7,8 @@ package com.example.autop.agent.runtime.tools
 import com.example.autop.agent.AgentErrorCodes
 import com.example.autop.agent.PauseReason
 import com.example.autop.agent.PreparedAction
+import com.example.autop.agent.ScreenAccess
+import com.example.autop.agent.ScreenAccessGate
 import com.example.autop.agent.ScreenActionTool
 import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolAccess
@@ -39,6 +41,7 @@ internal class ToolExecutor(
     prompts: PromptRepository,
     private val clock: Clock,
     private val logger: Logger,
+    private val screenGate: ScreenAccessGate? = null,
 ) {
     private val byName: Map<String, Tool> = tools.associateBy { it.spec.name }
     private val screenLock = ReadWriteMutex()
@@ -90,6 +93,21 @@ internal class ToolExecutor(
             else -> null
         }
 
+    /**
+     * ADR-0035：读写屏幕的工具首次执行前取得手机。忙时返回错误结果（附给模型的提示），不执行工具。
+     * 无门（null）或非屏幕工具直接放行。
+     */
+    private suspend fun gateScreen(tool: Tool): ToolOutput? {
+        if (!tool.touchesScreen) return null
+        val gate = screenGate ?: return null
+        if (gate.acquire() == ScreenAccess.HELD) return null
+        return errors.errorOutput(
+            AgentErrorCodes.SCREEN_BUSY,
+            "phone is in use by another task",
+            errors.render(ID_SCREEN_BUSY_HINT, emptyMap()),
+        )
+    }
+
     /** 加锁 + 超时执行；异常转 agent.tool_crashed（取消原样传播）。 */
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // 统一兜底转换为错误结果，异常不外传
     private suspend fun executeLocked(
@@ -100,6 +118,7 @@ internal class ToolExecutor(
         val timeoutMs = ctx.config[AgentConfig.TOOLS].let { it.timeoutMs[tool.id] ?: it.defaultTimeoutMs }
         return try {
             withTimeout(timeoutMs) {
+                gateScreen(tool)?.let { return@withTimeout it }
                 when (tool.access) {
                     ToolAccess.READ_SCREEN -> screenLock.withRead { invokeTool(tool, args, ctx) }
                     ToolAccess.WRITE_SCREEN -> screenLock.withWrite { invokeTool(tool, args, ctx) }
@@ -211,6 +230,7 @@ internal class ToolExecutor(
         const val ID_ERROR_RESULT = "agent.tool.error_result"
         const val ID_BLOCKED_HINT = "agent.policy.blocked_hint"
         const val ID_TIMEOUT_WRITE_HINT = "agent.tool.timeout_write_hint"
+        const val ID_SCREEN_BUSY_HINT = "agent.screen.busy_hint"
         const val ID_TRACE_HEADER = "agent.tool.trace_header"
     }
 }

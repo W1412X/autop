@@ -64,8 +64,9 @@ public class RunCoordinator(
         text: String,
         images: List<ImageAttachment>,
         modelProfileId: String?,
+        screenTools: Boolean,
     ): Outcome<RunRecord> {
-        val result = executor.launchChat(threadId, text, images, modelProfileId)
+        val result = executor.launchChat(threadId, text, images, modelProfileId, screenTools)
         host.ensureRunning()
         return result
     }

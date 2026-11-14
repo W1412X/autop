@@ -245,6 +245,7 @@ private class FakeRunService : RunService {
         text: String,
         images: List<com.example.autop.task.ImageAttachment>,
         modelProfileId: String?,
+        screenTools: Boolean,
     ): com.example.autop.core.common.Outcome<RunRecord> = error("unused")
 
     override suspend fun forkAndRun(

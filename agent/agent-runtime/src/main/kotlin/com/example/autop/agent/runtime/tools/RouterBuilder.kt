@@ -48,6 +48,8 @@ internal class RouterBuilder(
             tools.filter { tool ->
                 // Beta 功能关闭时工具整体不存在：不进入状态消息，模型无从得知其存在（ADR-0030）。
                 if (tool.betaFeature?.let { !features.isEnabled(it) } == true) return@filter false
+                // ADR-0035「只聊天」：屏幕工具整体不进入本轮工具列表，也不记入隐藏清单（模型无从得知）。
+                if (!request.screenTools && isScreenTool(tool)) return@filter false
                 val reason = hiddenReasonOf(tool, enabled, toolFilter, capabilities)
                 if (reason == null) {
                     true
@@ -59,12 +61,14 @@ internal class RouterBuilder(
         val router =
             ToolRouter(
                 tools = visible,
-                executor = ToolExecutor(visible, policy, audit, prompts, clock, logger),
+                executor = ToolExecutor(visible, policy, audit, prompts, clock, logger, request.screenGate),
                 enrichers = enrichers.toList(),
                 prompts = prompts,
             )
         return RouterBuild(router, hidden)
     }
+
+    private fun isScreenTool(tool: Tool): Boolean = tool.touchesScreen
 
     /** 首个不可见原因；null = 可见（与 [ToolRouter.visibleTools] 同一判定顺序）。 */
     private fun hiddenReasonOf(

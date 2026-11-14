@@ -143,6 +143,9 @@ public class RunFlowTool
         // 流程内部有自己的工具路由与锁；这里按"写系统"串行化，避免与其他写工具并行。
         override val access: ToolAccess = ToolAccess.WRITE_SYSTEM
 
+        /** 流程可能操作屏幕：智能体在调用前按需取得屏幕，流程内的动作在该租约下执行（ADR-0035）。 */
+        override val touchesScreen: Boolean = true
+
         override suspend fun invoke(
             args: JsonObject,
             ctx: ToolContext,

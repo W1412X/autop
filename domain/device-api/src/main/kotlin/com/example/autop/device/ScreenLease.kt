@@ -13,6 +13,18 @@ public interface ScreenLease {
         block: suspend () -> T,
     ): T
 
+    /**
+     * 按需取得租约（ADR-0035）：取得后持有到 [release]，期间 [withLease] 的其他 owner 会等待。
+     * 同一 owner 重复调用直接返回 true。[timeoutMs] 内取不到返回 false，不无限等待。
+     */
+    public suspend fun tryAcquire(
+        owner: String,
+        timeoutMs: Long,
+    ): Boolean
+
+    /** 释放 [owner] 持有的租约；不是持有者时无效果。 */
+    public fun release(owner: String)
+
     /** 当前持有者（无持有者为 null）。 */
     public val holder: StateFlow<String?>
 }

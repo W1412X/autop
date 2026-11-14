@@ -59,6 +59,7 @@ public class RunExecutor(
         text: String,
         images: List<ImageAttachment>,
         modelProfileId: String? = null,
+        screenTools: Boolean = true,
     ): Outcome<RunRecord> {
         val placeholder = if (threadId == null) placeholderTitle(text) else null
         val thread = threadId ?: threadStore.createThread(title = placeholder, parent = null)
@@ -71,7 +72,15 @@ public class RunExecutor(
         val blocks = mutableListOf<Block>()
         if (text.isNotBlank()) blocks += Block.Text(text)
         saveImages(thread, images, blocks)
-        val enqueued = enqueue(RunOrigin.CHAT, thread, blocks, UserMessageKind.INPUT, emptyMap(), null)
+        val enqueued =
+            enqueue(
+                RunOrigin.CHAT,
+                thread,
+                blocks,
+                UserMessageKind.INPUT,
+                if (screenTools) emptyMap() else mapOf(SCREEN_TOOLS_VAR to "false"),
+                null,
+            )
         if (placeholder != null && enqueued is Outcome.Ok) {
             refineTitle(thread = thread, message = text, placeholder = placeholder)
         }

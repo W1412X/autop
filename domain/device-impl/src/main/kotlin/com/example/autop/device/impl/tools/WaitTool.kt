@@ -34,7 +34,7 @@ public class WaitTool
 
         override val spec = DeviceToolSpecs.wait
 
-        override val access: ToolAccess = ToolAccess.READ_SCREEN
+        override val access: ToolAccess = ToolAccess.CONTROL
 
         override suspend fun invoke(
             args: JsonObject,

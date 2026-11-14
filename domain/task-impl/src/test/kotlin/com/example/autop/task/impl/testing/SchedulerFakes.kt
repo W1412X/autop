@@ -88,6 +88,19 @@ public class FakeScreenLease(
         current.value = owner
     }
 
+    override suspend fun tryAcquire(
+        owner: String,
+        timeoutMs: Long,
+    ): Boolean {
+        if (current.value == owner) return true
+        current.value = owner
+        return true
+    }
+
+    override fun release(owner: String) {
+        if (current.value == owner) current.value = null
+    }
+
     override suspend fun <T> withLease(
         owner: String,
         block: suspend () -> T,

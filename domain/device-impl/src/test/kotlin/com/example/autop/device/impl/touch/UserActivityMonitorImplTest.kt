@@ -150,6 +150,13 @@ class UserActivityMonitorImplTest {
             block: suspend () -> T,
         ): T = block()
 
+        override suspend fun tryAcquire(
+            owner: String,
+            timeoutMs: Long,
+        ): Boolean = true
+
+        override fun release(owner: String) = Unit
+
         override val holder: StateFlow<String?> = MutableStateFlow(null)
     }
 

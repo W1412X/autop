@@ -53,6 +53,7 @@ internal class FakeRunService(
         text: String,
         images: List<com.example.autop.task.ImageAttachment>,
         modelProfileId: String?,
+        screenTools: Boolean,
     ): Outcome<RunRecord> = error("unused")
 
     override suspend fun forkAndRun(

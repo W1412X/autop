@@ -13,6 +13,8 @@ package com.example.autop.task.impl
 import com.example.autop.agent.RunHandle
 import com.example.autop.agent.RunState
 import com.example.autop.device.TouchShield
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -32,10 +34,16 @@ public class TouchShieldWatcher
             shield.reset()
         }
 
-        /** 按 Run 状态驱动屏蔽；协程由 RunRunner 在 Run 结束时取消（finally 兜底解除）。 */
-        public suspend fun watch(handle: RunHandle) {
+        /** 按 Run 状态与屏幕占用驱动屏蔽（ADR-0035：只有本 Run 持有屏幕时才屏蔽）；协程由 RunRunner 在 Run 结束时取消（finally 兜底解除）。 */
+        public suspend fun watch(
+            handle: RunHandle,
+            owner: String,
+            holder: StateFlow<String?>,
+        ) {
             try {
-                handle.state.collect { shield.setActive(shouldShield(it)) }
+                handle.state
+                    .combine(holder) { state, current -> shouldShield(state) && current == owner }
+                    .collect { shield.setActive(it) }
             } finally {
                 shield.setActive(false)
             }

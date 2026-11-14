@@ -31,6 +31,10 @@ public data class RunRequest(
     val modelProfileId: String? = null,
     /** WP10：有值时先回放再进入主循环（docs/tech/04 §3.12）。 */
     val replay: ReplayPlan? = null,
+    /** ADR-0035：智能体按需占用屏幕的门；null 时屏幕工具不取得租约（仅用于测试与流程运行）。 */
+    val screenGate: ScreenAccessGate? = null,
+    /** ADR-0035「只聊天」：false 时屏幕工具不出现在本次 Run 的工具列表中。 */
+    val screenTools: Boolean = true,
 )
 
 /** 按请求解析 provider：会话级覆盖优先，否则取默认模型（模型切换）。 */

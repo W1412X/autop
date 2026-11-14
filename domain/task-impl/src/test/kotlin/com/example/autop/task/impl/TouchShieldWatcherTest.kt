@@ -44,7 +44,8 @@ public class TouchShieldWatcherTest {
         runTest {
             val shield = FakeTouchShield()
             val handle = MutableStateHandle(RunState.STARTING)
-            val job = launch { TouchShieldWatcher(shield).watch(handle) }
+            val holder = MutableStateFlow<String?>("test-run")
+            val job = launch { TouchShieldWatcher(shield).watch(handle, "test-run", holder) }
             runCurrent()
             assertTrue(shield.lastActive)
 
@@ -62,6 +63,23 @@ public class TouchShieldWatcherTest {
         }
 
     @Test
+    public fun `no shield while another run holds the screen`() =
+        runTest {
+            // ADR-0035：未持有屏幕的 Run 执行态也不屏蔽；持有权转移后才屏蔽。
+            val shield = FakeTouchShield()
+            val handle = MutableStateHandle(RunState.EXECUTING_TOOLS)
+            val holder = MutableStateFlow<String?>("other-run")
+            val job = launch { TouchShieldWatcher(shield).watch(handle, "test-run", holder) }
+            runCurrent()
+            assertFalse(shield.lastActive)
+
+            holder.value = "test-run"
+            runCurrent()
+            assertTrue(shield.lastActive)
+            job.cancelAndJoin()
+        }
+
+    @Test
     public fun `beginRun resets force release before driving`() =
         runTest {
             // N191/N217（安全关键）：上一 Run 被强制解除后，新 Run 仍能正常屏蔽——
@@ -72,7 +90,8 @@ public class TouchShieldWatcherTest {
             watcher.beginRun()
             assertFalse(shield.forceReleased)
             val handle = MutableStateHandle(RunState.EXECUTING_TOOLS)
-            val job = launch { watcher.watch(handle) }
+            val holder = MutableStateFlow<String?>("test-run")
+            val job = launch { watcher.watch(handle, "test-run", holder) }
             runCurrent()
             assertTrue(shield.lastActive)
             job.cancelAndJoin()

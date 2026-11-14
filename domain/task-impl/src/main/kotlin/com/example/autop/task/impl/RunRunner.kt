@@ -21,6 +21,7 @@ import com.example.autop.core.common.Clock
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Logger
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.FlowConfig
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.core.prompt.PromptRepository
@@ -96,14 +97,26 @@ public class RunRunner(
             return
         }
         val needsScreen = flowLaunch?.needsScreen ?: task?.needsScreen ?: true
-        val originPkg = if (needsScreen) deviceState.current().foregroundPackage else null
         val request = if (flowLaunch == null && !isFlowTask(task)) buildRequest(record, task, entry) else null
+        // ADR-0035：智能体 Run 按需占用屏幕（首次屏幕工具调用时取得），不在开始时整段取租约。
+        val gate =
+            request?.let {
+                RunScreenGate(
+                    owner = record.id.value,
+                    lease = screenLease,
+                    deviceState = deviceState,
+                    acquireTimeoutMs = configProvider.current()[DeviceConfig.SCREEN_LEASE].acquireTimeoutMs,
+                )
+            }
+        // 流程与任务的流程运行仍在开始时持有租约（屏幕需求在定义里已知）。
+        val originPkg = if (gate == null && needsScreen) deviceState.current().foregroundPackage else null
         val finished =
             try {
-                if (needsScreen) {
-                    screenLease.withLease(record.id.value) { runBlock(record, request, flowLaunch, task, entry) }
+                val run = request?.copy(screenGate = gate)
+                if (gate == null && needsScreen) {
+                    screenLease.withLease(record.id.value) { runBlock(record, run, flowLaunch, task, entry) }
                 } else {
-                    runBlock(record, request, flowLaunch, task, entry)
+                    runBlock(record, run, flowLaunch, task, entry)
                 }
             } catch (e: CancellationException) {
                 // 取消也要收口：不 finish/clear 会让进度页永远停在「运行中」。
@@ -124,11 +137,13 @@ public class RunRunner(
                     )
                 ensureRunFinished(record, failed)
                 failed
+            } finally {
+                gate?.release()
             }
         observer.finish(record.id, finished)
         observer.clear(record.id)
         val final = runStore.get(record.id) ?: return
-        settle(record, task, flowLaunch, finished, final, originPkg)
+        settle(record, task, flowLaunch, finished, final, gate?.originPackage ?: originPkg)
     }
 
     /** 收口后的沉淀与通知：回放脚本、流程建议、后台通知、回到原 App。 */
@@ -236,7 +251,7 @@ public class RunRunner(
             flowFeed.register(record.id, flowLaunch.definition.name, handle)
         }
         val watcher = scope.launch { observer.watch(record.id, handle) }
-        val shieldWatcher = scope.launch { touchShieldWatcher.watch(handle) }
+        val shieldWatcher = scope.launch { touchShieldWatcher.watch(handle, record.id.value, screenLease.holder) }
         try {
             return handle.await()
         } finally {
@@ -296,6 +311,7 @@ public class RunRunner(
             toolFilter = task?.allowedTools,
             modelProfileId = threadStore.modelProfileOf(record.threadId),
             replay = replayPlan(record, task),
+            screenTools = entry?.vars?.get(SCREEN_TOOLS_VAR) != "false",
         )
 
     /**

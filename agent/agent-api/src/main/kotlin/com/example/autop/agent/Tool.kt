@@ -54,6 +54,13 @@ public interface Tool {
 
     public val access: ToolAccess
 
+    /**
+     * 是否会读写手机屏幕（ADR-0035）：为真时执行前必须取得屏幕（按需占用），「只聊天」下不可见。
+     * 默认由访问类别推导；会在工具内部操作屏幕、但类别不是屏幕类（如 `run_flow`）的工具需覆盖为真。
+     */
+    public val touchesScreen: Boolean
+        get() = access == ToolAccess.READ_SCREEN || access == ToolAccess.WRITE_SCREEN
+
     /** 设备能力要求（如截图需要 API 30+），不满足时不出现在可用工具列表。 */
     public val requiredCapabilities: Set<Capability>
         get() = emptySet()

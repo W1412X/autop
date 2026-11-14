@@ -7,6 +7,13 @@ package com.example.autop.core.config
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
+/** `device.screenLease`：屏幕占用（ADR-0035 按需占用）。 */
+@Serializable
+public data class DeviceScreenLeaseSection(
+    /** 智能体首次需要屏幕时，等待手机空闲的最长时间；超时返回「手机正被使用」。 */
+    @SerialName("acquireTimeoutMs") val acquireTimeoutMs: Long = 3000,
+) : ConfigSection
+
 /** `device.capture`：屏幕抓取。 */
 @Serializable
 public data class DeviceCaptureSection(
@@ -471,6 +478,8 @@ public data class DeviceAppsSection(
 
 /** `device` 领域全部配置键的登记（DI 多绑定与测试用）。 */
 public object DeviceConfig {
+    public val SCREEN_LEASE: ConfigKey<DeviceScreenLeaseSection> =
+        ConfigKey("device.screenLease", DeviceScreenLeaseSection.serializer()) { DeviceScreenLeaseSection() }
     public val CAPTURE: ConfigKey<DeviceCaptureSection> =
         ConfigKey("device.capture", DeviceCaptureSection.serializer()) { DeviceCaptureSection() }
     public val EVENTS: ConfigKey<DeviceEventsSection> =

@@ -307,6 +307,7 @@ private class FakeChatRunService : RunService {
         text: String,
         images: List<ImageAttachment>,
         modelProfileId: String?,
+        screenTools: Boolean,
     ): Outcome<RunRecord> = Outcome.Ok(record("r-new", threadId ?: ThreadId("thread-new")))
 
     override suspend fun forkAndRun(
