@@ -99,6 +99,7 @@ public fun TasksListScreen(
             menuTaskId = null
             when (selected) {
                 MENU_EDIT -> onAction(TasksListAction.OpenEdit(id))
+                MENU_AI_EDIT -> onAction(TasksListAction.OpenAiEdit(id))
                 MENU_DELETE -> onAction(TasksListAction.RequestDelete(id))
             }
         },
@@ -175,6 +176,11 @@ private fun TaskDialogs(
                         icon = OptionIcon.EDIT,
                     ),
                     OptionItem(
+                        id = MENU_AI_EDIT,
+                        label = stringResource(R.string.tasks_action_ai_edit),
+                        icon = OptionIcon.AI,
+                    ),
+                    OptionItem(
                         id = MENU_DELETE,
                         label = stringResource(R.string.tasks_action_delete),
                         icon = OptionIcon.DELETE,
@@ -198,6 +204,7 @@ private fun TaskDialogs(
 }
 
 private const val MENU_EDIT = "edit"
+private const val MENU_AI_EDIT = "ai_edit"
 private const val MENU_DELETE = "delete"
 
 @Composable

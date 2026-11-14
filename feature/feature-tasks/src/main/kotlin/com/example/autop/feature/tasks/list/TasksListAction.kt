@@ -23,6 +23,11 @@ public sealed interface TasksListAction {
         val taskId: String,
     ) : TasksListAction
 
+    /** AI 修改已有任务（进入 AI 创作页，带上该任务）。 */
+    public data class OpenAiEdit(
+        val taskId: String,
+    ) : TasksListAction
+
     /** 新建任务。 */
     public data object CreateTask : TasksListAction
 

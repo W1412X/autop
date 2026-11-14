@@ -78,6 +78,7 @@ public class TasksListViewModel
                 TasksListAction.CreateFlow -> if (flowsEnabled.value) navigator.openFlowCreate()
                 is TasksListAction.OpenDetail,
                 is TasksListAction.OpenEdit,
+                is TasksListAction.OpenAiEdit,
                 TasksListAction.CreateTask,
                 TasksListAction.CreateTaskAi,
                 -> navigate(action, navigator)
@@ -100,6 +101,7 @@ public class TasksListViewModel
             when (action) {
                 is TasksListAction.OpenDetail -> navigator.openDetail(action.taskId)
                 is TasksListAction.OpenEdit -> navigator.openEdit(action.taskId)
+                is TasksListAction.OpenAiEdit -> navigator.openTaskAuthor(action.taskId)
                 TasksListAction.CreateTask -> navigator.openEdit(NEW_TASK_ID)
                 TasksListAction.CreateTaskAi -> navigator.openTaskAuthor()
                 else -> Unit

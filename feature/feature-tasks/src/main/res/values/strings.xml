@@ -31,6 +31,7 @@
     <string name="tasks_delete_text">删除后不可恢复，历史运行记录会保留。</string>
     <string name="tasks_delete_confirm">删除</string>
     <string name="tasks_action_edit">编辑</string>
+    <string name="tasks_action_ai_edit">AI 修改</string>
     <string name="tasks_action_delete">删除</string>
     <string name="tasks_trigger_manual">手动触发</string>
     <string name="tasks_trigger_schedule">定时：%1$s</string>
