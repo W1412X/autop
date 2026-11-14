@@ -1,5 +1,5 @@
 /**
- * "我的"一级页（docs/tech/08 §4.5 两级结构）：健康状态卡 + 七个分类入口。
+ * "我的"一级页（docs/tech/08 §4.5 两级结构）：应用状态列表 + 七个分类入口。
  *
  * 每个分类行的副标题显示当前值（如常驻后台状态、主模型名）；点击进入对应的二级页 [MeGroupScreen]。
  */
@@ -51,7 +51,7 @@ public fun MeScreen(
     ) {
         LazyColumn(modifier = Modifier.fillMaxSize()) {
             item { TopLevelHeader(title = stringResource(R.string.me_title)) }
-            item { HealthCard(state = state, onAction = onAction) }
+            item { AppStatusSection(state = state, onAction = onAction) }
             items(GROUP_ORDER, key = { it.id }) { group ->
                 NavRow(
                     title = stringResource(groupTitleRes(group)),

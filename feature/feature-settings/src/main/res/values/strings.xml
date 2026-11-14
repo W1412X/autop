@@ -478,4 +478,7 @@
     <string name="me_navigation_auto">自动（按优先级选择已安装的应用）</string>
     <string name="me_navigation_ask">每次询问</string>
     <string name="me_navigation_not_installed">%1$s（未安装，将自动选择）</string>
+    <string name="me_app_status_permission">必需权限</string>
+    <string name="me_app_status_shell">注入通道</string>
+    <string name="me_app_status_model">当前模型</string>
 </resources>
