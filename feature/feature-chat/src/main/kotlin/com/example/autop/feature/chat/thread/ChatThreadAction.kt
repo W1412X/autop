@@ -6,6 +6,7 @@
 package com.example.autop.feature.chat.thread
 
 import android.net.Uri
+import com.example.autop.agent.timeline.StepLink
 
 public sealed interface ChatThreadAction {
     /** 输入框变化。 */

@@ -21,6 +21,7 @@ import com.example.autop.core.common.Logger
 import com.example.autop.core.common.exceptionHandler
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.TaskConfig
+import com.example.autop.core.platform.DataSchemaState
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellKeepAlive
 import com.example.autop.task.ActiveRunInfo
@@ -106,7 +107,13 @@ public class AgentHostService : Service() {
         intent: Intent?,
         flags: Int,
         startId: Int,
-    ): Int = START_STICKY
+    ): Int {
+        if (!DataSchemaState.isReady()) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
+        return START_STICKY
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 

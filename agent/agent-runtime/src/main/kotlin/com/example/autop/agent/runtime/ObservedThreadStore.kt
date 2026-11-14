@@ -27,6 +27,15 @@ internal class ObservedThreadStore(
         parent: Pair<ThreadId, Long>?,
     ): ThreadId = delegate.createThread(title, parent)
 
+    override suspend fun createTaskRunThread(title: String?): ThreadId = delegate.createTaskRunThread(title)
+
+    override suspend fun listChatThreads(
+        offset: Int,
+        limit: Int,
+    ): List<ThreadSummary> = delegate.listChatThreads(offset, limit)
+
+    override suspend fun pruneTaskRunThreads(keep: Int): List<ThreadId> = delegate.pruneTaskRunThreads(keep)
+
     override suspend fun append(
         threadId: ThreadId,
         runId: RunId?,

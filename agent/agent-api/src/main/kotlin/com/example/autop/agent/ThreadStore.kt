@@ -15,6 +15,12 @@ import kotlinx.coroutines.flow.map
  */
 public const val USER_IMAGE_NAME_PREFIX: String = "pick-"
 
+/** 线程来源（ADR-0031）：对话列表只显示 [CHAT]；任务与流程运行各自的线程为 [TASK_RUN]。 */
+public enum class ThreadOrigin {
+    CHAT,
+    TASK_RUN,
+}
+
 /** 线程列表项（`listThreads` 返回）。 */
 public data class ThreadSummary(
     val threadId: ThreadId,
@@ -82,6 +88,21 @@ public interface ThreadStore {
         offset: Int,
         limit: Int,
     ): List<ThreadSummary>
+
+    /** 对话列表（倒序，只含 [ThreadOrigin.CHAT] 的线程）。默认实现不过滤，正式实现在存储层过滤。 */
+    public suspend fun listChatThreads(
+        offset: Int,
+        limit: Int,
+    ): List<ThreadSummary> = listThreads(offset, limit)
+
+    /** 建任务或流程运行的线程（来源 [ThreadOrigin.TASK_RUN]，不出现在对话列表）。 */
+    public suspend fun createTaskRunThread(title: String?): ThreadId = createThread(title, null)
+
+    /**
+     * 保留最近 [keep] 个任务运行线程，删除更早的（ADR-0031）。返回被删除的线程 id，调用方据此删除运行记录。
+     * 默认实现不删除，正式实现在存储层按创建时间删除。
+     */
+    public suspend fun pruneTaskRunThreads(keep: Int): List<ThreadId> = emptyList()
 
     /** 重命名线程。 */
     public suspend fun rename(

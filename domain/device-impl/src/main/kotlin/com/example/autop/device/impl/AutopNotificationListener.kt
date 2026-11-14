@@ -10,6 +10,7 @@ import com.example.autop.core.common.Logger
 import com.example.autop.core.common.exceptionHandler
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceConfig
+import com.example.autop.core.platform.DataSchemaState
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -45,6 +46,7 @@ public class AutopNotificationListener : NotificationListenerService() {
     }
 
     override fun onNotificationPosted(sbn: StatusBarNotification) {
+        if (!DataSchemaState.isReady()) return
         val info = parse(sbn) ?: return
         scope.launch { feed.onPosted(info) }
     }

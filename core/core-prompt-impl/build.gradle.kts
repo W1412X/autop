@@ -7,6 +7,7 @@ plugins {
 dependencies {
     api(project(":core:core-prompt"))
     implementation(libs.androidx.datastore.core)
+    implementation(project(":core:core-platform"))
 }
 
 // 测试读取真实的 assets/prompts（docs/tech/02 §5 的 autop.promptDir 机制）。

@@ -27,6 +27,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.config.UiBannerSection
+import com.example.autop.core.thread.ui.TimelineEntry
+import com.example.autop.core.thread.ui.TimelineRow
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTonalButton
@@ -160,7 +162,7 @@ private fun ThreadTimeline(
             items(count = entries.size) { index ->
                 TimelineRow(
                     entry = entries[index],
-                    onAction = onAction,
+                    onAction = { action -> onAction(action.toChatAction()) },
                     modifier = Modifier.fillMaxWidth(),
                 )
             }

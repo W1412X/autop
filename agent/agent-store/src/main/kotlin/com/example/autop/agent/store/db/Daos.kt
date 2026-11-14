@@ -49,6 +49,23 @@ public interface ThreadDao {
         limit: Int,
     ): List<ThreadEntity>
 
+    /** 对话列表分页：只含来源为 CHAT 的线程（ADR-0031）。 */
+    @Query(
+        "SELECT * FROM threads WHERE archived = 0 AND origin = 'CHAT' " +
+            "ORDER BY updatedAt DESC LIMIT :limit OFFSET :offset",
+    )
+    public suspend fun pageChat(
+        offset: Int,
+        limit: Int,
+    ): List<ThreadEntity>
+
+    /** 任务运行线程中，创建时间最早、超出 [keep] 个的线程 id。 */
+    @Query(
+        "SELECT id FROM threads WHERE origin = 'TASK_RUN' " +
+            "ORDER BY createdAt DESC LIMIT -1 OFFSET :keep",
+    )
+    public suspend fun taskRunIdsBeyond(keep: Int): List<String>
+
     @Query("UPDATE threads SET title = :title WHERE id = :id")
     public suspend fun rename(
         id: String,

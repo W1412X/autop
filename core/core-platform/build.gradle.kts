@@ -10,6 +10,8 @@ dependencies {
     // BitmapImageLoader 实现 llm 领域的 ImageLoader 端口（docs/tech/03 §6）。
     implementation(project(":llm:llm-api"))
     implementation(libs.androidx.datastore.preferences)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
 
 // 测试读取真实的 assets/rules/device_quirks.json（同 core-config-impl 的 autop.configDir 机制）。

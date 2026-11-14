@@ -122,7 +122,7 @@ public class ChatListViewModel
             if (current.loading || current.endReached) return
             page.update { it.copy(loading = true, failed = false) }
             viewModelScope.launch {
-                val result = runCatching { threadStore.listThreads(current.items.size, PAGE_SIZE) }
+                val result = runCatching { threadStore.listChatThreads(current.items.size, PAGE_SIZE) }
                 result.fold(
                     onSuccess = { next ->
                         page.update {
@@ -179,7 +179,7 @@ public class ChatListViewModel
                     .coerceAtLeast(PAGE_SIZE)
             page.update { it.copy(loading = true, failed = false) }
             viewModelScope.launch {
-                runCatching { threadStore.listThreads(offset = 0, limit = keep) }.fold(
+                runCatching { threadStore.listChatThreads(offset = 0, limit = keep) }.fold(
                     onSuccess = { items ->
                         page.update {
                             it.copy(items = items, loading = false, endReached = items.size < keep)

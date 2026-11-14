@@ -6,4 +6,10 @@
     <string name="nav_memory">记忆</string>
     <string name="nav_me">我的</string>
     <string name="app_placeholder_soon">即将推出</string>
+    <string name="data_schema_title">数据结构已更新</string>
+    <string name="data_schema_body">以下数据库的结构版本与当前版本不一致：%1$s。请选择备份后清除（备份写入下方位置，之后数据库按新结构重新创建），或直接清除。</string>
+    <string name="data_schema_backup_path">备份位置：%1$s</string>
+    <string name="data_schema_backup_and_clear">备份后清除</string>
+    <string name="data_schema_clear">直接清除</string>
+    <string name="data_schema_failed">操作失败：%1$s</string>
 </resources>

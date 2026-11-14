@@ -1,12 +1,14 @@
 package com.example.autop
 
 import android.app.Application
+import android.content.Context
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.platform.AndroidLogger
 import com.example.autop.core.platform.CrashLogger
+import com.example.autop.core.platform.DataSchemaState
 import com.example.autop.device.PairingDiscovery
 import com.example.autop.device.UpdateChecker
 import com.example.autop.device.UserActivityMonitor
@@ -100,9 +102,30 @@ class AutopApplication : Application() {
     @AppScope
     lateinit var appScope: CoroutineScope
 
+    override fun attachBaseContext(base: Context) {
+        super.attachBaseContext(base)
+        // ADR-0032：在依赖注入与任何数据读取之前检查。DataStore 在读取到不一致的文件时会重置它，
+        // 所以必须先于注入判断，用户选择前不能碰这些文件。
+        if (dataSchemaGate(this).mismatches().isNotEmpty()) {
+            DataSchemaState.block()
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         CrashLogger.install(androidLogger)
+        if (DataSchemaState.blocked) return
+        DataSchemaState.markReady()
+        startServices()
+    }
+
+    /** 数据结构页完成备份或清除后调用：解除拦截并启动被推迟的服务（必须在主线程调用）。 */
+    public fun resumeAfterDataReset() {
+        DataSchemaState.markReady()
+        startServices()
+    }
+
+    private fun startServices() {
         bindLoggingConfig()
         // N186：触摸盾最先注册并常驻（z 序垫底，开关走 spec.touchable）。
         touchShield.start()

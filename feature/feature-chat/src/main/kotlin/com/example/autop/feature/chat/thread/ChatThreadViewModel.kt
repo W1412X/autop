@@ -27,6 +27,9 @@ import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.UiConfig
+import com.example.autop.core.thread.ui.TimelineEntry
+import com.example.autop.core.thread.ui.TimelineItem
+import com.example.autop.core.thread.ui.mergeTimeline
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.feature.chat.NEW_THREAD

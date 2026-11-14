@@ -11,6 +11,7 @@ import com.example.autop.core.common.Logger
 import com.example.autop.core.common.RunId
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.TaskConfig
+import com.example.autop.core.platform.DataSchemaState
 import com.example.autop.task.impl.RunControl
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -28,6 +29,7 @@ public class ReminderActionReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
+        if (!DataSchemaState.isReady()) return
         val runId = intent.getStringExtra(EXTRA_RUN_ID)?.let { RunId(it) } ?: return
         when (intent.action) {
             ACTION_EXECUTE -> control.requeueNow(runId)

@@ -15,7 +15,7 @@ import androidx.room.RoomDatabase
         ThreadEventFtsEntity::class,
         ThreadEventVectorEntity::class,
     ],
-    version = 1,
+    version = THREADS_DB_VERSION,
     exportSchema = true,
 )
 public abstract class ThreadsDb : RoomDatabase() {
@@ -27,3 +27,6 @@ public abstract class ThreadsDb : RoomDatabase() {
 
     public abstract fun vectorDao(): VectorDao
 }
+
+/** threads.db（线程） 结构版本（ADR-0032）：结构变化时升高，启动检查据此提示备份或清除。 */
+public const val THREADS_DB_VERSION: Int = 2

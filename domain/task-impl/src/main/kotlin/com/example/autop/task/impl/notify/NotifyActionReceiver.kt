@@ -8,6 +8,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.example.autop.core.common.RunId
+import com.example.autop.core.platform.DataSchemaState
 import com.example.autop.task.impl.R
 import com.example.autop.task.impl.RunControl
 import dagger.hilt.android.AndroidEntryPoint
@@ -22,6 +23,7 @@ public class NotifyActionReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
+        if (!DataSchemaState.isReady()) return
         val runId = intent.getStringExtra(EXTRA_RUN_ID)?.let { RunId(it) } ?: return
         when (intent.action) {
             UserNotifierImpl.ACTION_RESUME ->

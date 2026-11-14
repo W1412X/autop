@@ -7,26 +7,19 @@ package com.example.autop.feature.tasks.run
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.example.autop.agent.AssistantMessage
-import com.example.autop.agent.EventPayload
-import com.example.autop.agent.PlanUpdated
-import com.example.autop.agent.RunFinished
-import com.example.autop.agent.RunNoteAdded
-import com.example.autop.agent.RunPaused
-import com.example.autop.agent.RunResumed
-import com.example.autop.agent.RunStarted
 import com.example.autop.agent.ThreadStore
-import com.example.autop.agent.ToolResultEvent
-import com.example.autop.agent.UserMessage
-import com.example.autop.agent.protocol.displayTextOf
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.ThreadId
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.UiConfig
+import com.example.autop.core.thread.ui.TimelineAction
+import com.example.autop.core.thread.ui.TimelineEntry
+import com.example.autop.core.thread.ui.mergeTimeline
 import com.example.autop.feature.tasks.RUN_ID_ARG
 import com.example.autop.feature.tasks.RUN_LIMIT
 import com.example.autop.feature.tasks.TasksNavigator
 import com.example.autop.feature.tasks.formatTime
-import com.example.autop.llm.Block
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
@@ -45,6 +38,7 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -59,16 +53,18 @@ public class RunDetailViewModel
         private val runService: RunService,
         private val threadStore: ThreadStore,
         private val logger: Logger,
+        private val configProvider: ConfigProvider,
     ) : ViewModel() {
         private val runId: String = savedStateHandle.get<String>(RUN_ID_ARG).orEmpty()
 
         private val record = MutableStateFlow<RunRecord?>(null)
-        private val timeline = MutableStateFlow<List<TimelineUi>>(emptyList())
+        private val timeline = MutableStateFlow<List<TimelineEntry>>(emptyList())
         private val loaded = MutableStateFlow(false)
         private val feedback = MutableStateFlow<RunDetailFeedback?>(null)
+        private val overlay = MutableStateFlow(RunDetailOverlay())
 
         public val uiState: StateFlow<RunDetailUiState> =
-            combine(record, timeline, loaded, feedback, ::stateOf)
+            combine(record, timeline, loaded, feedback, overlay, ::stateOf)
                 .stateIn(
                     viewModelScope,
                     SharingStarted.WhileSubscribed(STOP_TIMEOUT_MS),
@@ -103,14 +99,20 @@ public class RunDetailViewModel
                 RunDetailAction.Continue -> continueFrom()
                 RunDetailAction.ResumeInterrupted -> resumeInterrupted()
                 RunDetailAction.Back -> navigator.navigateBack()
+                is RunDetailAction.Timeline -> onTimeline(action.action, navigator)
+                is RunDetailAction.Fork -> forkAt(action.seq)
+                is RunDetailAction.ShowRaw -> showRaw(action.seq)
+                RunDetailAction.DismissEntryMenu -> overlay.update { it.copy(entryMenu = null) }
+                RunDetailAction.DismissRaw -> overlay.update { it.copy(rawText = null) }
             }
         }
 
         private fun stateOf(
             run: RunRecord?,
-            steps: List<TimelineUi>,
+            steps: List<TimelineEntry>,
             isLoaded: Boolean,
             current: RunDetailFeedback?,
+            ov: RunDetailOverlay,
         ): RunDetailUiState =
             RunDetailUiState(
                 runId = runId,
@@ -122,9 +124,52 @@ public class RunDetailViewModel
                 startedText = run?.let { formatTime(it.startedAt ?: it.createdAt) }.orEmpty(),
                 endedText = run?.endedAt?.let(::formatTime).orEmpty(),
                 timeline = steps,
+                entryMenu = ov.entryMenu,
+                rawText = ov.rawText,
                 feedback = current,
                 canResume = run?.status == RunStatus.INTERRUPTED,
             )
+
+        /** 过程条目动作：快捷入口与分叉标记经导航回调；长按打开菜单；暂停/停止直接作用于 Run。 */
+        private fun onTimeline(
+            action: TimelineAction,
+            navigator: TasksNavigator,
+        ) {
+            when (action) {
+                is TimelineAction.OpenLink -> navigator.openStepLink(action.link)
+                is TimelineAction.OpenSourceThread -> navigator.openThread(action.threadId)
+                is TimelineAction.ShowEntryMenu -> {
+                    val forkable = timeline.value.firstOrNull { it.seq == action.seq }?.forkable == true
+                    overlay.update { it.copy(entryMenu = RunEntryMenu(action.seq, forkable)) }
+                }
+                TimelineAction.Resume -> record.value?.let { runService.resume(it.id, null) }
+                TimelineAction.Stop -> record.value?.let { runService.cancel(it.id) }
+                // 复制需要剪贴板，由页面处理。
+                TimelineAction.CopyReply -> Unit
+            }
+        }
+
+        private fun forkAt(seq: Long) {
+            val run = record.value ?: return
+            overlay.update { it.copy(entryMenu = null) }
+            viewModelScope.launch { feedback.value = forkFrom(run.threadId, seq) }
+        }
+
+        private fun showRaw(seq: Long) {
+            val run = record.value ?: return
+            overlay.update { it.copy(entryMenu = null) }
+            viewModelScope.launch {
+                val text =
+                    runCatching {
+                        threadStore
+                            .events(run.threadId, fromSeq = seq, toSeq = seq)
+                            .filter { it.seq == seq }
+                            .joinToString("\n\n") { "seq=${it.seq}\n${it.payload}" }
+                    }.onFailure { logger.w(TAG, "raw_load_failed", "runId" to runId, error = it) }
+                        .getOrDefault("")
+                overlay.update { it.copy(rawText = text.ifBlank { null }) }
+            }
+        }
 
         private fun continueFrom() {
             val run = record.value ?: return
@@ -173,54 +218,26 @@ public class RunDetailViewModel
                 is Outcome.Err -> RunDetailFeedback(continued = false, errorCode = result.error.code)
             }
 
-        private suspend fun loadTimeline(run: RunRecord): List<TimelineUi> =
+        private suspend fun loadTimeline(run: RunRecord): List<TimelineEntry> =
             runCatching {
-                threadStore
-                    .events(run.threadId, fromSeq = FIRST_SEQ)
-                    .filter { it.runId == run.id }
-                    .takeLast(TIMELINE_LIMIT)
-                    .map { timelineOf(it.payload) }
+                // 一次运行对应一个线程（ADR-0031），线程事件全部属于这次运行；与对话页使用同一套归并。
+                mergeTimeline(
+                    history = threadStore.events(run.threadId, fromSeq = FIRST_SEQ),
+                    live = emptyList(),
+                    stepGroupThreshold = configProvider.current()[UiConfig.CHAT].stepGroupThreshold,
+                )
             }.onFailure { logger.w(TAG, "timeline_load_failed", "runId" to runId, error = it) }
                 .getOrDefault(emptyList())
 
-        private fun timelineOf(payload: EventPayload): TimelineUi =
-            when (payload) {
-                is UserMessage -> TimelineUi(TimelineKind.USER, payload.blocks.textOf())
-                // 回退协议/工具标记文本不冒充正文（displayTextOf 过滤）。
-                is AssistantMessage ->
-                    TimelineUi(
-                        TimelineKind.ASSISTANT,
-                        payload.blocks
-                            .filterIsInstance<Block.Text>()
-                            .map { displayTextOf(it.text) }
-                            .filter { it.isNotBlank() }
-                            .joinToString(" ")
-                            .take(TEXT_LIMIT),
-                    )
-                is ToolResultEvent -> TimelineUi(TimelineKind.TOOL, payload.toolId)
-                is RunStarted -> TimelineUi(TimelineKind.STARTED, "")
-                is RunFinished -> TimelineUi(TimelineKind.FINISHED, payload.summary.orEmpty())
-                is RunPaused -> TimelineUi(TimelineKind.PAUSED, payload.detail.orEmpty())
-                is RunResumed -> TimelineUi(TimelineKind.RESUMED, payload.userNote.orEmpty())
-                is RunNoteAdded -> TimelineUi(TimelineKind.NOTE, payload.text)
-                is PlanUpdated ->
-                    TimelineUi(
-                        TimelineKind.PLAN,
-                        (listOfNotNull(payload.explanation) + payload.items.map { it.step }).joinToString("\n"),
-                    )
-                else -> TimelineUi(TimelineKind.OTHER, "")
-            }
-
-        private fun List<Block>.textOf(): String =
-            filterIsInstance<Block.Text>()
-                .joinToString(" ") { it.text }
-                .take(TEXT_LIMIT)
+        /** 过程页弹层状态：长按菜单与原始数据文本。 */
+        private data class RunDetailOverlay(
+            val entryMenu: RunEntryMenu? = null,
+            val rawText: String? = null,
+        )
 
         private companion object {
             const val TAG = "RunDetailViewModel"
             const val STOP_TIMEOUT_MS = 5_000L
-            const val TIMELINE_LIMIT = 50
-            const val TEXT_LIMIT = 120
             const val FIRST_SEQ = 0L
         }
     }

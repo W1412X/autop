@@ -7,6 +7,10 @@ package com.example.autop.feature.chat.thread
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.PlanStatus
 import com.example.autop.agent.RunOutcome
+import com.example.autop.agent.timeline.BannerKind
+import com.example.autop.agent.timeline.StepState
+import com.example.autop.core.thread.ui.TimelineEntry
+import com.example.autop.core.thread.ui.TimelineItem
 
 /** 运行中时间线假数据：分叉标记、思考、计划卡、步骤、折叠组、steer 气泡、流式文本。 */
 internal fun previewRunningEntries(): List<TimelineEntry> =

@@ -36,7 +36,8 @@ object ModuleTypes {
             name.endsWith("-api") || path == ":core:core-config" || path == ":core:core-prompt" -> ModuleType.API
             name.endsWith("-core") || path == ":agent:agent-runtime" || path == ":core:core-testing" -> ModuleType.CORE
             name.endsWith("-impl") || path == ":agent:agent-store" ||
-                path == ":core:core-platform" || path == ":core:core-ui" -> ModuleType.IMPL
+                path == ":core:core-platform" || path == ":core:core-ui" ||
+                path == ":core:core-thread-ui" -> ModuleType.IMPL
             // 文档缺口（见 questions.md N2）：llm-http 是适配器共享的传输层，视为 llm 领域 CORE；
             // llm-openai / llm-anthropic 是 llm-api 端口的适配器实现，视为 llm 领域 IMPL。
             path == ":llm:llm-http" -> ModuleType.CORE
@@ -77,7 +78,7 @@ object ModuleTypes {
         }
         ModuleType.FEATURE -> when (to.type) {
             ModuleType.COMMON, ModuleType.API -> true
-            ModuleType.IMPL -> to.path == ":core:core-ui"
+            ModuleType.IMPL -> to.path == ":core:core-ui" || to.path == ":core:core-thread-ui"
             else -> false
         }
         ModuleType.APP -> true

@@ -160,16 +160,6 @@
     <string name="run_detail_resumed">已从断点继续执行</string>
     <string name="run_detail_resume_failed">继续执行失败：%1$s</string>
     <string name="run_detail_thread">对话 #%1$s</string>
-    <string name="run_timeline_user">你说</string>
-    <string name="run_timeline_assistant">助手</string>
-    <string name="run_timeline_tool">工具</string>
-    <string name="run_timeline_started">开始</string>
-    <string name="run_timeline_finished">结束</string>
-    <string name="run_timeline_paused">暂停</string>
-    <string name="run_timeline_resumed">恢复</string>
-    <string name="run_timeline_note">笔记</string>
-    <string name="run_timeline_plan">计划</string>
-    <string name="run_timeline_other">其他</string>
 
     <!-- 状态名 -->
     <string name="run_status_QUEUED">排队中</string>
@@ -221,4 +211,9 @@
     <string name="task_author_activity_memory_search">正在检索记忆…</string>
     <string name="task_author_activity_list_flows">正在查看已有流程…</string>
     <string name="task_author_activity_propose_task">正在整理任务草稿…</string>
+    <string name="run_entry_menu_title">操作</string>
+    <string name="run_entry_menu_fork">从这里分叉</string>
+    <string name="run_entry_menu_raw">查看原始数据</string>
+    <string name="run_raw_title">原始数据</string>
+    <string name="run_raw_close">关闭</string>
 </resources>

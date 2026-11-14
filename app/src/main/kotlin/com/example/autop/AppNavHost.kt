@@ -44,11 +44,11 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.autop.agent.timeline.StepLink
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.feature.chat.ChatNavigator
 import com.example.autop.feature.chat.chatGraph
-import com.example.autop.feature.chat.thread.StepLink
 import com.example.autop.feature.flows.FlowsNavigator
 import com.example.autop.feature.flows.FlowsRoutes
 import com.example.autop.feature.flows.flowsGraph
@@ -441,19 +441,7 @@ private fun createChatNavigator(
         }
 
         override fun openStepLink(link: StepLink) {
-            when (link.kind) {
-                StepLink.TASK_DETAIL -> link.taskId?.let { navController.navigate(AutopRoutes.taskDetail(it)) }
-                StepLink.TASK_EDIT -> link.taskId?.let { navController.navigate(AutopRoutes.taskEdit(it)) }
-                StepLink.TASK_AI -> link.taskId?.let { navController.navigate(AutopRoutes.taskAuthor(it)) }
-                StepLink.FLOW_DETAIL ->
-                    if (flowsEnabled.value) link.flowId?.let { navController.navigate(AutopRoutes.flowDetail(it)) }
-                StepLink.FLOW_EDIT ->
-                    if (flowsEnabled.value) link.flowId?.let { navController.navigate(AutopRoutes.flowEditor(it)) }
-                StepLink.FLOW_AI ->
-                    if (flowsEnabled.value && (link.draftId != null || link.flowId != null)) {
-                        navController.navigate(AutopRoutes.flowAuthor(draftId = link.draftId, editFlowId = link.flowId))
-                    }
-            }
+            navigateStepLink(navController, flowsEnabled.value, link)
         }
 
         override fun openTaskCreate(hint: String) {
@@ -488,6 +476,14 @@ private fun createTasksNavigator(
 
         override fun openRun(runId: String) {
             navController.navigate(AutopRoutes.runDetail(runId))
+        }
+
+        override fun openStepLink(link: StepLink) {
+            navigateStepLink(navController, flowsEnabled.value, link)
+        }
+
+        override fun openThread(threadId: String) {
+            navController.navigate(AutopRoutes.chatThread(threadId))
         }
 
         override fun openFlowCreate() {
@@ -587,3 +583,44 @@ private tailrec fun Context.findActivity(): Activity? =
         is ContextWrapper -> baseContext.findActivity()
         else -> null
     }
+
+/** 快捷入口跳转：对话页与运行详情共用；流程入口受 Beta 开关控制（ADR-0030）。 */
+private fun navigateStepLink(
+    navController: NavHostController,
+    flowsEnabled: Boolean,
+    link: StepLink,
+) {
+    when (link.kind) {
+        StepLink.TASK_DETAIL, StepLink.TASK_EDIT, StepLink.TASK_AI -> navigateTaskStepLink(navController, link)
+        StepLink.FLOW_DETAIL, StepLink.FLOW_EDIT, StepLink.FLOW_AI ->
+            if (flowsEnabled) navigateFlowStepLink(navController, link)
+    }
+}
+
+private fun navigateTaskStepLink(
+    navController: NavHostController,
+    link: StepLink,
+) {
+    val taskId = link.taskId ?: return
+    val route =
+        when (link.kind) {
+            StepLink.TASK_EDIT -> AutopRoutes.taskEdit(taskId)
+            StepLink.TASK_AI -> AutopRoutes.taskAuthor(taskId)
+            else -> AutopRoutes.taskDetail(taskId)
+        }
+    navController.navigate(route)
+}
+
+private fun navigateFlowStepLink(
+    navController: NavHostController,
+    link: StepLink,
+) {
+    when (link.kind) {
+        StepLink.FLOW_DETAIL -> link.flowId?.let { navController.navigate(AutopRoutes.flowDetail(it)) }
+        StepLink.FLOW_EDIT -> link.flowId?.let { navController.navigate(AutopRoutes.flowEditor(it)) }
+        StepLink.FLOW_AI ->
+            if (link.draftId != null || link.flowId != null) {
+                navController.navigate(AutopRoutes.flowAuthor(draftId = link.draftId, editFlowId = link.flowId))
+            }
+    }
+}

@@ -24,7 +24,7 @@ import kotlinx.coroutines.flow.Flow
         ApiEndpointEntity::class,
         FlowVersionEntity::class,
     ],
-    version = 3,
+    version = FLOWS_DB_VERSION,
     exportSchema = true,
 )
 internal abstract class FlowsDb : RoomDatabase() {
@@ -216,3 +216,6 @@ internal interface FlowVersionDao {
         version: Int,
     ): FlowVersionEntity?
 }
+
+/** flows.db（流程） 结构版本（ADR-0032）：结构变化时升高，启动检查据此提示备份或清除。 */
+public const val FLOWS_DB_VERSION: Int = 3

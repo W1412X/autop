@@ -3,6 +3,8 @@
  */
 package com.example.autop.feature.tasks
 
+import com.example.autop.agent.timeline.StepLink
+
 /** 任务页导航回调。 */
 public interface TasksNavigator {
     /** 打开任务编辑页（[taskId] 为 null = 新建）。 */
@@ -22,4 +24,10 @@ public interface TasksNavigator {
 
     /** 返回上一页。 */
     public fun navigateBack()
+
+    /** 打开过程里的快捷入口（任务详情、编辑、AI 修改，流程入口）。 */
+    public fun openStepLink(link: StepLink)
+
+    /** 打开一个对话线程（分叉标记指向的原会话）。 */
+    public fun openThread(threadId: String)
 }

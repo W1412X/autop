@@ -9,6 +9,7 @@ import androidx.room.withTransaction
 import com.example.autop.agent.AssistantMessage
 import com.example.autop.agent.EventPayload
 import com.example.autop.agent.ThreadEvent
+import com.example.autop.agent.ThreadOrigin
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ThreadSummary
 import com.example.autop.agent.ToolResultEvent
@@ -50,6 +51,15 @@ public class ThreadStoreImpl(
     override suspend fun createThread(
         title: String?,
         parent: Pair<ThreadId, Long>?,
+    ): ThreadId = insertThread(title, parent, ThreadOrigin.CHAT)
+
+    override suspend fun createTaskRunThread(title: String?): ThreadId =
+        insertThread(title, null, ThreadOrigin.TASK_RUN)
+
+    private suspend fun insertThread(
+        title: String?,
+        parent: Pair<ThreadId, Long>?,
+        origin: ThreadOrigin,
     ): ThreadId {
         val id = ThreadId(ids.newId())
         val now = clock.nowMillis()
@@ -75,6 +85,7 @@ public class ThreadStoreImpl(
                     lastRunStatus = null,
                     preview = null,
                     modelProfileId = null,
+                    origin = origin.name,
                 ),
             )
         }
@@ -209,6 +220,17 @@ public class ThreadStoreImpl(
         offset: Int,
         limit: Int,
     ): List<ThreadSummary> = db.threadDao().page(offset, limit).map { mappers.toSummary(it) }
+
+    override suspend fun listChatThreads(
+        offset: Int,
+        limit: Int,
+    ): List<ThreadSummary> = db.threadDao().pageChat(offset, limit).map { mappers.toSummary(it) }
+
+    override suspend fun pruneTaskRunThreads(keep: Int): List<ThreadId> {
+        val stale = db.threadDao().taskRunIdsBeyond(keep).map { ThreadId(it) }
+        stale.forEach { delete(it) }
+        return stale
+    }
 
     override suspend fun rename(
         threadId: ThreadId,

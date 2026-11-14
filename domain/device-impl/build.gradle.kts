@@ -5,6 +5,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":core:core-platform"))
     api(project(":domain:device-api"))
     implementation(project(":domain:device-core"))
     implementation(project(":domain:policy-api"))

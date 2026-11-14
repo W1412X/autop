@@ -12,6 +12,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.BatteryManager
 import android.os.PowerManager
+import com.example.autop.core.platform.DataSchemaState
 import com.example.autop.device.DeviceState
 import com.example.autop.device.DeviceStateProvider
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -54,6 +55,7 @@ public class DeviceStateProviderImpl
                             context: Context,
                             intent: Intent,
                         ) {
+                            if (!DataSchemaState.isReady()) return
                             trySend(current())
                         }
                     }

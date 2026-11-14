@@ -10,6 +10,7 @@ import com.example.autop.core.config.CURRENT_SCHEMA_VERSION
 import com.example.autop.core.config.ConfigMigration
 import com.example.autop.core.config.migrateConfig
 import com.example.autop.core.config.putSchemaVersion
+import com.example.autop.core.platform.guardedReplaceHandler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.JsonObject
@@ -78,7 +79,7 @@ internal class DataStoreOverridesStore(
 
 /** 迁移失败/文件损坏时的回退：重置为空覆盖文档。 */
 internal fun overridesCorruptionHandler(): ReplaceFileCorruptionHandler<JsonObject> =
-    ReplaceFileCorruptionHandler { ConfigOverridesSerializer().defaultValue }
+    guardedReplaceHandler { ConfigOverridesSerializer().defaultValue }
 
 /** 剥掉覆盖文档顶层的 `schemaVersion`，得到纯覆盖树。 */
 internal fun stripSchemaVersion(doc: JsonObject): JsonObject = JsonObject(doc.filterKeys { it != "schemaVersion" })

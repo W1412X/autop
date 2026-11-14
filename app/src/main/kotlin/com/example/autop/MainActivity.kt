@@ -16,6 +16,8 @@ import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.config.UiConfig
+import com.example.autop.core.platform.DataSchemaState
+import com.example.autop.core.ui.theme.AppearanceSettings
 import com.example.autop.core.ui.theme.AutopTheme
 import com.example.autop.core.ui.theme.toAppearanceSettings
 import com.example.autop.feature.settings.debug.DebugPage
@@ -44,34 +46,44 @@ class MainActivity : ComponentActivity() {
     /** 通知深链目标路由（如注入通道页；[com.example.autop.device.PairingDiscovery.EXTRA_OPEN_ROUTE]）。 */
     private var openRoute by mutableStateOf<String?>(null)
 
+    /** 数据结构检查通过（或用户完成备份/清除）后为 true；拦截期间显示数据结构页（ADR-0032）。 */
+    private var gateOpen by mutableStateOf(!DataSchemaState.blocked)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         openRoute = intent?.getStringExtra(EXTRA_OPEN_ROUTE)
         setContent {
-            val snapshot by configProvider.observe().collectAsStateWithLifecycle()
-            val appearance =
-                snapshot[UiConfig.APPEARANCE].toAppearanceSettings(
-                    dynamicColorSupported = capabilities.has(Capability.DYNAMIC_COLOR),
-                    systemAnimationsEnabled = animationScaleReader.isEnabled(),
-                )
-            AutopTheme(appearance = appearance) {
-                AppNavHost(
-                    showLabels = snapshot[UiConfig.NAV].showLabels,
-                    // 流程 Beta 开关（docs/adr/0030-beta-feature-switch.md）：关闭时流程入口不可达。
-                    flowsEnabled = snapshot[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS),
-                    // 首次未完成引导进引导页（docs/tech/08 §4.7，N159）。
-                    startDestination =
-                        if (snapshot[UiConfig.ONBOARDING].completed) {
-                            AutopRoutes.CHAT_LIST
-                        } else {
-                            AutopRoutes.ONBOARDING
-                        },
-                    openRoute = openRoute,
-                    debugPage = debugPage.orElse(null),
-                )
-                // 新版本提示弹窗：全局挂载，任何页面都可能弹出（Run 执行期间不弹，见 UpdatePromptViewModel）。
-                UpdatePromptHost()
+            // ADR-0032：拦截期间不读取任何用户数据。配置文件在数据结构确认前不能访问，否则 DataStore 可能重置它。
+            if (!gateOpen) {
+                AutopTheme(appearance = AppearanceSettings()) {
+                    DataSchemaScreen(onResolved = { gateOpen = true })
+                }
+            } else {
+                val snapshot by configProvider.observe().collectAsStateWithLifecycle()
+                val appearance =
+                    snapshot[UiConfig.APPEARANCE].toAppearanceSettings(
+                        dynamicColorSupported = capabilities.has(Capability.DYNAMIC_COLOR),
+                        systemAnimationsEnabled = animationScaleReader.isEnabled(),
+                    )
+                AutopTheme(appearance = appearance) {
+                    AppNavHost(
+                        showLabels = snapshot[UiConfig.NAV].showLabels,
+                        // 流程 Beta 开关（docs/adr/0030-beta-feature-switch.md）：关闭时流程入口不可达。
+                        flowsEnabled = snapshot[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS),
+                        // 首次未完成引导进引导页（docs/tech/08 §4.7，N159）。
+                        startDestination =
+                            if (snapshot[UiConfig.ONBOARDING].completed) {
+                                AutopRoutes.CHAT_LIST
+                            } else {
+                                AutopRoutes.ONBOARDING
+                            },
+                        openRoute = openRoute,
+                        debugPage = debugPage.orElse(null),
+                    )
+                    // 新版本提示弹窗：全局挂载，任何页面都可能弹出（Run 执行期间不弹，见 UpdatePromptViewModel）。
+                    UpdatePromptHost()
+                }
             }
         }
     }

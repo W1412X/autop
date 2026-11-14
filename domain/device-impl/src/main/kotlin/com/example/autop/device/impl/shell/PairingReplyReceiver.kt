@@ -9,6 +9,7 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.RemoteInput
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.platform.DataSchemaState
 import com.example.autop.device.ShellInput
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -25,6 +26,7 @@ public class PairingReplyReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
+        if (!DataSchemaState.isReady()) return
         val port = intent.getIntExtra(EXTRA_PORT, 0)
         val code =
             RemoteInput

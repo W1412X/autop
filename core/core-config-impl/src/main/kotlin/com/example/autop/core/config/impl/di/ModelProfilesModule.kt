@@ -3,13 +3,13 @@ package com.example.autop.core.config.impl.di
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.core.DataStoreFactory
-import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.exceptionHandler
 import com.example.autop.core.config.impl.DataStoreModelProfileStore
 import com.example.autop.core.config.impl.ModelProfilesDoc
 import com.example.autop.core.config.impl.ModelProfilesSerializer
+import com.example.autop.core.platform.guardedReplaceHandler
 import com.example.autop.llm.ModelProfileStore
 import dagger.Module
 import dagger.Provides
@@ -39,7 +39,7 @@ public object ModelProfilesModule {
     ): DataStore<ModelProfilesDoc> =
         DataStoreFactory.create(
             serializer = ModelProfilesSerializer(),
-            corruptionHandler = ReplaceFileCorruptionHandler { ModelProfilesSerializer().defaultValue },
+            corruptionHandler = guardedReplaceHandler { ModelProfilesSerializer().defaultValue },
             scope = CoroutineScope(SupervisorJob() + dispatchers.io + logger.exceptionHandler("ModelProfilesStore")),
         ) { File(context.filesDir, PROFILES_FILE) }
 

@@ -7,6 +7,7 @@ package com.example.autop.task.impl.sources
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.example.autop.core.platform.DataSchemaState
 
 /** 解锁事件接收器（manifest 注册，仅响应系统解锁广播）。 */
 public class UnlockReceiver : BroadcastReceiver() {
@@ -14,6 +15,7 @@ public class UnlockReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
+        if (!DataSchemaState.isReady()) return
         if (intent.action != Intent.ACTION_USER_PRESENT) return
         UnlockBus.events.tryEmit(Unit)
     }

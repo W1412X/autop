@@ -57,6 +57,7 @@ include(":domain:task-api")
 include(":domain:task-core")
 include(":domain:task-impl")
 
+include(":core:core-thread-ui")
 include(":feature:feature-chat")
 include(":feature:feature-tasks")
 include(":feature:feature-flows")

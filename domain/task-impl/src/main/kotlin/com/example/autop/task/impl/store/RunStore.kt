@@ -56,6 +56,11 @@ public class RunStore(
 
     public suspend fun get(id: RunId): RunRecord? = db.runDao().byId(id.value)?.toRecord()
 
+    /** 删除某线程的运行记录（任务运行线程被保留策略清理时使用，ADR-0031）。 */
+    public suspend fun deleteByThread(threadId: ThreadId) {
+        mutex.withLock { db.runDao().deleteByThread(threadId.value) }
+    }
+
     /** 记录变化流（对话页状态条与问题卡片使用）。 */
     public fun observe(runId: RunId): Flow<RunRecord> =
         db

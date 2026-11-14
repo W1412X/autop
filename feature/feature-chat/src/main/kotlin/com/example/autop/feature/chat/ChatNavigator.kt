@@ -5,7 +5,7 @@
  */
 package com.example.autop.feature.chat
 
-import com.example.autop.feature.chat.thread.StepLink
+import com.example.autop.agent.timeline.StepLink
 
 /** 对话模块导航回调接口。 */
 public interface ChatNavigator {

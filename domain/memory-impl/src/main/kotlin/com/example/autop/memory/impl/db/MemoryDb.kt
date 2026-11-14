@@ -14,7 +14,7 @@ import androidx.room.RoomDatabase
         MemoryVersionEntity::class,
         MemoryVectorEntity::class,
     ],
-    version = 1,
+    version = MEMORY_DB_VERSION,
     exportSchema = true,
 )
 public abstract class MemoryDb : RoomDatabase() {
@@ -24,3 +24,6 @@ public abstract class MemoryDb : RoomDatabase() {
 
     public abstract fun vectorDao(): MemoryVectorDao
 }
+
+/** memory.db（记忆） 结构版本（ADR-0032）：结构变化时升高，启动检查据此提示备份或清除。 */
+public const val MEMORY_DB_VERSION: Int = 1

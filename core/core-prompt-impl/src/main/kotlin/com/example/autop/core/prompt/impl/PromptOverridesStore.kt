@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.core.Serializer
 import androidx.datastore.core.handlers.ReplaceFileCorruptionHandler
 import com.example.autop.core.common.AutopJson
+import com.example.autop.core.platform.guardedReplaceHandler
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.SerialName
@@ -88,6 +89,6 @@ internal class DataStorePromptOverridesStore(
 
 /** 迁移失败/文件损坏时的回退：重置为空覆盖文档（同 core-config-impl 的 N11）。 */
 internal fun promptOverridesCorruptionHandler(): ReplaceFileCorruptionHandler<PromptOverridesDoc> =
-    ReplaceFileCorruptionHandler { PromptOverridesDoc() }
+    guardedReplaceHandler { PromptOverridesDoc() }
 
-internal const val CURRENT_PROMPT_SCHEMA_VERSION = 1
+public const val CURRENT_PROMPT_SCHEMA_VERSION = 1

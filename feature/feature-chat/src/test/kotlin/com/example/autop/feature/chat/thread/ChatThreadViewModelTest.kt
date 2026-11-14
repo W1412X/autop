@@ -18,6 +18,7 @@ import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.TestDispatcherProvider
+import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.ImageAttachment

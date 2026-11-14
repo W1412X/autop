@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
     implementation(project(":core:core-common"))
+    implementation(project(":core:core-thread-ui"))
     implementation(project(":core:core-config"))
     implementation(project(":domain:task-api"))
     implementation(project(":agent:agent-api"))

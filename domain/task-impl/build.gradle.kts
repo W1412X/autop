@@ -8,6 +8,7 @@ plugins {
 }
 
 dependencies {
+    implementation(project(":core:core-platform"))
     api(project(":domain:task-api"))
     implementation(project(":domain:task-core"))
     implementation(project(":domain:device-api"))

@@ -67,6 +67,10 @@ public interface RunDao {
     /** 进程被杀留下的未收口 Run（WP8.4 启动收口用；无表结构变化）。 */
     @Query("SELECT * FROM runs WHERE status IN ('QUEUED','WAITING_SCREEN','WAITING_USER','RUNNING','PAUSED')")
     public suspend fun unfinished(): List<RunEntity>
+
+    /** 删除某线程的运行记录（任务运行线程被保留策略清理时，ADR-0031）。 */
+    @Query("DELETE FROM runs WHERE threadId = :threadId")
+    public suspend fun deleteByThread(threadId: String)
 }
 
 /** 审计日志表访问。 */

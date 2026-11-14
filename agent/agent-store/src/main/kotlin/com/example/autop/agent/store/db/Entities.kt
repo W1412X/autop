@@ -34,6 +34,8 @@ public data class ThreadEntity(
     val preview: String?,
     /** 会话级模型覆盖（ModelProfile id）；null 表示跟随全局默认。 */
     val modelProfileId: String?,
+    /** 线程来源（ThreadOrigin 的名字）：对话列表只显示 CHAT（ADR-0031）。 */
+    val origin: String = "CHAT",
 )
 
 /**

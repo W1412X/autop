@@ -11,6 +11,7 @@ import android.content.Intent
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.TaskId
+import com.example.autop.core.platform.DataSchemaState
 import com.example.autop.task.impl.di.AppScope
 import com.example.autop.task.impl.store.TaskStore
 import dagger.hilt.android.AndroidEntryPoint
@@ -39,6 +40,7 @@ public class AlarmReceiver : BroadcastReceiver() {
         context: Context,
         intent: Intent,
     ) {
+        if (!DataSchemaState.isReady()) return
         val pending = goAsync()
         scope.launch {
             try {

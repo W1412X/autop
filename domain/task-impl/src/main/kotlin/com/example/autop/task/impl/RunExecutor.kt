@@ -18,6 +18,7 @@ import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.flatMap
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.TaskConfig
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.llm.Block
@@ -100,7 +101,8 @@ public class RunExecutor(
         if (task.executor == TaskExecutor.FLOW && !configProvider.current().flowsEnabled()) {
             return Outcome.Err(AppError(code = TaskErrorCodes.FLOW_DISABLED, message = "flow feature disabled"))
         }
-        val thread = threadStore.createThread(title = task.name, parent = null)
+        val thread = threadStore.createTaskRunThread(task.name)
+        pruneRunHistory()
         return enqueue(origin, thread, emptyList(), null, vars, task)
     }
 
@@ -111,7 +113,8 @@ public class RunExecutor(
         options: FlowRunOptions,
         needsScreen: Boolean,
     ): Outcome<RunRecord> {
-        val thread = threadStore.createThread(title = flow.name, parent = null)
+        val thread = threadStore.createTaskRunThread(flow.name)
+        pruneRunHistory()
         val launch = FlowLaunch(flow, params, options, needsScreen)
         return enqueue(RunOrigin.TASK_MANUAL, thread, emptyList(), null, emptyMap(), null, launch)
     }
@@ -129,6 +132,15 @@ public class RunExecutor(
             mapOf(RESUMED_FROM_KEY to source.id.value),
             null,
         )
+
+    /**
+     * 任务与流程运行线程超出 `task.runs.retainedThreads` 时，删除最早的线程及其运行记录（ADR-0031）。
+     * 新线程刚建好、排在最前，因此被删的都是较早的历史运行。
+     */
+    private suspend fun pruneRunHistory() {
+        val keep = configProvider.current()[TaskConfig.RUNS].retainedThreads
+        threadStore.pruneTaskRunThreads(keep).forEach { runStore.deleteByThread(it) }
+    }
 
     /** 取消尚未启动的 Run（已启动的由 `RunHandle.cancel` 处理）。 */
     fun cancelQueued(runId: RunId) {

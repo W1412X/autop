@@ -5,6 +5,8 @@
 package com.example.autop.feature.chat.thread
 
 import com.example.autop.core.config.UiChatSection
+import com.example.autop.core.thread.ui.TimelineEntry
+import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.task.ImageAttachment
 

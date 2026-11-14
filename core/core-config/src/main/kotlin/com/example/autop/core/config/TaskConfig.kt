@@ -85,6 +85,18 @@ public data class TaskAuditSection(
     @SerialName("retentionDays") val retentionDays: Int = 30,
 ) : ConfigSection
 
+/** `task.runs`：任务与流程运行的历史线程保留（ADR-0031）。 */
+@Serializable
+public data class TaskRunsSection(
+    /** 保留最近多少个运行线程（过程记录）；超出的最早线程与运行记录一起删除。 */
+    @SerialName("retainedThreads") val retainedThreads: Int = 200,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (retainedThreads <= 0) add("retainedThreads must be > 0, was $retainedThreads")
+        }
+}
+
 /** `task.host`：AgentHost 前台服务。 */
 @Serializable
 public data class TaskHostSection(
@@ -139,9 +151,11 @@ public object TaskConfig {
         ConfigKey("task.audit", TaskAuditSection.serializer()) { TaskAuditSection() }
     public val HOST: ConfigKey<TaskHostSection> =
         ConfigKey("task.host", TaskHostSection.serializer()) { TaskHostSection() }
+    public val RUNS: ConfigKey<TaskRunsSection> =
+        ConfigKey("task.runs", TaskRunsSection.serializer()) { TaskRunsSection() }
     public val REPLAY: ConfigKey<TaskReplaySection> =
         ConfigKey("task.replay", TaskReplaySection.serializer()) { TaskReplaySection() }
 
     public val ALL: List<ConfigKey<*>> =
-        listOf(TASK, CONDITIONS, DEDUPE, QUEUE, LIMITS, REMINDER, NOTIFY, DRAFT, AUDIT, HOST, REPLAY)
+        listOf(TASK, CONDITIONS, DEDUPE, QUEUE, LIMITS, REMINDER, NOTIFY, DRAFT, AUDIT, RUNS, HOST, REPLAY)
 }
