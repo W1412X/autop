@@ -18,6 +18,7 @@ import com.example.autop.llm.Role
 import com.example.autop.llm.StopReason
 import com.example.autop.llm.Usage
 import com.example.autop.llm.http.matchesContextExceeded
+import com.example.autop.llm.http.matchesQuotaExhausted
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
@@ -141,6 +142,8 @@ public class OpenAiStreamParser(
         return when {
             matchesContextExceeded(message, contextPatterns) ->
                 AppError(code = LlmErrorCodes.CONTEXT_EXCEEDED, message = message)
+            matchesQuotaExhausted(probe) || matchesQuotaExhausted(message) ->
+                AppError(code = LlmErrorCodes.QUOTA_EXHAUSTED, message = message)
             probe.contains(RATE_LIMIT_PROBE) ->
                 AppError(code = LlmErrorCodes.RATE_LIMITED, message = message, retryable = true)
             SERVER_PROBES.any { probe.contains(it) } ->

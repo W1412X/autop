@@ -147,6 +147,20 @@ class OpenAiStreamParserTest {
     }
 
     @Test
+    fun `error chunk with insufficient quota maps to quota exhausted`() {
+        val quota =
+            assertThrows(LlmException::class.java) {
+                parser.feed(
+                    chunk(
+                        """{"error": {"type": "insufficient_quota", "code": "insufficient_quota"}}""",
+                    ),
+                )
+            }
+        assertThat(quota.error.code).isEqualTo(LlmErrorCodes.QUOTA_EXHAUSTED)
+        assertThat(quota.error.retryable).isFalse()
+    }
+
+    @Test
     fun `missing index with single call merges`() {
         parser.feed(
             chunk(

@@ -15,6 +15,7 @@ import com.example.autop.llm.StopReason
 import com.example.autop.llm.Usage
 import com.example.autop.llm.http.mapHttpError
 import com.example.autop.llm.http.matchesContextExceeded
+import com.example.autop.llm.http.matchesQuotaExhausted
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.intOrNull
@@ -186,6 +187,9 @@ public class AnthropicStreamParser(
                 ?.jsonPrimitive
                 ?.contentOrNull
                 .orEmpty()
+        if (matchesQuotaExhausted(message)) {
+            return LlmException(AppError(code = LlmErrorCodes.QUOTA_EXHAUSTED, message = message))
+        }
         return when (type) {
             "overloaded_error" -> LlmException(serverError(message))
             "rate_limit_error" ->

@@ -132,6 +132,18 @@ class AnthropicStreamParserTest {
     }
 
     @Test
+    fun `credit balance error maps to quota exhausted`() {
+        val parser = AnthropicStreamParser(listOf("ctx"))
+        val data =
+            obj(
+                """{"error":{"type":"invalid_request_error","message":"credit balance is too low"}}""",
+            )
+        val e = assertThrows(LlmException::class.java) { parser.feed("error", data) }
+        assertThat(e.error.code).isEqualTo(LlmErrorCodes.QUOTA_EXHAUSTED)
+        assertThat(e.error.retryable).isFalse()
+    }
+
+    @Test
     fun `context pattern turns invalid request into context exceeded`() {
         val parser = AnthropicStreamParser(listOf("too long"))
         val data = obj("""{"error":{"type":"invalid_request_error","message":"prompt is TOO LONG"}}""")
