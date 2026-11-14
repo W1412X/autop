@@ -4,17 +4,13 @@
  */
 package com.example.autop.feature.overlay.progress
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Send
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -27,11 +23,10 @@ import com.example.autop.agent.PauseReason
 import com.example.autop.core.ui.component.AutopButton
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopInputBar
-import com.example.autop.core.ui.component.AutopOptionRow
 import com.example.autop.core.ui.component.AutopTextButton
+import com.example.autop.core.ui.component.InlineQuestionCard
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.StatusBanner
-import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.overlay.R
@@ -40,23 +35,6 @@ import com.example.autop.feature.overlay.panel.ControlIntentKind
 import com.example.autop.feature.overlay.panel.controlIntentLabelRes
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunStatus
-
-/** 「自己输入」独立输入行的最大行数（同 AskCard，N181）。 */
-private const val ASK_INPUT_MAX_LINES: Int = 3
-
-/** 运行中交互动作回调聚合（由各面板装配层构造，动作实现在 PanelRunActions）。 */
-@Suppress("LongParameterList") // 回调聚合容器：九个动作入口不可再减（questions.md N114 口径）
-internal class ProgressCallbacks(
-    val onAnswer: (String) -> Unit,
-    val onPauseResume: () -> Unit,
-    val onStop: () -> Unit,
-    val onStopFlow: () -> Unit,
-    val onOpenThread: () -> Unit,
-    val onSteer: (String) -> Unit,
-    val onContinueBlocked: () -> Unit,
-    val onFinishBlocked: () -> Unit,
-    val onClose: () -> Unit,
-)
 
 /** 提问卡 / 暂停拦截横幅（只在需要时显示，N182 跨页面 ask_user 展示修复）。 */
 @Composable
@@ -134,60 +112,14 @@ internal fun AskCard(
     callbacks: ProgressCallbacks,
     modifier: Modifier = Modifier,
 ) {
-    var selfInput by remember { mutableStateOf(false) }
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AutopAlpha.BLOCK_FILL),
-                    shape = MaterialTheme.shapes.medium,
-                ).padding(all = LocalSpacing.current.md),
-        verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
-    ) {
-        Text(text = question, style = MaterialTheme.typography.titleSmall)
-        options.forEach { option ->
-            AutopOptionRow(text = option, onClick = { callbacks.onAnswer(option) })
-        }
-        if (selfInput) {
-            AskInputRow(callbacks = callbacks)
-        } else {
-            AutopTextButton(
-                text = stringResource(R.string.panel_ask_self),
-                onClick = { selfInput = true },
-            )
-        }
-    }
-}
-
-/** 「自己输入」展开后的独立输入行（N181：不占用对话底部输入框）。 */
-@Composable
-private fun AskInputRow(
-    callbacks: ProgressCallbacks,
-    modifier: Modifier = Modifier,
-) {
-    var text by remember { mutableStateOf("") }
-    Row(
-        modifier = modifier.fillMaxWidth(),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
-    ) {
-        AutopInputBar(
-            value = text,
-            onValueChange = { text = it },
-            spec = InputBarSpec(maxLines = ASK_INPUT_MAX_LINES),
-            modifier = Modifier.weight(1f),
-        )
-        AutopTextButton(
-            text = stringResource(R.string.panel_send),
-            onClick = {
-                if (text.isNotBlank()) {
-                    callbacks.onAnswer(text.trim())
-                    text = ""
-                }
-            },
-        )
-    }
+    InlineQuestionCard(
+        question = question,
+        options = options,
+        onAnswer = callbacks.onAnswer,
+        customLabel = stringResource(R.string.panel_ask_self),
+        sendDescription = stringResource(R.string.panel_send),
+        modifier = modifier,
+    )
 }
 
 /** steer 补充指令输入行（同运行面板 SteerRow）。 */

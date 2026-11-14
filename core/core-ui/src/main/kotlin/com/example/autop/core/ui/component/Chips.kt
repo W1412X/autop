@@ -25,6 +25,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -192,6 +193,49 @@ public fun AutopOptionRow(
             text = text,
             style = MaterialTheme.typography.labelLarge,
             color = MaterialTheme.colorScheme.onSurface,
+        )
+    }
+}
+
+/**
+ * 扁平小号 Chip（次要入口，如步骤下方的链接）：无描边、[AutopAlpha.BLOCK_FILL] 的 surfaceVariant 底、
+ * 8dp 圆角、labelMedium、可选前置 Xs 图标；高 [AutopDimens.flatChipHeight]。
+ */
+@Composable
+public fun AutopFlatChip(
+    text: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+) {
+    val shape = MaterialTheme.shapes.small
+    Row(
+        modifier =
+            modifier
+                .height(AutopDimens.flatChipHeight)
+                .clip(shape)
+                .background(
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AutopAlpha.BLOCK_FILL),
+                    shape = shape,
+                ).clickable(onClick = onClick)
+                .padding(horizontal = LocalSpacing.current.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (icon != null) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                modifier = Modifier.size(IconSize.Xs.scaled()),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+            Spacer(modifier = Modifier.width(LocalSpacing.current.xs))
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurface,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
         )
     }
 }

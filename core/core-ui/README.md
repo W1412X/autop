@@ -24,7 +24,8 @@
 ## 组件（src/main/kotlin/…/ui/component/，docs/tech/08 §2）
 
 - 按钮：`AutopButton`/`AutopTonalButton`/`AutopOutlinedButton`/`AutopTextButton`、`AutopIconButton`、`IconAction`。
-- Chip：`AutopChip`（高 34）；`StatusChip`（高 24、`StatusTone` 语义色、图标+文字双通道）。
+- Chip：`AutopChip`（高 34）；`AutopFlatChip`（扁平小号，高 30，无描边，用于步骤链接）；`StatusChip`（高 24、`StatusTone` 语义色、图标+文字双通道）。
+- 提问：`InlineQuestionCard`（对话、悬浮窗、创建页共用的内嵌提问卡）。
 - 分组：`SectionHeader`（4×18 竖条）；`SectionTitle`。
 - 设置行：`SwitchRow`/`OptionRow`/`InfoRow`/`ActionRow`/`NavRow`（最小触控区 48）。
 - 列表：`ListRow`（48dp 图标块、可选 3dp 进度条）+ `subtitleParts`；`PagedList`（距末尾 6 项自动加载，

@@ -32,7 +32,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import com.example.autop.core.thread.ui.R
-import com.example.autop.core.ui.component.AutopChip
+import com.example.autop.core.ui.component.AutopFlatChip
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.IconSize
@@ -184,9 +184,8 @@ private fun StepLinks(
             ),
     ) {
         known.forEach { link ->
-            AutopChip(
+            AutopFlatChip(
                 text = link.label ?: stringResource(stepLinkLabelRes(link.kind)),
-                selected = false,
                 onClick = { onLinkClick(link) },
                 icon = stepLinkIconOf(link.kind),
             )

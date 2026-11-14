@@ -43,8 +43,8 @@ import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopModelSelector
-import com.example.autop.core.ui.component.AutopOptionRow
 import com.example.autop.core.ui.component.AutopTonalButton
+import com.example.autop.core.ui.component.InlineQuestionCard
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.MarkdownText
 import com.example.autop.core.ui.component.SectionTitle
@@ -303,7 +303,7 @@ private fun UserBubble(text: String) {
 }
 
 /**
- * 提问卡片：问题 + 每个选项一行 + 固定的"自己输入"一行（与流程 AI 创建的提问卡一致）。
+ * 提问卡片：问题 + 每个选项一行 + 固定的"自己输入"一行（与流程 AI 创建的提问卡一致，样式见 core-ui InlineQuestionCard）。
  * 回答后只保留问题文字，回答作为用户气泡出现在对话里。
  */
 @Composable
@@ -312,55 +312,16 @@ private fun QuestionCard(
     pending: Boolean,
     onAction: (TaskAuthorAction) -> Unit,
 ) {
-    val spacing = LocalSpacing.current
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clip(MaterialTheme.shapes.medium)
-                .background(MaterialTheme.colorScheme.surfaceVariant)
-                .padding(spacing.md),
-        verticalArrangement = Arrangement.spacedBy(spacing.sm),
-    ) {
-        Text(text = question.question, style = MaterialTheme.typography.bodyMedium)
-        if (pending) {
-            question.options.forEach { option ->
-                AutopOptionRow(text = option, onClick = { onAction(TaskAuthorAction.Answer(option)) })
-            }
-            CustomAnswer(onAnswer = { onAction(TaskAuthorAction.Answer(it)) })
-        }
-    }
-}
-
-/** 固定的"自己输入"：收起时是一行选项，点开后是输入框，发送即作为回答。 */
-@Composable
-private fun CustomAnswer(onAnswer: (String) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    var text by remember { mutableStateOf("") }
-    if (!open) {
-        AutopOptionRow(text = stringResource(R.string.task_author_custom_option), onClick = { open = true })
-    } else {
-        AutopInputBar(
-            value = text,
-            onValueChange = { text = it },
-            spec = InputBarSpec(placeholder = stringResource(R.string.task_author_custom_hint), maxLines = 3),
-            modifier = Modifier.fillMaxWidth(),
-            trailing = {
-                AutopIconButton(
-                    AutopIcons.Send,
-                    stringResource(R.string.task_author_send),
-                    {
-                        val answer = text.trim()
-                        if (answer.isNotEmpty()) {
-                            onAnswer(answer)
-                            text = ""
-                            open = false
-                        }
-                    },
-                )
-            },
-        )
-    }
+    InlineQuestionCard(
+        question = question.question,
+        options = question.options,
+        onAnswer = { onAction(TaskAuthorAction.Answer(it)) },
+        customLabel = stringResource(R.string.task_author_custom_option),
+        sendDescription = stringResource(R.string.task_author_send),
+        modifier = Modifier.fillMaxWidth(),
+        customPlaceholder = stringResource(R.string.task_author_custom_hint),
+        interactive = pending,
+    )
 }
 
 /** 流式生成中的这一轮：思考展开实时显示，正文逐字出现，工具调用显示动作名。 */
