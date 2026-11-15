@@ -23,13 +23,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.scaled
 
-/** 44dp 方形图标按钮；[selected] 时实心 8dp 圆角底。 */
+/**
+ * 图标按钮。默认 44dp 方形、Md 图标；[compact] 为 32dp、Sm 图标，用于输入区等需要紧凑的位置。
+ * [selected] 时实心 8dp 圆角底。
+ */
 @Composable
 public fun AutopIconButton(
     icon: ImageVector,
@@ -37,8 +41,10 @@ public fun AutopIconButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     selected: Boolean = false,
+    compact: Boolean = false,
 ) {
-    val size = Modifier.size(AutopDimens.iconButtonSize)
+    val size = Modifier.size(if (compact) CompactButtonSize else AutopDimens.iconButtonSize)
+    val iconSize = if (compact) IconSize.Sm.scaled() else IconSize.Md.scaled()
     val iconTint = LocalContentColor.current
     if (selected) {
         FilledIconButton(
@@ -49,7 +55,7 @@ public fun AutopIconButton(
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                modifier = Modifier.size(IconSize.Md.scaled()),
+                modifier = Modifier.size(iconSize),
                 tint = iconTint,
             )
         }
@@ -58,12 +64,14 @@ public fun AutopIconButton(
             Icon(
                 imageVector = icon,
                 contentDescription = contentDescription,
-                modifier = Modifier.size(IconSize.Md.scaled()),
+                modifier = Modifier.size(iconSize),
                 tint = iconTint,
             )
         }
     }
 }
+
+private val CompactButtonSize = 32.dp
 
 /** 图标在上、文字在下的动作块；底 surfaceVariant α0.55，选中 primaryContainer。 */
 @Composable

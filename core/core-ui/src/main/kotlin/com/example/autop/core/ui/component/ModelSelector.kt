@@ -40,9 +40,8 @@ public fun AutopModelSelector(
             else -> stringResource(R.string.core_ui_model_default)
         }
     val showDefaultTag = shownProfile != null && shownProfile.id == defaultProfileId
-    AutopChip(
+    AutopFlatChip(
         text = label,
-        selected = false,
         onClick = { if (enabled && profiles.isNotEmpty()) open = true },
         labelTrailing = {
             if (showDefaultTag) {
@@ -50,7 +49,7 @@ public fun AutopModelSelector(
             }
             Text(
                 text = ARROW,
-                style = MaterialTheme.typography.labelLarge,
+                style = MaterialTheme.typography.labelMedium,
                 modifier = Modifier.padding(start = LocalSpacing.current.xs),
             )
         },

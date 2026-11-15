@@ -27,9 +27,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -92,12 +92,19 @@ internal fun InputArea(
             )
             Spacer(modifier = Modifier.weight(1f))
             // ADR-0035「只聊天」：开启后本轮发送不提供屏幕工具，不占用手机；运行中不切换（下一轮生效）。
-            FilterChip(
-                selected = state.chatOnly,
-                onClick = { onAction(ChatThreadAction.SetChatOnly(!state.chatOnly)) },
-                enabled = !state.running,
-                label = { Text(stringResource(R.string.thread_chat_only)) },
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.thread_chat_only),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                Switch(
+                    checked = state.chatOnly,
+                    onCheckedChange = { onAction(ChatThreadAction.SetChatOnly(it)) },
+                    enabled = !state.running,
+                    modifier = Modifier.padding(start = LocalSpacing.current.xs),
+                )
+            }
             if (!state.running && state.images.size < state.maxImages) AddImageButton(onAction)
         }
         AutopInputBar(
@@ -135,6 +142,7 @@ private fun AddImageButton(onAction: (ChatThreadAction) -> Unit) {
     AutopIconButton(
         icon = AutopIcons.AddPhoto,
         contentDescription = stringResource(R.string.thread_add_image),
+        compact = true,
         onClick = {
             picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
         },

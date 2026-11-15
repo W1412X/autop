@@ -207,6 +207,7 @@ public fun AutopFlatChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
+    labelTrailing: (@Composable () -> Unit)? = null,
 ) {
     val shape = MaterialTheme.shapes.small
     Row(
@@ -237,6 +238,10 @@ public fun AutopFlatChip(
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
         )
+        if (labelTrailing != null) {
+            Spacer(modifier = Modifier.width(LocalSpacing.current.xs))
+            labelTrailing()
+        }
     }
 }
 
