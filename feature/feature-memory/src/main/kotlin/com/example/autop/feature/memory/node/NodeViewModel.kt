@@ -61,9 +61,9 @@ public class NodeViewModel
             when (action) {
                 is NodeAction.FieldChanged -> changeField(action)
                 is NodeAction.KeywordAdded ->
-                    update { it.copy(keywords = (it.keywords + action.keyword.trim()).distinct()) }
+                    update { it.copy(keywords = (it.keywords + action.keyword.trim()).distinct(), dirty = true) }
                 is NodeAction.KeywordRemoved ->
-                    update { it.copy(keywords = it.keywords - action.keyword) }
+                    update { it.copy(keywords = it.keywords - action.keyword, dirty = true) }
                 NodeAction.Save -> save()
                 NodeAction.ShowVersions -> showVersions()
                 NodeAction.HideVersions -> update { it.copy(showVersions = false, diffVersion = null) }
@@ -98,11 +98,13 @@ public class NodeViewModel
 
         private fun changeField(action: NodeAction.FieldChanged) {
             update {
-                when (action.field) {
-                    NodeField.TITLE -> it.copy(title = action.value, titleInvalid = false)
-                    NodeField.SUMMARY -> it.copy(summary = action.value.take(it.summaryMaxChars))
-                    NodeField.CONTENT -> it.copy(content = action.value)
-                }
+                val next =
+                    when (action.field) {
+                        NodeField.TITLE -> it.copy(title = action.value, titleInvalid = false)
+                        NodeField.SUMMARY -> it.copy(summary = action.value.take(it.summaryMaxChars))
+                        NodeField.CONTENT -> it.copy(content = action.value)
+                    }
+                next.copy(dirty = true)
             }
         }
 

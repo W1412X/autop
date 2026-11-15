@@ -4,23 +4,35 @@
  */
 package com.example.autop.feature.memory.node
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,11 +47,13 @@ import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ErrorState
 import com.example.autop.core.ui.component.InfoRow
 import com.example.autop.core.ui.component.InputBarSpec
-import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.theme.AutopDimens
+import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
+import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.memory.R
 import com.example.autop.memory.VectorStatus
 import java.text.SimpleDateFormat
@@ -62,20 +76,7 @@ public fun NodeScreen(
         SubPageTopBar(
             title = heading(state),
             onBack = onBack,
-            actions = {
-                if (!state.isNew) {
-                    AutopIconButton(
-                        icon = AutopIcons.Schedule,
-                        contentDescription = stringResource(R.string.memory_version_history),
-                        onClick = { onAction(NodeAction.ShowVersions) },
-                    )
-                    AutopIconButton(
-                        icon = AutopIcons.MoreVert,
-                        contentDescription = stringResource(R.string.memory_more),
-                        onClick = { onAction(NodeAction.ShowMore) },
-                    )
-                }
-            },
+            actions = { NodeTopActions(state = state, onAction = onAction) },
         )
         if (state.loading) {
             EmptyState(text = stringResource(R.string.memory_loading))
@@ -118,7 +119,7 @@ private fun NodeForm(
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState()),
     ) {
-        SectionTitle(text = stringResource(R.string.memory_section_content))
+        NodeSectionTitle(text = stringResource(R.string.memory_section_content))
         FieldInput(
             label = stringResource(R.string.memory_field_title),
             value = state.title,
@@ -144,10 +145,10 @@ private fun NodeForm(
                 field = NodeField.CONTENT,
             )
         }
-        SectionTitle(text = stringResource(R.string.memory_section_keywords))
+        NodeSectionTitle(text = stringResource(R.string.memory_section_keywords))
         KeywordRow(state = state, onAction = onAction)
-        SectionTitle(text = stringResource(R.string.memory_section_info))
-        NodeInfoRows(state = state)
+        NodeSectionTitle(text = stringResource(R.string.memory_section_info))
+        NodeInfoSection(state = state, onAction = onAction)
         AutopButton(
             text = stringResource(R.string.memory_save),
             onClick = { onAction(NodeAction.Save) },
@@ -182,7 +183,10 @@ private fun SummaryField(
 }
 
 @Composable
-private fun NodeInfoRows(state: NodeUiState) {
+private fun NodeInfoRows(
+    state: NodeUiState,
+    onAction: (NodeAction) -> Unit,
+) {
     if (state.isNew) {
         InfoRow(
             title = stringResource(R.string.memory_info_location),
@@ -211,6 +215,10 @@ private fun NodeInfoRows(state: NodeUiState) {
         subtitle = null,
         value = vectorLabel(state),
     )
+    AutopTextButton(
+        text = stringResource(R.string.memory_version_history),
+        onClick = { onAction(NodeAction.ShowVersions) },
+    )
 }
 
 @Composable
@@ -226,6 +234,7 @@ private fun AgentBanner(onAction: (NodeAction) -> Unit) {
     StatusBanner(
         tone = StatusTone.PAUSED,
         message = stringResource(R.string.memory_agent_banner),
+        compact = true,
         actions = {
             AutopTextButton(
                 text = stringResource(R.string.memory_confirm),
@@ -250,7 +259,7 @@ private fun FieldInput(
     val spacing = LocalSpacing.current
     Text(
         text = label,
-        style = MaterialTheme.typography.labelMedium,
+        style = MaterialTheme.typography.labelSmall,
         color = MaterialTheme.colorScheme.onSurfaceVariant,
         modifier = Modifier.padding(start = spacing.screenEdge, top = NODE_V_PADDING),
     )
@@ -358,3 +367,90 @@ internal fun formatTime(epochMs: Long): String =
 private val NODE_V_PADDING = 12.dp
 private const val CONTENT_MAX_LINES = 12
 private const val TIME_PATTERN: String = "yyyy-MM-dd HH:mm"
+
+/**
+ * 条目页的区块标题：左侧一根主色短条 + 标题文字。传入 [expanded] 与 [onToggle] 时整行可点，右侧显示折叠箭头。
+ */
+@Composable
+private fun NodeSectionTitle(
+    text: String,
+    expanded: Boolean? = null,
+    onToggle: (() -> Unit)? = null,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .then(if (onToggle != null) Modifier.clickable(onClick = onToggle) else Modifier)
+                .padding(start = spacing.screenEdge, end = spacing.screenEdge, top = spacing.lg, bottom = spacing.xs),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .width(AutopDimens.sectionBarWidth)
+                    .height(AutopDimens.sectionBarHeight)
+                    .background(
+                        color = MaterialTheme.colorScheme.primary,
+                        shape = RoundedCornerShape(AutopDimens.sectionBarCornerRadius),
+                    ),
+        )
+        Spacer(modifier = Modifier.width(spacing.sm))
+        Text(text = text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
+        if (expanded != null) {
+            Spacer(modifier = Modifier.weight(1f))
+            Icon(
+                imageVector = if (expanded) AutopIcons.ArrowDown else AutopIcons.ChevronRight,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                modifier = Modifier.size(IconSize.Sm.scaled()),
+            )
+        }
+    }
+}
+
+/** 条目页的信息区：标题可点击折叠或展开（默认展开，状态随页面保存），展开时显示来源、版本、更新时间等。 */
+@Composable
+private fun NodeInfoSection(
+    state: NodeUiState,
+    onAction: (NodeAction) -> Unit,
+) {
+    var expanded by rememberSaveable { mutableStateOf(true) }
+    NodeSectionTitle(
+        text = stringResource(R.string.memory_section_info),
+        expanded = expanded,
+        onToggle = { expanded = !expanded },
+    )
+    if (expanded) {
+        NodeInfoRows(state = state, onAction = onAction)
+    }
+}
+
+/** 条目页顶栏右侧：已保存/未保存状态与更多操作（新建条目时不显示）。 */
+@Composable
+private fun NodeTopActions(
+    state: NodeUiState,
+    onAction: (NodeAction) -> Unit,
+) {
+    if (!state.isNew) {
+        val saveColor =
+            if (state.dirty) {
+                MaterialTheme.colorScheme.primary
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        val saveText =
+            stringResource(if (state.dirty) R.string.memory_unsaved else R.string.memory_saved)
+        Text(
+            text = saveText,
+            style = MaterialTheme.typography.labelMedium,
+            color = saveColor,
+        )
+        AutopIconButton(
+            icon = AutopIcons.MoreVert,
+            contentDescription = stringResource(R.string.memory_more),
+            onClick = { onAction(NodeAction.ShowMore) },
+        )
+    }
+}

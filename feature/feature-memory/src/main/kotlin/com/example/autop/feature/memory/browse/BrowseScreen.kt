@@ -4,6 +4,7 @@
  */
 package com.example.autop.feature.memory.browse
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Column
@@ -42,11 +43,13 @@ import com.example.autop.core.ui.component.PagedListState
 import com.example.autop.core.ui.component.StatusChip
 import com.example.autop.core.ui.component.TopLevelHeader
 import com.example.autop.core.ui.component.subtitleParts
+import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.memory.R
+import com.example.autop.feature.memory.node.formatTime
 
 /** 浏览页。 */
 @Composable
@@ -239,11 +242,12 @@ private fun ChildRow(
     onOpenNode: (String) -> Unit,
     onAction: (BrowseAction) -> Unit,
 ) {
+    val updated = formatTime(row.updatedAt)
     val subtitle =
-        if (row.isDirectory && row.childCount > 0) {
-            subtitleParts(row.summary, stringResource(R.string.memory_child_count, row.childCount))
+        if (row.isDirectory) {
+            subtitleParts(stringResource(R.string.memory_child_count, row.childCount), updated)
         } else {
-            row.summary
+            subtitleParts(updated, row.summary)
         }
     ListRow(
         title = row.title,
@@ -315,25 +319,30 @@ private fun RecentChangesRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = spacing.lg, vertical = spacing.md),
+                .padding(horizontal = spacing.lg, vertical = spacing.xs)
+                .background(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = AutopAlpha.BANNER_COMPACT_FILL),
+                    shape = MaterialTheme.shapes.medium,
+                ).clickable(onClick = onClick)
+                .padding(horizontal = spacing.md, vertical = spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = stringResource(R.string.memory_recent_changes),
+                style = MaterialTheme.typography.titleSmall,
+                color = MaterialTheme.colorScheme.onSurface,
+            )
+            Text(
+                text = stringResource(R.string.memory_recent_changes_hint, count),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
-            text = stringResource(R.string.memory_recent_changes),
-            style = MaterialTheme.typography.bodyMedium,
-            modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = stringResource(R.string.memory_recent_changes_hint, count),
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Icon(
-            imageVector = AutopIcons.ChevronRight,
-            contentDescription = null,
-            modifier = Modifier.size(IconSize.Sm.scaled()),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            text = stringResource(R.string.memory_view_all),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
         )
     }
 }

@@ -146,6 +146,7 @@ public class BrowseViewModel
                         childCount = child.childCount,
                         isDirectory = child.content.isBlank(),
                         byAgent = child.source.isAutomated,
+                        updatedAt = child.updatedAt,
                     )
                 }
             _uiState.value =

@@ -13,6 +13,8 @@ public data class BrowseRow(
     val childCount: Int,
     val isDirectory: Boolean,
     val byAgent: Boolean,
+    /** 最后更新时间（毫秒）。 */
+    val updatedAt: Long,
 )
 
 /** 搜索结果行。 */

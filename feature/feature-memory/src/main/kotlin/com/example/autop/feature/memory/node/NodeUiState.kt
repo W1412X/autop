@@ -40,6 +40,8 @@ public data class NodeUiState(
     /** 新建模式下标题为空或含 `/`，不能作为路径段。 */
     val titleInvalid: Boolean = false,
     val saving: Boolean = false,
+    /** 有尚未保存的修改。 */
+    val dirty: Boolean = false,
     val error: String? = null,
     val versions: List<VersionRow> = emptyList(),
     val showVersions: Boolean = false,
