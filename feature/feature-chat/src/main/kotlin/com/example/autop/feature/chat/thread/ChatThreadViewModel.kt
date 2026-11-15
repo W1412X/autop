@@ -363,6 +363,7 @@ public class ChatThreadViewModel
 
         /** 语音输入：识别中的临时结果实时写进输入框（接在开始时的文字后面）；确定结果并入输入框。 */
         private fun collectVoice() {
+            collectVoiceErrors()
             viewModelScope.launch {
                 speech.partial.collect { partial ->
                     if (speech.listening.value && partial.isNotEmpty()) {
@@ -375,6 +376,21 @@ public class ChatThreadViewModel
                     val text = joinVoice(voiceBase, result)
                     voiceBase = text
                     meta.update { it.copy(input = text) }
+                }
+            }
+        }
+
+        /** 语音识别出错：按错误码给出提示（错误码见 SystemSpeechInput）。 */
+        private fun collectVoiceErrors() {
+            viewModelScope.launch {
+                speech.errors.collect { code ->
+                    val notice =
+                        when (code) {
+                            "speech.permission" -> ThreadNotice.VOICE_PERMISSION
+                            "speech.no_speech" -> ThreadNotice.VOICE_NO_SPEECH
+                            else -> ThreadNotice.VOICE_ERROR
+                        }
+                    meta.update { it.copy(notice = notice) }
                 }
             }
         }
@@ -396,6 +412,7 @@ public class ChatThreadViewModel
                     speech.start()
                 }
                 ChatThreadAction.StopVoice -> speech.stop()
+                is ChatThreadAction.ShowNotice -> meta.update { it.copy(notice = action.notice) }
                 else -> Unit
             }
         }

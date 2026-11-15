@@ -34,6 +34,11 @@ public sealed interface ChatThreadAction {
         val enabled: Boolean,
     ) : ChatThreadAction
 
+    /** 在页面上提示一条错误（语音、拍照等的失败原因）。 */
+    public data class ShowNotice(
+        val notice: ThreadNotice,
+    ) : ChatThreadAction
+
     /** 开始语音输入（系统语音识别；麦克风权限由 UI 先行取得）。 */
     public data object StartVoice : ChatThreadAction
 

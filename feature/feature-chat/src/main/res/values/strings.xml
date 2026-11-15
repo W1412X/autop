@@ -48,6 +48,11 @@
     <string name="thread_notice_copied">已复制</string>
     <string name="thread_notice_image_failed">有图片无法读取，已跳过</string>
     <string name="thread_notice_steer_failed">补充指令失败：任务已结束，输入内容已保留</string>
+    <string name="thread_notice_voice_permission">需要麦克风权限才能语音输入，请在系统设置里允许</string>
+    <string name="thread_notice_voice_no_speech">没有听清楚，请再说一次</string>
+    <string name="thread_notice_voice_error">语音识别失败，请稍后再试</string>
+    <string name="thread_notice_camera_failed">拍照没有完成，没有添加图片</string>
+    <string name="thread_camera">拍照</string>
     <string name="thread_ask_self">自己输入</string>
     <string name="thread_add_image">添加图片</string>
     <string name="thread_chat_only">只聊天</string>

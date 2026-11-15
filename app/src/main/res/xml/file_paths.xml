@@ -8,4 +8,7 @@
     <cache-path
         name="update"
         path="update/" />
+    <cache-path
+        name="camera"
+        path="camera/" />
 </paths>

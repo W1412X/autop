@@ -7,7 +7,10 @@
 package com.example.autop.feature.chat.thread
 
 import android.Manifest
+import android.content.ActivityNotFoundException
+import android.content.Context
 import android.content.pm.PackageManager
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -51,6 +54,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.example.autop.core.thread.ui.Thumbnail
 import com.example.autop.core.thread.ui.decodeSampledBytes
 import com.example.autop.core.ui.component.AutopIconButton
@@ -66,6 +70,7 @@ import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.chat.R
 import com.example.autop.task.ImageAttachment
+import java.io.File
 
 /** 发送与停止图标互换的淡入淡出时长（毫秒）。 */
 private const val SWAP_MS: Int = 150
@@ -157,9 +162,18 @@ internal fun InputArea(
 @Composable
 private fun AttachMenuButton(onAction: (ChatThreadAction) -> Unit) {
     var open by remember { mutableStateOf(false) }
+    val context = LocalContext.current
+    var pendingCapture by remember { mutableStateOf<Uri?>(null) }
     val picker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
             if (uris.isNotEmpty()) onAction(ChatThreadAction.AddImages(uris))
+        }
+    // 用户取消拍照不算错误（不提示）；拍成功才加入图片。
+    val camera =
+        rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
+            val uri = pendingCapture
+            pendingCapture = null
+            if (saved && uri != null) onAction(ChatThreadAction.AddImages(listOf(uri)))
         }
     Box {
         AutopIconButton(
@@ -177,8 +191,30 @@ private fun AttachMenuButton(onAction: (ChatThreadAction) -> Unit) {
                     picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
                 },
             )
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.thread_camera)) },
+                leadingIcon = { Icon(imageVector = AutopIcons.PhotoCamera, contentDescription = null) },
+                onClick = {
+                    open = false
+                    val uri = newCaptureUri(context)
+                    pendingCapture = uri
+                    try {
+                        camera.launch(uri)
+                    } catch (_: ActivityNotFoundException) {
+                        pendingCapture = null
+                        onAction(ChatThreadAction.ShowNotice(ThreadNotice.CAMERA_FAILED))
+                    }
+                },
+            )
         }
     }
+}
+
+/** 拍照输出文件：放在 cache/camera 下，经 FileProvider 交给系统相机写入。 */
+private fun newCaptureUri(context: Context): Uri {
+    val dir = File(context.cacheDir, "camera").apply { mkdirs() }
+    val file = File(dir, "capture_${System.currentTimeMillis()}.jpg")
+    return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 }
 
 /** 语音输入按钮（系统语音识别）：未取得录音权限时先申请，授权后开始；听写中再点结束。 */
@@ -190,7 +226,11 @@ private fun VoiceButton(
     val context = LocalContext.current
     val permission =
         rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) onAction(ChatThreadAction.StartVoice)
+            if (granted) {
+                onAction(ChatThreadAction.StartVoice)
+            } else {
+                onAction(ChatThreadAction.ShowNotice(ThreadNotice.VOICE_PERMISSION))
+            }
         }
     AutopIconButton(
         icon = AutopIcons.Mic,

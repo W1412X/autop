@@ -29,6 +29,18 @@ public enum class ThreadNotice {
 
     /** 补充指令（steer）失败：目标 Run 已结束或不存在，输入框保留原文（WP8.5）。 */
     STEER_FAILED,
+
+    /** 语音输入：没有录音权限（被拒绝或被系统永久拒绝）。 */
+    VOICE_PERMISSION,
+
+    /** 语音输入：没有听清楚。 */
+    VOICE_NO_SPEECH,
+
+    /** 语音输入：识别服务出错。 */
+    VOICE_ERROR,
+
+    /** 拍照没有完成，没有添加图片。 */
+    CAMERA_FAILED,
 }
 
 /** 对话页弹层状态。 */
