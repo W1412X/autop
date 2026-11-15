@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -58,7 +57,6 @@ import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.VoiceErrorToast
-import com.example.autop.core.ui.component.VoiceWave
 import com.example.autop.core.ui.component.llmErrorTextRes
 import com.example.autop.core.ui.component.rememberVoiceStarter
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -130,8 +128,7 @@ public fun FlowAuthorScreen(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
-                .imePadding(),
+                .navigationBarsPadding(),
     ) {
         SubPageTopBar(
             title = stringResource(R.string.author_title),
@@ -175,9 +172,6 @@ public fun FlowAuthorScreen(
             if (state.imageError) item { ErrorBanner(AUTHOR_IMAGE_FAILED) }
         }
         author.pendingDemonstration?.let { goal -> DemoConfirm(goal = goal, onAction = onAction) }
-        if (state.listening) {
-            VoiceWave(level = state.voiceLevel, modifier = Modifier.padding(horizontal = spacing.screenEdge))
-        }
         VoiceErrorToast(code = state.voiceError)
         LeaveGuard(state = state, onAction = onAction)
         if (state.images.isNotEmpty()) {
@@ -226,6 +220,7 @@ public fun FlowAuthorScreen(
                     else -> ComposerTrailing.SEND
                 },
             listening = state.listening,
+            voiceLevel = state.voiceLevel,
             onVoice = { if (state.listening) onAction(FlowAuthorAction.StopVoice) else startVoice() },
             onSend = { onAction(FlowAuthorAction.Send) },
             onStop = { onAction(FlowAuthorAction.Stop) },

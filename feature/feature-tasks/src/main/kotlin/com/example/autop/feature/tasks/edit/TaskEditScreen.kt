@@ -7,7 +7,6 @@ import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -46,8 +45,7 @@ public fun TaskEditScreen(
             Modifier
                 .fillMaxSize()
                 .statusBarsPadding()
-                .navigationBarsPadding()
-                .imePadding(),
+                .navigationBarsPadding(),
     ) {
         SubPageTopBar(
             title = stringResource(if (state.isNew) R.string.task_edit_new_title else R.string.task_edit_title),
