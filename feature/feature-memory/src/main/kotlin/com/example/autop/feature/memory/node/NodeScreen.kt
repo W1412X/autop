@@ -6,6 +6,7 @@ package com.example.autop.feature.memory.node
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -147,8 +148,7 @@ private fun NodeForm(
         }
         NodeSectionTitle(text = stringResource(R.string.memory_section_keywords))
         KeywordRow(state = state, onAction = onAction)
-        NodeSectionTitle(text = stringResource(R.string.memory_section_info))
-        NodeInfoSection(state = state, onAction = onAction)
+        NodeInfoSection(state = state)
         AutopButton(
             text = stringResource(R.string.memory_save),
             onClick = { onAction(NodeAction.Save) },
@@ -183,10 +183,7 @@ private fun SummaryField(
 }
 
 @Composable
-private fun NodeInfoRows(
-    state: NodeUiState,
-    onAction: (NodeAction) -> Unit,
-) {
+private fun NodeInfoRows(state: NodeUiState) {
     if (state.isNew) {
         InfoRow(
             title = stringResource(R.string.memory_info_location),
@@ -214,10 +211,6 @@ private fun NodeInfoRows(
         title = stringResource(R.string.memory_info_vector),
         subtitle = null,
         value = vectorLabel(state),
-    )
-    AutopTextButton(
-        text = stringResource(R.string.memory_version_history),
-        onClick = { onAction(NodeAction.ShowVersions) },
     )
 }
 
@@ -282,24 +275,26 @@ private fun KeywordRow(
     onAction: (NodeAction) -> Unit,
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    val spacing = LocalSpacing.current
     FlowRow(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(horizontal = LocalSpacing.current.screenEdge),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+        verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         state.keywords.forEach { keyword ->
             AutopChip(
                 text = keyword,
                 selected = true,
                 onClick = { onAction(NodeAction.KeywordRemoved(keyword)) },
-                modifier = Modifier.padding(end = NODE_V_PADDING / 2f),
+                compact = true,
             )
         }
         AutopChip(
             text = stringResource(R.string.memory_keyword_add),
             selected = false,
             onClick = { showAddDialog = true },
+            icon = AutopIcons.Add,
+            compact = true,
         )
     }
     if (showAddDialog) {
@@ -412,10 +407,7 @@ private fun NodeSectionTitle(
 
 /** 条目页的信息区：标题可点击折叠或展开（默认展开，状态随页面保存），展开时显示来源、版本、更新时间等。 */
 @Composable
-private fun NodeInfoSection(
-    state: NodeUiState,
-    onAction: (NodeAction) -> Unit,
-) {
+private fun NodeInfoSection(state: NodeUiState) {
     var expanded by rememberSaveable { mutableStateOf(true) }
     NodeSectionTitle(
         text = stringResource(R.string.memory_section_info),
@@ -423,7 +415,7 @@ private fun NodeInfoSection(
         onToggle = { expanded = !expanded },
     )
     if (expanded) {
-        NodeInfoRows(state = state, onAction = onAction)
+        NodeInfoRows(state = state)
     }
 }
 
