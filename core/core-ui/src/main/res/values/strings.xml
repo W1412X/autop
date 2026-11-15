@@ -59,5 +59,7 @@
     <string name="core_ui_voice_too_many">语音识别请求太频繁，请稍后再试。</string>
     <string name="core_ui_voice_disconnected">语音识别服务连接断开，请重试。</string>
     <string name="core_ui_voice_language">当前语言不被语音识别服务支持。</string>
+    <string name="core_ui_voice_support_check">无法确认这台设备是否支持语音识别（错误码 %1$s）。</string>
+    <string name="core_ui_voice_download">语音识别所需资源的下载状态无法获取（错误码 %1$s），请稍后再试。</string>
     <string name="core_ui_voice_unknown">语音识别失败（错误码 %1$s）。</string>
 </resources>

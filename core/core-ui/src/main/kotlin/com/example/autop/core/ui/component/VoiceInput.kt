@@ -90,4 +90,6 @@ private val VOICE_ERROR_RES: Map<String, Int> =
         "${ERR_PREFIX}11" to R.string.core_ui_voice_disconnected,
         "${ERR_PREFIX}12" to R.string.core_ui_voice_language,
         "${ERR_PREFIX}13" to R.string.core_ui_voice_language,
+        "${ERR_PREFIX}14" to R.string.core_ui_voice_support_check,
+        "${ERR_PREFIX}15" to R.string.core_ui_voice_download,
     )
