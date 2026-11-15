@@ -46,6 +46,7 @@ public fun AutopChip(
     modifier: Modifier = Modifier,
     icon: ImageVector? = null,
     labelTrailing: (@Composable () -> Unit)? = null,
+    compact: Boolean = false,
 ) {
     FilterChip(
         selected = selected,
@@ -64,7 +65,7 @@ public fun AutopChip(
                 }
             }
         },
-        modifier = modifier.height(AutopDimens.chipHeight),
+        modifier = modifier.height(if (compact) AutopDimens.flatChipHeight else AutopDimens.chipHeight),
         shape = MaterialTheme.shapes.small,
         leadingIcon =
             icon?.let { iconVector ->
