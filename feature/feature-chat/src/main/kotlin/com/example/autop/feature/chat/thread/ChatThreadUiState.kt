@@ -62,6 +62,10 @@ public data class ChatThreadUiState(
     val defaultModelId: String? = null,
     /** ADR-0035「只聊天」：开启时本轮发送不提供屏幕工具，不占用手机。 */
     val chatOnly: Boolean = false,
+    /** 系统语音识别是否可用（不可用时不显示麦克风）。 */
+    val voiceAvailable: Boolean = false,
+    /** 正在语音输入。 */
+    val listening: Boolean = false,
     /** 待发送的图片（已压缩，发送后清空）。 */
     val images: List<ImageAttachment> = emptyList(),
     /** 单条消息可附图片数上限（`ui.chat.attachMaxImages`）。 */

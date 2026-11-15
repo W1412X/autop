@@ -34,6 +34,12 @@ public sealed interface ChatThreadAction {
         val enabled: Boolean,
     ) : ChatThreadAction
 
+    /** 开始语音输入（系统语音识别；麦克风权限由 UI 先行取得）。 */
+    public data object StartVoice : ChatThreadAction
+
+    /** 结束语音输入，交出已听到的内容。 */
+    public data object StopVoice : ChatThreadAction
+
     /** 发送：空闲=发起对话；运行中=补充指令（steer）。 */
     public data object Send : ChatThreadAction
 

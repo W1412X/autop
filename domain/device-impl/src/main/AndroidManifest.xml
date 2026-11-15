@@ -3,6 +3,13 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 语音输入（系统语音识别）：录音权限由 UI 在点麦克风时申请；queries 让 Android 11+ 能找到识别服务。 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <queries>
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
     <!-- list_apps / open_app 全量枚举应用所需（docs/tech/01 第 7 节，WP6；自用不上架，
          包可见性 <queries> 无法表达"枚举全部应用"，按文档口径声明并豁免 lint 告警）。 -->
     <uses-permission

@@ -32,6 +32,7 @@ import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.core.thread.ui.mergeTimeline
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.SpeechInput
 import com.example.autop.feature.chat.NEW_THREAD
 import com.example.autop.llm.ModelProfileStore
 import com.example.autop.task.ActiveRunInfo
@@ -101,7 +102,14 @@ public class ChatThreadViewModel
         private val accessibility: AccessibilityStatus,
         private val logFiles: LogFiles,
         private val imageReader: ChatImageReader,
+        private val speech: SpeechInput,
     ) : ViewModel() {
+        /** 系统语音识别是否可用（设备没有识别服务时不显示麦克风）。 */
+        private val voiceAvailable: Boolean = speech.available()
+
+        /** 开始语音输入时输入框已有的文字；识别结果接在它后面。 */
+        private var voiceBase = ""
+
         private val timeline = MutableStateFlow(TimelineInput())
         private val meta = MutableStateFlow(ChatMeta())
         private val threadTitle = MutableStateFlow<String?>(null)
@@ -152,11 +160,13 @@ public class ChatThreadViewModel
          * 事件流状态之上再叠一层。
          */
         public val uiState: StateFlow<ChatThreadUiState> =
-            combine(baseState, threadTitle, modelChoices) { state, title, choices ->
+            combine(baseState, threadTitle, modelChoices, speech.listening) { state, title, choices, listening ->
                 state.copy(
                     title = title ?: state.title,
                     modelOptions = choices.options,
                     defaultModelId = choices.defaultId,
+                    voiceAvailable = voiceAvailable,
+                    listening = listening,
                 )
             }.stateIn(
                 scope = viewModelScope,
@@ -165,6 +175,7 @@ public class ChatThreadViewModel
             )
 
         init {
+            collectVoice()
             viewModelScope.launch {
                 threadStore
                     .observeChanges()
@@ -230,6 +241,7 @@ public class ChatThreadViewModel
                     viewModelScope.launch { navChannel.send(ChatNavEvent.OpenLink(action.link)) }
                 else -> {
                     updateChatOption(action)
+                    handleVoice(action)
                     handleSheet(action)
                 }
             }
@@ -346,6 +358,45 @@ public class ChatThreadViewModel
                     }
                     if (background) navChannel.send(ChatNavEvent.Background)
                 }
+            }
+        }
+
+        /** 语音输入：识别中的临时结果实时写进输入框（接在开始时的文字后面）；确定结果并入输入框。 */
+        private fun collectVoice() {
+            viewModelScope.launch {
+                speech.partial.collect { partial ->
+                    if (speech.listening.value && partial.isNotEmpty()) {
+                        meta.update { it.copy(input = joinVoice(voiceBase, partial)) }
+                    }
+                }
+            }
+            viewModelScope.launch {
+                speech.results.collect { result ->
+                    val text = joinVoice(voiceBase, result)
+                    voiceBase = text
+                    meta.update { it.copy(input = text) }
+                }
+            }
+        }
+
+        private fun joinVoice(
+            base: String,
+            spoken: String,
+        ): String =
+            when {
+                base.isBlank() -> spoken
+                base.endsWith(" ") || base.endsWith("\n") -> base + spoken
+                else -> "$base $spoken"
+            }
+
+        private fun handleVoice(action: ChatThreadAction) {
+            when (action) {
+                ChatThreadAction.StartVoice -> {
+                    voiceBase = meta.value.input
+                    speech.start()
+                }
+                ChatThreadAction.StopVoice -> speech.stop()
+                else -> Unit
             }
         }
 

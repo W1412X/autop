@@ -51,6 +51,9 @@
     <string name="thread_ask_self">自己输入</string>
     <string name="thread_add_image">添加图片</string>
     <string name="thread_chat_only">只聊天</string>
+    <string name="thread_attach">附件</string>
+    <string name="thread_voice_input">语音输入</string>
+    <string name="thread_voice_stop">停止语音输入</string>
     <string name="thread_remove_image">移除图片</string>
     <string name="thread_image_description">图片</string>
     <string name="thread_input_hint_idle">告诉我要做什么</string>

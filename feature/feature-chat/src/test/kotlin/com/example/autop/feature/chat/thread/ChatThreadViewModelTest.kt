@@ -148,6 +148,7 @@ public class ChatThreadViewModelTest {
                     org.robolectric.RuntimeEnvironment.getApplication(),
                     TestDispatcherProvider(testDispatcher),
                 ),
+            speech = FakeSpeechInput(),
         )
 }
 
@@ -385,4 +386,24 @@ private object FakeChatModelProfiles : com.example.autop.llm.ModelProfileStore {
     override suspend fun delete(id: String) = Unit
 
     override suspend fun setDefaultProfileId(id: String?) = Unit
+}
+
+/** 测试用语音输入：默认不可用，不产生识别结果。 */
+private class FakeSpeechInput : com.example.autop.device.SpeechInput {
+    override fun available(): Boolean = false
+
+    override val listening: kotlinx.coroutines.flow.StateFlow<Boolean> =
+        kotlinx.coroutines.flow.MutableStateFlow(false)
+    override val partial: kotlinx.coroutines.flow.StateFlow<String> =
+        kotlinx.coroutines.flow.MutableStateFlow("")
+    override val results: kotlinx.coroutines.flow.SharedFlow<String> =
+        kotlinx.coroutines.flow.MutableSharedFlow()
+    override val errors: kotlinx.coroutines.flow.SharedFlow<String> =
+        kotlinx.coroutines.flow.MutableSharedFlow()
+
+    override fun start() = Unit
+
+    override fun stop() = Unit
+
+    override fun cancel() = Unit
 }

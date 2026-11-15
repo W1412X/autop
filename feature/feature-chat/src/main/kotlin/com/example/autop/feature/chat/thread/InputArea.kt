@@ -6,6 +6,8 @@
  */
 package com.example.autop.feature.chat.thread
 
+import android.Manifest
+import android.content.pm.PackageManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
@@ -28,19 +30,27 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import com.example.autop.core.thread.ui.Thumbnail
 import com.example.autop.core.thread.ui.decodeSampledBytes
 import com.example.autop.core.ui.component.AutopIconButton
@@ -65,7 +75,16 @@ private val SWITCH_BOX_HEIGHT = 24.dp
 private const val SWITCH_SCALE = 0.7f
 
 /** 尾部按钮当前是发送还是停止。 */
-private enum class TrailingMode { SEND, STOP }
+private enum class TrailingMode { SEND, STOP, VOICE }
+
+/** 尾部按钮模式：听写中为麦克风（停止态）；运行中无输入为停止；无输入且可语音为麦克风；其余为发送。 */
+private fun trailingModeOf(state: ChatThreadUiState): TrailingMode =
+    when {
+        state.listening -> TrailingMode.VOICE
+        state.running && state.input.isBlank() -> TrailingMode.STOP
+        state.voiceAvailable && state.input.isBlank() && state.images.isEmpty() -> TrailingMode.VOICE
+        else -> TrailingMode.SEND
+    }
 
 /**
  * 输入区。
@@ -100,7 +119,6 @@ internal fun InputArea(
             Spacer(modifier = Modifier.weight(1f))
             // ADR-0035「只聊天」：开启后本轮发送不提供屏幕工具，不占用手机；运行中不切换（下一轮生效）。
             ChatOnlySwitch(chatOnly = state.chatOnly, running = state.running, onAction = onAction)
-            if (!state.running && state.images.size < state.maxImages) AddImageButton(onAction)
         }
         AutopInputBar(
             value = state.input,
@@ -122,6 +140,14 @@ internal fun InputArea(
                     .fillMaxWidth()
                     .padding(top = LocalSpacing.current.sm)
                     .focusRequester(focusRequester),
+            leading =
+                if (!state.running &&
+                    state.images.size < state.maxImages
+                ) {
+                    ({ AttachMenuButton(onAction) })
+                } else {
+                    null
+                },
             trailing = { TrailingButton(state = state, enabled = enabled, onAction = onAction) },
         )
     }
@@ -129,17 +155,58 @@ internal fun InputArea(
 
 /** 系统相册选图（Photo Picker 不需要存储权限）；选中的 Uri 交给 ViewModel 读取压缩。 */
 @Composable
-private fun AddImageButton(onAction: (ChatThreadAction) -> Unit) {
+private fun AttachMenuButton(onAction: (ChatThreadAction) -> Unit) {
+    var open by remember { mutableStateOf(false) }
     val picker =
         rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia()) { uris ->
             if (uris.isNotEmpty()) onAction(ChatThreadAction.AddImages(uris))
         }
+    Box {
+        AutopIconButton(
+            icon = AutopIcons.Add,
+            contentDescription = stringResource(R.string.thread_attach),
+            compact = true,
+            onClick = { open = true },
+        )
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text(stringResource(R.string.thread_add_image)) },
+                leadingIcon = { Icon(imageVector = AutopIcons.AddPhoto, contentDescription = null) },
+                onClick = {
+                    open = false
+                    picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+                },
+            )
+        }
+    }
+}
+
+/** 语音输入按钮（系统语音识别）：未取得录音权限时先申请，授权后开始；听写中再点结束。 */
+@Composable
+private fun VoiceButton(
+    listening: Boolean,
+    onAction: (ChatThreadAction) -> Unit,
+) {
+    val context = LocalContext.current
+    val permission =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) onAction(ChatThreadAction.StartVoice)
+        }
     AutopIconButton(
-        icon = AutopIcons.AddPhoto,
-        contentDescription = stringResource(R.string.thread_add_image),
+        icon = AutopIcons.Mic,
+        contentDescription =
+            stringResource(
+                if (listening) R.string.thread_voice_stop else R.string.thread_voice_input,
+            ),
         compact = true,
+        selected = listening,
         onClick = {
-            picker.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly))
+            when {
+                listening -> onAction(ChatThreadAction.StopVoice)
+                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+                    PackageManager.PERMISSION_GRANTED -> onAction(ChatThreadAction.StartVoice)
+                else -> permission.launch(Manifest.permission.RECORD_AUDIO)
+            }
         },
     )
 }
@@ -196,7 +263,7 @@ private fun TrailingButton(
     enabled: Boolean,
     onAction: (ChatThreadAction) -> Unit,
 ) {
-    val mode = if (state.running && state.input.isBlank()) TrailingMode.STOP else TrailingMode.SEND
+    val mode = trailingModeOf(state)
     val duration = if (LocalMotionEnabled.current) SWAP_MS else 0
     AnimatedContent(
         targetState = mode,
@@ -205,6 +272,7 @@ private fun TrailingButton(
     ) { target ->
         when (target) {
             TrailingMode.STOP -> StopButton(onClick = { onAction(ChatThreadAction.Stop) })
+            TrailingMode.VOICE -> VoiceButton(listening = state.listening, onAction = onAction)
             TrailingMode.SEND ->
                 SendButton(
                     sendable = enabled && (state.input.isNotBlank() || state.images.isNotEmpty()),

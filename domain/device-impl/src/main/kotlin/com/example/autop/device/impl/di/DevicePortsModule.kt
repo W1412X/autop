@@ -19,6 +19,7 @@ import com.example.autop.device.ScreenLease
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellKeepAlive
+import com.example.autop.device.SpeechInput
 import com.example.autop.device.TouchShield
 import com.example.autop.device.UiStabilizer
 import com.example.autop.device.UpdateChecker
@@ -37,6 +38,7 @@ import com.example.autop.device.impl.record.ElementPickerImpl
 import com.example.autop.device.impl.shell.AdbShellInput
 import com.example.autop.device.impl.shell.PairingDiscoveryImpl
 import com.example.autop.device.impl.shell.ShellKeepAliveImpl
+import com.example.autop.device.impl.speech.SystemSpeechInput
 import com.example.autop.device.impl.touch.TouchShieldController
 import com.example.autop.device.impl.update.GitHubUpdateChecker
 import com.example.autop.device.impl.vision.VisualScreenParserImpl
@@ -103,6 +105,11 @@ public object DevicePortsModule {
     @Provides
     @Singleton
     public fun provideShellInput(impl: AdbShellInput): ShellInput = impl
+
+    /** 语音转文字（系统自带语音识别）。 */
+    @Provides
+    @Singleton
+    public fun provideSpeechInput(impl: SystemSpeechInput): SpeechInput = impl
 
     /** shell 通道后台保活（N203）。 */
     @Provides
