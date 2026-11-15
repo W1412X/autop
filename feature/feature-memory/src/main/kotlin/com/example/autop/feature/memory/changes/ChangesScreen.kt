@@ -7,6 +7,7 @@ package com.example.autop.feature.memory.changes
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -19,6 +20,7 @@ import com.example.autop.core.ui.component.PagedList
 import com.example.autop.core.ui.component.SectionHeader
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.subtitleParts
+import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.memory.R
 import com.example.autop.feature.memory.node.formatTime
 import com.example.autop.memory.ChangeType
@@ -51,6 +53,7 @@ public fun ChangesScreen(
                     items = state.groups,
                     state = state.paged,
                     onLoadMore = { onAction(ChangesAction.LoadMore) },
+                    modifier = Modifier.padding(horizontal = LocalSpacing.current.screenEdge),
                 ) { group ->
                     GroupSection(
                         group = group,
