@@ -31,7 +31,6 @@ import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.ComposerTrailing
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.VoiceErrorToast
-import com.example.autop.core.ui.component.VoiceWave
 import com.example.autop.core.ui.component.rememberVoiceStarter
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.chat.R
@@ -67,7 +66,6 @@ internal fun InputArea(
                 .padding(horizontal = LocalSpacing.current.screenEdge),
     ) {
         PendingImageStrip(images = state.images, onRemove = { onAction(ChatThreadAction.RemoveImage(it)) })
-        if (state.listening) VoiceWave(level = state.voiceLevel)
         VoiceErrorToast(code = state.voiceError)
         AutopComposer(
             value = state.input,
@@ -105,6 +103,7 @@ internal fun InputArea(
             trailing = composerTrailingOf(state),
             sendEnabled = enabled && (state.input.isNotBlank() || state.images.isNotEmpty()),
             listening = state.listening,
+            voiceLevel = state.voiceLevel,
             onSend = { if (enabled) onAction(ChatThreadAction.Send) },
             onStop = { onAction(ChatThreadAction.Stop) },
             onVoice = { if (state.listening) onAction(ChatThreadAction.StopVoice) else startVoice() },

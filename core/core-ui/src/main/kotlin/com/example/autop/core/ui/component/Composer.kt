@@ -53,6 +53,7 @@ public fun AutopComposer(
     trailing: ComposerTrailing = ComposerTrailing.SEND,
     sendEnabled: Boolean = true,
     listening: Boolean = false,
+    voiceLevel: Float = 0f,
     onSend: () -> Unit = {},
     onStop: () -> Unit = {},
     onVoice: (() -> Unit)? = null,
@@ -79,6 +80,7 @@ public fun AutopComposer(
                     mode = trailing,
                     sendEnabled = sendEnabled,
                     listening = listening,
+                    voiceLevel = voiceLevel,
                     onSend = onSend,
                     onStop = onStop,
                     onVoice = onVoice,
@@ -94,6 +96,7 @@ private fun ComposerTrailingButton(
     mode: ComposerTrailing,
     sendEnabled: Boolean,
     listening: Boolean,
+    voiceLevel: Float,
     onSend: () -> Unit,
     onStop: () -> Unit,
     onVoice: (() -> Unit)?,
@@ -115,20 +118,20 @@ private fun ComposerTrailingButton(
                 )
             ComposerTrailing.VOICE ->
                 if (onVoice != null) {
-                    AutopIconButton(
-                        icon = AutopIcons.Mic,
-                        contentDescription =
-                            stringResource(
-                                if (listening) {
-                                    R.string.core_ui_composer_voice_stop
-                                } else {
-                                    R.string.core_ui_composer_voice
-                                },
-                            ),
-                        onClick = onVoice,
-                        compact = true,
-                        selected = listening,
-                    )
+                    if (listening) {
+                        ListeningMicButton(
+                            level = voiceLevel,
+                            onClick = onVoice,
+                            contentDescription = stringResource(R.string.core_ui_composer_voice_stop),
+                        )
+                    } else {
+                        AutopIconButton(
+                            icon = AutopIcons.Mic,
+                            contentDescription = stringResource(R.string.core_ui_composer_voice),
+                            onClick = onVoice,
+                            compact = true,
+                        )
+                    }
                 }
             ComposerTrailing.SEND ->
                 AutopIconButton(

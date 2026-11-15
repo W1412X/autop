@@ -32,10 +32,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.AutopDimens
@@ -152,18 +156,44 @@ private fun Modifier.voiceHalo(color: Color): Modifier {
             ),
         label = "voice_halo_phase",
     )
-    val spread = AutopDimens.voiceHaloSpread
     return drawBehind {
         val base = size.minDimension / 2f
         repeat(HALO_RINGS) { ring ->
             val t = (phase + ring.toFloat() / HALO_RINGS) % 1f
             drawCircle(
                 color = color.copy(alpha = sin(PI.toFloat() * t) * AutopAlpha.HALO_MAX),
-                radius = base + spread.toPx() * t,
+                radius = base * (HALO_INNER_FRACTION + (1f - HALO_INNER_FRACTION) * t),
             )
         }
     }
 }
 
 private const val HALO_RINGS: Int = 3
+private const val HALO_INNER_FRACTION: Float = 0.6f
 private const val HALO_PERIOD_MS: Int = 1_600
+
+/** 录音中的麦克风按钮：圆形底与内圈光环不变，中间的麦克风图标换成随音量跳动的音波。点击即停止录音。 */
+@Composable
+internal fun ListeningMicButton(
+    level: Float,
+    onClick: () -> Unit,
+    contentDescription: String,
+) {
+    val primary = MaterialTheme.colorScheme.primary
+    Box(
+        modifier =
+            Modifier
+                .size(CompactButtonSize)
+                .semantics { this.contentDescription = contentDescription }
+                .voiceHalo(primary)
+                .clip(CircleShape)
+                .background(primary.copy(alpha = AutopAlpha.CHIP_SELECTED_FILL))
+                .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+    ) {
+        VoiceWave(level = level, barWidth = LISTENING_BAR_WIDTH, waveHeight = LISTENING_WAVE_HEIGHT)
+    }
+}
+
+private val LISTENING_BAR_WIDTH: Dp = 2.dp
+private val LISTENING_WAVE_HEIGHT: Dp = 18.dp

@@ -20,6 +20,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.Dp
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import kotlin.math.PI
@@ -33,6 +34,8 @@ import kotlin.math.sin
 public fun VoiceWave(
     level: Float,
     modifier: Modifier = Modifier,
+    barWidth: Dp = AutopDimens.voiceBarWidth,
+    waveHeight: Dp = AutopDimens.voiceWaveHeight,
 ) {
     val smoothLevel by animateFloatAsState(targetValue = level.coerceIn(0f, 1f), label = "voice_level")
     val motion = LocalMotionEnabled.current
@@ -48,7 +51,7 @@ public fun VoiceWave(
     )
     val amplitude = IDLE_AMPLITUDE + (1f - IDLE_AMPLITUDE) * smoothLevel
     Row(
-        modifier = modifier.height(AutopDimens.voiceWaveHeight),
+        modifier = modifier.height(waveHeight),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(AutopDimens.voiceBarGap),
     ) {
@@ -63,7 +66,7 @@ public fun VoiceWave(
             Box(
                 modifier =
                     Modifier
-                        .width(AutopDimens.voiceBarWidth)
+                        .width(barWidth)
                         .fillMaxHeight(fraction)
                         .background(MaterialTheme.colorScheme.primary, CircleShape),
             )
