@@ -129,8 +129,8 @@ public class ChangesViewModel
                                     versionId = it.id,
                                     path = it.path.value,
                                     title = it.titleAfter ?: it.path.name,
-                                    changeType = it.changeType.name,
-                                    source = it.source.name,
+                                    changeType = it.changeType,
+                                    source = it.source,
                                     createdAt = it.createdAt,
                                     evidence = it.evidence?.excerpt,
                                 )

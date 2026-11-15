@@ -60,4 +60,14 @@
     <string name="memory_changes_empty">最近没有变更</string>
     <string name="memory_changes_manual_group">手动变更</string>
     <string name="memory_run_title">Run %1$s</string>
+    <string name="memory_run_group">一次运行</string>
+    <string name="memory_change_create">新建</string>
+    <string name="memory_change_update">修改</string>
+    <string name="memory_change_append">追加</string>
+    <string name="memory_change_supplement">补充</string>
+    <string name="memory_change_delete">删除</string>
+    <string name="memory_change_move">移动</string>
+    <string name="memory_change_revert">撤销</string>
+    <string name="memory_change_confirm">确认</string>
+    <string name="memory_source_import">导入</string>
 </resources>

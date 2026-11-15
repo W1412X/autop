@@ -4,14 +4,16 @@
 package com.example.autop.feature.memory.changes
 
 import com.example.autop.core.ui.component.PagedListState
+import com.example.autop.memory.ChangeType
+import com.example.autop.memory.MemorySource
 
 /** 一条变更记录行。 */
 public data class ChangeRow(
     val versionId: Long,
     val path: String,
     val title: String,
-    val changeType: String,
-    val source: String,
+    val changeType: ChangeType,
+    val source: MemorySource,
     val createdAt: Long,
     val evidence: String?,
 )
