@@ -248,7 +248,13 @@ private class Fixture(
     val clock = FakeClock(start = START_MS)
     val config = FakeConfigProvider()
     val db: TasksDb =
-        Room.inMemoryDatabaseBuilder(context, TasksDb::class.java).allowMainThreadQueries().build()
+        Room
+            .inMemoryDatabaseBuilder(context, TasksDb::class.java)
+            .allowMainThreadQueries()
+            // 查询与事务在调用线程上同步完成：pump 的 runCurrent 返回时数据库操作已结束，不依赖真实线程时序。
+            .setQueryExecutor { it.run() }
+            .setTransactionExecutor { it.run() }
+            .build()
     val runStore = RunStore(db)
     val pending = PendingRuns()
     val threads = FakeThreadStore()
