@@ -16,6 +16,7 @@ import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.ScreenLease
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.example.autop.task.ActiveRunInfo
@@ -143,6 +144,7 @@ class ChatListViewModelTest {
             capabilities = FakeCapabilities(),
             configProvider = FakeConfigProvider(),
             shellInput = FakeShellInput(),
+            screenLease = FakeScreenLease(),
         )
 
     private companion object {
@@ -346,4 +348,21 @@ private class FakeShellInput : ShellInput {
     override suspend fun keyEvent(code: Int): Boolean = true
 
     override suspend fun keyCombination(vararg codes: Int): Boolean = true
+}
+
+/** 屏幕租约假实现：测试中不占用屏幕。 */
+private class FakeScreenLease : ScreenLease {
+    override val holder: StateFlow<String?> = MutableStateFlow(null)
+
+    override suspend fun <T> withLease(
+        owner: String,
+        block: suspend () -> T,
+    ): T = block()
+
+    override suspend fun tryAcquire(
+        owner: String,
+        timeoutMs: Long,
+    ): Boolean = true
+
+    override fun release(owner: String) = Unit
 }

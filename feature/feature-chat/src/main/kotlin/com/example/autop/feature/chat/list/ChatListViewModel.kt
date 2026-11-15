@@ -17,6 +17,7 @@ import com.example.autop.core.common.ThreadId
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.ScreenLease
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.example.autop.task.ActiveRunInfo
@@ -52,6 +53,7 @@ public class ChatListViewModel
         private val capabilities: PlatformCapabilities,
         private val configProvider: ConfigProvider,
         private val shellInput: ShellInput,
+        private val screenLease: ScreenLease,
     ) : ViewModel() {
         private val page = MutableStateFlow(PageAccum())
         private val sheet = MutableStateFlow(ChatListSheet())
@@ -59,9 +61,13 @@ public class ChatListViewModel
         public val uiState: StateFlow<ChatListUiState> =
             combine(
                 accessibility.connected,
-                combine(runService.observeActive(), runService.observeRunningThreads()) { active, running ->
-                    active to
-                        running
+                combine(
+                    runService.observeActive(),
+                    runService.observeRunningThreads(),
+                    screenLease.holder,
+                ) { active, running, holder ->
+                    // 头部卡片只为占用屏幕的运行显示；后台运行不占用卡片
+                    (if (active?.run?.id?.value == holder) active else null) to running
                 },
                 page,
                 sheet,

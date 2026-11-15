@@ -97,7 +97,7 @@ private fun ListRowContent(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (leadingContent != null) {
-            leadingContent()
+            ListRowSlot(content = leadingContent)
         } else if (leading != null) {
             ListRowIcon(leading)
         }
@@ -122,8 +122,9 @@ private fun ListRowContent(
     }
 }
 
+/** 列表行左侧的统一外框：圆角底色 + 居中内容。普通图标与运行中的三点都放在这里，保证左侧宽度一致。 */
 @Composable
-private fun ListRowIcon(icon: ImageVector) {
+private fun ListRowSlot(content: @Composable () -> Unit) {
     Box(
         modifier =
             Modifier
@@ -135,6 +136,13 @@ private fun ListRowIcon(icon: ImageVector) {
                 ),
         contentAlignment = Alignment.Center,
     ) {
+        content()
+    }
+}
+
+@Composable
+private fun ListRowIcon(icon: ImageVector) {
+    ListRowSlot {
         Icon(
             imageVector = icon,
             contentDescription = null,
