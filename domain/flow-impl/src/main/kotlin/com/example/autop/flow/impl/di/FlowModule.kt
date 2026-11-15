@@ -13,6 +13,7 @@ import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolInvokerFactory
 import com.example.autop.agent.ToolProbeService
 import com.example.autop.agent.UserInteraction
+import com.example.autop.core.common.AuthorImageStore
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.IdGenerator
@@ -245,6 +246,7 @@ public object FlowModule {
         invokerFactory: Provider<ToolInvokerFactory>,
         probe: Provider<ToolProbeService>,
         runService: Provider<RunService>,
+        authorImages: AuthorImageStore,
     ): FlowAuthor =
         FlowAuthorImpl(
             AuthorDeps(
@@ -262,6 +264,7 @@ public object FlowModule {
                 invokerFactory = { invokerFactory.get() },
                 probe = { probe.get() },
                 runService = { runService.get() },
+                images = authorImages,
             ),
         )
 

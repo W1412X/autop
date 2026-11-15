@@ -11,10 +11,12 @@ import com.example.autop.agent.protocol.ResolvedCalls
 import com.example.autop.agent.protocol.displayTextOf
 import com.example.autop.agent.protocol.sanitizeTextsOf
 import com.example.autop.core.common.AppError
+import com.example.autop.core.common.AuthorImageStore
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.FlowId
 import com.example.autop.core.common.IdGenerator
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.ConfigProvider
@@ -55,12 +57,17 @@ import com.example.autop.llm.ToolSchema
 import com.example.autop.task.RunService
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -89,20 +96,35 @@ internal class AuthorDeps(
     val invokerFactory: () -> ToolInvokerFactory,
     val probe: () -> ToolProbeService,
     val runService: () -> RunService,
+    val images: AuthorImageStore,
 )
 
-/** AI 创作入口：草稿存 `flow_drafts`，会话是一个独立的小循环（不用 AgentSession）。 */
+/** 流程 AI 创建会话的 key：新建草稿。 */
+private const val FLOW_NEW_KEY: String = "new"
+
+/** AI 创建流程会话的工厂：同一草稿（或编辑对象）只保留一个会话；离开时仍在运行的会话留在这里，回到同一草稿时接上。 */
 internal class FlowAuthorImpl(
     private val d: AuthorDeps,
 ) : FlowAuthor {
     private val json = AutopJson.default
+    private val lock = Any()
+    private val sessions = mutableMapOf<String, FlowAuthorSessionImpl>()
 
     override suspend fun open(
         draftId: String?,
         editFlowId: String?,
     ): FlowAuthorSession {
+        val key = draftId ?: editFlowId?.let { "edit:$it" } ?: FLOW_NEW_KEY
+        synchronized(lock) { sessions[key]?.takeIf { !it.isClosed } }?.let { return it }
         val saved = draftId?.let { d.db.flowDao().draft(it) }
-        val session = FlowAuthorSessionImpl(d, saved?.draftId ?: d.ids.newId(), saved?.flowId ?: editFlowId)
+        val session =
+            FlowAuthorSessionImpl(
+                d = d,
+                draftId = saved?.draftId ?: d.ids.newId(),
+                editingFlowId = saved?.flowId ?: editFlowId,
+                key = key,
+                onClose = ::release,
+            )
         if (saved != null) {
             session.restore(
                 saved.conversationJson,
@@ -111,7 +133,12 @@ internal class FlowAuthorImpl(
         } else if (editFlowId != null) {
             d.store.get(FlowId(editFlowId))?.let { session.seedEditing(it.definition) }
         }
+        synchronized(lock) { sessions[key] = session }
         return session
+    }
+
+    private fun release(session: FlowAuthorSessionImpl) {
+        synchronized(lock) { if (sessions[session.key] === session) sessions.remove(session.key) }
     }
 
     override suspend fun drafts(): List<DraftInfo> =
@@ -129,7 +156,10 @@ internal class FlowAuthorImpl(
             DraftInfo(e.draftId, e.flowId, name.orEmpty(), e.updatedAt)
         }
 
-    override suspend fun deleteDraft(draftId: String) = d.db.flowDao().deleteDraft(draftId)
+    override suspend fun deleteDraft(draftId: String) {
+        d.images.deleteOwner(draftId)
+        d.db.flowDao().deleteDraft(draftId)
+    }
 
     override suspend fun analyze(request: FlowAnalysisRequest): Outcome<String> {
         val session = FlowAuthorSessionImpl(d, d.ids.newId(), request.baseFlowId)
@@ -142,8 +172,18 @@ internal class FlowAuthorSessionImpl(
     private val d: AuthorDeps,
     override val draftId: String,
     private var editingFlowId: String?,
+    val key: String = "analyze",
+    private val onClose: (FlowAuthorSessionImpl) -> Unit = {},
 ) : FlowAuthorSession {
     private val json = AutopJson.default
+
+    /** 一轮在会话自己的作用域里运行：发起方（ViewModel）离开时，这一轮仍继续。 */
+    private val turnScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** 会话是否已结束（保存、取消或离开时空闲）。 */
+    val isClosed: Boolean get() = closed
+
+    @Volatile private var closed = false
     private val conversation = mutableListOf<Msg>()
     private val _state = MutableStateFlow(AuthorState())
     override val state: StateFlow<AuthorState> = _state.asStateFlow()
@@ -176,19 +216,39 @@ internal class FlowAuthorSessionImpl(
 
     private var pendingDraftContext = false
 
+    override suspend fun send(
+        text: String,
+        images: List<ImageAttachment>,
+        modelProfileId: String?,
+    ) {
+        turnScope.launch { runTurn(text, images, modelProfileId) }.join()
+    }
+
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // 发送边界兜底，见下方 catch 注释
-    override suspend fun send(text: String, modelProfileId: String?) {
+    private suspend fun runTurn(
+        text: String,
+        images: List<ImageAttachment>,
+        modelProfileId: String?,
+    ) {
         activeModelProfileId = modelProfileId
+        val imageBlocks = storeImages(images)
         mutex.withLock {
             cancelled = false
-            _state.update { it.copy(busy = true, errorCode = null, messages = it.messages + AuthorMessage.User(text)) }
+            _state.update {
+                it.copy(
+                    busy = true,
+                    errorCode = null,
+                    messages =
+                        it.messages + AuthorMessage.User(text, imageBlocks.map { block -> block.fileRef }),
+                )
+            }
             // 防御：上一轮若因取消留下未得到结果的工具调用，先补齐，否则 LLM 校验会拒绝这条用户消息。
             conversation.repairDanglingToolCalls(cancelledToolText())
             if (pendingDraftContext) {
                 state.value.draft?.let { conversation += userMsg(draftContext(it)) }
                 pendingDraftContext = false
             }
-            conversation += userMsg(text)
+            conversation += userMsg(text, imageBlocks)
             try {
                 loop()
             } catch (e: CancellationException) {
@@ -293,7 +353,10 @@ internal class FlowAuthorSessionImpl(
             } else {
                 d.store.save(draft)
             }
-        if (saved is Outcome.Ok) d.db.flowDao().deleteDraft(draftId)
+        if (saved is Outcome.Ok) {
+            d.db.flowDao().deleteDraft(draftId)
+            d.images.deleteOwner(draftId)
+        }
         return saved
     }
 
@@ -440,7 +503,7 @@ internal class FlowAuthorSessionImpl(
                     displayTextOf(
                         message.blocks
                             .filterIsInstance<Block.Text>()
-                            .joinToString("") { it.text },
+                            .joinToString("\n") { it.text },
                     ).trim()
                 else -> ""
             }
@@ -567,6 +630,26 @@ internal class FlowAuthorSessionImpl(
 
     private fun userMsg(text: String) = Msg(Role.USER, listOf(Block.Text(text)))
 
+    /** 带图片的用户消息：文字（可为空）加图片块。 */
+    private fun userMsg(
+        text: String,
+        images: List<Block.Image>,
+    ): Msg = Msg(Role.USER, (if (text.isNotBlank()) listOf<Block>(Block.Text(text)) else emptyList()) + images)
+
+    /** 图片写入临时目录，返回图片块（fileRef 为绝对路径）；路径记下，会话结束时删除。 */
+    private fun storeImages(images: List<ImageAttachment>): List<Block.Image> =
+        images.map { image ->
+            val path = d.images.save(image, draftId)
+            Block.Image(path, image.mime, image.width, image.height)
+        }
+
+    /** 结束会话：取消进行中的一轮，删除图片临时文件。 */
+    override fun close() {
+        closed = true
+        turnScope.cancel()
+        onClose(this)
+    }
+
     private fun draftContext(flow: FlowDefinition): String =
         render(DRAFT_CONTEXT, mapOf("draft" to json.encodeToString(FlowDefinition.serializer(), flow)))
 
@@ -596,14 +679,28 @@ internal class FlowAuthorSessionImpl(
 
     /** 从持久化的对话重建展示消息（只还原用户与助手文字和问答）。 */
     private fun rebuildMessages(): List<AuthorMessage> =
-        conversation.flatMap { m -> m.blocks.mapNotNull { b -> authorMessageOf(m, b) } }
+        conversation.flatMap { m ->
+            if (m.role ==
+                Role.USER
+            ) {
+                userMessagesOf(m)
+            } else {
+                m.blocks.mapNotNull { b -> authorMessageOf(m, b) }
+            }
+        }
+
+    /** 用户消息：文字与图片合成一条气泡（与发送时一致）。 */
+    private fun userMessagesOf(m: Msg): List<AuthorMessage> {
+        val text = m.blocks.filterIsInstance<Block.Text>().joinToString("\n") { it.text }
+        val images = m.blocks.filterIsInstance<Block.Image>().map { it.fileRef }
+        return if (text.isBlank() && images.isEmpty()) emptyList() else listOf(AuthorMessage.User(text, images))
+    }
 
     private fun authorMessageOf(
         m: Msg,
         b: Block,
     ): AuthorMessage? =
         when {
-            m.role == Role.USER && b is Block.Text -> AuthorMessage.User(b.text)
             m.role == Role.ASSISTANT && b is Block.Thinking && b.text.isNotBlank() -> AuthorMessage.Thinking(b.text)
             // 回退模式的历史正文是协议 JSON：tool_calls 丢弃，final 只留正文。
             m.role == Role.ASSISTANT && b is Block.Text && b.text.isNotBlank() ->

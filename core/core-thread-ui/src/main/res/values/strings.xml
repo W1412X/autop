@@ -55,4 +55,8 @@
     <string name="thread_banner_interrupted">运行已中断，可重新发送继续</string>
     <string name="thread_banner_paused">运行已暂停，点“继续”恢复</string>
     <string name="thread_pause_divider">用户暂停运行</string>
+    <string name="thread_camera">拍照</string>
+    <string name="thread_add_image">添加图片</string>
+    <string name="thread_attach">附件</string>
+    <string name="thread_remove_image">移除图片</string>
 </resources>

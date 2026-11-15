@@ -3,10 +3,16 @@
  */
 package com.example.autop.feature.flows.author
 
+import android.net.Uri
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.getOrNull
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.UiConfig
+import com.example.autop.core.thread.ui.ChatImageReader
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.joinVoiceText
 import com.example.autop.device.SpeechInput
@@ -37,6 +43,9 @@ public data class FlowAuthorUiState(
     val ready: Boolean = false,
     val author: AuthorState = AuthorState(),
     val input: String = "",
+    val images: List<ImageAttachment> = emptyList(),
+    val imageError: Boolean = false,
+    val leaveConfirm: Boolean = false,
     val saveError: String? = null,
     /** 系统语音识别是否可用（不可用时不显示麦克风）。 */
     val voiceAvailable: Boolean = false,
@@ -55,6 +64,22 @@ public sealed interface FlowAuthorAction {
     ) : FlowAuthorAction
 
     public data object Send : FlowAuthorAction
+
+    public data class AddImages(
+        val uris: List<Uri>,
+    ) : FlowAuthorAction
+
+    public data class RemoveImage(
+        val index: Int,
+    ) : FlowAuthorAction
+
+    public data object ImageFailed : FlowAuthorAction
+
+    public data object LeaveKeepRunning : FlowAuthorAction
+
+    public data object LeaveCancelRun : FlowAuthorAction
+
+    public data object DismissLeave : FlowAuthorAction
 
     public data class Answer(
         val text: String,
@@ -95,6 +120,8 @@ public class FlowAuthorViewModel
         private val author: FlowAuthor,
         private val modelProfiles: ModelProfileStore,
         private val speech: SpeechInput,
+        private val imageReader: ChatImageReader,
+        private val configProvider: ConfigProvider,
     ) : ViewModel() {
         private val draftId: String? = savedStateHandle.get<String>(AUTHOR_DRAFT_ARG)?.takeIf { it != NO_ARG }
         private val editId: String? = savedStateHandle.get<String>(AUTHOR_EDIT_ARG)?.takeIf { it != NO_ARG }
@@ -134,9 +161,22 @@ public class FlowAuthorViewModel
         ) {
             val s = session
             when (action) {
-                FlowAuthorAction.Back -> navigator.navigateBack()
+                FlowAuthorAction.Back,
+                FlowAuthorAction.LeaveKeepRunning,
+                FlowAuthorAction.LeaveCancelRun,
+                FlowAuthorAction.DismissLeave,
+                ->
+                    handleLeave(
+                        s,
+                        action,
+                        navigator,
+                    )
                 is FlowAuthorAction.SetInput -> _uiState.update { it.copy(input = action.value) }
                 FlowAuthorAction.Send -> send(s)
+                is FlowAuthorAction.AddImages, is FlowAuthorAction.RemoveImage, FlowAuthorAction.ImageFailed ->
+                    handleImages(
+                        action,
+                    )
                 is FlowAuthorAction.Answer -> s?.answer(action.text)
                 is FlowAuthorAction.Demonstration -> s?.confirmDemonstration(action.allowed)
                 FlowAuthorAction.Stop -> {
@@ -187,18 +227,80 @@ public class FlowAuthorViewModel
             }
         }
 
+        private fun handleImages(action: FlowAuthorAction) {
+            when (action) {
+                is FlowAuthorAction.AddImages -> addImages(action.uris)
+                is FlowAuthorAction.RemoveImage ->
+                    _uiState.update { st ->
+                        st.copy(
+                            images =
+                                st.images.filterIndexed { i, _ ->
+                                    i !=
+                                        action.index
+                                },
+                        )
+                    }
+                FlowAuthorAction.ImageFailed -> _uiState.update { it.copy(imageError = true) }
+                else -> Unit
+            }
+        }
+
+        /** 返回：运行中先弹出确认（后台运行 / 取消运行 / 留在本页），空闲时直接返回。 */
+        private fun handleLeave(
+            s: FlowAuthorSession?,
+            action: FlowAuthorAction,
+            navigator: FlowsNavigator,
+        ) {
+            when (action) {
+                FlowAuthorAction.Back ->
+                    if (_uiState.value.author.busy) {
+                        _uiState.update { it.copy(leaveConfirm = true) }
+                    } else {
+                        navigator.navigateBack()
+                    }
+                FlowAuthorAction.LeaveKeepRunning -> {
+                    _uiState.update { it.copy(leaveConfirm = false) }
+                    navigator.navigateBack()
+                }
+                FlowAuthorAction.LeaveCancelRun -> {
+                    s?.cancel()
+                    s?.close()
+                    navigator.navigateBack()
+                }
+                else -> _uiState.update { it.copy(leaveConfirm = false) }
+            }
+        }
+
+        /** 读取选中的图片（限额内），失败的计入 imageError。 */
+        private fun addImages(uris: List<Uri>) {
+            val config = configProvider.current()[UiConfig.CHAT]
+            val room = config.attachMaxImages - _uiState.value.images.size
+            if (room <= 0 || uris.isEmpty()) return
+            viewModelScope.launch {
+                val loaded = uris.take(room).map { imageReader.read(it, config).getOrNull() }
+                _uiState.update { state ->
+                    state.copy(
+                        images = (state.images + loaded.filterNotNull()).take(config.attachMaxImages),
+                        imageError = loaded.any { it == null },
+                    )
+                }
+            }
+        }
+
         private fun send(s: FlowAuthorSession?) {
             val text = _uiState.value.input.trim()
-            if (s == null || text.isEmpty()) return
-            // 有待回答的问题时，输入框的内容就是回答。
+            val images = _uiState.value.images
+            if (s == null || (text.isEmpty() && images.isEmpty())) return
+            // 待回答的问题只接受文字，图片留在输入区
             if (_uiState.value.author.pendingQuestion != null) {
+                if (text.isEmpty()) return
                 s.answer(text)
                 _uiState.update { it.copy(input = "") }
                 return
             }
             if (_uiState.value.author.busy) return
-            _uiState.update { it.copy(input = "") }
-            sendJob = viewModelScope.launch { s.send(text, _uiState.value.modelProfileId) }
+            _uiState.update { it.copy(input = "", images = emptyList(), imageError = false) }
+            sendJob = viewModelScope.launch { s.send(text, images, _uiState.value.modelProfileId) }
         }
 
         private fun save(
@@ -209,7 +311,8 @@ public class FlowAuthorViewModel
             if (s == null) return
             viewModelScope.launch {
                 when (val saved = s.save()) {
-                    is Outcome.Ok ->
+                    is Outcome.Ok -> {
+                        s.close()
                         if (openEditor) {
                             navigator.openEditor(
                                 saved.value.id.value,
@@ -217,6 +320,7 @@ public class FlowAuthorViewModel
                         } else {
                             navigator.openFlow(saved.value.id.value)
                         }
+                    }
                     is Outcome.Err -> _uiState.update { it.copy(saveError = saved.error.message) }
                 }
             }
@@ -224,6 +328,8 @@ public class FlowAuthorViewModel
 
         override fun onCleared() {
             sendJob?.cancel()
+            // 运行中的一轮留在会话里（后台运行），空闲时才关闭会话
+            if (session?.state?.value?.busy != true) session?.close()
             super.onCleared()
         }
     }

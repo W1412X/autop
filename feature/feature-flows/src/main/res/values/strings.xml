@@ -415,4 +415,9 @@
     <string name="flow_tpl_pre_text_wait">页面含文字（等待）</string>
     <string name="flow_tpl_pre_app">前台应用（断言）</string>
     <string name="flow_tpl_pre_element">元素存在（断言）</string>
+    <string name="flow_author_image_failed">图片读取失败，请换一张再试。</string>
+    <string name="flow_author_leave_title">AI 正在生成</string>
+    <string name="flow_author_leave_text">可以让它在后台继续运行，回到这个草稿时再查看；也可以取消本次生成。</string>
+    <string name="flow_author_leave_keep">后台运行</string>
+    <string name="flow_author_leave_cancel">取消运行</string>
 </resources>

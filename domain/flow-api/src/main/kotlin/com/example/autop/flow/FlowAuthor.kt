@@ -3,14 +3,17 @@
  */
 package com.example.autop.flow
 
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.serialization.json.JsonElement
 
 /** 创作对话里的一条展示消息。 */
 public sealed interface AuthorMessage {
+    /** 用户消息；[images] 为会话持有的图片临时文件绝对路径（会话结束后文件被删除）。 */
     public data class User(
         val text: String,
+        val images: List<String> = emptyList(),
     ) : AuthorMessage
 
     public data class Assistant(
@@ -85,6 +88,8 @@ public interface FlowAuthorSession {
     /** 用户发送一条消息，驱动 AI 继续；返回时本轮结束。 */
     public suspend fun send(
         text: String,
+        /** 随消息发送的图片（可为空）。 */
+        images: List<ImageAttachment> = emptyList(),
         /** 本轮使用的会话级模型（ModelProfile id）；null 表示跟随角色默认。 */
         modelProfileId: String? = null,
     )
@@ -100,6 +105,9 @@ public interface FlowAuthorSession {
 
     /** 中止当前一轮。 */
     public fun cancel()
+
+    /** 结束会话：释放本会话的图片临时文件；默认无操作。 */
+    public fun close() {}
 
     /** 校验并保存草稿到流程库（有错误返回失败）。 */
     public suspend fun save(): Outcome<StoredFlow>

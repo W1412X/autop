@@ -12,6 +12,7 @@ import com.example.autop.agent.UserMessageKind
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
@@ -23,7 +24,6 @@ import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowRunOptions
 import com.example.autop.llm.Block
 import com.example.autop.task.ChatTitleGenerator
-import com.example.autop.task.ImageAttachment
 import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus

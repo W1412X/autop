@@ -6,6 +6,7 @@ package com.example.autop.task.impl.di
 
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolInvokerFactory
+import com.example.autop.core.common.AuthorImageStore
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Logger
@@ -96,6 +97,7 @@ public object TaskDraftModule {
         clock: Clock,
         ids: IdGenerator,
         invokerFactory: Provider<ToolInvokerFactory>,
+        authorImages: AuthorImageStore,
     ): TaskAuthor =
         TaskAuthorImpl(
             TaskAuthorDeps(
@@ -109,6 +111,7 @@ public object TaskDraftModule {
                 clock = clock,
                 ids = ids,
                 invokerFactory = { invokerFactory.get() },
+                images = authorImages,
             ),
         )
 

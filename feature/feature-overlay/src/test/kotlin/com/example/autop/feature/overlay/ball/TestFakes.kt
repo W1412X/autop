@@ -51,7 +51,7 @@ internal class FakeRunService(
     override suspend fun startChat(
         threadId: ThreadId?,
         text: String,
-        images: List<com.example.autop.task.ImageAttachment>,
+        images: List<com.example.autop.core.common.ImageAttachment>,
         modelProfileId: String?,
         screenTools: Boolean,
     ): Outcome<RunRecord> = error("unused")

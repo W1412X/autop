@@ -5,6 +5,7 @@
  */
 package com.example.autop.task
 
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.TaskId
 import com.example.autop.flow.AuthorLive
@@ -58,6 +59,8 @@ public interface TaskAuthorSession {
     /** 发送一条用户消息并驱动一轮（或多轮工具调用）创作。 */
     public suspend fun send(
         text: String,
+        /** 随消息发送的图片（可为空）。 */
+        images: List<ImageAttachment> = emptyList(),
         /** 本轮使用的会话级模型（ModelProfile id）；null 表示跟随角色默认。 */
         modelProfileId: String? = null,
     )
@@ -67,6 +70,9 @@ public interface TaskAuthorSession {
 
     /** 取消本轮（挂起的提问/工具调用立即收尾）。 */
     public fun cancel()
+
+    /** 结束会话：释放本会话的图片临时文件；默认无操作。 */
+    public fun close() {}
 
     /** 确认草稿：新建任务，或更新 [TaskAuthorState.editing] 对应的既有任务。 */
     public suspend fun save(): Outcome<Task>

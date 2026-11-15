@@ -6,6 +6,7 @@
 
 package com.example.autop.feature.tasks.author
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.scrollBy
@@ -24,8 +25,10 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +41,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.autop.core.thread.ui.AttachImageButton
+import com.example.autop.core.thread.ui.PendingImageStrip
+import com.example.autop.core.thread.ui.SentImageRow
 import com.example.autop.core.ui.component.AutopChip
 import com.example.autop.core.ui.component.AutopComposer
 import com.example.autop.core.ui.component.AutopModelSelector
@@ -160,10 +166,25 @@ public fun TaskAuthorScreen(
             author.errorCode?.let { item { ErrorBanner(it) } }
             state.voiceError?.let { item { VoiceErrorBanner(it) } }
             state.saveError?.let { item { ErrorBanner(it) } }
+            if (state.imageError) item { ErrorBanner(AUTHOR_IMAGE_FAILED) }
+        }
+        LeaveGuard(state = state, onAction = onAction)
+        if (state.images.isNotEmpty()) {
+            PendingImageStrip(
+                images = state.images,
+                onRemove = { onAction(TaskAuthorAction.RemoveImage(it)) },
+                modifier = Modifier.padding(horizontal = spacing.screenEdge),
+            )
         }
         AutopComposer(
             value = state.input,
             onValueChange = { onAction(TaskAuthorAction.SetInput(it)) },
+            leading = {
+                AttachImageButton(
+                    onImages = { onAction(TaskAuthorAction.AddImages(it)) },
+                    onCaptureFailed = { onAction(TaskAuthorAction.ImageFailed) },
+                )
+            },
             spec =
                 InputBarSpec(
                     placeholder =
@@ -232,14 +253,17 @@ private fun Intro(
 
 @Composable
 private fun authorErrorText(code: String): String =
-    if (code == AUTHOR_LLM_UNAVAILABLE) {
-        stringResource(R.string.task_author_llm_unavailable)
-    } else {
-        stringResource(llmErrorTextRes(code))
+    when (code) {
+        AUTHOR_LLM_UNAVAILABLE -> stringResource(R.string.task_author_llm_unavailable)
+        AUTHOR_IMAGE_FAILED -> stringResource(R.string.task_author_image_failed)
+        else -> stringResource(llmErrorTextRes(code))
     }
 
 /** 任务创建页自身的错误码（TaskAuthorImpl.ERROR_LLM_UNAVAILABLE）。 */
 private const val AUTHOR_LLM_UNAVAILABLE: String = "task.author_llm_unavailable"
+
+/** 图片读取或拍照失败的错误码（界面内部使用，不进入 LLM 错误）。 */
+private const val AUTHOR_IMAGE_FAILED: String = "task.author_image_failed"
 
 @Composable
 private fun ErrorBanner(code: String) {
@@ -257,7 +281,10 @@ private fun MessageItem(
     onAction: (TaskAuthorAction) -> Unit,
 ) {
     when (message) {
-        is AuthorMessage.User -> UserBubble(message.text)
+        is AuthorMessage.User -> {
+            if (message.text.isNotBlank()) UserBubble(message.text)
+            SentImageRow(paths = message.images)
+        }
         is AuthorMessage.Assistant -> MarkdownText(text = message.text)
         is AuthorMessage.Thinking -> ThinkingBlock(text = message.text, streaming = false)
         is AuthorMessage.Activity ->
@@ -441,3 +468,29 @@ private fun triggerText(draft: TaskDraft): String =
             )
         else -> draft.triggerType
     }
+
+/** 离开页面的守卫：AI 运行中按返回（含系统返回键）时询问是后台运行、取消运行，还是留在本页。 */
+@Composable
+private fun LeaveGuard(
+    state: TaskAuthorUiState,
+    onAction: (TaskAuthorAction) -> Unit,
+) {
+    BackHandler(enabled = state.author.busy) { onAction(TaskAuthorAction.Back) }
+    if (state.leaveConfirm) {
+        AlertDialog(
+            onDismissRequest = { onAction(TaskAuthorAction.DismissLeave) },
+            title = { Text(stringResource(R.string.task_author_leave_title)) },
+            text = { Text(stringResource(R.string.task_author_leave_text)) },
+            confirmButton = {
+                TextButton(onClick = { onAction(TaskAuthorAction.LeaveKeepRunning) }) {
+                    Text(stringResource(R.string.task_author_leave_keep))
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { onAction(TaskAuthorAction.LeaveCancelRun) }) {
+                    Text(stringResource(R.string.task_author_leave_cancel))
+                }
+            },
+        )
+    }
+}

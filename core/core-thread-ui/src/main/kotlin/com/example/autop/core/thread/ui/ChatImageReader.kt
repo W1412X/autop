@@ -2,7 +2,7 @@
  * 相册图片读取：把 Uri 解码、缩放到长边上限、压成 JPEG。
  * 用 [ImageDecoder] 解码，它按 EXIF 自动转正；缩放与压缩参数来自 `ui.chat.attach*` 配置。
  */
-package com.example.autop.feature.chat.thread
+package com.example.autop.core.thread.ui
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -10,10 +10,10 @@ import android.graphics.ImageDecoder
 import android.net.Uri
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.DispatcherProvider
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.runCatchingCancellable
 import com.example.autop.core.config.UiChatSection
-import com.example.autop.task.ImageAttachment
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.withContext
 import java.io.ByteArrayOutputStream
@@ -29,7 +29,7 @@ public class ChatImageReader
         private val dispatchers: DispatcherProvider,
     ) {
         /** 读取失败（格式不支持、文件不可读、解码出错）返回 [Outcome.Err]。 */
-        internal suspend fun read(
+        public suspend fun read(
             uri: Uri,
             config: UiChatSection,
         ): Outcome<ImageAttachment> =

@@ -10,10 +10,12 @@ import com.example.autop.agent.protocol.ResolvedCalls
 import com.example.autop.agent.protocol.displayTextOf
 import com.example.autop.agent.protocol.sanitizeTextsOf
 import com.example.autop.core.common.AppError
+import com.example.autop.core.common.AuthorImageStore
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.FlowId
 import com.example.autop.core.common.IdGenerator
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.config.AgentConfig
@@ -54,11 +56,16 @@ import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.impl.flowsPromptVars
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -87,23 +94,37 @@ internal class TaskAuthorDeps(
     val clock: Clock,
     val ids: IdGenerator,
     val invokerFactory: () -> ToolInvokerFactory,
+    val images: AuthorImageStore,
 )
 
-/**
- * 任务 AI 创作入口：会话是一个独立的小循环（不用 AgentSession，与流程创作
- * [com.example.autop.flow.FlowAuthor] 同构）。不落草稿库——确认即建任务。
- */
+/** AI 创建任务的会话工厂：同一任务（或新建草稿）只保留一个会话；离开时仍在运行的会话留在这里，回到同一草稿时接上。 */
+private const val NEW_KEY: String = "new"
+
 internal class TaskAuthorImpl(
     private val d: TaskAuthorDeps,
 ) : TaskAuthor {
+    private val lock = Any()
+    private val sessions = mutableMapOf<String, TaskAuthorSessionImpl>()
+
     override suspend fun open(taskId: TaskId?): TaskAuthorSession {
+        val key = taskId?.value ?: NEW_KEY
+        synchronized(lock) { sessions[key]?.takeIf { !it.isClosed } }?.let { return it }
         val base = taskId?.let { d.tasks.get(it) }
-        return TaskAuthorSessionImpl(
-            d = d,
-            base = base,
-            initialDraft = base?.let { toDraft(it) },
-            missing = taskId != null && base == null,
-        )
+        val session =
+            TaskAuthorSessionImpl(
+                d = d,
+                key = key,
+                base = base,
+                initialDraft = base?.let { toDraft(it) },
+                missing = taskId != null && base == null,
+                onClose = ::release,
+            )
+        synchronized(lock) { sessions[key] = session }
+        return session
+    }
+
+    private fun release(session: TaskAuthorSessionImpl) {
+        synchronized(lock) { if (sessions[session.key] === session) sessions.remove(session.key) }
     }
 
     /** 既有任务 → 可编辑草稿（流程名回填，触发器还原为创作字段口径）。 */
@@ -167,10 +188,22 @@ internal class TaskAuthorImpl(
 /** 一个任务创作会话（[base] 非空时保存为更新）。 */
 internal class TaskAuthorSessionImpl(
     private val d: TaskAuthorDeps,
+    val key: String,
     private val base: Task? = null,
     initialDraft: TaskDraft? = null,
     missing: Boolean = false,
+    private val onClose: (TaskAuthorSessionImpl) -> Unit = {},
 ) : TaskAuthorSession {
+    /** 一轮在会话自己的作用域里运行：发起方（ViewModel）离开时，这一轮仍继续。 */
+    private val turnScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+
+    /** 会话是否已结束（保存、取消或离开时空闲）。 */
+    val isClosed: Boolean get() = closed
+
+    @Volatile private var closed = false
+
+    /** 本会话图片的所属目录名（会话结束时整体删除）。 */
+    private val imageOwner: String = d.ids.newId()
     private val json = AutopJson.default
     private val conversation = mutableListOf<Msg>()
     private val _state =
@@ -189,15 +222,35 @@ internal class TaskAuthorSessionImpl(
     private val tools = TaskAuthorTools(d.invokerFactory, d.configProvider, d.prompts, d.ids, d.threads)
     private val sourceIds: Set<String> = d.sources.map { it.id }.toSet()
 
+    override suspend fun send(
+        text: String,
+        images: List<ImageAttachment>,
+        modelProfileId: String?,
+    ) {
+        turnScope.launch { runTurn(text, images, modelProfileId) }.join()
+    }
+
     @Suppress("TooGenericExceptionCaught", "SwallowedException") // 发送边界兜底，见下方 catch 注释
-    override suspend fun send(text: String, modelProfileId: String?) {
+    private suspend fun runTurn(
+        text: String,
+        images: List<ImageAttachment>,
+        modelProfileId: String?,
+    ) {
         activeModelProfileId = modelProfileId
+        val imageBlocks = storeImages(images)
         mutex.withLock {
             cancelled = false
-            _state.update { it.copy(busy = true, errorCode = null, messages = it.messages + AuthorMessage.User(text)) }
+            _state.update {
+                it.copy(
+                    busy = true,
+                    errorCode = null,
+                    messages =
+                        it.messages + AuthorMessage.User(text, imageBlocks.map { block -> block.fileRef }),
+                )
+            }
             // 防御：上一轮若因取消留下未得到结果的工具调用，先补齐，否则 LLM 校验会拒绝这条用户消息。
             conversation.repairDanglingToolCalls(cancelledToolText())
-            conversation += userMsg(text)
+            conversation += userMsg(text, imageBlocks)
             try {
                 loop()
             } catch (e: CancellationException) {
@@ -613,6 +666,27 @@ internal class TaskAuthorSessionImpl(
     // ---- 对话辅助 -----------------------------------------------------------------------------
 
     private fun userMsg(text: String) = Msg(Role.USER, listOf(Block.Text(text)))
+
+    /** 带图片的用户消息：文字（可为空）加图片块。 */
+    private fun userMsg(
+        text: String,
+        images: List<Block.Image>,
+    ): Msg = Msg(Role.USER, (if (text.isNotBlank()) listOf<Block>(Block.Text(text)) else emptyList()) + images)
+
+    /** 图片写入临时目录，返回图片块（fileRef 为绝对路径）；路径记下，会话结束时删除。 */
+    private fun storeImages(images: List<ImageAttachment>): List<Block.Image> =
+        images.map { image ->
+            val path = d.images.save(image, imageOwner)
+            Block.Image(path, image.mime, image.width, image.height)
+        }
+
+    /** 结束会话：取消进行中的一轮，删除图片临时文件。 */
+    override fun close() {
+        closed = true
+        turnScope.cancel()
+        d.images.deleteOwner(imageOwner)
+        onClose(this)
+    }
 
     private fun cancelledToolText(): String = render(TOOL_CANCELLED, emptyMap())
 

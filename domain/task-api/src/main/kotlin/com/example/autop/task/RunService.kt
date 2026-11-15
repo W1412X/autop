@@ -7,6 +7,7 @@ import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.RunState
 import com.example.autop.core.common.FlowId
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId

@@ -4,11 +4,11 @@
  */
 package com.example.autop.feature.chat.thread
 
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.config.UiChatSection
 import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.core.ui.component.OptionItem
-import com.example.autop.task.ImageAttachment
 
 /** 等待回答的问题（docs/tech/08 §4.2 AskCard）。 */
 public data class WaitingQuestion(

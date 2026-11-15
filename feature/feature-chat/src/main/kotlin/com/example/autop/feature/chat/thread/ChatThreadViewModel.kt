@@ -21,12 +21,14 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.core.common.AutopJson
+import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.LogFiles
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.UiConfig
+import com.example.autop.core.thread.ui.ChatImageReader
 import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.core.thread.ui.mergeTimeline
@@ -37,7 +39,6 @@ import com.example.autop.device.SpeechInput
 import com.example.autop.feature.chat.NEW_THREAD
 import com.example.autop.llm.ModelProfileStore
 import com.example.autop.task.ActiveRunInfo
-import com.example.autop.task.ImageAttachment
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
