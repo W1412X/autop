@@ -83,7 +83,12 @@ public class MemoryStoreImpl
         ): List<MemoryNode> {
             val entities = db.nodeDao().children(path.value, offset, limit)
             val statuses = indexer.statusesOf(entities)
-            return entities.map { toModel(it).copy(vectorStatus = statuses[it.path] ?: VectorStatus.DISABLED) }
+            return entities.map {
+                toModel(it).copy(
+                    vectorStatus = statuses[it.path] ?: VectorStatus.DISABLED,
+                    childCount = db.nodeDao().childCount(it.path),
+                )
+            }
         }
 
         /** 树变更（写入、删除、移动、撤销）与向量化完成都会发出，页面据此刷新。 */
