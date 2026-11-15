@@ -31,7 +31,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,12 +47,10 @@ import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ErrorState
 import com.example.autop.core.ui.component.InfoRow
 import com.example.autop.core.ui.component.InputBarSpec
-import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSpacing
-import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.memory.R
 import com.example.autop.memory.VectorStatus
@@ -89,9 +86,6 @@ public fun NodeScreen(
         }
         if (state.error != null) {
             ErrorState(text = state.error.orEmpty(), onRetry = { onAction(NodeAction.Retry) })
-        }
-        if (state.byAgent) {
-            AgentBanner(onAction = onAction)
         }
         NodeForm(state = state, onAction = onAction)
     }
@@ -148,7 +142,8 @@ private fun NodeForm(
         }
         NodeSectionTitle(text = stringResource(R.string.memory_section_keywords))
         KeywordRow(state = state, onAction = onAction)
-        NodeInfoSection(state = state)
+        NodeSectionTitle(text = stringResource(R.string.memory_section_info))
+        NodeInfoRows(state = state)
         AutopButton(
             text = stringResource(R.string.memory_save),
             onClick = { onAction(NodeAction.Save) },
@@ -223,25 +218,6 @@ private fun vectorLabel(state: NodeUiState): String =
     }
 
 @Composable
-private fun AgentBanner(onAction: (NodeAction) -> Unit) {
-    StatusBanner(
-        tone = StatusTone.PAUSED,
-        message = stringResource(R.string.memory_agent_banner),
-        compact = true,
-        actions = {
-            AutopTextButton(
-                text = stringResource(R.string.memory_confirm),
-                onClick = { onAction(NodeAction.Confirm) },
-            )
-            AutopTextButton(
-                text = stringResource(R.string.memory_undo_write),
-                onClick = { onAction(NodeAction.UndoLastWrite) },
-            )
-        },
-    )
-}
-
-@Composable
 private fun FieldInput(
     label: String,
     value: String,
@@ -285,8 +261,19 @@ private fun KeywordRow(
             AutopChip(
                 text = keyword,
                 selected = true,
-                onClick = { onAction(NodeAction.KeywordRemoved(keyword)) },
+                onClick = {},
                 compact = true,
+                labelTrailing = {
+                    Icon(
+                        imageVector = AutopIcons.Close,
+                        contentDescription = stringResource(R.string.memory_keyword_remove),
+                        tint = MaterialTheme.colorScheme.primary,
+                        modifier =
+                            Modifier
+                                .size(IconSize.Sm.scaled())
+                                .clickable { onAction(NodeAction.KeywordRemoved(keyword)) },
+                    )
+                },
             )
         }
         AutopChip(
@@ -363,22 +350,12 @@ private val NODE_V_PADDING = 12.dp
 private const val CONTENT_MAX_LINES = 12
 private const val TIME_PATTERN: String = "yyyy-MM-dd HH:mm"
 
-/**
- * 条目页的区块标题：左侧一根主色短条 + 标题文字。传入 [expanded] 与 [onToggle] 时整行可点，右侧显示折叠箭头。
- */
+/** 条目页的区块标题：左侧一根主色短条 + 标题文字（只用于本页）。 */
 @Composable
-private fun NodeSectionTitle(
-    text: String,
-    expanded: Boolean? = null,
-    onToggle: (() -> Unit)? = null,
-) {
+private fun NodeSectionTitle(text: String) {
     val spacing = LocalSpacing.current
     Row(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .then(if (onToggle != null) Modifier.clickable(onClick = onToggle) else Modifier)
-                .padding(start = spacing.screenEdge, end = spacing.screenEdge, top = spacing.lg, bottom = spacing.xs),
+        modifier = Modifier.padding(start = spacing.screenEdge, top = spacing.lg, bottom = spacing.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -393,51 +370,20 @@ private fun NodeSectionTitle(
         )
         Spacer(modifier = Modifier.width(spacing.sm))
         Text(text = text, style = MaterialTheme.typography.titleSmall, color = MaterialTheme.colorScheme.onSurface)
-        if (expanded != null) {
-            Spacer(modifier = Modifier.weight(1f))
-            Icon(
-                imageVector = if (expanded) AutopIcons.ArrowDown else AutopIcons.ChevronRight,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                modifier = Modifier.size(IconSize.Sm.scaled()),
-            )
-        }
     }
 }
 
-/** 条目页的信息区：标题可点击折叠或展开（默认展开，状态随页面保存），展开时显示来源、版本、更新时间等。 */
-@Composable
-private fun NodeInfoSection(state: NodeUiState) {
-    var expanded by rememberSaveable { mutableStateOf(true) }
-    NodeSectionTitle(
-        text = stringResource(R.string.memory_section_info),
-        expanded = expanded,
-        onToggle = { expanded = !expanded },
-    )
-    if (expanded) {
-        NodeInfoRows(state = state)
-    }
-}
-
-/** 条目页顶栏右侧：已保存/未保存状态与更多操作（新建条目时不显示）。 */
+/** 条目页顶栏右侧：版本历史（时钟）与更多操作；新建条目时不显示。 */
 @Composable
 private fun NodeTopActions(
     state: NodeUiState,
     onAction: (NodeAction) -> Unit,
 ) {
     if (!state.isNew) {
-        val saveColor =
-            if (state.dirty) {
-                MaterialTheme.colorScheme.primary
-            } else {
-                MaterialTheme.colorScheme.onSurfaceVariant
-            }
-        val saveText =
-            stringResource(if (state.dirty) R.string.memory_unsaved else R.string.memory_saved)
-        Text(
-            text = saveText,
-            style = MaterialTheme.typography.labelMedium,
-            color = saveColor,
+        AutopIconButton(
+            icon = AutopIcons.Schedule,
+            contentDescription = stringResource(R.string.memory_version_history),
+            onClick = { onAction(NodeAction.ShowVersions) },
         )
         AutopIconButton(
             icon = AutopIcons.MoreVert,
