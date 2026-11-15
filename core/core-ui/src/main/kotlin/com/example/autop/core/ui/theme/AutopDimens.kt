@@ -33,6 +33,11 @@ public object AutopDimens {
     /** 用户发送图片的展示区缩略图边长（独立于气泡，比输入区略大）。 */
     public val chatImageThumb: Dp = 120.dp
 
+    /** 录音音波的高度、每根竖条的宽度与间距。 */
+    public val voiceWaveHeight: Dp = 24.dp
+    public val voiceBarWidth: Dp = 4.dp
+    public val voiceBarGap: Dp = 3.dp
+
     /** 运行过程截图展开后的显示宽度（高度按原图比例）。 */
     public val stepScreenshotWidth: Dp = 220.dp
     public val overlayBall: Dp = 52.dp

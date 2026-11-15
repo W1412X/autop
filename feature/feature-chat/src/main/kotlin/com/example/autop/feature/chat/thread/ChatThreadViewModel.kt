@@ -163,13 +163,20 @@ public class ChatThreadViewModel
          * 事件流状态之上再叠一层。
          */
         public val uiState: StateFlow<ChatThreadUiState> =
-            combine(baseState, threadTitle, modelChoices, speech.listening) { state, title, choices, listening ->
+            combine(
+                baseState,
+                threadTitle,
+                modelChoices,
+                speech.listening,
+                speech.level,
+            ) { state, title, choices, listening, level ->
                 state.copy(
                     title = title ?: state.title,
                     modelOptions = choices.options,
                     defaultModelId = choices.defaultId,
                     voiceAvailable = voiceAvailable,
                     listening = listening,
+                    voiceLevel = level,
                 )
             }.stateIn(
                 scope = viewModelScope,

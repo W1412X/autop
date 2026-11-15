@@ -395,6 +395,8 @@ private class FakeSpeechInput : com.example.autop.device.SpeechInput {
 
     override val listening: kotlinx.coroutines.flow.StateFlow<Boolean> =
         kotlinx.coroutines.flow.MutableStateFlow(false)
+    override val level: kotlinx.coroutines.flow.StateFlow<Float> =
+        kotlinx.coroutines.flow.MutableStateFlow(0f)
     override val partial: kotlinx.coroutines.flow.StateFlow<String> =
         kotlinx.coroutines.flow.MutableStateFlow("")
     override val results: kotlinx.coroutines.flow.SharedFlow<String> =

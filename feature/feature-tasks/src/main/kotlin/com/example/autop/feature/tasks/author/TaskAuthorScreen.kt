@@ -56,6 +56,7 @@ import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.VoiceErrorToast
+import com.example.autop.core.ui.component.VoiceWave
 import com.example.autop.core.ui.component.llmErrorTextRes
 import com.example.autop.core.ui.component.rememberVoiceStarter
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -166,6 +167,9 @@ public fun TaskAuthorScreen(
             author.errorCode?.let { item { ErrorBanner(it) } }
             state.saveError?.let { item { ErrorBanner(it) } }
             if (state.imageError) item { ErrorBanner(AUTHOR_IMAGE_FAILED) }
+        }
+        if (state.listening) {
+            VoiceWave(level = state.voiceLevel, modifier = Modifier.padding(horizontal = spacing.screenEdge))
         }
         VoiceErrorToast(code = state.voiceError)
         LeaveGuard(state = state, onAction = onAction)

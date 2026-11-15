@@ -69,6 +69,8 @@ public data class ChatThreadUiState(
     val voiceAvailable: Boolean = false,
     /** 正在语音输入。 */
     val listening: Boolean = false,
+    /** 录音音量 0..1（音波动效）。 */
+    val voiceLevel: Float = 0f,
     /** 语音输入出错的错误码（Toast 提示，见 VoiceErrorToast）。 */
     val voiceError: String? = null,
     /** 待发送的图片（已压缩，发送后清空）。 */

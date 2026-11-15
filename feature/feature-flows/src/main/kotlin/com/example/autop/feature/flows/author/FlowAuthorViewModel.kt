@@ -53,6 +53,7 @@ public data class FlowAuthorUiState(
     val listening: Boolean = false,
     /** 语音输入出错的错误码（提示用，见界面）。 */
     val voiceError: String? = null,
+    val voiceLevel: Float = 0f,
 )
 
 /** 创作页意图。 */
@@ -211,6 +212,9 @@ public class FlowAuthorViewModel
             }
             viewModelScope.launch {
                 speech.errors.collect { code -> _uiState.update { it.copy(voiceError = code) } }
+            }
+            viewModelScope.launch {
+                speech.level.collect { level -> _uiState.update { it.copy(voiceLevel = level) } }
             }
         }
 

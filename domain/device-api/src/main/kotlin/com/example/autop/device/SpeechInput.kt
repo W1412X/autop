@@ -15,6 +15,9 @@ public interface SpeechInput {
     /** 是否正在识别。 */
     public val listening: StateFlow<Boolean>
 
+    /** 录音音量 0..1（录音中实时更新，用于音波动效）。 */
+    public val level: StateFlow<Float>
+
     /** 识别过程中的临时结果（尚未确定的整句文字）。 */
     public val partial: StateFlow<String>
 
