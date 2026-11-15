@@ -196,6 +196,9 @@ public object AutopAlpha {
     /** 录音光环最外圈的最大透明度（逐层向外淡出）。 */
     public const val HALO_MAX: Float = 0.35f
 
+    /** 运行中停止按钮的圆形底色透明度。 */
+    public const val STOP_FILL: Float = 0.10f
+
     /** 禁用态底块。 */
     public const val BLOCK_FILL_DISABLED: Float = 0.35f
 

@@ -38,6 +38,9 @@ public object AutopDimens {
     public val voiceBarWidth: Dp = 4.dp
     public val voiceBarGap: Dp = 3.dp
 
+    /** 运行中停止按钮外圈弧线的粗细。 */
+    public val stopArcWidth: Dp = 2.dp
+
     /** 运行过程截图展开后的显示宽度（高度按原图比例）。 */
     public val stepScreenshotWidth: Dp = 220.dp
     public val overlayBall: Dp = 52.dp

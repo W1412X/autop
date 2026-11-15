@@ -6,26 +6,52 @@
 package com.example.autop.core.ui.component
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.R
 import com.example.autop.core.ui.theme.AutopAlpha
+import com.example.autop.core.ui.theme.AutopDimens
+import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
+import com.example.autop.core.ui.theme.scaled
 
 /** 发送与停止（或语音）互换的淡入淡出时长（毫秒）。 */
 private const val SWAP_MS: Int = 150
@@ -110,11 +136,9 @@ private fun ComposerTrailingButton(
         when (target) {
             ComposerTrailing.NONE -> Unit
             ComposerTrailing.STOP ->
-                AutopIconButton(
-                    icon = AutopIcons.Stop,
-                    contentDescription = stringResource(R.string.core_ui_composer_stop),
+                StopRunningButton(
                     onClick = onStop,
-                    compact = true,
+                    contentDescription = stringResource(R.string.core_ui_composer_stop),
                 )
             ComposerTrailing.VOICE ->
                 if (onVoice != null) {
@@ -144,3 +168,62 @@ private fun ComposerTrailingButton(
         }
     }
 }
+
+/**
+ * 运行中的停止按钮：36dp 圆形底，外圈有一段红色弧线持续转动，表示正在运行、可以停止。
+ * 关闭动效（[LocalMotionEnabled]）时只显示静态的停止图标。
+ */
+@Composable
+private fun StopRunningButton(
+    onClick: () -> Unit,
+    contentDescription: String,
+) {
+    val motion = LocalMotionEnabled.current
+    val angle by rememberInfiniteTransition(label = "stop_arc").animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = STOP_ARC_PERIOD_MS, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+        label = "stop_arc_angle",
+    )
+    val color = MaterialTheme.colorScheme.error
+    val arcWidth = AutopDimens.stopArcWidth
+    Box(
+        modifier =
+            Modifier
+                .size(STOP_BUTTON_SIZE)
+                .semantics { this.contentDescription = contentDescription }
+                .clip(CircleShape)
+                .background(color.copy(alpha = AutopAlpha.STOP_FILL))
+                .clickable(onClick = onClick)
+                .drawBehind {
+                    if (motion) {
+                        val stroke = arcWidth.toPx()
+                        drawArc(
+                            color = color,
+                            startAngle = angle,
+                            sweepAngle = STOP_ARC_SWEEP,
+                            useCenter = false,
+                            topLeft = Offset(stroke / 2f, stroke / 2f),
+                            size = Size(size.width - stroke, size.height - stroke),
+                            style = Stroke(width = stroke, cap = StrokeCap.Round),
+                        )
+                    }
+                },
+        contentAlignment = Alignment.Center,
+    ) {
+        Icon(
+            imageVector = AutopIcons.Stop,
+            contentDescription = null,
+            tint = color,
+            modifier = Modifier.size(IconSize.Sm.scaled()),
+        )
+    }
+}
+
+private val STOP_BUTTON_SIZE: Dp = 36.dp
+private const val STOP_ARC_PERIOD_MS: Int = 1_100
+private const val STOP_ARC_SWEEP: Float = 110f
