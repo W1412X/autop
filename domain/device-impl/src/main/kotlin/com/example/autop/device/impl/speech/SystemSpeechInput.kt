@@ -56,7 +56,9 @@ public class SystemSpeechInput
                     mutableErrors.tryEmit(ERR_NO_SERVICE)
                     return@onMain
                 }
-                val engine = recognizer ?: createRecognizer()
+                // 每次会话新建识别器，结束后释放（与 dsh-Go 一致）：复用已出错的识别器会在后续启动时报 ERROR_CLIENT
+                releaseRecognizer()
+                val engine = createRecognizer()
                 cancelled = false
                 mutablePartial.value = ""
                 mutableListening.value = true
@@ -72,7 +74,7 @@ public class SystemSpeechInput
             onMain {
                 cancelled = true
                 finishSession()
-                recognizer?.cancel()
+                releaseRecognizer()
             }
 
         private fun createRecognizer(): SpeechRecognizer {
@@ -80,6 +82,13 @@ public class SystemSpeechInput
             engine.setRecognitionListener(listener)
             recognizer = engine
             return engine
+        }
+
+        private fun releaseRecognizer() {
+            val engine = recognizer ?: return
+            recognizer = null
+            runCatching { engine.cancel() }
+            runCatching { engine.destroy() }
         }
 
         private fun recognitionIntent(): Intent =
@@ -119,12 +128,14 @@ public class SystemSpeechInput
                     val text = results?.firstText().orEmpty()
                     val wasCancelled = cancelled
                     finishSession()
+                    releaseRecognizer()
                     if (!wasCancelled && text.isNotBlank()) mutableResults.tryEmit(text)
                 }
 
                 override fun onError(error: Int) {
                     val wasCancelled = cancelled
                     finishSession()
+                    releaseRecognizer()
                     if (wasCancelled) return
                     Log.w(TAG, "recognition error $error")
                     mutableErrors.tryEmit(errorCodeOf(error))
