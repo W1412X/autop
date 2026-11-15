@@ -14,6 +14,7 @@ import com.example.autop.agent.RunResumed
 import com.example.autop.agent.RunState
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.ThreadId
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.flow.FlowProgressFeed
@@ -33,6 +34,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
@@ -49,6 +51,11 @@ public class RunObserver(
     private val handles = ConcurrentHashMap<RunId, RunHandle>()
     private val eventFlows = ConcurrentHashMap<RunId, MutableSharedFlow<AgentEvent>>()
     private val _active = MutableStateFlow<ActiveRunInfo?>(null)
+    private val _runningThreads = MutableStateFlow<Set<ThreadId>>(emptySet())
+    private val threadOf = ConcurrentHashMap<RunId, ThreadId>()
+
+    /** 正在运行的对话集合（每个对话只要有运行中的运行就在里面）。 */
+    val runningThreads: StateFlow<Set<ThreadId>> = _runningThreads.asStateFlow()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** 当前活跃 Run（悬浮球与对话页使用）；流程执行时附带根 Run 名下的流程进度（P1-2）。 */
@@ -64,6 +71,8 @@ public class RunObserver(
     ) {
         handles[record.id] = handle
         _active.value = ActiveRunInfo(record, RunState.STARTING, null, 0, emptyList())
+        threadOf[record.id] = record.threadId
+        _runningThreads.value = threadOf.values.toSet()
     }
 
     fun handleOf(runId: RunId): RunHandle? = handles[runId]
@@ -127,6 +136,8 @@ public class RunObserver(
     fun clear(runId: RunId) {
         handles.remove(runId)
         eventFlows.remove(runId)
+        threadOf.remove(runId)
+        _runningThreads.value = threadOf.values.toSet()
         _active.update { info -> if (info?.run?.id == runId) null else info }
     }
 

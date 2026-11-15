@@ -240,6 +240,8 @@ private class FakeRunService : RunService {
 
     override fun observeActive(): StateFlow<ActiveRunInfo?> = active
 
+    override fun observeRunningThreads(): StateFlow<Set<ThreadId>> = MutableStateFlow(emptySet())
+
     override suspend fun startChat(
         threadId: ThreadId?,
         text: String,

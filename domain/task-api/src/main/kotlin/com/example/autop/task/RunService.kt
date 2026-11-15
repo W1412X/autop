@@ -98,6 +98,9 @@ public interface RunService {
     /** 当前活跃 Run（悬浮球与对话页使用）。 */
     public fun observeActive(): StateFlow<ActiveRunInfo?>
 
+    /** 正在运行的对话集合（有运行中的运行即在内）：对话列表用它显示运行中状态。 */
+    public fun observeRunningThreads(): StateFlow<Set<ThreadId>>
+
     /** Run 记录流（对话页状态条与问题卡片使用）。 */
     public fun observeRun(runId: RunId): Flow<RunRecord>
 

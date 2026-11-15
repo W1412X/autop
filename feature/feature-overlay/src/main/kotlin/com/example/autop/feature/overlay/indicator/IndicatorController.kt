@@ -104,6 +104,7 @@ public class IndicatorController
                         active = active,
                         enabled = ind.enabled,
                         barOn = ind.capsule,
+                        operating = operating,
                         glowOn =
                             ind.edgeGlow && operating,
                     )
@@ -151,7 +152,7 @@ public class IndicatorController
         /** 控制条与边缘光的显隐；控制条隐藏时一并收起详情面板。 */
         private fun applyVisibility(input: VisibilityInput) {
             if (input.active != null) lastActive = input.active
-            applyBar(input.enabled && input.barOn && input.active != null)
+            applyBar(input.enabled && input.barOn && input.active != null && input.operating)
             applyGlow(input.enabled && input.glowOn && isOperating(input.active))
         }
 
@@ -280,6 +281,7 @@ private data class VisibilityInput(
     val active: ActiveRunInfo?,
     val enabled: Boolean,
     val barOn: Boolean,
+    val operating: Boolean,
     val glowOn: Boolean,
 )
 
