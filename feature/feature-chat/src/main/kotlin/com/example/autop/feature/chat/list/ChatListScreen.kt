@@ -44,6 +44,7 @@ import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.OptionTone
 import com.example.autop.core.ui.component.PagedList
 import com.example.autop.core.ui.component.PagedListState
+import com.example.autop.core.ui.component.RunningDots
 import com.example.autop.core.ui.component.TopLevelHeader
 import com.example.autop.core.ui.component.subtitleParts
 import com.example.autop.core.ui.theme.AutopAlpha
@@ -81,6 +82,7 @@ public fun ChatListScreen(
             restrictedSettings = state.restrictedSettings,
             onEnable = { onAction(ChatListAction.EnableAccessibility) },
             shellHint = state.accessibilityConnected && !state.shellConnected,
+            runningCount = state.runningCount,
         )
         state.active?.let { model ->
             ActiveRunCard(
@@ -157,7 +159,13 @@ private fun ThreadRow(
                 row.status?.let { statusText(it) },
                 relativeAgeText(row.updatedAt),
             ),
-        leading = statusIcon(row.status),
+        leading = if (row.running) null else statusIcon(row.status),
+        leadingContent =
+            if (row.running) {
+                { RunningDots() }
+            } else {
+                null
+            },
         modifier =
             Modifier
                 .fillMaxWidth()

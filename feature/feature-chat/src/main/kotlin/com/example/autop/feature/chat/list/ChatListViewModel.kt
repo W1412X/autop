@@ -59,17 +59,22 @@ public class ChatListViewModel
         public val uiState: StateFlow<ChatListUiState> =
             combine(
                 accessibility.connected,
-                runService.observeActive(),
+                combine(runService.observeActive(), runService.observeRunningThreads()) { active, running ->
+                    active to
+                        running
+                },
                 page,
                 sheet,
                 shellInput.state,
-            ) { connected, active, accum, sheets, shell ->
+            ) { connected, activeAndRunning, accum, sheets, shell ->
+                val (active, running) = activeAndRunning
                 val budget = configProvider.current()[AgentConfig.BUDGET].maxSteps
                 ChatListUiState(
                     accessibilityConnected = connected,
                     restrictedSettings = capabilities.has(Capability.RESTRICTED_SETTINGS),
                     shellConnected = shell is ShellState.Connected,
-                    threads = accum.items.map(::toRow),
+                    runningCount = running.size,
+                    threads = accum.items.map { toRow(it, running) },
                     paging =
                         ChatPaging(
                             loading = accum.loading,
@@ -200,13 +205,17 @@ public class ChatListViewModel
         }
     }
 
-private fun toRow(summary: ThreadSummary): ChatThreadRow =
+private fun toRow(
+    summary: ThreadSummary,
+    running: Set<ThreadId>,
+): ChatThreadRow =
     ChatThreadRow(
         threadId = summary.threadId.value,
         title = summary.title,
         preview = summary.preview,
         status = summary.lastRunStatus,
         updatedAt = summary.updatedAt,
+        running = summary.threadId in running,
     )
 
 private fun ActiveRunInfo?.toCard(

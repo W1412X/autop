@@ -27,6 +27,8 @@ public data class ChatThreadRow(
     val title: String?,
     val preview: String?,
     val status: RunOutcome?,
+    /** 该对话当前有运行中的运行。 */
+    val running: Boolean = false,
     /** 最后更新时间（Unix epoch 毫秒；相对时间由 Screen 渲染时计算）。 */
     val updatedAt: Long,
 )
@@ -83,6 +85,8 @@ public data class ChatPaging(
 public data class ChatListUiState(
     /** 无障碍服务是否已连接（false 时新建禁用、显示提示，docs/tech/08 §4.1）。 */
     val accessibilityConnected: Boolean = true,
+    /** 正在运行的对话数（无障碍行右侧显示）。 */
+    val runningCount: Int = 0,
     /** SDK ≥ 33 时"去开启"前需先弹受限设置说明（Capability.RESTRICTED_SETTINGS）。 */
     val restrictedSettings: Boolean = false,
     /** shell 注入通道已连接（未连接时无障碍提示下附可选开启提示，不阻塞使用）。 */

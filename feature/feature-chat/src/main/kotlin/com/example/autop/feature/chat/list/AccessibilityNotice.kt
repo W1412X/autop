@@ -51,9 +51,10 @@ public fun AccessibilityNotice(
     onEnable: () -> Unit,
     modifier: Modifier = Modifier,
     shellHint: Boolean = false,
+    runningCount: Int = 0,
 ) {
     if (connected) {
-        ConnectedRow(shellHint = shellHint, modifier = modifier)
+        ConnectedRow(shellHint = shellHint, runningCount = runningCount, modifier = modifier)
     } else {
         DisabledBanner(
             restrictedSettings = restrictedSettings,
@@ -66,6 +67,7 @@ public fun AccessibilityNotice(
 @Composable
 private fun ConnectedRow(
     shellHint: Boolean,
+    runningCount: Int,
     modifier: Modifier,
 ) {
     Column(
@@ -87,6 +89,14 @@ private fun ConnectedRow(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
+            Spacer(modifier = Modifier.weight(1f))
+            if (runningCount > 0) {
+                Text(
+                    text = stringResource(R.string.chat_running_count, runningCount),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
         if (shellHint) {
             ShellHint(modifier = Modifier.padding(top = LocalSpacing.current.xs))

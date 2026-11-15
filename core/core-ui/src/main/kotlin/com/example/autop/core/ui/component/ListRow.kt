@@ -35,6 +35,7 @@ public fun ListRow(
     subtitle: String,
     modifier: Modifier = Modifier,
     leading: ImageVector? = null,
+    leadingContent: (@Composable () -> Unit)? = null,
     trailing: (@Composable () -> Unit)? = null,
 ) {
     ListRowContent(
@@ -42,6 +43,7 @@ public fun ListRow(
         title = title,
         subtitle = subtitle,
         leading = leading,
+        leadingContent = leadingContent,
         trailing = trailing,
     )
 }
@@ -84,6 +86,7 @@ private fun ListRowContent(
     subtitle: String,
     leading: ImageVector?,
     trailing: (@Composable () -> Unit)?,
+    leadingContent: (@Composable () -> Unit)? = null,
 ) {
     val spacing = LocalSpacing.current
     Row(
@@ -93,7 +96,9 @@ private fun ListRowContent(
                 .padding(horizontal = spacing.lg, vertical = spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        if (leading != null) {
+        if (leadingContent != null) {
+            leadingContent()
+        } else if (leading != null) {
             ListRowIcon(leading)
         }
         Column(modifier = Modifier.weight(1f)) {
