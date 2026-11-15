@@ -6,10 +6,12 @@ package com.example.autop.core.ui.component
 
 import android.Manifest
 import android.content.pm.PackageManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Modifier
@@ -57,17 +59,19 @@ public fun joinVoiceText(
         else -> "$base $spoken"
     }
 
-/** 语音输入出错的提示横幅。[code] 为 speech.* 错误码。 */
+/**
+ * 语音错误以 Toast 提示：[code] 从 null 变为某个错误码时提示一次；起手时调用方会把错误码清空，
+ * 所以同一个错误再次出现时也会重新提示。
+ */
 @Composable
-public fun VoiceErrorBanner(code: String) {
-    val (res, arg) = voiceErrorText(code)
-    StatusBanner(
-        tone = StatusTone.BLOCKED,
-        message = stringResource(res, arg),
-        modifier = Modifier.fillMaxWidth(),
-    )
+public fun VoiceErrorToast(code: String?) {
+    val context = LocalContext.current
+    LaunchedEffect(code) {
+        if (code == null) return@LaunchedEffect
+        val (res, arg) = voiceErrorText(code)
+        Toast.makeText(context, context.getString(res, arg), Toast.LENGTH_LONG).show()
+    }
 }
-
 /** 错误码 → 文案资源与参数（错误码数字）。未列出的错误码给出通用文案并显示错误码。 */
 internal fun voiceErrorText(code: String): Pair<Int, String> =
     (VOICE_ERROR_RES[code] ?: R.string.core_ui_voice_unknown) to code.removePrefix(ERR_PREFIX)

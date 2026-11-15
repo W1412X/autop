@@ -69,7 +69,7 @@ public data class ChatThreadUiState(
     val voiceAvailable: Boolean = false,
     /** 正在语音输入。 */
     val listening: Boolean = false,
-    /** 语音输入出错的错误码（横幅提示，见 VoiceErrorBanner）。 */
+    /** 语音输入出错的错误码（Toast 提示，见 VoiceErrorToast）。 */
     val voiceError: String? = null,
     /** 待发送的图片（已压缩，发送后清空）。 */
     val images: List<ImageAttachment> = emptyList(),

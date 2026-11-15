@@ -57,7 +57,7 @@ import com.example.autop.core.ui.component.MarkdownText
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
-import com.example.autop.core.ui.component.VoiceErrorBanner
+import com.example.autop.core.ui.component.VoiceErrorToast
 import com.example.autop.core.ui.component.llmErrorTextRes
 import com.example.autop.core.ui.component.rememberVoiceStarter
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -170,11 +170,11 @@ public fun FlowAuthorScreen(
                 }
             }
             author.errorCode?.let { item { ErrorBanner(it) } }
-            state.voiceError?.let { item { VoiceErrorBanner(it) } }
             state.saveError?.let { item { ErrorBanner(it) } }
             if (state.imageError) item { ErrorBanner(AUTHOR_IMAGE_FAILED) }
         }
         author.pendingDemonstration?.let { goal -> DemoConfirm(goal = goal, onAction = onAction) }
+        VoiceErrorToast(code = state.voiceError)
         LeaveGuard(state = state, onAction = onAction)
         if (state.images.isNotEmpty()) {
             PendingImageStrip(
