@@ -1,7 +1,7 @@
 /**
- * 输入区（docs/tech/08 §4.2 InputArea）：附图入口 + 输入栏。
- * 尾部只有一个按钮（与 AI 创建流程页一致的无底色图标按钮）：空闲或输入了内容时是发送，
- * 运行中且输入为空时换成停止图标；运行中输入了补充指令则回到发送（steer），不会两个按钮并排。
+ * 对话输入区（docs/tech/08 §4.2 InputArea）：基于共用的 [AutopComposer]。
+ * 顶部：模型选择 + 「只聊天」开关；输入框左侧「＋」附件菜单（图片、拍照）；
+ * 右侧：没有输入时是语音（系统语音识别），有输入或图片时是发送，运行中是停止。
  * `ui.chat.backgroundOnSend` 的让屏行为由 ViewModel 经 navEvents 交给 app。
  */
 package com.example.autop.feature.chat.thread
@@ -14,11 +14,6 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
@@ -43,12 +38,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -57,44 +52,29 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.autop.core.thread.ui.Thumbnail
 import com.example.autop.core.thread.ui.decodeSampledBytes
+import com.example.autop.core.ui.component.AutopComposer
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
-import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopModelSelector
+import com.example.autop.core.ui.component.ComposerTrailing
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.IconSize
-import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.scaled
 import com.example.autop.feature.chat.R
 import com.example.autop.task.ImageAttachment
 import java.io.File
 
-/** 发送与停止图标互换的淡入淡出时长（毫秒）。 */
-private const val SWAP_MS: Int = 150
-
 /** 只聊天开关：布局高度 24dp，Material 开关按 0.7 缩放后的视觉尺寸。 */
 private val SWITCH_BOX_HEIGHT = 24.dp
 private const val SWITCH_SCALE = 0.7f
 
-/** 尾部按钮当前是发送还是停止。 */
-private enum class TrailingMode { SEND, STOP, VOICE }
-
-/** 尾部按钮模式：听写中为麦克风（停止态）；运行中无输入为停止；无输入且可语音为麦克风；其余为发送。 */
-private fun trailingModeOf(state: ChatThreadUiState): TrailingMode =
-    when {
-        state.listening -> TrailingMode.VOICE
-        state.running && state.input.isBlank() -> TrailingMode.STOP
-        state.voiceAvailable && state.input.isBlank() && state.images.isEmpty() -> TrailingMode.VOICE
-        else -> TrailingMode.SEND
-    }
-
 /**
- * 输入区。
+ * 对话输入区。
  *
- * @param state 页面状态（输入文本、运行中、附屏幕开关、无障碍连接）。
+ * @param state 页面状态（输入文本、运行中、只聊天、语音、无障碍连接）。
  * @param onAction 用户操作回调。
  * @param focusRequester 输入框焦点（AskCard 的"自己输入"聚焦用）。
  */
@@ -106,6 +86,11 @@ internal fun InputArea(
     modifier: Modifier = Modifier,
 ) {
     val enabled = state.accessibilityConnected
+    val startVoice =
+        rememberVoiceStarter(
+            onGranted = { onAction(ChatThreadAction.StartVoice) },
+            onDenied = { onAction(ChatThreadAction.ShowNotice(ThreadNotice.VOICE_PERMISSION)) },
+        )
     Column(
         modifier =
             modifier
@@ -113,19 +98,7 @@ internal fun InputArea(
                 .padding(horizontal = LocalSpacing.current.screenEdge),
     ) {
         PendingImages(images = state.images, onAction = onAction)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            AutopModelSelector(
-                selectedId = state.modelProfileId,
-                profiles = state.modelOptions,
-                enabled = !state.running,
-                onSelect = { onAction(ChatThreadAction.SetModel(it)) },
-                defaultProfileId = state.defaultModelId,
-            )
-            Spacer(modifier = Modifier.weight(1f))
-            // ADR-0035「只聊天」：开启后本轮发送不提供屏幕工具，不占用手机；运行中不切换（下一轮生效）。
-            ChatOnlySwitch(chatOnly = state.chatOnly, running = state.running, onAction = onAction)
-        }
-        AutopInputBar(
+        AutopComposer(
             value = state.input,
             onValueChange = { text -> if (enabled) onAction(ChatThreadAction.SetInput(text)) },
             spec =
@@ -140,25 +113,72 @@ internal fun InputArea(
                         ),
                     maxLines = state.inputMaxLines,
                 ),
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .padding(top = LocalSpacing.current.sm)
-                    .focusRequester(focusRequester),
+            top = {
+                AutopModelSelector(
+                    selectedId = state.modelProfileId,
+                    profiles = state.modelOptions,
+                    enabled = !state.running,
+                    onSelect = { onAction(ChatThreadAction.SetModel(it)) },
+                    defaultProfileId = state.defaultModelId,
+                )
+                Spacer(modifier = Modifier.weight(1f))
+                // ADR-0035「只聊天」：开启后本轮发送不提供屏幕工具，不占用手机；运行中不切换（下一轮生效）。
+                ChatOnlySwitch(chatOnly = state.chatOnly, running = state.running, onAction = onAction)
+            },
             leading =
-                if (!state.running &&
-                    state.images.size < state.maxImages
-                ) {
-                    ({ AttachMenuButton(onAction) })
+                if (!state.running && state.images.size < state.maxImages) {
+                    { AttachMenuButton(onAction) }
                 } else {
                     null
                 },
-            trailing = { TrailingButton(state = state, enabled = enabled, onAction = onAction) },
+            trailing = composerTrailingOf(state),
+            sendEnabled = enabled && (state.input.isNotBlank() || state.images.isNotEmpty()),
+            listening = state.listening,
+            onSend = { if (enabled) onAction(ChatThreadAction.Send) },
+            onStop = { onAction(ChatThreadAction.Stop) },
+            onVoice = { if (state.listening) onAction(ChatThreadAction.StopVoice) else startVoice() },
+            focusRequester = focusRequester,
         )
     }
 }
 
-/** 系统相册选图（Photo Picker 不需要存储权限）；选中的 Uri 交给 ViewModel 读取压缩。 */
+/** 尾部按钮：听写中为语音（停止态）；运行中无输入为停止；无输入且可语音为语音；其余为发送。 */
+private fun composerTrailingOf(state: ChatThreadUiState): ComposerTrailing =
+    when {
+        state.listening -> ComposerTrailing.VOICE
+        state.running && state.input.isBlank() -> ComposerTrailing.STOP
+        state.voiceAvailable && state.input.isBlank() && state.images.isEmpty() -> ComposerTrailing.VOICE
+        else -> ComposerTrailing.SEND
+    }
+
+/**
+ * 返回「开始语音输入」的函数：已授权直接调用 [onGranted]；未授权先申请录音权限，
+ * 授权后调用 [onGranted]，拒绝时调用 [onDenied]。
+ */
+@Composable
+private fun rememberVoiceStarter(
+    onGranted: () -> Unit,
+    onDenied: () -> Unit,
+): () -> Unit {
+    val context = LocalContext.current
+    val grantedNow by rememberUpdatedState(onGranted)
+    val deniedNow by rememberUpdatedState(onDenied)
+    val request =
+        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) grantedNow() else deniedNow()
+        }
+    return {
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            grantedNow()
+        } else {
+            request.launch(Manifest.permission.RECORD_AUDIO)
+        }
+    }
+}
+
+/** 「＋」附件菜单：图片（系统相册，不需要存储权限）与拍照（系统相机）。 */
 @Composable
 private fun AttachMenuButton(onAction: (ChatThreadAction) -> Unit) {
     var open by remember { mutableStateOf(false) }
@@ -217,40 +237,6 @@ private fun newCaptureUri(context: Context): Uri {
     return FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", file)
 }
 
-/** 语音输入按钮（系统语音识别）：未取得录音权限时先申请，授权后开始；听写中再点结束。 */
-@Composable
-private fun VoiceButton(
-    listening: Boolean,
-    onAction: (ChatThreadAction) -> Unit,
-) {
-    val context = LocalContext.current
-    val permission =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) {
-                onAction(ChatThreadAction.StartVoice)
-            } else {
-                onAction(ChatThreadAction.ShowNotice(ThreadNotice.VOICE_PERMISSION))
-            }
-        }
-    AutopIconButton(
-        icon = AutopIcons.Mic,
-        contentDescription =
-            stringResource(
-                if (listening) R.string.thread_voice_stop else R.string.thread_voice_input,
-            ),
-        compact = true,
-        selected = listening,
-        onClick = {
-            when {
-                listening -> onAction(ChatThreadAction.StopVoice)
-                ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-                    PackageManager.PERMISSION_GRANTED -> onAction(ChatThreadAction.StartVoice)
-                else -> permission.launch(Manifest.permission.RECORD_AUDIO)
-            }
-        },
-    )
-}
-
 /** 待发送图片缩略图行：每张右上角带移除按钮。 */
 @Composable
 private fun PendingImages(
@@ -294,63 +280,6 @@ private fun PendingImages(
             }
         }
     }
-}
-
-/** 尾部唯一的按钮：发送与停止互换，两者同为 44dp 图标按钮，切换时不会跳动布局。 */
-@Composable
-private fun TrailingButton(
-    state: ChatThreadUiState,
-    enabled: Boolean,
-    onAction: (ChatThreadAction) -> Unit,
-) {
-    val mode = trailingModeOf(state)
-    val duration = if (LocalMotionEnabled.current) SWAP_MS else 0
-    AnimatedContent(
-        targetState = mode,
-        transitionSpec = { fadeIn(tween(duration)) togetherWith fadeOut(tween(duration)) },
-        label = "chat_input_trailing",
-    ) { target ->
-        when (target) {
-            TrailingMode.STOP -> StopButton(onClick = { onAction(ChatThreadAction.Stop) })
-            TrailingMode.VOICE -> VoiceButton(listening = state.listening, onAction = onAction)
-            TrailingMode.SEND ->
-                SendButton(
-                    sendable = enabled && (state.input.isNotBlank() || state.images.isNotEmpty()),
-                    running = state.running,
-                    onClick = { if (enabled) onAction(ChatThreadAction.Send) },
-                )
-        }
-    }
-}
-
-/** 发送按钮：无底色图标；输入为空或无障碍未连接时降透明（点击仍交给 ViewModel 校验）。 */
-@Composable
-private fun SendButton(
-    sendable: Boolean,
-    running: Boolean,
-    onClick: () -> Unit,
-) {
-    AutopIconButton(
-        icon = AutopIcons.Send,
-        contentDescription =
-            stringResource(
-                if (running) R.string.thread_send_steer else R.string.thread_send,
-            ),
-        onClick = onClick,
-        compact = true,
-        modifier = if (sendable) Modifier else Modifier.alpha(AutopAlpha.DISABLED_CONTENT),
-    )
-}
-
-/** 停止按钮（运行中、输入为空时取代发送）：与 AI 创建页一致的无底色停止图标。 */
-@Composable
-private fun StopButton(onClick: () -> Unit) {
-    AutopIconButton(
-        icon = AutopIcons.Stop,
-        contentDescription = stringResource(R.string.thread_stop),
-        onClick = onClick,
-        compact = true,
-    )
 }
 
 /** 只聊天开关（ADR-0035）：文字与开关同排，布局高度 [SWITCH_BOX_HEIGHT]；运行中不可切换（下一轮生效）。 */

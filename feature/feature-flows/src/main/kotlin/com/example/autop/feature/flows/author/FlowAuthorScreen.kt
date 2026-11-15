@@ -40,12 +40,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopButton
 import com.example.autop.core.ui.component.AutopChip
-import com.example.autop.core.ui.component.AutopIconButton
-import com.example.autop.core.ui.component.AutopIcons
-import com.example.autop.core.ui.component.AutopInputBar
+import com.example.autop.core.ui.component.AutopComposer
 import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.AutopOutlinedButton
 import com.example.autop.core.ui.component.AutopTonalButton
+import com.example.autop.core.ui.component.ComposerTrailing
 import com.example.autop.core.ui.component.InlineQuestionCard
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.MarkdownText
@@ -161,25 +160,14 @@ public fun FlowAuthorScreen(
             state.saveError?.let { item { ErrorBanner(it) } }
         }
         author.pendingDemonstration?.let { goal -> DemoConfirm(goal = goal, onAction = onAction) }
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge)) {
-            AutopModelSelector(
-                selectedId = state.modelProfileId,
-                profiles = state.modelOptions,
-                enabled = !author.busy,
-                onSelect = { onAction(FlowAuthorAction.SetModel(it)) },
-                defaultProfileId = state.defaultModelId,
-            )
-        }
-        AutopInputBar(
+        AutopComposer(
             value = state.input,
             onValueChange = { onAction(FlowAuthorAction.SetInput(it)) },
             spec =
                 InputBarSpec(
                     placeholder =
                         stringResource(
-                            if (author.pendingQuestion !=
-                                null
-                            ) {
+                            if (author.pendingQuestion != null) {
                                 R.string.author_input_answer_hint
                             } else {
                                 R.string.author_input_hint
@@ -188,21 +176,23 @@ public fun FlowAuthorScreen(
                     maxLines = 4,
                 ),
             modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge),
-            trailing = {
-                if (author.busy && author.pendingQuestion == null) {
-                    AutopIconButton(
-                        AutopIcons.Stop,
-                        stringResource(R.string.flow_ctl_stop),
-                        { onAction(FlowAuthorAction.Stop) },
-                    )
-                } else {
-                    AutopIconButton(
-                        AutopIcons.Send,
-                        stringResource(R.string.author_send),
-                        { onAction(FlowAuthorAction.Send) },
-                    )
-                }
+            top = {
+                AutopModelSelector(
+                    selectedId = state.modelProfileId,
+                    profiles = state.modelOptions,
+                    enabled = !author.busy,
+                    onSelect = { onAction(FlowAuthorAction.SetModel(it)) },
+                    defaultProfileId = state.defaultModelId,
+                )
             },
+            trailing =
+                if (author.busy && author.pendingQuestion == null) {
+                    ComposerTrailing.STOP
+                } else {
+                    ComposerTrailing.SEND
+                },
+            onSend = { onAction(FlowAuthorAction.Send) },
+            onStop = { onAction(FlowAuthorAction.Stop) },
         )
     }
 }

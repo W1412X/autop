@@ -71,7 +71,7 @@ public fun AutopIconButton(
     }
 }
 
-private val CompactButtonSize = 32.dp
+private val CompactButtonSize = 36.dp
 
 /** 图标在上、文字在下的动作块；底 surfaceVariant α0.55，选中 primaryContainer。 */
 @Composable

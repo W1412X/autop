@@ -39,11 +39,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopChip
-import com.example.autop.core.ui.component.AutopIconButton
-import com.example.autop.core.ui.component.AutopIcons
-import com.example.autop.core.ui.component.AutopInputBar
+import com.example.autop.core.ui.component.AutopComposer
 import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.AutopTonalButton
+import com.example.autop.core.ui.component.ComposerTrailing
 import com.example.autop.core.ui.component.InlineQuestionCard
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.MarkdownText
@@ -154,16 +153,7 @@ public fun TaskAuthorScreen(
             author.errorCode?.let { item { ErrorBanner(it) } }
             state.saveError?.let { item { ErrorBanner(it) } }
         }
-        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge)) {
-            AutopModelSelector(
-                selectedId = state.modelProfileId,
-                profiles = state.modelOptions,
-                enabled = !state.author.busy,
-                onSelect = { onAction(TaskAuthorAction.SetModel(it)) },
-                defaultProfileId = state.defaultModelId,
-            )
-        }
-        AutopInputBar(
+        AutopComposer(
             value = state.input,
             onValueChange = { onAction(TaskAuthorAction.SetInput(it)) },
             spec =
@@ -179,21 +169,23 @@ public fun TaskAuthorScreen(
                     maxLines = 4,
                 ),
             modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge),
-            trailing = {
-                if (author.busy && author.pendingQuestion == null) {
-                    AutopIconButton(
-                        AutopIcons.Stop,
-                        stringResource(R.string.task_author_stop),
-                        { onAction(TaskAuthorAction.Stop) },
-                    )
-                } else {
-                    AutopIconButton(
-                        AutopIcons.Send,
-                        stringResource(R.string.task_author_send),
-                        { onAction(TaskAuthorAction.Send) },
-                    )
-                }
+            top = {
+                AutopModelSelector(
+                    selectedId = state.modelProfileId,
+                    profiles = state.modelOptions,
+                    enabled = !state.author.busy,
+                    onSelect = { onAction(TaskAuthorAction.SetModel(it)) },
+                    defaultProfileId = state.defaultModelId,
+                )
             },
+            trailing =
+                if (author.busy && author.pendingQuestion == null) {
+                    ComposerTrailing.STOP
+                } else {
+                    ComposerTrailing.SEND
+                },
+            onSend = { onAction(TaskAuthorAction.Send) },
+            onStop = { onAction(TaskAuthorAction.Stop) },
         )
     }
 }
