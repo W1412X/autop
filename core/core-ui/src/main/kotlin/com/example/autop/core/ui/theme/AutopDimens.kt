@@ -38,6 +38,9 @@ public object AutopDimens {
     public val voiceBarWidth: Dp = 4.dp
     public val voiceBarGap: Dp = 3.dp
 
+    /** 录音光环向外扩散的最大距离。 */
+    public val voiceHaloSpread: Dp = 10.dp
+
     /** 运行过程截图展开后的显示宽度（高度按原图比例）。 */
     public val stepScreenshotWidth: Dp = 220.dp
     public val overlayBall: Dp = 52.dp

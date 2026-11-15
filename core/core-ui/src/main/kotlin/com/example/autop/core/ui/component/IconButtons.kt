@@ -6,33 +6,49 @@
  */
 package com.example.autop.core.ui.component
 
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.IconSize
+import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.scaled
+import kotlin.math.PI
+import kotlin.math.sin
 
 /**
- * 图标按钮。默认 44dp 方形、Md 图标；[compact] 为 32dp、Sm 图标，用于输入区等需要紧凑的位置。
- * [selected] 时实心 8dp 圆角底。
+ * 图标按钮：默认为无底色图标按钮（[compact] 时为较小尺寸）。[selected] 为录音等进行中的状态：
+ * 中间是 primary 半透明圆底，外圈有层层向外扩散、逐渐淡出的光环（关闭动效时不显示光环）。
  */
 @Composable
 public fun AutopIconButton(
@@ -47,17 +63,27 @@ public fun AutopIconButton(
     val iconSize = if (compact) IconSize.Sm.scaled() else IconSize.Md.scaled()
     val iconTint = LocalContentColor.current
     if (selected) {
-        FilledIconButton(
-            onClick = onClick,
-            modifier = modifier.then(size),
-            shape = MaterialTheme.shapes.small,
+        Box(
+            modifier = modifier.then(size).voiceHalo(MaterialTheme.colorScheme.primary),
+            contentAlignment = Alignment.Center,
         ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = contentDescription,
-                modifier = Modifier.size(iconSize),
-                tint = iconTint,
-            )
+            FilledIconButton(
+                onClick = onClick,
+                modifier = Modifier.fillMaxSize(),
+                shape = CircleShape,
+                colors =
+                    IconButtonDefaults.filledIconButtonColors(
+                        containerColor = MaterialTheme.colorScheme.primary.copy(alpha = AutopAlpha.CHIP_SELECTED_FILL),
+                        contentColor = MaterialTheme.colorScheme.primary,
+                    ),
+            ) {
+                Icon(
+                    imageVector = icon,
+                    contentDescription = contentDescription,
+                    modifier = Modifier.size(iconSize),
+                    tint = iconTint,
+                )
+            }
         }
     } else {
         IconButton(onClick = onClick, modifier = modifier.then(size)) {
@@ -111,3 +137,33 @@ public fun IconAction(
         )
     }
 }
+
+/** 外圈光环：多层同心圆，半径逐层向外扩大、透明度逐层变淡，循环出现。 */
+@Composable
+private fun Modifier.voiceHalo(color: Color): Modifier {
+    if (!LocalMotionEnabled.current) return this
+    val phase by rememberInfiniteTransition(label = "voice_halo").animateFloat(
+        initialValue = 0f,
+        targetValue = 1f,
+        animationSpec =
+            infiniteRepeatable(
+                animation = tween(durationMillis = HALO_PERIOD_MS, easing = LinearEasing),
+                repeatMode = RepeatMode.Restart,
+            ),
+        label = "voice_halo_phase",
+    )
+    val spread = AutopDimens.voiceHaloSpread
+    return drawBehind {
+        val base = size.minDimension / 2f
+        repeat(HALO_RINGS) { ring ->
+            val t = (phase + ring.toFloat() / HALO_RINGS) % 1f
+            drawCircle(
+                color = color.copy(alpha = sin(PI.toFloat() * t) * AutopAlpha.HALO_MAX),
+                radius = base + spread.toPx() * t,
+            )
+        }
+    }
+}
+
+private const val HALO_RINGS: Int = 3
+private const val HALO_PERIOD_MS: Int = 1_600

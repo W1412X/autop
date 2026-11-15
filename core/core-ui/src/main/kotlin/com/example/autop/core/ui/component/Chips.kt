@@ -5,7 +5,6 @@
  */
 package com.example.autop.core.ui.component
 
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -38,7 +37,7 @@ import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.core.ui.theme.scaled
 import com.example.autop.core.ui.theme.tone
 
-/** 选项 Chip：高 34、8dp 圆角、labelLarge；边框未选中 outlineVariant / 选中 primary。 */
+/** 标签：半透明底、无描边。选中为 primary 半透明底，未选中为中性半透明底。 */
 @Composable
 public fun AutopChip(
     text: String,
@@ -77,21 +76,14 @@ public fun AutopChip(
                     )
                 }
             },
-        border =
-            BorderStroke(
-                width = BorderWidth,
-                color =
-                    if (selected) {
-                        MaterialTheme.colorScheme.primary
-                    } else {
-                        MaterialTheme.colorScheme.outlineVariant
-                    },
-            ),
+        border = null,
         colors =
             FilterChipDefaults.filterChipColors(
                 selectedContainerColor =
                     MaterialTheme.colorScheme.primary.copy(alpha = AutopAlpha.CHIP_SELECTED_FILL),
                 selectedLabelColor = MaterialTheme.colorScheme.primary,
+                containerColor =
+                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = AutopAlpha.CHIP_UNSELECTED_FILL),
             ),
     )
 }

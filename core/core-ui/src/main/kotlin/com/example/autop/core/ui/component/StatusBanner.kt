@@ -20,6 +20,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalSemanticColors
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -44,7 +45,12 @@ public fun StatusBanner(
     modifier: Modifier = Modifier,
     title: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
+    compact: Boolean = false,
 ) {
+    if (compact) {
+        CompactStatusBanner(tone = tone, message = message, modifier = modifier, actions = actions)
+        return
+    }
     val semantic = LocalSemanticColors.current.tone(tone)
     Row(
         modifier =
@@ -85,6 +91,49 @@ public fun StatusBanner(
                 ) {
                     actions()
                 }
+            }
+        }
+    }
+}
+
+/** 紧凑横幅：低透明度底、单行，操作按钮在右侧；用于记忆条目等信息密集的页面。 */
+@Composable
+private fun CompactStatusBanner(
+    tone: StatusTone,
+    message: String,
+    modifier: Modifier,
+    actions: (@Composable RowScope.() -> Unit)?,
+) {
+    val semantic = LocalSemanticColors.current.tone(tone)
+    val spacing = LocalSpacing.current
+    Row(
+        modifier =
+            modifier
+                .background(
+                    color = semantic.foreground.copy(alpha = AutopAlpha.BANNER_COMPACT_FILL),
+                    shape = MaterialTheme.shapes.small,
+                ).padding(horizontal = spacing.md, vertical = spacing.sm),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Icon(
+            imageVector = statusToneIcon(tone),
+            contentDescription = null,
+            modifier = Modifier.size(IconSize.Sm.scaled()),
+            tint = semantic.foreground,
+        )
+        Spacer(modifier = Modifier.width(spacing.sm))
+        Text(
+            text = message,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        if (actions != null) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                actions()
             }
         }
     }

@@ -187,6 +187,15 @@ public object AutopAlpha {
     /** Chip 选中态浅洗底。 */
     public const val CHIP_SELECTED_FILL: Float = 0.08f
 
+    /** 未选中标签的中性底色透明度。 */
+    public const val CHIP_UNSELECTED_FILL: Float = 0.10f
+
+    /** 紧凑横幅的底色透明度（取自语义色）。 */
+    public const val BANNER_COMPACT_FILL: Float = 0.12f
+
+    /** 录音光环最外圈的最大透明度（逐层向外淡出）。 */
+    public const val HALO_MAX: Float = 0.35f
+
     /** 禁用态底块。 */
     public const val BLOCK_FILL_DISABLED: Float = 0.35f
 

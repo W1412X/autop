@@ -12,6 +12,7 @@ import androidx.compose.material.icons.automirrored.outlined.HelpOutline
 import androidx.compose.material.icons.automirrored.outlined.Launch
 import androidx.compose.material.icons.automirrored.outlined.ListAlt
 import androidx.compose.material.icons.automirrored.outlined.Send
+import androidx.compose.material.icons.automirrored.outlined.Undo
 import androidx.compose.material.icons.filled.ChatBubble
 import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.FiberManualRecord
@@ -104,6 +105,7 @@ public object AutopIcons {
     public val Copy: ImageVector = Icons.Outlined.ContentCopy
     public val Settings: ImageVector = Icons.Outlined.Settings
     public val History: ImageVector = Icons.Outlined.History
+    public val Undo: ImageVector = Icons.AutoMirrored.Outlined.Undo
     public val Export: ImageVector = Icons.Outlined.FileDownload
     public val Bug: ImageVector = Icons.Outlined.BugReport
     public val DataObject: ImageVector = Icons.Outlined.DataObject
