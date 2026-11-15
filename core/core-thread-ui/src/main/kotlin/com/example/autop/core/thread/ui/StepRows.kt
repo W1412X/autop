@@ -114,12 +114,7 @@ private fun StepSummary(step: TimelineItem.StepRow) {
                 .padding(vertical = LocalSpacing.current.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(
-            imageVector = toolIconOf(step.toolId),
-            contentDescription = null,
-            modifier = Modifier.size(IconSize.Sm.scaled()),
-            tint = tone.foreground,
-        )
+        StepToolIcon(toolId = step.toolId, tint = tone.foreground)
 
         Text(
             text = stepDesc(step),

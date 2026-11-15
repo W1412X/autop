@@ -4,9 +4,34 @@
  */
 package com.example.autop.core.thread.ui
 
+import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Icon
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.example.autop.core.ui.component.AutopIcons
+import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.StatusTone
+import com.example.autop.core.ui.theme.scaled
+
+/**
+ * 工具步骤的类别图标（统一组件：对话页步骤行与悬浮进度面板共用）。
+ * 只有图标本身，不加底色或容器，颜色由调用方按状态传入。
+ */
+@Composable
+public fun StepToolIcon(
+    toolId: String,
+    tint: Color,
+    modifier: Modifier = Modifier,
+) {
+    Icon(
+        imageVector = toolIconOf(toolId),
+        contentDescription = null,
+        modifier = modifier.size(IconSize.Sm.scaled()),
+        tint = tint,
+    )
+}
 
 /** 工具类别图标（[stepLabelOf] 归类后查表；未知工具用问号图标）。 */
 internal fun toolIconOf(toolId: String): ImageVector = TOOL_ICONS[stepLabelOf(toolId)] ?: AutopIcons.HelpOutline

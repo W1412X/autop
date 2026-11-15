@@ -44,6 +44,7 @@ import com.example.autop.agent.PlanItem
 import com.example.autop.agent.PlanStatus
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.timeline.StepState
+import com.example.autop.core.thread.ui.StepToolIcon
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.MarkdownText
 import com.example.autop.core.ui.theme.AutopAlpha
@@ -214,20 +215,7 @@ private fun ToolRow(
                 .padding(vertical = LocalSpacing.current.xs),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Box(
-            modifier =
-                Modifier
-                    .background(color = tone.container, shape = MaterialTheme.shapes.extraSmall)
-                    .padding(LocalSpacing.current.xs),
-            contentAlignment = Alignment.Center,
-        ) {
-            Icon(
-                imageVector = toolIconOf(row.toolId),
-                contentDescription = null,
-                modifier = Modifier.size(IconSize.Sm.scaled()),
-                tint = tone.foreground,
-            )
-        }
+        StepToolIcon(toolId = row.toolId, tint = tone.foreground)
         Text(
             text = toolNameOf(row.toolId),
             style = MaterialTheme.typography.bodySmall,
@@ -428,3 +416,6 @@ private const val CURSOR_BLINK_MS: Int = 530
 private const val CURSOR_ALPHA_MIN: Float = 0.2f
 
 private const val CURSOR_ALPHA_MAX: Float = 1f
+
+/** 工具 id 去掉 `tool.` 前缀后作为步骤名。 */
+private fun toolNameOf(toolId: String): String = toolId.removePrefix("tool.")
