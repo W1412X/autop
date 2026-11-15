@@ -16,6 +16,12 @@ public data class ChangeRow(
     val source: MemorySource,
     val createdAt: Long,
     val evidence: String?,
+    /** 变更的推理原因（agent 或用户填写），可能为空。 */
+    val reason: String? = null,
+    /** 字数变化：改后长度减改前长度。 */
+    val charDelta: Int = 0,
+    /** 内容摘要：改后第一行有内容的文字（删除时取改前），可能为空。 */
+    val snippet: String? = null,
 )
 
 /** 一个 Run 的变更分组（[runId] 为 null 时是用户手动变更）。 */

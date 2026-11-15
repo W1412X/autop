@@ -133,6 +133,9 @@ public class ChangesViewModel
                                     source = it.source,
                                     createdAt = it.createdAt,
                                     evidence = it.evidence?.excerpt,
+                                    reason = it.reason,
+                                    charDelta = it.contentAfter.orEmpty().length - it.contentBefore.orEmpty().length,
+                                    snippet = snippetOf(it.contentAfter ?: it.contentBefore),
                                 )
                             },
                     )
@@ -145,3 +148,13 @@ public class ChangesViewModel
             const val REFRESH_DEBOUNCE_MS: Long = 300
         }
     }
+
+/** 摘要取第一行有内容的文字，最多 [SNIPPET_CHARS] 个字符。 */
+private fun snippetOf(content: String?): String? =
+    content
+        ?.lineSequence()
+        ?.map { it.trim() }
+        ?.firstOrNull { it.isNotEmpty() }
+        ?.take(SNIPPET_CHARS)
+
+private const val SNIPPET_CHARS: Int = 60

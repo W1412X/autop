@@ -136,6 +136,7 @@ private fun ChangeItem(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            ChangeDetail(text = row.reason ?: row.evidence ?: row.snippet)
             Row(
                 modifier = Modifier.padding(top = spacing.xs),
                 verticalAlignment = Alignment.CenterVertically,
@@ -149,6 +150,13 @@ private fun ChangeItem(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     modifier = Modifier.weight(1f),
+                )
+                Spacer(modifier = Modifier.width(spacing.sm))
+                Text(
+                    text = stringResource(R.string.memory_chars_delta, signedDelta(row.charDelta)),
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
                 )
             }
         }
@@ -213,3 +221,20 @@ private fun sourceLabel(source: MemorySource): Int =
     }
 
 private const val PILL_CORNER_PERCENT: Int = 50
+
+/** 字数变化带符号显示，如 +12、-5、0。 */
+private fun signedDelta(delta: Int): String = if (delta > 0) "+$delta" else delta.toString()
+
+/** 变更的详情（原因、证据摘录或内容摘要），最多两行；为空时不显示。 */
+@Composable
+private fun ChangeDetail(text: String?) {
+    if (text.isNullOrBlank()) return
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = MaterialTheme.colorScheme.onSurfaceVariant,
+        maxLines = 2,
+        overflow = TextOverflow.Ellipsis,
+        modifier = Modifier.padding(top = LocalSpacing.current.xs),
+    )
+}
