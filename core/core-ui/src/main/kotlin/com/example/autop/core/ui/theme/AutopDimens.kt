@@ -17,8 +17,8 @@ public object AutopDimens {
     public val chipHeight: Dp = 34.dp
 
     /** 扁平小号 Chip（[AutopFlatChip]，步骤链接等次要入口）高度。 */
-    public val flatChipHeight: Dp = 30.dp
-    public val inputHeight: Dp = 44.dp
+    public val flatChipHeight: Dp = 24.dp
+    public val inputHeight: Dp = 36.dp
     public val inputPaddingH: Dp = 12.dp
     public val navBarHeight: Dp = 64.dp
     public val sectionBarWidth: Dp = 4.dp

@@ -23,6 +23,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -37,7 +38,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.example.autop.core.thread.ui.Thumbnail
 import com.example.autop.core.thread.ui.decodeSampledBytes
 import com.example.autop.core.ui.component.AutopIconButton
@@ -56,6 +59,10 @@ import com.example.autop.task.ImageAttachment
 
 /** 发送与停止图标互换的淡入淡出时长（毫秒）。 */
 private const val SWAP_MS: Int = 150
+
+/** 只聊天开关：布局高度 24dp，Material 开关按 0.7 缩放后的视觉尺寸。 */
+private val SWITCH_BOX_HEIGHT = 24.dp
+private const val SWITCH_SCALE = 0.7f
 
 /** 尾部按钮当前是发送还是停止。 */
 private enum class TrailingMode { SEND, STOP }
@@ -92,19 +99,7 @@ internal fun InputArea(
             )
             Spacer(modifier = Modifier.weight(1f))
             // ADR-0035「只聊天」：开启后本轮发送不提供屏幕工具，不占用手机；运行中不切换（下一轮生效）。
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = stringResource(R.string.thread_chat_only),
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-                Switch(
-                    checked = state.chatOnly,
-                    onCheckedChange = { onAction(ChatThreadAction.SetChatOnly(it)) },
-                    enabled = !state.running,
-                    modifier = Modifier.padding(start = LocalSpacing.current.xs),
-                )
-            }
+            ChatOnlySwitch(chatOnly = state.chatOnly, running = state.running, onAction = onAction)
             if (!state.running && state.images.size < state.maxImages) AddImageButton(onAction)
         }
         AutopInputBar(
@@ -234,6 +229,7 @@ private fun SendButton(
                 if (running) R.string.thread_send_steer else R.string.thread_send,
             ),
         onClick = onClick,
+        compact = true,
         modifier = if (sendable) Modifier else Modifier.alpha(AutopAlpha.DISABLED_CONTENT),
     )
 }
@@ -245,5 +241,33 @@ private fun StopButton(onClick: () -> Unit) {
         icon = AutopIcons.Stop,
         contentDescription = stringResource(R.string.thread_stop),
         onClick = onClick,
+        compact = true,
     )
+}
+
+/** 只聊天开关（ADR-0035）：文字与开关同排，布局高度 [SWITCH_BOX_HEIGHT]；运行中不可切换（下一轮生效）。 */
+@Composable
+private fun ChatOnlySwitch(
+    chatOnly: Boolean,
+    running: Boolean,
+    onAction: (ChatThreadAction) -> Unit,
+) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(
+            text = stringResource(R.string.thread_chat_only),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Box(
+            modifier = Modifier.padding(start = LocalSpacing.current.xs).height(SWITCH_BOX_HEIGHT),
+            contentAlignment = Alignment.Center,
+        ) {
+            Switch(
+                checked = chatOnly,
+                onCheckedChange = { onAction(ChatThreadAction.SetChatOnly(it)) },
+                enabled = !running,
+                modifier = Modifier.graphicsLayer(scaleX = SWITCH_SCALE, scaleY = SWITCH_SCALE),
+            )
+        }
+    }
 }
