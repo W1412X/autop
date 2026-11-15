@@ -6,6 +6,7 @@ plugins {
 
 dependencies {
     implementation(project(":core:core-common"))
+    implementation(project(":domain:device-api"))
     implementation(project(":core:core-config"))
     implementation(project(":domain:flow-api"))
     implementation(project(":domain:task-api"))

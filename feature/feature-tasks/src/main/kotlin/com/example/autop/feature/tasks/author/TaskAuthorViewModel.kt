@@ -10,6 +10,8 @@ import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.ui.component.OptionItem
+import com.example.autop.core.ui.component.joinVoiceText
+import com.example.autop.device.SpeechInput
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.TASK_HINT_ARG
 import com.example.autop.feature.tasks.TASK_ID_ARG
@@ -40,6 +42,12 @@ public data class TaskAuthorUiState(
     val author: TaskAuthorState = TaskAuthorState(),
     val input: String = "",
     val saveError: String? = null,
+    /** 系统语音识别是否可用（不可用时不显示麦克风）。 */
+    val voiceAvailable: Boolean = false,
+    /** 正在语音输入。 */
+    val listening: Boolean = false,
+    /** 语音输入出错的错误码（提示用，见界面）。 */
+    val voiceError: String? = null,
 )
 
 /** 创作页意图。 */
@@ -63,6 +71,17 @@ public sealed interface TaskAuthorAction {
     ) : TaskAuthorAction
 
     public data object Save : TaskAuthorAction
+
+    /** 开始语音输入（麦克风权限由界面先行取得）。 */
+    public data object StartVoice : TaskAuthorAction
+
+    /** 结束语音输入。 */
+    public data object StopVoice : TaskAuthorAction
+
+    /** 语音输入失败（如权限被拒），以错误码提示。 */
+    public data class VoiceFailed(
+        val code: String,
+    ) : TaskAuthorAction
 }
 
 /** 创作页 ViewModel。 */
@@ -74,15 +93,25 @@ public class TaskAuthorViewModel
         private val author: TaskAuthor,
         private val modelProfiles: ModelProfileStore,
         private val configProvider: ConfigProvider,
+        private val speech: SpeechInput,
     ) : ViewModel() {
         private val taskId: String? = savedStateHandle.get<String>(TASK_ID_ARG)?.takeIf { it != NEW_TASK_ID }
         private val _uiState =
-            MutableStateFlow(TaskAuthorUiState(flowsEnabled = configProvider.current().flowsEnabled()))
+            MutableStateFlow(
+                TaskAuthorUiState(
+                    flowsEnabled = configProvider.current().flowsEnabled(),
+                    voiceAvailable = speech.available(),
+                ),
+            )
         public val uiState: StateFlow<TaskAuthorUiState> = _uiState
         private var session: TaskAuthorSession? = null
         private var sendJob: Job? = null
 
+        /** 开始语音输入时输入框已有的文字；识别结果接在它后面。 */
+        private var voiceBase: String = ""
+
         init {
+            collectVoice()
             viewModelScope.launch {
                 configProvider.observe().collect { snapshot ->
                     _uiState.update { it.copy(flowsEnabled = snapshot.flowsEnabled()) }
@@ -127,6 +156,44 @@ public class TaskAuthorViewModel
                 }
                 is TaskAuthorAction.SetModel -> _uiState.update { it.copy(modelProfileId = action.profileId) }
                 TaskAuthorAction.Save -> save(s, navigator)
+                TaskAuthorAction.StartVoice, TaskAuthorAction.StopVoice -> handleVoice(action)
+                is TaskAuthorAction.VoiceFailed -> handleVoice(action)
+            }
+        }
+
+        /** 语音输入：识别中的临时结果写进输入框（接在开始时的文字后面），确定结果并入输入框。 */
+        private fun collectVoice() {
+            viewModelScope.launch {
+                speech.listening.collect { on -> _uiState.update { it.copy(listening = on) } }
+            }
+            viewModelScope.launch {
+                speech.partial.collect { p ->
+                    if (speech.listening.value && p.isNotEmpty()) {
+                        _uiState.update { it.copy(input = joinVoiceText(voiceBase, p)) }
+                    }
+                }
+            }
+            viewModelScope.launch {
+                speech.results.collect { r ->
+                    voiceBase = joinVoiceText(voiceBase, r)
+                    _uiState.update { it.copy(input = voiceBase) }
+                }
+            }
+            viewModelScope.launch {
+                speech.errors.collect { code -> _uiState.update { it.copy(voiceError = code) } }
+            }
+        }
+
+        private fun handleVoice(action: TaskAuthorAction) {
+            when (action) {
+                TaskAuthorAction.StartVoice -> {
+                    voiceBase = _uiState.value.input
+                    _uiState.update { it.copy(voiceError = null) }
+                    speech.start()
+                }
+                TaskAuthorAction.StopVoice -> speech.stop()
+                is TaskAuthorAction.VoiceFailed -> _uiState.update { it.copy(voiceError = action.code) }
+                else -> Unit
             }
         }
 

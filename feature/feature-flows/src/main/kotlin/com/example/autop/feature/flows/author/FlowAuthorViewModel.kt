@@ -8,6 +8,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.ui.component.OptionItem
+import com.example.autop.core.ui.component.joinVoiceText
+import com.example.autop.device.SpeechInput
 import com.example.autop.feature.flows.AUTHOR_DRAFT_ARG
 import com.example.autop.feature.flows.AUTHOR_EDIT_ARG
 import com.example.autop.feature.flows.FlowsNavigator
@@ -36,6 +38,12 @@ public data class FlowAuthorUiState(
     val author: AuthorState = AuthorState(),
     val input: String = "",
     val saveError: String? = null,
+    /** 系统语音识别是否可用（不可用时不显示麦克风）。 */
+    val voiceAvailable: Boolean = false,
+    /** 正在语音输入。 */
+    val listening: Boolean = false,
+    /** 语音输入出错的错误码（提示用，见界面）。 */
+    val voiceError: String? = null,
 )
 
 /** 创作页意图。 */
@@ -65,6 +73,17 @@ public sealed interface FlowAuthorAction {
     ) : FlowAuthorAction
 
     public data object OpenAdvanced : FlowAuthorAction
+
+    /** 开始语音输入（麦克风权限由界面先行取得）。 */
+    public data object StartVoice : FlowAuthorAction
+
+    /** 结束语音输入。 */
+    public data object StopVoice : FlowAuthorAction
+
+    /** 语音输入失败（如权限被拒），以错误码提示。 */
+    public data class VoiceFailed(
+        val code: String,
+    ) : FlowAuthorAction
 }
 
 /** 创作页 ViewModel。 */
@@ -75,15 +94,20 @@ public class FlowAuthorViewModel
         savedStateHandle: SavedStateHandle,
         private val author: FlowAuthor,
         private val modelProfiles: ModelProfileStore,
+        private val speech: SpeechInput,
     ) : ViewModel() {
         private val draftId: String? = savedStateHandle.get<String>(AUTHOR_DRAFT_ARG)?.takeIf { it != NO_ARG }
         private val editId: String? = savedStateHandle.get<String>(AUTHOR_EDIT_ARG)?.takeIf { it != NO_ARG }
-        private val _uiState = MutableStateFlow(FlowAuthorUiState())
+        private val _uiState = MutableStateFlow(FlowAuthorUiState(voiceAvailable = speech.available()))
         public val uiState: StateFlow<FlowAuthorUiState> = _uiState
         private var session: FlowAuthorSession? = null
         private var sendJob: Job? = null
 
+        /** 开始语音输入时输入框已有的文字；识别结果接在它后面。 */
+        private var voiceBase: String = ""
+
         init {
+            collectVoice()
             viewModelScope.launch {
                 combine(modelProfiles.profiles, modelProfiles.defaultProfileId) { profiles, defaultId ->
                     profiles to defaultId
@@ -122,6 +146,44 @@ public class FlowAuthorViewModel
                 FlowAuthorAction.Save -> save(s, navigator)
                 is FlowAuthorAction.SetModel -> _uiState.update { it.copy(modelProfileId = action.profileId) }
                 FlowAuthorAction.OpenAdvanced -> save(s, navigator, openEditor = true)
+                FlowAuthorAction.StartVoice, FlowAuthorAction.StopVoice -> handleVoice(action)
+                is FlowAuthorAction.VoiceFailed -> handleVoice(action)
+            }
+        }
+
+        /** 语音输入：识别中的临时结果写进输入框（接在开始时的文字后面），确定结果并入输入框。 */
+        private fun collectVoice() {
+            viewModelScope.launch {
+                speech.listening.collect { on -> _uiState.update { it.copy(listening = on) } }
+            }
+            viewModelScope.launch {
+                speech.partial.collect { p ->
+                    if (speech.listening.value && p.isNotEmpty()) {
+                        _uiState.update { it.copy(input = joinVoiceText(voiceBase, p)) }
+                    }
+                }
+            }
+            viewModelScope.launch {
+                speech.results.collect { r ->
+                    voiceBase = joinVoiceText(voiceBase, r)
+                    _uiState.update { it.copy(input = voiceBase) }
+                }
+            }
+            viewModelScope.launch {
+                speech.errors.collect { code -> _uiState.update { it.copy(voiceError = code) } }
+            }
+        }
+
+        private fun handleVoice(action: FlowAuthorAction) {
+            when (action) {
+                FlowAuthorAction.StartVoice -> {
+                    voiceBase = _uiState.value.input
+                    _uiState.update { it.copy(voiceError = null) }
+                    speech.start()
+                }
+                FlowAuthorAction.StopVoice -> speech.stop()
+                is FlowAuthorAction.VoiceFailed -> _uiState.update { it.copy(voiceError = action.code) }
+                else -> Unit
             }
         }
 

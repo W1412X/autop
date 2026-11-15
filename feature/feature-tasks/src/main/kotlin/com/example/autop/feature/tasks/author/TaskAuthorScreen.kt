@@ -49,7 +49,9 @@ import com.example.autop.core.ui.component.MarkdownText
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.component.VoiceErrorBanner
 import com.example.autop.core.ui.component.llmErrorTextRes
+import com.example.autop.core.ui.component.rememberVoiceStarter
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.tasks.R
@@ -79,6 +81,11 @@ public fun TaskAuthorScreen(
     state: TaskAuthorUiState,
     onAction: (TaskAuthorAction) -> Unit,
 ) {
+    val startVoice =
+        rememberVoiceStarter(
+            onGranted = { onAction(TaskAuthorAction.StartVoice) },
+            onDenied = { onAction(TaskAuthorAction.VoiceFailed("speech.permission")) },
+        )
     val spacing = LocalSpacing.current
     val author = state.author
     val listState = rememberLazyListState()
@@ -151,6 +158,7 @@ public fun TaskAuthorScreen(
                 }
             }
             author.errorCode?.let { item { ErrorBanner(it) } }
+            state.voiceError?.let { item { VoiceErrorBanner(it) } }
             state.saveError?.let { item { ErrorBanner(it) } }
         }
         AutopComposer(
@@ -179,11 +187,14 @@ public fun TaskAuthorScreen(
                 )
             },
             trailing =
-                if (author.busy && author.pendingQuestion == null) {
-                    ComposerTrailing.STOP
-                } else {
-                    ComposerTrailing.SEND
+                when {
+                    state.listening -> ComposerTrailing.VOICE
+                    author.busy && author.pendingQuestion == null -> ComposerTrailing.STOP
+                    state.voiceAvailable && state.input.isBlank() -> ComposerTrailing.VOICE
+                    else -> ComposerTrailing.SEND
                 },
+            listening = state.listening,
+            onVoice = { if (state.listening) onAction(TaskAuthorAction.StopVoice) else startVoice() },
             onSend = { onAction(TaskAuthorAction.Send) },
             onStop = { onAction(TaskAuthorAction.Stop) },
         )

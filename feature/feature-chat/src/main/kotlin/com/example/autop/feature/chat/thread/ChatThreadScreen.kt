@@ -211,9 +211,6 @@ private fun noticeText(notice: ThreadNotice): String =
             ThreadNotice.COPIED -> R.string.thread_notice_copied
             ThreadNotice.IMAGE_FAILED -> R.string.thread_notice_image_failed
             ThreadNotice.STEER_FAILED -> R.string.thread_notice_steer_failed
-            ThreadNotice.VOICE_PERMISSION -> R.string.thread_notice_voice_permission
-            ThreadNotice.VOICE_NO_SPEECH -> R.string.thread_notice_voice_no_speech
-            ThreadNotice.VOICE_ERROR -> R.string.thread_notice_voice_error
             ThreadNotice.CAMERA_FAILED -> R.string.thread_notice_camera_failed
         },
     )

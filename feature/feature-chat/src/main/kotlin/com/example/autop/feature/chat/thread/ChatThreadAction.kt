@@ -45,6 +45,11 @@ public sealed interface ChatThreadAction {
     /** 结束语音输入，交出已听到的内容。 */
     public data object StopVoice : ChatThreadAction
 
+    /** 语音输入失败（如权限被拒），以错误码提示。 */
+    public data class VoiceFailed(
+        val code: String,
+    ) : ChatThreadAction
+
     /** 发送：空闲=发起对话；运行中=补充指令（steer）。 */
     public data object Send : ChatThreadAction
 

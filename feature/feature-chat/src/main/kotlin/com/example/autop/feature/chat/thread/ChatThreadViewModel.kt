@@ -31,6 +31,7 @@ import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.core.thread.ui.mergeTimeline
 import com.example.autop.core.ui.component.OptionItem
+import com.example.autop.core.ui.component.joinVoiceText
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.SpeechInput
 import com.example.autop.feature.chat.NEW_THREAD
@@ -80,6 +81,7 @@ private data class ChatMeta(
     val chatOnly: Boolean = false,
     val sheet: ChatThreadSheet = ChatThreadSheet(),
     val notice: ThreadNotice? = null,
+    val voiceError: String? = null,
 )
 
 /** 模型选项与全局默认（输入区芯片展示默认模型名 + "默认"标记用）。 */
@@ -384,13 +386,7 @@ public class ChatThreadViewModel
         private fun collectVoiceErrors() {
             viewModelScope.launch {
                 speech.errors.collect { code ->
-                    val notice =
-                        when (code) {
-                            "speech.permission" -> ThreadNotice.VOICE_PERMISSION
-                            "speech.no_speech" -> ThreadNotice.VOICE_NO_SPEECH
-                            else -> ThreadNotice.VOICE_ERROR
-                        }
-                    meta.update { it.copy(notice = notice) }
+                    meta.update { it.copy(voiceError = code) }
                 }
             }
         }
@@ -398,20 +394,17 @@ public class ChatThreadViewModel
         private fun joinVoice(
             base: String,
             spoken: String,
-        ): String =
-            when {
-                base.isBlank() -> spoken
-                base.endsWith(" ") || base.endsWith("\n") -> base + spoken
-                else -> "$base $spoken"
-            }
+        ): String = joinVoiceText(base, spoken)
 
         private fun handleVoice(action: ChatThreadAction) {
             when (action) {
                 ChatThreadAction.StartVoice -> {
                     voiceBase = meta.value.input
+                    meta.update { it.copy(voiceError = null) }
                     speech.start()
                 }
                 ChatThreadAction.StopVoice -> speech.stop()
+                is ChatThreadAction.VoiceFailed -> meta.update { it.copy(voiceError = action.code) }
                 is ChatThreadAction.ShowNotice -> meta.update { it.copy(notice = action.notice) }
                 else -> Unit
             }
@@ -499,6 +492,7 @@ public class ChatThreadViewModel
                 input = metaState.input,
                 modelProfileId = metaState.modelProfileId,
                 chatOnly = metaState.chatOnly,
+                voiceError = metaState.voiceError,
                 images = metaState.images,
                 maxImages = chatConfig.attachMaxImages,
                 inputMaxLines = chatConfig.inputMaxLines,

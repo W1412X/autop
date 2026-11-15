@@ -51,7 +51,9 @@ import com.example.autop.core.ui.component.MarkdownText
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.component.VoiceErrorBanner
 import com.example.autop.core.ui.component.llmErrorTextRes
+import com.example.autop.core.ui.component.rememberVoiceStarter
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.flows.R
@@ -85,6 +87,11 @@ public fun FlowAuthorScreen(
     state: FlowAuthorUiState,
     onAction: (FlowAuthorAction) -> Unit,
 ) {
+    val startVoice =
+        rememberVoiceStarter(
+            onGranted = { onAction(FlowAuthorAction.StartVoice) },
+            onDenied = { onAction(FlowAuthorAction.VoiceFailed("speech.permission")) },
+        )
     val spacing = LocalSpacing.current
     val author = state.author
     val listState = rememberLazyListState()
@@ -157,6 +164,7 @@ public fun FlowAuthorScreen(
                 }
             }
             author.errorCode?.let { item { ErrorBanner(it) } }
+            state.voiceError?.let { item { VoiceErrorBanner(it) } }
             state.saveError?.let { item { ErrorBanner(it) } }
         }
         author.pendingDemonstration?.let { goal -> DemoConfirm(goal = goal, onAction = onAction) }
@@ -186,11 +194,14 @@ public fun FlowAuthorScreen(
                 )
             },
             trailing =
-                if (author.busy && author.pendingQuestion == null) {
-                    ComposerTrailing.STOP
-                } else {
-                    ComposerTrailing.SEND
+                when {
+                    state.listening -> ComposerTrailing.VOICE
+                    author.busy && author.pendingQuestion == null -> ComposerTrailing.STOP
+                    state.voiceAvailable && state.input.isBlank() -> ComposerTrailing.VOICE
+                    else -> ComposerTrailing.SEND
                 },
+            listening = state.listening,
+            onVoice = { if (state.listening) onAction(FlowAuthorAction.StopVoice) else startVoice() },
             onSend = { onAction(FlowAuthorAction.Send) },
             onStop = { onAction(FlowAuthorAction.Stop) },
         )

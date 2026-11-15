@@ -6,10 +6,8 @@
  */
 package com.example.autop.feature.chat.thread
 
-import android.Manifest
 import android.content.ActivityNotFoundException
 import android.content.Context
-import android.content.pm.PackageManager
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
@@ -38,7 +36,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -48,7 +45,6 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import com.example.autop.core.thread.ui.Thumbnail
 import com.example.autop.core.thread.ui.decodeSampledBytes
@@ -58,6 +54,8 @@ import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.ComposerTrailing
 import com.example.autop.core.ui.component.InputBarSpec
+import com.example.autop.core.ui.component.VoiceErrorBanner
+import com.example.autop.core.ui.component.rememberVoiceStarter
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.IconSize
@@ -89,7 +87,7 @@ internal fun InputArea(
     val startVoice =
         rememberVoiceStarter(
             onGranted = { onAction(ChatThreadAction.StartVoice) },
-            onDenied = { onAction(ChatThreadAction.ShowNotice(ThreadNotice.VOICE_PERMISSION)) },
+            onDenied = { onAction(ChatThreadAction.VoiceFailed("speech.permission")) },
         )
     Column(
         modifier =
@@ -98,6 +96,7 @@ internal fun InputArea(
                 .padding(horizontal = LocalSpacing.current.screenEdge),
     ) {
         PendingImages(images = state.images, onAction = onAction)
+        state.voiceError?.let { VoiceErrorBanner(code = it) }
         AutopComposer(
             value = state.input,
             onValueChange = { text -> if (enabled) onAction(ChatThreadAction.SetInput(text)) },
@@ -150,33 +149,6 @@ private fun composerTrailingOf(state: ChatThreadUiState): ComposerTrailing =
         state.voiceAvailable && state.input.isBlank() && state.images.isEmpty() -> ComposerTrailing.VOICE
         else -> ComposerTrailing.SEND
     }
-
-/**
- * 返回「开始语音输入」的函数：已授权直接调用 [onGranted]；未授权先申请录音权限，
- * 授权后调用 [onGranted]，拒绝时调用 [onDenied]。
- */
-@Composable
-private fun rememberVoiceStarter(
-    onGranted: () -> Unit,
-    onDenied: () -> Unit,
-): () -> Unit {
-    val context = LocalContext.current
-    val grantedNow by rememberUpdatedState(onGranted)
-    val deniedNow by rememberUpdatedState(onDenied)
-    val request =
-        rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) grantedNow() else deniedNow()
-        }
-    return {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) ==
-            PackageManager.PERMISSION_GRANTED
-        ) {
-            grantedNow()
-        } else {
-            request.launch(Manifest.permission.RECORD_AUDIO)
-        }
-    }
-}
 
 /** 「＋」附件菜单：图片（系统相册，不需要存储权限）与拍照（系统相机）。 */
 @Composable

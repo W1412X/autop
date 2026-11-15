@@ -30,15 +30,6 @@ public enum class ThreadNotice {
     /** 补充指令（steer）失败：目标 Run 已结束或不存在，输入框保留原文（WP8.5）。 */
     STEER_FAILED,
 
-    /** 语音输入：没有录音权限（被拒绝或被系统永久拒绝）。 */
-    VOICE_PERMISSION,
-
-    /** 语音输入：没有听清楚。 */
-    VOICE_NO_SPEECH,
-
-    /** 语音输入：识别服务出错。 */
-    VOICE_ERROR,
-
     /** 拍照没有完成，没有添加图片。 */
     CAMERA_FAILED,
 }
@@ -78,6 +69,8 @@ public data class ChatThreadUiState(
     val voiceAvailable: Boolean = false,
     /** 正在语音输入。 */
     val listening: Boolean = false,
+    /** 语音输入出错的错误码（横幅提示，见 VoiceErrorBanner）。 */
+    val voiceError: String? = null,
     /** 待发送的图片（已压缩，发送后清空）。 */
     val images: List<ImageAttachment> = emptyList(),
     /** 单条消息可附图片数上限（`ui.chat.attachMaxImages`）。 */

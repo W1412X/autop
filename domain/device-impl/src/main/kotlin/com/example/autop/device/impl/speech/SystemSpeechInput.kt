@@ -12,6 +12,7 @@ import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
+import android.util.Log
 import com.example.autop.device.SpeechInput
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -50,7 +51,11 @@ public class SystemSpeechInput
 
         override fun start() =
             onMain {
-                if (mutableListening.value || !available()) return@onMain
+                if (mutableListening.value) return@onMain
+                if (!available()) {
+                    mutableErrors.tryEmit(ERR_NO_SERVICE)
+                    return@onMain
+                }
                 val engine = recognizer ?: createRecognizer()
                 cancelled = false
                 mutablePartial.value = ""
@@ -121,6 +126,7 @@ public class SystemSpeechInput
                     val wasCancelled = cancelled
                     finishSession()
                     if (wasCancelled) return
+                    Log.w(TAG, "recognition error $error")
                     mutableErrors.tryEmit(errorCodeOf(error))
                 }
 
@@ -133,17 +139,14 @@ public class SystemSpeechInput
         private fun Bundle.firstText(): String? =
             getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)?.firstOrNull()
 
+        /** 错误码原样保留（speech.err.N），界面按 SpeechRecognizer 的错误表给出具体原因。 */
         private fun errorCodeOf(error: Int): String =
-            when (error) {
-                SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> ERR_PERMISSION
-                SpeechRecognizer.ERROR_NO_MATCH, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> ERR_NO_SPEECH
-                else -> ERR_FAILED
-            }
+            if (error == SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS) ERR_PERMISSION else "speech.err.$error"
 
         private companion object {
+            const val TAG = "SystemSpeechInput"
             const val EVENT_BUFFER = 4
             const val ERR_PERMISSION = "speech.permission"
-            const val ERR_NO_SPEECH = "speech.no_speech"
-            const val ERR_FAILED = "speech.failed"
+            const val ERR_NO_SERVICE = "speech.no_service"
         }
     }
