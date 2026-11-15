@@ -9,17 +9,13 @@ import android.content.pm.PackageManager
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
-import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.stringResource
 import androidx.core.content.ContextCompat
 import com.example.autop.core.ui.R
-import com.example.autop.core.ui.theme.StatusTone
 
 /**
  * 返回「开始语音输入」的函数：已授权直接调用 [onGranted]；未授权先申请录音权限，
@@ -72,6 +68,7 @@ public fun VoiceErrorToast(code: String?) {
         Toast.makeText(context, context.getString(res, arg), Toast.LENGTH_LONG).show()
     }
 }
+
 /** 错误码 → 文案资源与参数（错误码数字）。未列出的错误码给出通用文案并显示错误码。 */
 internal fun voiceErrorText(code: String): Pair<Int, String> =
     (VOICE_ERROR_RES[code] ?: R.string.core_ui_voice_unknown) to code.removePrefix(ERR_PREFIX)
