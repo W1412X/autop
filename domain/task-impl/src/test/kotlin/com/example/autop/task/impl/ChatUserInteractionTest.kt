@@ -95,6 +95,9 @@ private class InteractionFixture {
                     ApplicationProvider.getApplicationContext(),
                     TasksDb::class.java,
                 ).allowMainThreadQueries()
+                // 查询与事务同步完成，pump 中的状态检查不依赖真实线程耗时（慢机器上不偶发失败）
+                .setQueryExecutor { it.run() }
+                .setTransactionExecutor { it.run() }
                 .build(),
         )
     val interaction = ChatUserInteraction(runStore, FakeLogger)
