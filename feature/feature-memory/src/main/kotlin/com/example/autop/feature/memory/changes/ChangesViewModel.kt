@@ -37,6 +37,14 @@ public sealed interface ChangesAction {
 
     /** 重试。 */
     public data object Retry : ChangesAction
+
+    /** 打开某条变更的详情。 */
+    public data class Select(
+        val versionId: Long,
+    ) : ChangesAction
+
+    /** 关闭变更详情。 */
+    public data object ClearSelection : ChangesAction
 }
 
 /** 最近变更页 ViewModel。 */
@@ -66,6 +74,16 @@ public class ChangesViewModel
                 is ChangesAction.RevertRun -> revertRun(action.runId)
                 ChangesAction.LoadMore -> loadMore()
                 ChangesAction.Retry -> loadMore()
+                is ChangesAction.Select ->
+                    _uiState.value =
+                        _uiState.value.copy(
+                            selected =
+                                _uiState.value.groups.flatMap { it.rows }.firstOrNull {
+                                    it.versionId ==
+                                        action.versionId
+                                },
+                        )
+                ChangesAction.ClearSelection -> _uiState.value = _uiState.value.copy(selected = null)
             }
         }
 

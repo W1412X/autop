@@ -37,4 +37,6 @@ public data class ChangesUiState(
     val groups: List<ChangeGroup> = emptyList(),
     val paged: PagedListState = PagedListState(),
     val error: String? = null,
+    /** 当前打开详情的变更；为空表示未打开。 */
+    val selected: ChangeRow? = null,
 )
