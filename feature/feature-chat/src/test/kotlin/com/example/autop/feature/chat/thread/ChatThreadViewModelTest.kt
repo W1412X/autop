@@ -196,6 +196,7 @@ public class ChatThreadViewModelTest {
                 ),
             speech = FakeSpeechInput(),
             shellInput = FakeChatShellInput(),
+            dispatchers = TestDispatcherProvider(testDispatcher),
         )
 }
 

@@ -23,6 +23,7 @@ import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
 import com.example.autop.core.common.AutopJson
+import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.LogFiles
 import com.example.autop.core.common.Outcome
@@ -65,6 +66,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
@@ -79,6 +81,13 @@ private data class TimelineInput(
     val live: List<AgentEvent> = emptyList(),
     /** 刚发出、尚未在事件流中出现的用户消息文本（乐观显示，入库后清除）。 */
     val outgoing: String? = null,
+)
+
+/** 归并结果（只随时间线变化重算）：界面条目、线程标题、历史（取原始事件用）。 */
+private data class MergedTimeline(
+    val history: List<ThreadEvent> = emptyList(),
+    val title: String? = null,
+    val entries: List<TimelineEntry> = emptyList(),
 )
 
 /** 发出消息后等待第一条输出的运行状态（这些状态下才显示等待占位）。 */
@@ -150,6 +159,7 @@ public class ChatThreadViewModel
         private val imageReader: ChatImageReader,
         private val speech: SpeechInput,
         private val shellInput: ShellInput,
+        private val dispatchers: DispatcherProvider,
     ) : ViewModel() {
         /** 系统语音识别是否可用（设备没有识别服务时不显示麦克风）。 */
         private val voiceAvailable: Boolean = speech.available()
@@ -178,9 +188,31 @@ public class ChatThreadViewModel
         /** 一次性导航事件（NavGraph 的 Route 层收集后转 [com.example.autop.feature.chat.ChatNavigator]）。 */
         public val navEvents: Flow<ChatNavEvent> = navChannel.receiveAsFlow()
 
+        /**
+         * 归并结果只随时间线（历史与实时增量）变化重算。输入框逐字输入、弹层开关等页面状态变化
+         * 不会触发整条时间线的重新归并（主线程逐字输入时的卡顿来源之一）。
+         */
+        private val merged: StateFlow<MergedTimeline> =
+            timeline
+                // 归并在后台线程进行，不占主线程。StateFlow 只向收集方交付最新值，归并忙碌期间
+                // 到达的中间状态会被合并，流式输出时不会堆积过期的全量归并。
+                .map { input ->
+                    val chatConfig = configProvider.current()[UiConfig.CHAT]
+                    MergedTimeline(
+                        history = input.history,
+                        title = input.history.firstNotNullOfOrNull { (it.payload as? ThreadCreated)?.title },
+                        entries =
+                            withOutgoing(
+                                mergeTimeline(input.history, input.live, chatConfig.stepGroupThreshold),
+                                input.outgoing,
+                            ),
+                    )
+                }.flowOn(dispatchers.default)
+                .stateIn(viewModelScope, SharingStarted.Eagerly, MergedTimeline())
+
         private val baseState: StateFlow<ChatThreadUiState> =
             combine(
-                timeline,
+                merged,
                 runService.observeActive(),
                 meta,
                 openRun,
@@ -570,7 +602,7 @@ public class ChatThreadViewModel
         }
 
         private fun buildState(
-            input: TimelineInput,
+            input: MergedTimeline,
             active: ActiveRunInfo?,
             open: RunRecord?,
             metaState: ChatMeta,
@@ -579,14 +611,10 @@ public class ChatThreadViewModel
             val chatConfig = configProvider.current()[UiConfig.CHAT]
             val rawSeq = metaState.sheet.rawSeq
             val rawEvent = rawSeq?.let { seq -> input.history.firstOrNull { it.seq == seq } }
-            val entries =
-                withOutgoing(
-                    mergeTimeline(input.history, input.live, chatConfig.stepGroupThreshold),
-                    input.outgoing,
-                )
+            val entries = input.entries
             return ChatThreadUiState(
                 threadId = threadId,
-                title = input.history.firstNotNullOfOrNull { (it.payload as? ThreadCreated)?.title },
+                title = input.title,
                 entries = entries,
                 running = open != null,
                 awaitingReply = awaitingReplyOf(entries, open),

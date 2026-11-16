@@ -201,7 +201,9 @@ public fun mergeCore(
         }
         unpaired = appendPayload(entries, event, unpaired)
     }
-    live.forEach { appendLive(entries, it) }
+    val stream = StreamBuffer(entries)
+    live.forEach { appendLive(entries, stream, it) }
+    stream.flush()
     return entries
 }
 
@@ -416,11 +418,12 @@ private fun appendResult(
 /** 实时增量 → 追加或合并到流式条目。 */
 private fun appendLive(
     entries: MutableList<CoreEntry>,
+    stream: StreamBuffer,
     event: AgentEvent,
 ) {
     when (event) {
-        is AgentEvent.TextDelta -> appendStream(entries, event.text, thinking = false)
-        is AgentEvent.ThinkingDelta -> appendStream(entries, event.text, thinking = true)
+        is AgentEvent.TextDelta -> stream.append(event.text, thinking = false)
+        is AgentEvent.ThinkingDelta -> stream.append(event.text, thinking = true)
         is AgentEvent.ToolCallStreaming -> appendLiveStep(entries, event)
         is AgentEvent.ToolProgress -> applyToolProgress(entries, event)
         is AgentEvent.StateChanged,
@@ -460,27 +463,51 @@ private fun appendLiveStep(
     )
 }
 
-/** 流式文本合并：追加到同类型流式条目，否则新建（docs/tech/08 §7 测试项）。 */
-private fun appendStream(
-    entries: MutableList<CoreEntry>,
-    text: String,
-    thinking: Boolean,
+/**
+ * 流式文本合并（docs/tech/08 §7 测试项）：同类型增量追加到紧邻的流式条目，否则新建。
+ *
+ * 增量先累积进 [StringBuilder]，条目切换或归并结束时一次性写回。逐个增量复制整段正文
+ * 会让每次归并的成本随已输出字数平方增长，流式输出时主线程卡顿即由此而来。
+ * 条目被其他实时事件（工具调用开始）挤开、或改变类型（思考 ↔ 正文）时，视为新条目。
+ */
+private class StreamBuffer(
+    private val entries: MutableList<CoreEntry>,
 ) {
-    val last = entries.lastOrNull()?.takeIf { it.seq == null }
-    val row = last?.row
-    if (thinking && row is CoreRow.Thinking) {
-        entries[entries.lastIndex] = last.copy(row = row.copy(text = row.text + text))
-    } else if (!thinking && row is CoreRow.Assistant && row.streaming) {
-        entries[entries.lastIndex] = last.copy(row = row.copy(text = row.text + text))
-    } else {
-        val new =
-            if (thinking) {
-                CoreRow.Thinking(text, streaming = true)
-            } else {
-                CoreRow.Assistant(text, streaming = true)
-            }
-        entries.add(CoreEntry(new, seq = null, forkable = false))
+    /** 正在累积的条目下标；-1 表示当前没有。 */
+    private var index = -1
+    private var thinking = false
+    private val text = StringBuilder()
+
+    fun append(
+        delta: String,
+        thinking: Boolean,
+    ) {
+        val continues = index >= 0 && index == entries.lastIndex && this.thinking == thinking
+        if (!continues) {
+            flush()
+            index = entries.size
+            this.thinking = thinking
+            text.setLength(0)
+            entries.add(CoreEntry(streamRow(text = "", thinking = thinking), seq = null, forkable = false))
+        }
+        text.append(delta)
     }
+
+    /** 把累积的正文写回条目；归并结束前必须调用一次。 */
+    fun flush() {
+        if (index < 0) return
+        entries[index] = CoreEntry(streamRow(text = text.toString(), thinking = thinking), seq = null, forkable = false)
+    }
+
+    private fun streamRow(
+        text: String,
+        thinking: Boolean,
+    ): CoreRow =
+        if (thinking) {
+            CoreRow.Thinking(text, streaming = true)
+        } else {
+            CoreRow.Assistant(text, streaming = true)
+        }
 }
 
 private fun applyToolProgress(
