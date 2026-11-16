@@ -248,13 +248,14 @@ private fun GroupSteps(
     }
 }
 
-/** 展开的详情：参数（mono）/ 结果 / 观测摘要 / 截图占位。 */
+/** 展开的详情：参数（mono）/ 命令（run_shell 原文）/ 结果 / 观测摘要 / 截图占位。 */
 @Composable
 private fun StepDetail(step: TimelineItem.StepRow) {
     val mono =
         MaterialTheme.typography.bodySmall.copy(
             fontFamily = FontFamily.Monospace,
         )
+    val shellCommand = if (step.toolId == SHELL_TOOL) stepShellCommandOf(step.argsJson) else null
     Column(
         modifier =
             Modifier
@@ -265,10 +266,19 @@ private fun StepDetail(step: TimelineItem.StepRow) {
                     bottom = LocalSpacing.current.sm,
                 ),
     ) {
-        if (step.argsJson.isNotBlank()) {
+        // run_shell 只展示命令原文，不必连 JSON 外壳一起给。
+        if (step.argsJson.isNotBlank() && shellCommand == null) {
             DetailLabel(res = R.string.thread_detail_args)
             Text(
                 text = step.argsJson,
+                style = mono,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        shellCommand?.let { command ->
+            DetailLabel(res = R.string.thread_detail_command)
+            Text(
+                text = command,
                 style = mono,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -342,14 +352,13 @@ private val QUOTED_LABELS: Set<StepLabel> =
         StepLabel.MEMORY_WRITE,
     )
 
-/** 括号文案：枚举或命令类参数。 */
+/** 括号文案：枚举类参数。 */
 private val PAREN_LABELS: Set<StepLabel> =
     setOf(
         StepLabel.SCROLL,
         StepLabel.SCROLL_NODE,
         StepLabel.GLOBAL_ACTION,
         StepLabel.INTENT,
-        StepLabel.RUN_SHELL,
     )
 
 /** 耗时文本（毫秒 → 秒，保留一位小数）。 */
@@ -360,3 +369,6 @@ private fun timingText(step: TimelineItem.StepRow): String? {
 }
 
 private const val MS_PER_SECOND_FLOAT: Float = 1000f
+
+/** 命令类工具：折叠行不显示参数，完整命令在展开详情里。 */
+private const val SHELL_TOOL: String = "run_shell"

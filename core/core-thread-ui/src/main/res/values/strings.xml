@@ -57,6 +57,7 @@
     <string name="thread_ask_self">自己输入</string>
     <string name="thread_send">发送</string>
     <string name="thread_detail_args">参数</string>
+    <string name="thread_detail_command">命令</string>
     <string name="thread_detail_observation">观测</string>
     <string name="thread_detail_result">结果</string>
     <string name="thread_duration_hour_min">%1$d 小时 %2$d 分</string>

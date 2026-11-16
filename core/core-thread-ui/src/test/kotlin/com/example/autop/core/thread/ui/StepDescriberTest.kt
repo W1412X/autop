@@ -31,17 +31,17 @@ class StepDescriberTest {
     @Test
     fun `previously other tools map to dedicated labels`() {
         assertThat(stepLabelOf("run_shell")).isEqualTo(StepLabel.RUN_SHELL)
-        assertThat(stepArgOf("run_shell", """{"command":"pm list packages"}""")).isEqualTo("pm list packages")
         assertThat(stepLabelOf("ask_user")).isEqualTo(StepLabel.ASK_USER)
         assertThat(stepLabelOf("memory_search")).isEqualTo(StepLabel.MEMORY_SEARCH)
         assertThat(stepLabelOf("patch_flow_node")).isEqualTo(StepLabel.PATCH_FLOW_NODE)
     }
 
     @Test
-    fun `multi line shell command collapses into a single line`() {
+    fun `shell command is hidden from the collapsed row and shown in full`() {
         val args = """{"command":"pm list packages\n  | grep demo"}"""
 
-        assertThat(stepArgOf("run_shell", args)).isEqualTo("pm list packages | grep demo")
+        assertThat(stepArgOf("run_shell", args)).isNull()
+        assertThat(stepShellCommandOf(args)).isEqualTo("pm list packages\n  | grep demo")
     }
 
     @Test

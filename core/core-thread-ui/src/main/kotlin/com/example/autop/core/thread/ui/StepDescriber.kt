@@ -28,6 +28,12 @@ public fun stepArgOf(
         parseArgs(argsJson)?.let { args -> argOf(toolId, args) }
     }
 
+/**
+ * run_shell 的完整命令：折叠行只显示"执行命令"，命令原文在展开详情里查看。
+ * 命令可能很长且多行，不参与折叠行描述。
+ */
+public fun stepShellCommandOf(argsJson: String): String? = parseArgs(argsJson)?.text("command")
+
 private fun argOf(
     toolId: String,
     args: JsonObject,
@@ -45,7 +51,7 @@ private fun argOf(
 
 /**
  * 描述参数单行化：换行与连续空白折叠为空格。
- * 折叠行只占一行（多行 shell 命令等不会把行撑高），完整原文在展开详情里看。
+ * 折叠行只占一行（多行文本参数不会把行撑高），完整原文在展开详情里看。
  */
 private fun String.oneLine(): String = replace(WHITESPACE, " ").trim()
 
@@ -116,7 +122,6 @@ private val ARG_KEYS_BY_TOOL: Map<String, List<String>> =
         "list_apps" to listOf("query"),
         "read_notifications" to listOf("package"),
         "clipboard_set" to listOf("text"),
-        "run_shell" to listOf("command"),
         "ask_user" to listOf("question"),
         "finish" to listOf("summary"),
         "note" to listOf("text"),
