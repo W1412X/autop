@@ -18,52 +18,81 @@ import androidx.compose.material.icons.filled.EventRepeat
 import androidx.compose.material.icons.filled.FiberManualRecord
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Psychology
+import androidx.compose.material.icons.outlined.AccountTree
 import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material.icons.outlined.AddBox
 import androidx.compose.material.icons.outlined.AddPhotoAlternate
+import androidx.compose.material.icons.outlined.AddTask
+import androidx.compose.material.icons.outlined.AdsClick
+import androidx.compose.material.icons.outlined.Apps
 import androidx.compose.material.icons.outlined.ArrowDownward
 import androidx.compose.material.icons.outlined.ArrowUpward
 import androidx.compose.material.icons.outlined.Block
 import androidx.compose.material.icons.outlined.BugReport
 import androidx.compose.material.icons.outlined.CallSplit
+import androidx.compose.material.icons.outlined.Campaign
 import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Check
 import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.Checklist
 import androidx.compose.material.icons.outlined.ChevronRight
 import androidx.compose.material.icons.outlined.Close
+import androidx.compose.material.icons.outlined.Construction
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ContentPaste
+import androidx.compose.material.icons.outlined.ContentPasteGo
 import androidx.compose.material.icons.outlined.DataObject
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Description
+import androidx.compose.material.icons.outlined.DesignServices
 import androidx.compose.material.icons.outlined.Edit
+import androidx.compose.material.icons.outlined.EditNote
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.EventRepeat
 import androidx.compose.material.icons.outlined.FileDownload
 import androidx.compose.material.icons.outlined.Folder
+import androidx.compose.material.icons.outlined.Gesture
 import androidx.compose.material.icons.outlined.History
+import androidx.compose.material.icons.outlined.HourglassEmpty
 import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.outlined.Keyboard
 import androidx.compose.material.icons.outlined.Link
+import androidx.compose.material.icons.outlined.MenuBook
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MoreVert
+import androidx.compose.material.icons.outlined.NotificationsActive
+import androidx.compose.material.icons.outlined.OpenInNew
 import androidx.compose.material.icons.outlined.OpenWith
 import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Pause
+import androidx.compose.material.icons.outlined.PermDeviceInformation
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.PhotoCamera
 import androidx.compose.material.icons.outlined.PlayArrow
+import androidx.compose.material.icons.outlined.PlayCircle
+import androidx.compose.material.icons.outlined.PostAdd
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.QuestionAnswer
 import androidx.compose.material.icons.outlined.RadioButtonUnchecked
 import androidx.compose.material.icons.outlined.Refresh
 import androidx.compose.material.icons.outlined.Remove
+import androidx.compose.material.icons.outlined.RestartAlt
+import androidx.compose.material.icons.outlined.SaveAs
+import androidx.compose.material.icons.outlined.SavedSearch
 import androidx.compose.material.icons.outlined.Schedule
+import androidx.compose.material.icons.outlined.Screenshot
 import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Stop
+import androidx.compose.material.icons.outlined.Storage
+import androidx.compose.material.icons.outlined.SwapVert
 import androidx.compose.material.icons.outlined.Swipe
+import androidx.compose.material.icons.outlined.SwipeVertical
+import androidx.compose.material.icons.outlined.TaskAlt
 import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.TouchApp
+import androidx.compose.material.icons.outlined.Update
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
 import androidx.compose.material.icons.outlined.Warning
@@ -133,19 +162,48 @@ public object AutopIcons {
 
     // ── 工具类别（执行轨迹，docs/tech/08 §4.2，N178）──────────
     public val TouchApp: ImageVector = Icons.Outlined.TouchApp
+    public val AdsClick: ImageVector = Icons.Outlined.AdsClick
     public val Keyboard: ImageVector = Icons.Outlined.Keyboard
     public val Swipe: ImageVector = Icons.Outlined.Swipe
+    public val SwipeVertical: ImageVector = Icons.Outlined.SwipeVertical
+    public val SwapVert: ImageVector = Icons.Outlined.SwapVert
+    public val Gesture: ImageVector = Icons.Outlined.Gesture
     public val OpenWith: ImageVector = Icons.Outlined.OpenWith
     public val Palette: ImageVector = Icons.Outlined.Palette
     public val Launch: ImageVector = Icons.AutoMirrored.Outlined.Launch
+    public val OpenInNew: ImageVector = Icons.Outlined.OpenInNew
+    public val RestartAlt: ImageVector = Icons.Outlined.RestartAlt
     public val Link: ImageVector = Icons.Outlined.Link
     public val PhotoCamera: ImageVector = Icons.Outlined.PhotoCamera
+    public val Screenshot: ImageVector = Icons.Outlined.Screenshot
     public val Visibility: ImageVector = Icons.Outlined.Visibility
     public val VisibilityOff: ImageVector = Icons.Outlined.VisibilityOff
+    public val HourglassEmpty: ImageVector = Icons.Outlined.HourglassEmpty
+    public val Apps: ImageVector = Icons.Outlined.Apps
     public val ListAlt: ImageVector = Icons.AutoMirrored.Outlined.ListAlt
     public val PhoneAndroid: ImageVector = Icons.Outlined.PhoneAndroid
+    public val PermDeviceInformation: ImageVector = Icons.Outlined.PermDeviceInformation
+    public val NotificationsActive: ImageVector = Icons.Outlined.NotificationsActive
     public val Terminal: ImageVector = Icons.Outlined.Terminal
     public val ContentPaste: ImageVector = Icons.Outlined.ContentPaste
+    public val ContentPasteGo: ImageVector = Icons.Outlined.ContentPasteGo
+    public val QuestionAnswer: ImageVector = Icons.Outlined.QuestionAnswer
+    public val Checklist: ImageVector = Icons.Outlined.Checklist
+    public val TaskAlt: ImageVector = Icons.Outlined.TaskAlt
+    public val EditNote: ImageVector = Icons.Outlined.EditNote
+    public val Campaign: ImageVector = Icons.Outlined.Campaign
+    public val AddTask: ImageVector = Icons.Outlined.AddTask
+    public val PlayCircle: ImageVector = Icons.Outlined.PlayCircle
+    public val AccountTree: ImageVector = Icons.Outlined.AccountTree
+    public val AddBox: ImageVector = Icons.Outlined.AddBox
+    public val DesignServices: ImageVector = Icons.Outlined.DesignServices
+    public val Update: ImageVector = Icons.Outlined.Update
+    public val SaveAs: ImageVector = Icons.Outlined.SaveAs
+    public val Construction: ImageVector = Icons.Outlined.Construction
+    public val Storage: ImageVector = Icons.Outlined.Storage
+    public val MenuBook: ImageVector = Icons.Outlined.MenuBook
+    public val SavedSearch: ImageVector = Icons.Outlined.SavedSearch
+    public val PostAdd: ImageVector = Icons.Outlined.PostAdd
     public val HelpOutline: ImageVector = Icons.AutoMirrored.Outlined.HelpOutline
 
     // ── 应用标识 ─────────────────────────────────────────────────

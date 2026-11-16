@@ -308,18 +308,46 @@ private fun stepDesc(step: TimelineItem.StepRow): String {
     }
 }
 
-/** 参数拼接模板（引号 / 直接 / 括号三类，docs/tech/08 §4.2 StepDescriber 文案）。 */
+/** 参数拼接模板（引号 / 括号 / 直接三类，docs/tech/08 §4.2 StepDescriber 文案）。 */
 private fun fmtOf(label: StepLabel): Int =
-    when (label) {
-        StepLabel.TAP,
-        StepLabel.INPUT_TEXT,
-        StepLabel.CLIPBOARD_SET,
-        -> R.string.step_desc_quoted
-        StepLabel.SCROLL,
-        StepLabel.GLOBAL_ACTION,
-        -> R.string.step_desc_paren
+    when {
+        label in QUOTED_LABELS -> R.string.step_desc_quoted
+        label in PAREN_LABELS -> R.string.step_desc_paren
         else -> R.string.step_desc_plain
     }
+
+/** 引号文案：自由文本或名称类参数。 */
+private val QUOTED_LABELS: Set<StepLabel> =
+    setOf(
+        StepLabel.TAP,
+        StepLabel.TAP_NODE,
+        StepLabel.INPUT_TEXT,
+        StepLabel.CLIPBOARD_SET,
+        StepLabel.ASK_USER,
+        StepLabel.NOTE,
+        StepLabel.HISTORY_RECALL,
+        StepLabel.NOTIFY_USER,
+        StepLabel.RUN_FLOW,
+        StepLabel.CREATE_FLOW,
+        StepLabel.EDIT_FLOW,
+        StepLabel.UPDATE_FLOW,
+        StepLabel.SAVE_AS_FLOW,
+        StepLabel.PATCH_FLOW_NODE,
+        StepLabel.MEMORY_LIST,
+        StepLabel.MEMORY_READ,
+        StepLabel.MEMORY_SEARCH,
+        StepLabel.MEMORY_WRITE,
+    )
+
+/** 括号文案：枚举或命令类参数。 */
+private val PAREN_LABELS: Set<StepLabel> =
+    setOf(
+        StepLabel.SCROLL,
+        StepLabel.SCROLL_NODE,
+        StepLabel.GLOBAL_ACTION,
+        StepLabel.INTENT,
+        StepLabel.RUN_SHELL,
+    )
 
 /** 耗时文本（毫秒 → 秒，保留一位小数）。 */
 @Composable
