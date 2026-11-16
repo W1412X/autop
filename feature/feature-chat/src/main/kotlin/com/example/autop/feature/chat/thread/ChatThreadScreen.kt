@@ -14,13 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -40,11 +38,9 @@ import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.ToastEffect
 import com.example.autop.core.ui.component.rememberStickToBottom
-import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.chat.R
-import kotlinx.coroutines.launch
 
 /**
  * 对话页。
@@ -157,9 +153,7 @@ private fun ThreadTimeline(
     modifier: Modifier = Modifier,
 ) {
     val listState = rememberLazyListState()
-    val scope = rememberCoroutineScope()
-    val motion = LocalMotionEnabled.current
-    rememberStickToBottom(listState)
+    val stick = rememberStickToBottom(listState)
     val atBottom by remember {
         derivedStateOf {
             val info = listState.layoutInfo
@@ -192,30 +186,17 @@ private fun ThreadTimeline(
             }
         }
         if (!atBottom && entries.isNotEmpty()) {
+            // 点按钮即恢复跟随（而不是只滚动一次）：末项高过视口时滚到"末项顶部"不算到底，
+            // 也不会重新开启跟随，后续输出就停在半截。
             AutopTonalButton(
                 text = stringResource(R.string.thread_back_bottom),
-                onClick = {
-                    scope.launch { scrollToEnd(listState, motion) }
-                },
+                onClick = { stick.follow() },
                 modifier =
                     Modifier
                         .align(Alignment.BottomCenter)
                         .padding(bottom = LocalSpacing.current.md),
             )
         }
-    }
-}
-
-private suspend fun scrollToEnd(
-    listState: LazyListState,
-    animate: Boolean,
-) {
-    val lastIndex = listState.layoutInfo.totalItemsCount - 1
-    if (lastIndex < 0) return
-    if (animate) {
-        listState.animateScrollToItem(lastIndex)
-    } else {
-        listState.scrollToItem(lastIndex)
     }
 }
 
