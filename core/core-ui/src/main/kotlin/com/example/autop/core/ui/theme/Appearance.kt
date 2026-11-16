@@ -40,6 +40,8 @@ public data class AppearanceSettings(
     public val darkMode: DarkMode = DarkMode.SYSTEM,
     public val dynamicColor: Boolean = false,
     public val seedIndex: Int = 0,
+    /** 调色盘自选主题色（ARGB，0 = 未启用；非 0 时优先于 [seedIndex]）。 */
+    public val customSeed: Long = 0,
     public val fontScale: Float = 1f,
     public val iconScale: Float = 1f,
     public val density: UiDensity = UiDensity.STANDARD,
@@ -60,6 +62,7 @@ public fun UiAppearanceSection.toAppearanceSettings(
         darkMode = DarkMode.entries.firstOrNull { it.name == darkMode } ?: DarkMode.SYSTEM,
         dynamicColor = dynamicColor && dynamicColorSupported,
         seedIndex = seedIndex.coerceIn(0, SeedColors.COUNT - 1),
+        customSeed = if (customSeed in CUSTOM_SEED_MIN..CUSTOM_SEED_MAX) customSeed else 0,
         fontScale = fontScale.toFloat(),
         iconScale = iconScale.toFloat(),
         density = UiDensity.entries.firstOrNull { it.name == density } ?: UiDensity.STANDARD,
@@ -68,6 +71,10 @@ public fun UiAppearanceSection.toAppearanceSettings(
 
 /** 动态取色最低 API（Android 12 / S）。 */
 private const val DYNAMIC_COLOR_MIN_SDK: Int = 31
+
+/** 自定义主题色的合法 ARGB 区间（0 表示未启用，不在此区间内视为无效）。 */
+private const val CUSTOM_SEED_MIN: Long = 0xFF000000L
+private const val CUSTOM_SEED_MAX: Long = 0xFFFFFFFFL
 
 /**
  * 是否使用动态取色（Monet）色板。

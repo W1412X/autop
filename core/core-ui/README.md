@@ -10,7 +10,8 @@
 - `Color.kt`：LimeTV 基线色板 → `AutopLightColors`/`AutopDarkColors`（Material3 全槽位）；
   `AutopAlpha` 透明度常量；`StatusTone` 状态语义枚举 + `AutopSemanticColors`/`LocalSemanticColors`
   （只映射 scheme 槽位，不新增色值）。
-- `SeedColors.kt`：5 种子色（Lime/Blue/Orange/Violet/Graphite），`SeedColors.light/dark(seedIndex)`。
+- `SeedColors.kt`：6 档预设主题色（青柠、湖蓝、薄荷、可可、紫罗兰、玫瑰），`SeedColors.light/dark(seedIndex)`。
+- `SeedPalette.kt`：调色盘自选色 → M3 色板推导（`hsl` 反推、on 色按黑白对比度择优）。
 - `AutopTypography.kt`：15 个 Material3 字体样式 + `mono` 等宽样式；`Typography.scaled(factor)` 字号缩放。
 - `Scale.kt`：`Spacing` 三档密度（COMPACT/STANDARD/COMFORTABLE）+ `LocalSpacing`；
   `IconSize` 枚举 + `LocalIconScale` + `IconSize.scaled()`。

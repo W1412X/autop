@@ -5,6 +5,7 @@
       "darkMode": "SYSTEM",
       "dynamicColor": false,
       "seedIndex": 0,
+      "customSeed": 0,
       "fontScale": 1.0,
       "iconScale": 1.0,
       "density": "STANDARD",

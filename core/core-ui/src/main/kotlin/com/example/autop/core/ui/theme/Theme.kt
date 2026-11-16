@@ -70,10 +70,11 @@ private fun AutopThemeLocals(
                 dynamicLightColorScheme(context)
             }
         } else {
-            if (darkTheme) {
-                SeedColors.dark(appearance.seedIndex)
-            } else {
-                SeedColors.light(appearance.seedIndex)
+            when {
+                appearance.customSeed != 0L ->
+                    if (darkTheme) SeedPalette.dark(appearance.customSeed) else SeedPalette.light(appearance.customSeed)
+                darkTheme -> SeedColors.dark(appearance.seedIndex)
+                else -> SeedColors.light(appearance.seedIndex)
             }
         }
     CompositionLocalProvider(

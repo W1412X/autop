@@ -47,6 +47,7 @@ import androidx.compose.material.icons.outlined.Link
 import androidx.compose.material.icons.outlined.Mic
 import androidx.compose.material.icons.outlined.MoreVert
 import androidx.compose.material.icons.outlined.OpenWith
+import androidx.compose.material.icons.outlined.Palette
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PhoneAndroid
@@ -134,6 +135,7 @@ public object AutopIcons {
     public val Keyboard: ImageVector = Icons.Outlined.Keyboard
     public val Swipe: ImageVector = Icons.Outlined.Swipe
     public val OpenWith: ImageVector = Icons.Outlined.OpenWith
+    public val Palette: ImageVector = Icons.Outlined.Palette
     public val Launch: ImageVector = Icons.AutoMirrored.Outlined.Launch
     public val Link: ImageVector = Icons.Outlined.Link
     public val PhotoCamera: ImageVector = Icons.Outlined.PhotoCamera

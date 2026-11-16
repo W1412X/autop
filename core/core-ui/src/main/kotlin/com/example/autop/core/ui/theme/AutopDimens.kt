@@ -61,6 +61,19 @@ public object AutopDimens {
     public val optionTagHeight: Dp = 20.dp
     public val optionRowGap: Dp = 2.dp
 
+    /** OptionSheet 颜色类选项的色点（与描边）。 */
+    public val optionSwatch: Dp = 20.dp
+    public val optionSwatchStroke: Dp = 1.dp
+
+    /** 主题色取色条：拖动区高度、色条高度、滑块直径与描边。 */
+    public val colorBarHeight: Dp = 40.dp
+    public val colorBarTrack: Dp = 12.dp
+    public val colorBarThumb: Dp = 20.dp
+    public val colorBarThumbStroke: Dp = 2.dp
+
+    /** 取色弹层预览圆点。 */
+    public val colorPreviewDot: Dp = 44.dp
+
     /** 加载圈与 PagedList 尾部行高。 */
     public val loadingIndicatorSize: Dp = 28.dp
     public val pagedFooterHeight: Dp = 56.dp

@@ -5,6 +5,7 @@
 package com.example.autop.core.ui.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -208,10 +210,17 @@ private fun OptionSheetRow(
                 .padding(horizontal = spacing.sm, vertical = spacing.sm),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        val swatch = item.swatch
         val icon = item.icon
-        if (icon != null) {
-            OptionRowIcon(icon = icon, palette = palette, shape = shape)
-            Spacer(modifier = Modifier.width(spacing.sm))
+        when {
+            swatch != null -> {
+                OptionRowSwatch(color = swatch)
+                Spacer(modifier = Modifier.width(spacing.sm))
+            }
+            icon != null -> {
+                OptionRowIcon(icon = icon, palette = palette, shape = shape)
+                Spacer(modifier = Modifier.width(spacing.sm))
+            }
         }
         Column(modifier = Modifier.weight(1f)) {
             OptionRowText(item = item, titleColor = palette.title)
@@ -315,6 +324,27 @@ private fun OptionRowIcon(
     }
 }
 
+/** 主题色类选项的色点：与外框图标块同宽，保证左右文字对齐。 */
+@Composable
+private fun OptionRowSwatch(color: Color) {
+    Box(
+        modifier = Modifier.size(AutopDimens.optionIconTile),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(
+            modifier =
+                Modifier
+                    .size(AutopDimens.optionSwatch)
+                    .background(color = color, shape = CircleShape)
+                    .border(
+                        width = AutopDimens.optionSwatchStroke,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = CircleShape,
+                    ),
+        )
+    }
+}
+
 /** 选项图标枚举 → 统一图标入口（纯一一映射）。 */
 @Suppress("CyclomaticComplexMethod")
 private fun OptionIcon.vector(): ImageVector =
@@ -339,4 +369,5 @@ private fun OptionIcon.vector(): ImageVector =
         OptionIcon.TEMPLATE -> AutopIcons.Description
         OptionIcon.AI -> AutopIcons.Psychology
         OptionIcon.SAVE_TASK -> AutopIcons.ListAlt
+        OptionIcon.PALETTE -> AutopIcons.Palette
     }

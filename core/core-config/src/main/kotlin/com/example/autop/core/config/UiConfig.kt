@@ -13,6 +13,8 @@ public data class UiAppearanceSection(
     @SerialName("darkMode") val darkMode: String = "SYSTEM",
     @SerialName("dynamicColor") val dynamicColor: Boolean = false,
     @SerialName("seedIndex") val seedIndex: Int = 0,
+    /** 调色盘选的自定义主题色（ARGB，0 = 未启用；非 0 时优先于 [seedIndex]）。 */
+    @SerialName("customSeed") val customSeed: Long = 0,
     @SerialName("fontScale") val fontScale: Double = 1.0,
     @SerialName("iconScale") val iconScale: Double = 1.0,
     @SerialName("density") val density: String = "STANDARD",
