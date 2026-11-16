@@ -1,6 +1,6 @@
 /**
  * [parseMarkdown] / [inlineMarkdown] 单测（docs/tech/08 §4.2 Markdown 渲染：块级
- * 标题 / 列表 / 引用 / 代码块 / 分隔线与行内强调，未闭合标记不得误判）。
+ * 标题 / 列表 / 引用 / 代码块 / 分隔线 / 表格与行内强调，未闭合标记不得误判）。
  */
 package com.example.autop.core.ui.component
 
@@ -63,6 +63,64 @@ class MarkdownTest {
             .containsExactly(
                 MdBlock.Paragraph("第一行\n第二行"),
                 MdBlock.Heading(2, "小标题"),
+            ).inOrder()
+    }
+
+    @Test
+    fun `table parses header alignment and rows`() {
+        val blocks =
+            parseMarkdown(
+                """
+                | 名称 | 数量 | 说明 |
+                | :--- | ---: | :---: |
+                | 苹果 | 3 | 红 |
+                | 梨 | 12 |
+                """.trimIndent(),
+            )
+
+        assertThat(blocks)
+            .containsExactly(
+                MdBlock.Table(
+                    headers = listOf("名称", "数量", "说明"),
+                    aligns = listOf(MdAlign.START, MdAlign.END, MdAlign.CENTER),
+                    rows = listOf(listOf("苹果", "3", "红"), listOf("梨", "12", "")),
+                ),
+            )
+    }
+
+    @Test
+    fun `paragraph before table stops at table header`() {
+        val blocks =
+            parseMarkdown(
+                """
+                下面是结果：
+                | 项目 | 值 |
+                | --- | --- |
+                | a | 1 |
+                """.trimIndent(),
+            )
+
+        assertThat(blocks)
+            .containsExactly(
+                MdBlock.Paragraph("下面是结果："),
+                MdBlock.Table(
+                    headers = listOf("项目", "值"),
+                    aligns = listOf(MdAlign.START, MdAlign.START),
+                    rows = listOf(listOf("a", "1")),
+                ),
+            ).inOrder()
+    }
+
+    @Test
+    fun `heading without space and chinese numbered list`() {
+        val blocks = parseMarkdown("###标题\n1、第一步\n- [x] 已完成\n- [ ] 待办")
+
+        assertThat(blocks)
+            .containsExactly(
+                MdBlock.Heading(3, "标题"),
+                MdBlock.Item("1.", "第一步"),
+                MdBlock.Item("☑", "已完成"),
+                MdBlock.Item("☐", "待办"),
             ).inOrder()
     }
 

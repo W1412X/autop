@@ -6,8 +6,10 @@
 package com.example.autop.core.ui.component
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
@@ -16,12 +18,15 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
@@ -30,8 +35,10 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -111,6 +118,7 @@ private fun MarkdownBlockView(
         is MdBlock.Quote -> QuoteView(block = block, code = code, link = link, style = style, suffix = suffix)
         is MdBlock.Item -> ItemView(block = block, code = code, link = link, style = style, suffix = suffix)
         is MdBlock.Code -> CodeView(block = block, suffix = suffix)
+        is MdBlock.Table -> TableView(block = block, code = code, link = link, style = style, suffix = suffix)
         MdBlock.Divider -> {
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             if (suffix != null) Text(text = suffix, style = style, color = color)
@@ -194,7 +202,110 @@ private fun CodeView(
 }
 
 /**
- * 标题档位：正文 [base] 上按 [H1_SIZE_FACTOR] / [H2_SIZE_FACTOR] / [H3_SIZE_FACTOR] 放大，
+ * 表格：列宽均分可用宽度（低于 [TableMinCellWidth] 时横向滚动），表头加粗浅底、
+ * 行间细分隔线；流式光标落在最后一个单元格。
+ */
+@Composable
+private fun TableView(
+    block: MdBlock.Table,
+    code: SpanStyle,
+    link: SpanStyle,
+    style: TextStyle,
+    suffix: AnnotatedString?,
+) {
+    val columns = block.headers.size
+    if (columns == 0) return
+    val cellStyle = style.copy(fontSize = style.fontSize * TABLE_FONT_SCALE)
+    BoxWithConstraints {
+        val cellWidth = (maxWidth / columns).coerceAtLeast(TableMinCellWidth)
+        val tableWidth = cellWidth * columns
+        Column(
+            modifier =
+                Modifier
+                    .background(
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AutopAlpha.BLOCK_FILL),
+                        shape = MaterialTheme.shapes.small,
+                    ).clip(MaterialTheme.shapes.small)
+                    .horizontalScroll(rememberScrollState()),
+        ) {
+            TableRowView(
+                cells = block.headers,
+                aligns = block.aligns,
+                cellWidth = cellWidth,
+                cellStyle = cellStyle.copy(fontWeight = FontWeight.SemiBold),
+                color = MaterialTheme.colorScheme.onSurface,
+                header = true,
+                suffix = if (block.rows.isEmpty()) suffix else null,
+                code = code,
+                link = link,
+            )
+            block.rows.forEachIndexed { rowIndex, cells ->
+                HorizontalDivider(
+                    modifier = Modifier.width(tableWidth),
+                    color = MaterialTheme.colorScheme.outlineVariant,
+                )
+                TableRowView(
+                    cells = cells,
+                    aligns = block.aligns,
+                    cellWidth = cellWidth,
+                    cellStyle = cellStyle,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    header = false,
+                    suffix = if (rowIndex == block.rows.lastIndex) suffix else null,
+                    code = code,
+                    link = link,
+                )
+            }
+        }
+    }
+}
+
+/** 表格一行：定宽单元格，按列对齐；[header] 用表头底色。 */
+@Composable
+private fun TableRowView(
+    cells: List<String>,
+    aligns: List<MdAlign>,
+    cellWidth: Dp,
+    cellStyle: TextStyle,
+    color: Color,
+    header: Boolean,
+    suffix: AnnotatedString?,
+    code: SpanStyle,
+    link: SpanStyle,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        modifier =
+            Modifier
+                .width(cellWidth * cells.size)
+                .background(
+                    if (header) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent,
+                ),
+        verticalAlignment = Alignment.Top,
+    ) {
+        cells.forEachIndexed { column, cell ->
+            Text(
+                text = inlineMarkdown(cell, code, link).withSuffix(if (column == cells.lastIndex) suffix else null),
+                style = cellStyle,
+                color = color,
+                textAlign = aligns.getOrElse(column) { MdAlign.START }.textAlign(),
+                modifier =
+                    Modifier
+                        .width(cellWidth)
+                        .padding(horizontal = spacing.sm, vertical = spacing.xs),
+            )
+        }
+    }
+}
+
+private fun MdAlign.textAlign(): TextAlign =
+    when (this) {
+        MdAlign.START -> TextAlign.Start
+        MdAlign.CENTER -> TextAlign.Center
+        MdAlign.END -> TextAlign.End
+    }
+
+/** 标题档位：正文 [base] 上按 [H1_SIZE_FACTOR] / [H2_SIZE_FACTOR] / [H3_SIZE_FACTOR] 放大，
  * 随全局字号缩放一起变化，避免固定 title token 显得过大。
  */
 private fun headingStyle(
@@ -235,6 +346,12 @@ private fun AnnotatedString.withSuffix(suffix: AnnotatedString?): AnnotatedStrin
     if (suffix == null) this else this + suffix
 
 private val QuoteBarWidth = 2.dp
+
+/** 表格单元格最小宽度：低于它时整表横向滚动，避免文字被挤成竖排。 */
+private val TableMinCellWidth = 88.dp
+
+/** 表格正文相对正文样式的缩小比例。 */
+private const val TABLE_FONT_SCALE: Float = 0.92f
 
 private const val STREAM_CURSOR_GLYPH: String = "▍"
 
