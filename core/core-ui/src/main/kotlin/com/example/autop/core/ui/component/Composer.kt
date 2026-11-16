@@ -93,7 +93,12 @@ public fun AutopComposer(
             .let { base -> focusRequester?.let { base.focusRequester(it) } ?: base }
     Column(modifier = modifier.fillMaxWidth()) {
         if (top != null) {
-            Row(verticalAlignment = Alignment.CenterVertically, content = top)
+            // 芯片行与输入栏之间已有 sm，上方补同样的间距，避免贴到组件上边缘。
+            Row(
+                modifier = Modifier.padding(top = spacing.sm),
+                verticalAlignment = Alignment.CenterVertically,
+                content = top,
+            )
         }
         AutopInputBar(
             value = value,
