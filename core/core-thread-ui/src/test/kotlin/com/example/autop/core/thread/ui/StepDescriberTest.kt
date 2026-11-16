@@ -38,6 +38,13 @@ class StepDescriberTest {
     }
 
     @Test
+    fun `multi line shell command collapses into a single line`() {
+        val args = """{"command":"pm list packages\n  | grep demo"}"""
+
+        assertThat(stepArgOf("run_shell", args)).isEqualTo("pm list packages | grep demo")
+    }
+
+    @Test
     fun `every registered tool has a dedicated label and icon`() {
         val tools = ToolProbeFixtures.names + "run_shell"
         for (tool in tools) {

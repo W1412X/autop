@@ -32,13 +32,24 @@ private fun argOf(
     toolId: String,
     args: JsonObject,
 ): String? {
-    val values = ARG_KEYS_BY_TOOL[toolId].orEmpty().mapNotNull { key -> args.text(key) }
+    val values =
+        ARG_KEYS_BY_TOOL[toolId].orEmpty().mapNotNull { key ->
+            args.text(key)?.oneLine()?.takeIf { it.isNotEmpty() }
+        }
     return if (toolId in JOIN_ARG_TOOLS) {
         values.joinToString(",").ifBlank { null }
     } else {
         values.firstOrNull()
     }
 }
+
+/**
+ * 描述参数单行化：换行与连续空白折叠为空格。
+ * 折叠行只占一行（多行 shell 命令等不会把行撑高），完整原文在展开详情里看。
+ */
+private fun String.oneLine(): String = replace(WHITESPACE, " ").trim()
+
+private val WHITESPACE: Regex = Regex("\\s+")
 
 private fun parseArgs(argsJson: String): JsonObject? =
     runCatching { AutopJson.default.parseToJsonElement(argsJson) as? JsonObject }.getOrNull()

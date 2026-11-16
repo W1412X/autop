@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import com.example.autop.core.thread.ui.R
 import com.example.autop.core.ui.component.AutopFlatChip
 import com.example.autop.core.ui.component.AutopIcons
@@ -105,6 +106,8 @@ private fun StepSummary(step: TimelineItem.StepRow) {
         Text(
             text = stepDesc(step),
             style = MaterialTheme.typography.bodyMedium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
             modifier =
                 Modifier
                     .weight(1f)
