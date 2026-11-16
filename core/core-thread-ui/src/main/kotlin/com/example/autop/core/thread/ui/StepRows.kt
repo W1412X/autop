@@ -67,20 +67,6 @@ internal fun StepRowView(
                 ),
     ) {
         StepSummary(step = step)
-        if (step.state == StepState.FAILED) {
-            step.resultText?.let { error ->
-                Text(
-                    text = error,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                    modifier =
-                        Modifier.padding(
-                            start = LocalSpacing.current.sm + IconSize.Sm.scaled() + LocalSpacing.current.xs * 2,
-                            bottom = LocalSpacing.current.xs,
-                        ),
-                )
-            }
-        }
         val progress = step.progressText
         if (progress != null && step.state == StepState.RUNNING) {
             Text(
