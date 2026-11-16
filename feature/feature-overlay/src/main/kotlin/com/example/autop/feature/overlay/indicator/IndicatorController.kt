@@ -254,7 +254,7 @@ public class IndicatorController
 
         @Composable
         private fun RunDetailContent() {
-            val rows by progress.rowsState.collectAsState()
+            val entries by progress.entriesState.collectAsState()
             val active by runService.observeActive().collectAsState()
             val pending by actions.controlIntent.collectAsState()
             val callbacks =
@@ -277,7 +277,7 @@ public class IndicatorController
                         onClose = ::collapseDetail,
                     )
                 }
-            RunDetailScreen(active = active, rows = rows, callbacks = callbacks, intent = pending)
+            RunDetailScreen(active = active, entries = entries, callbacks = callbacks, intent = pending)
         }
     }
 

@@ -49,7 +49,6 @@
     <string name="thread_notice_image_failed">有图片无法读取，已跳过</string>
     <string name="thread_notice_steer_failed">补充指令失败：任务已结束，输入内容已保留</string>
     <string name="thread_notice_camera_failed">拍照没有完成，没有添加图片</string>
-    <string name="thread_ask_self">自己输入</string>
     <string name="thread_chat_only">只聊天</string>
     <string name="thread_voice_input">语音输入</string>
     <string name="thread_voice_stop">停止语音输入</string>
@@ -63,7 +62,5 @@
     <string name="thread_raw_close">关闭</string>
 
     <!-- 步骤描述（docs/tech/08 §4.2 StepDescriber：动词 + 参数拼接模板） -->
-    <string name="chat_paused_title">运行已暂停</string>
-    <string name="chat_paused_continue">继续</string>
     <string name="chat_running_count">%1$d 个运行中</string>
 </resources>

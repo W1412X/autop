@@ -1,71 +1,19 @@
 /**
- * 进度悬浮窗数据映射（docs/tech/08 §5.3，N182）：线程事件 → 消息行（模型见 `ProgressRow`）。
- * 公共归并内核 `mergeCore` 的悬浮层映射（与对话页 `TimelineMerger` 共用归并口径：
- * 按轮窗口统计、结束元信息结算、callId 配对转态、流式合并），此处只做 UI 模型转换。
+ * 进度悬浮窗的状态推导（docs/tech/08 §5.3，N182/N185）：头部状态规格与结束元信息的查找。
+ * 消息流的归并与渲染已交给对话页同一套组件（ADR-0039，`mergeTimeline` + `TimelineRow`），此处不再映射行。
  * 独立于 Compose，供单测使用。
  */
 package com.example.autop.feature.overlay.progress
 
 import androidx.compose.runtime.Immutable
-import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.PauseReason
 import com.example.autop.agent.RunOutcome
-import com.example.autop.agent.ThreadEvent
-import com.example.autop.agent.timeline.CoreRow
-import com.example.autop.agent.timeline.StepState
-import com.example.autop.agent.timeline.mergeCore
+import com.example.autop.core.thread.ui.TimelineEntry
+import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.overlay.R
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunStatus
-
-/**
- * 线程事件 → 消息行（N182）：[CoreRow.Plan] 覆盖式（内核保证移除旧计划行再追加）；
- * 工具行发出即出行（RUNNING，N192 对齐对话页），结果到达转 DONE/FAILED；
- * Run 结束 → [ProgressRow.Finished] 元信息行附着**本轮**末条助手文（N183）。
- */
-public fun progressRowsOf(
-    events: List<ThreadEvent>,
-    live: List<AgentEvent> = emptyList(),
-): List<ProgressRow> = mergeCore(events, live).mapNotNull { it.row.toProgressRow() }
-
-/** 中立条目 → 消息行（对话页专属的横幅/分叉标记不出现在悬浮层消息流）。 */
-private fun CoreRow.toProgressRow(): ProgressRow? =
-    when (this) {
-        is CoreRow.User -> ProgressRow.User(text, isSteer)
-        is CoreRow.Assistant -> ProgressRow.Assistant(text, streaming, meta?.toFinished())
-        is CoreRow.Thinking -> ProgressRow.Thinking(text, streaming)
-        is CoreRow.Step -> toToolRow()
-        is CoreRow.Plan -> ProgressRow.Plan(items, explanation)
-        is CoreRow.RunMeta -> toFinished()
-        is CoreRow.Banner,
-        is CoreRow.ForkMarker,
-        -> null
-    }
-
-private fun CoreRow.RunMeta.toFinished(): ProgressRow.Finished =
-    ProgressRow.Finished(
-        status = outcome,
-        summary = summary,
-        stepCount = stepCount,
-        durationMs = durationMs,
-        outputTokens = outputTokens,
-    )
-
-private fun CoreRow.Step.toToolRow(): ProgressRow.Tool =
-    ProgressRow.Tool(
-        toolId = toolId,
-        state = state,
-        durationMs = durationMs,
-        // 错误文本只取首个文本块（同对话页 resultText 口径），无则回退 errorCode。
-        errorText =
-            if (state == StepState.FAILED) {
-                resultText?.takeIf { it.isNotBlank() } ?: errorCode
-            } else {
-                null
-            },
-        progressText = progressText,
-    )
 
 /** RunOutcome → 结束状态徽标文案（strings `progress_outcome_*`）。 */
 public fun outcomeTextOf(outcome: RunOutcome): Int =
@@ -77,6 +25,18 @@ public fun outcomeTextOf(outcome: RunOutcome): Int =
         RunOutcome.BREAKER_STOPPED -> R.string.progress_outcome_breaker
         RunOutcome.INTERRUPTED -> R.string.progress_outcome_interrupted
         RunOutcome.EXPIRED -> R.string.progress_outcome_expired
+    }
+
+/** RunOutcome → 结束状态的语义色。 */
+internal fun outcomeToneOf(outcome: RunOutcome): StatusTone =
+    when (outcome) {
+        RunOutcome.SUCCEEDED -> StatusTone.SUCCEEDED
+        RunOutcome.FAILED -> StatusTone.BLOCKED
+        RunOutcome.CANCELLED -> StatusTone.NEUTRAL
+        RunOutcome.BUDGET_EXHAUSTED -> StatusTone.PAUSED
+        RunOutcome.BREAKER_STOPPED -> StatusTone.BLOCKED
+        RunOutcome.INTERRUPTED -> StatusTone.PAUSED
+        RunOutcome.EXPIRED -> StatusTone.NEUTRAL
     }
 
 /**
@@ -98,7 +58,7 @@ public data class ProgressHeaderSpec(
 /** 头部状态推导（docs/tech/08 §5.3，N185，纯映射供单测）。 */
 public fun progressHeaderSpec(
     active: ActiveRunInfo?,
-    finished: ProgressRow.Finished?,
+    finished: TimelineItem.RunMeta?,
 ): ProgressHeaderSpec =
     when {
         active != null -> {
@@ -124,8 +84,8 @@ public fun progressHeaderSpec(
         }
         finished != null ->
             ProgressHeaderSpec(
-                tone = outcomeToneOf(finished.status),
-                chipText = outcomeTextOf(finished.status),
+                tone = outcomeToneOf(finished.outcome),
+                chipText = outcomeTextOf(finished.outcome),
                 hint = null,
                 runControls = false,
             )
@@ -136,6 +96,19 @@ public fun progressHeaderSpec(
                 hint = null,
                 runControls = false,
             )
+    }
+
+/**
+ * 最近一次结束的元信息：优先取末尾的独立结束行，其次取附着在助手文本上的元信息（对话页同口径）。
+ * 没有则为 null（Run 尚未结束）。
+ */
+public fun finishedMetaOf(entries: List<TimelineEntry>): TimelineItem.RunMeta? =
+    entries.asReversed().firstNotNullOfOrNull { entry ->
+        when (val item = entry.item) {
+            is TimelineItem.RunMeta -> item
+            is TimelineItem.AssistantText -> item.meta
+            else -> null
+        }
     }
 
 /** RunStatus → 状态徽标语义（自运行面板迁入，N182；N185 迁至数据映射层）。 */

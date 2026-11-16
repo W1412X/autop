@@ -14,6 +14,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.overlay.R
@@ -21,15 +22,15 @@ import com.example.autop.feature.overlay.panel.ControlIntent
 import com.example.autop.feature.overlay.progress.AlertCards
 import com.example.autop.feature.overlay.progress.ProgressCallbacks
 import com.example.autop.feature.overlay.progress.ProgressMessageList
-import com.example.autop.feature.overlay.progress.ProgressRow
 import com.example.autop.feature.overlay.progress.SteerRow
+import com.example.autop.feature.overlay.progress.actionHandler
 import com.example.autop.task.ActiveRunInfo
 
 /** 运行详情面板内容（窗口高度由 spec 定，内容铺满窗口）。 */
 @Composable
 internal fun RunDetailScreen(
     active: ActiveRunInfo?,
-    rows: List<ProgressRow>,
+    entries: List<TimelineEntry>,
     callbacks: ProgressCallbacks,
     intent: ControlIntent? = null,
     modifier: Modifier = Modifier,
@@ -45,7 +46,11 @@ internal fun RunDetailScreen(
                 ).padding(all = spacing.sm),
         verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        ProgressMessageList(rows = rows, modifier = Modifier.fillMaxWidth().weight(1f))
+        ProgressMessageList(
+            entries = entries,
+            onAction = callbacks.actionHandler(),
+            modifier = Modifier.fillMaxWidth().weight(1f),
+        )
         RunInteractArea(active = active, callbacks = callbacks, intent = intent)
     }
 }

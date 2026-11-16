@@ -2,7 +2,7 @@
  * 进度悬浮窗装配（docs/tech/08 §5.3，N182）：窗口注册 / 显示 / 收起、消息行供给。
  * **已弃用**（N218）：执行中交互（ask_user 回答、拦截决策、补充指令）已由顶部控制条＋
  * 消息条体系接管（IndicatorController 的运行详情面板自动展开），本进度窗不再自动弹出；
- * 窗口与内容代码保留（[rowsState] 仍供运行详情面板共用），入口仅剩兼容调用。
+ * 窗口与内容代码保留（[entriesState] 仍供运行详情面板共用），入口仅剩兼容调用。
  */
 package com.example.autop.feature.overlay.progress
 
@@ -23,6 +23,10 @@ import com.example.autop.core.common.Logger
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.exceptionHandler
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.UiConfig
+import com.example.autop.core.thread.ui.TimelineEntry
+import com.example.autop.core.thread.ui.mergeTimeline
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayHost
 import com.example.autop.feature.overlay.OverlayWindowIds
@@ -71,6 +75,7 @@ public class ProgressController
         private val threadStore: ThreadStore,
         private val actions: PanelRunActions,
         private val flowFeed: FlowProgressFeed,
+        private val configProvider: ConfigProvider,
         private val logger: Logger,
         dispatchers: DispatcherProvider,
     ) {
@@ -85,10 +90,13 @@ public class ProgressController
         private val rowsInput = MutableStateFlow(RowsInput())
 
         /** 消息行（历史 + 流式增量重算，N186；进度窗与顶部运行详情面板共用）。 */
-        internal val rowsState: StateFlow<List<ProgressRow>> =
+        internal val entriesState: StateFlow<List<TimelineEntry>> =
             rowsInput
-                .map { progressRowsOf(it.history, it.live) }
+                .map { mergeTimeline(it.history, it.live, stepGroupThreshold()) }
                 .stateIn(scope, SharingStarted.Eagerly, emptyList())
+
+        /** 折叠阈值取自 ui.chat.stepGroupThreshold（对话页同一来源）。 */
+        private fun stepGroupThreshold(): Int = configProvider.current()[UiConfig.CHAT].stepGroupThreshold
 
         /** 最近一次活跃 Run 的线程（N185：Run 结束后「打开对话」仍可用）。 */
         private val lastThreadState = MutableStateFlow<ThreadId?>(null)
@@ -196,7 +204,7 @@ public class ProgressController
         private fun ProgressContent() {
             val active by runService.observeActive().collectAsState()
             val pending by actions.controlIntent.collectAsState()
-            val rows by rowsState.collectAsState()
+            val entries by entriesState.collectAsState()
             val callbacks =
                 remember(this) {
                     ProgressCallbacks(
@@ -220,7 +228,7 @@ public class ProgressController
                 }
             ProgressScreen(
                 active = active,
-                rows = rows,
+                entries = entries,
                 callbacks = callbacks,
                 intent = pending,
             )

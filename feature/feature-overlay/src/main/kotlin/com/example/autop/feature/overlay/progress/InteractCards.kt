@@ -1,13 +1,12 @@
 /**
- * 执行中共用交互组件（N182 提问卡 / 拦截横幅 / 补充指令行）：进度窗与运行详情面板
- * （顶部控制条点开的消息条）共用——执行中交互统一走控制条＋消息条体系，就地完成。
+ * 执行中交互区（进度窗与运行详情面板共用，ADR-0039）：提问卡与暂停/拦截横幅使用 core-thread-ui 的共享组件，
+ * 这里只决定放在哪里、动作如何回到运行。补充指令输入行是悬浮窗自己的控件。
  */
 package com.example.autop.feature.overlay.progress
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Send
@@ -20,15 +19,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.agent.PauseReason
-import com.example.autop.core.ui.component.AutopButton
+import com.example.autop.core.thread.ui.AskQuestionCard
+import com.example.autop.core.thread.ui.BannerKind
+import com.example.autop.core.thread.ui.RunBannerCard
+import com.example.autop.core.thread.ui.TimelineAction
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopInputBar
-import com.example.autop.core.ui.component.AutopTextButton
-import com.example.autop.core.ui.component.InlineQuestionCard
 import com.example.autop.core.ui.component.InputBarSpec
-import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.theme.LocalSpacing
-import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.overlay.R
 import com.example.autop.feature.overlay.panel.ControlIntent
 import com.example.autop.feature.overlay.panel.ControlIntentKind
@@ -36,7 +34,7 @@ import com.example.autop.feature.overlay.panel.controlIntentLabelRes
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunStatus
 
-/** 提问卡 / 暂停拦截横幅（只在需要时显示，N182 跨页面 ask_user 展示修复）。 */
+/** 提问卡 / 暂停或拦截横幅：只在需要时显示（N182 跨页面 ask_user 展示修复）。 */
 @Composable
 internal fun AlertCards(
     active: ActiveRunInfo?,
@@ -46,54 +44,46 @@ internal fun AlertCards(
 ) {
     val run = active?.run ?: return
     val spacing = LocalSpacing.current
+    val pending = pendingActionOf(intent)
     Column(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
         run.waitingQuestion?.let { question ->
-            AskCard(
+            AskQuestionCard(
                 question = question,
                 options = run.waitingOptions,
-                callbacks = callbacks,
+                onAnswer = callbacks.onAnswer,
             )
         }
         when {
             run.pauseReason == PauseReason.POLICY_BLOCKED ->
-                StatusBanner(
-                    tone = StatusTone.BLOCKED,
-                    message = run.summary ?: stringResource(R.string.panel_blocked_reason_default),
-                    actions = {
-                        Spacer(modifier = Modifier.weight(1f))
-                        AutopTextButton(
-                            text = pendingLabelOf(intent, ControlIntentKind.STOP, R.string.panel_blocked_finish),
-                            destructive = true,
-                            onClick = callbacks.onFinishBlocked,
-                        )
-                        AutopButton(
-                            text = pendingLabelOf(intent, ControlIntentKind.RESUME, R.string.panel_blocked_continue),
-                            onClick = callbacks.onContinueBlocked,
-                            enabled = intent?.kind != ControlIntentKind.RESUME,
-                        )
-                    },
+                RunBannerCard(
+                    kind = BannerKind.BLOCKED,
+                    detail = run.summary,
+                    onAction = callbacks.actionHandler(blocked = true),
+                    pending = pending,
                 )
             run.status == RunStatus.PAUSED ->
-                StatusBanner(
-                    tone = StatusTone.PAUSED,
-                    message = stringResource(R.string.panel_status_paused),
-                    actions = {
-                        Spacer(modifier = Modifier.weight(1f))
-                        AutopButton(
-                            text = pendingLabelOf(intent, ControlIntentKind.RESUME, R.string.panel_action_resume),
-                            onClick = callbacks.onPauseResume,
-                            enabled = intent?.kind != ControlIntentKind.RESUME,
-                        )
-                    },
+                RunBannerCard(
+                    kind = BannerKind.PAUSED,
+                    detail = null,
+                    onAction = callbacks.actionHandler(),
+                    pending = pending,
                 )
         }
     }
 }
 
-/** 过渡态按钮文案（点击即反馈）：命中意图换「正在…」，暂停/继续类由调用方同步禁用防连点。 */
+/** 悬浮窗控制意图 → 共享横幅的过渡动作（点击即显示「正在…」并禁用，防连点）。 */
+private fun pendingActionOf(intent: ControlIntent?): TimelineAction? =
+    when (intent?.kind) {
+        ControlIntentKind.RESUME -> TimelineAction.Resume
+        ControlIntentKind.STOP -> TimelineAction.Stop
+        ControlIntentKind.PAUSE, null -> null
+    }
+
+/** 过渡态按钮文案（控制行用）：命中意图换「正在…」，暂停/继续类由调用方同步禁用防连点。 */
 @Composable
 internal fun pendingLabelOf(
     intent: ControlIntent?,
@@ -102,24 +92,6 @@ internal fun pendingLabelOf(
 ): String {
     val textRes = if (intent?.kind == kind) controlIntentLabelRes(kind) else defaultRes
     return stringResource(textRes)
-}
-
-/** 等待回答卡（AskCard 同款，N181/N182）：问题 + 选项每行一个 + 「自己输入」独立输入行。 */
-@Composable
-internal fun AskCard(
-    question: String,
-    options: List<String>,
-    callbacks: ProgressCallbacks,
-    modifier: Modifier = Modifier,
-) {
-    InlineQuestionCard(
-        question = question,
-        options = options,
-        onAnswer = callbacks.onAnswer,
-        customLabel = stringResource(R.string.panel_ask_self),
-        sendDescription = stringResource(R.string.panel_send),
-        modifier = modifier,
-    )
 }
 
 /** steer 补充指令输入行（同运行面板 SteerRow）。 */

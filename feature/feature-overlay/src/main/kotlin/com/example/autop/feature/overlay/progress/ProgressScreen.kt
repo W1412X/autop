@@ -26,6 +26,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTonalButton
@@ -50,7 +51,7 @@ private const val HEADER_TRANSITION_MS: Int = 250
 @Composable
 internal fun ProgressScreen(
     active: ActiveRunInfo?,
-    rows: List<ProgressRow>,
+    entries: List<TimelineEntry>,
     callbacks: ProgressCallbacks,
     intent: ControlIntent? = null,
     modifier: Modifier = Modifier,
@@ -66,21 +67,17 @@ internal fun ProgressScreen(
                 ).padding(all = spacing.md),
         verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        val finished =
-            rows.reversed().firstNotNullOfOrNull { row ->
-                when (row) {
-                    is ProgressRow.Finished -> row
-                    is ProgressRow.Assistant -> row.meta
-                    else -> null
-                }
-            }
-        val header = progressHeaderSpec(active = active, finished = finished)
+        val header = progressHeaderSpec(active = active, finished = finishedMetaOf(entries))
         HeaderBlock(
             header = header,
             currentStep = flowHintOf(active) ?: active?.currentStep,
             onClose = callbacks.onClose,
         )
-        ProgressMessageList(rows = rows, modifier = Modifier.weight(1f))
+        ProgressMessageList(
+            entries = entries,
+            onAction = callbacks.actionHandler(),
+            modifier = Modifier.weight(1f),
+        )
         AlertCards(active = active, callbacks = callbacks, intent = intent)
         ControlRow(active = active, expanded = header.runControls, callbacks = callbacks, intent = intent)
         if (header.runControls) {

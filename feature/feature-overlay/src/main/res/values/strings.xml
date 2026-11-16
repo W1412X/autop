@@ -21,10 +21,6 @@
     <string name="control_intent_stop">正在停止…</string>
     <string name="panel_action_stop_flow">停止流程</string>
     <string name="panel_action_open_chat">打开对话</string>
-    <string name="panel_ask_self">自己输入</string>
-    <string name="panel_blocked_reason_default">需要你确认如何继续</string>
-    <string name="panel_blocked_continue">我已手动完成，继续</string>
-    <string name="panel_blocked_finish">结束</string>
     <string name="panel_status_queued">排队中</string>
     <string name="panel_status_waiting">等待回答</string>
     <string name="panel_status_running">运行中</string>
@@ -111,7 +107,6 @@
     <string name="progress_title">任务进度</string>
     <string name="progress_close">关闭</string>
     <string name="progress_thinking">思考 · %1$d 字</string>
-    <string name="progress_plan_title">计划</string>
     <string name="progress_steer_tag">补充指令</string>
     <string name="progress_tool_duration">%1$d ms</string>
     <string name="progress_tool_running">执行中</string>

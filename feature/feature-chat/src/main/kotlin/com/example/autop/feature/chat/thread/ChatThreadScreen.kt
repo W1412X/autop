@@ -27,7 +27,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.config.UiBannerSection
+import com.example.autop.core.thread.ui.AskQuestionCard
 import com.example.autop.core.thread.ui.BannerKind
+import com.example.autop.core.thread.ui.RunBannerCard
 import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.core.thread.ui.TimelineRow
@@ -70,14 +72,21 @@ public fun ChatThreadScreen(
             modifier = Modifier.weight(1f),
         )
         livePauseOf(state)?.let { pause ->
-            PausedBar(
+            RunBannerCard(
+                kind = BannerKind.PAUSED,
                 detail = pause.detail,
-                onResume = { onAction(ChatThreadAction.Resume) },
+                onAction = { action -> onAction(action.toChatAction()) },
+                modifier =
+                    Modifier.padding(
+                        horizontal = LocalSpacing.current.screenEdge,
+                        vertical = LocalSpacing.current.xs,
+                    ),
             )
         }
         state.waitingQuestion?.let { question ->
-            AskCard(
-                question = question,
+            AskQuestionCard(
+                question = question.question,
+                options = question.options,
                 onAnswer = { text -> onAction(ChatThreadAction.Answer(text)) },
                 modifier =
                     Modifier.padding(
