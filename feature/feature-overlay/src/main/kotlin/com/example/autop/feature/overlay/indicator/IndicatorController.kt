@@ -120,15 +120,20 @@ public class IndicatorController
         private suspend fun autoExpandOnInteraction() {
             var lastQuestion: String? = null
             var lastBlocked = false
-            runService.observeActive().collect { info ->
-                val question = info?.run?.waitingQuestion
-                val blocked = info?.run?.pauseReason == PauseReason.POLICY_BLOCKED
-                if (questionAppeared(question, lastQuestion) || blockAppeared(blocked, lastBlocked)) {
-                    expandDetail()
+            combine(runService.observeActive(), screenLease.holder) { info, holder -> info to holder }
+                .collect { (info, holder) ->
+                    val question = info?.run?.waitingQuestion
+                    val blocked = info?.run?.pauseReason == PauseReason.POLICY_BLOCKED
+                    // 只在占屏幕的运行中展开（与控制条同一判断）；后台运行的提问与拦截由 RunAttentionNotifier 发通知。
+                    val operating = info != null && holder == info.run.id.value
+                    if (operating &&
+                        (questionAppeared(question, lastQuestion) || blockAppeared(blocked, lastBlocked))
+                    ) {
+                        expandDetail()
+                    }
+                    lastQuestion = question
+                    lastBlocked = blocked
                 }
-                lastQuestion = question
-                lastBlocked = blocked
-            }
         }
 
         /** 边缘光窗口工厂（app 组装层注册到 `OverlayWindowManager`）。 */

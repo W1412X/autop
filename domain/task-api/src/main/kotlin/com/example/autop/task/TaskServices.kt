@@ -59,6 +59,18 @@ public interface UserNotifier {
         text: String,
         runId: RunId?,
     )
+
+    /** ask_user 等待回答，且用户不在占屏幕的运行中：发提问通知，点按打开应用。 */
+    public fun notifyQuestion(
+        run: RunRecord,
+        question: String,
+    )
+
+    /** 提问已结束（回答、超时或运行结束）：撤掉对应通知。 */
+    public fun cancelQuestion(runId: RunId)
+
+    /** 策略拦截暂停，且用户不在占屏幕的运行中：发拦截通知，提供继续与结束操作。 */
+    public fun notifyBlocked(run: RunRecord)
 }
 
 /** AgentHost 前台服务运行状态（WP11 健康检查"常驻后台"项）。 */

@@ -11,9 +11,11 @@ import android.content.Context
 import android.content.Intent
 import androidx.core.app.NotificationCompat
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.ThreadId
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.task.RunRecord
+import com.example.autop.task.ThreadLaunchExtras
 import com.example.autop.task.UserNotifier
 import com.example.autop.task.impl.R
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -35,6 +37,7 @@ public class UserNotifierImpl(
             title = context.getString(R.string.notify_result_title),
             text = summary,
             runId = run.id,
+            threadId = run.threadId,
         )
     }
 
@@ -56,15 +59,13 @@ public class UserNotifierImpl(
     }
 
     /** 策略拦截（docs/tech/07 §7）：原因 + “我已手动完成，继续”/“结束”。 */
-    public fun notifyBlocked(
-        run: RunRecord,
-        reasonText: String,
-    ) {
+    override fun notifyBlocked(run: RunRecord) {
         ensureChannels()
         val builder =
             base(CHANNEL_ALERT)
                 .setContentTitle(context.getString(R.string.notify_blocked_title))
-                .setContentText(reasonText)
+                .setContentText(context.getString(R.string.notify_blocked_text))
+                .setContentIntent(openIntent(run.threadId))
                 .addAction(
                     0,
                     context.getString(R.string.notify_blocked_continue),
@@ -72,6 +73,25 @@ public class UserNotifierImpl(
                 ).addAction(0, context.getString(R.string.notify_blocked_end), actionIntent(run.id, ACTION_CANCEL))
         manager.notify(run.id.value.hashCode(), builder.build())
     }
+
+    override fun notifyQuestion(
+        run: RunRecord,
+        question: String,
+    ) {
+        ensureChannels()
+        val builder =
+            base(CHANNEL_ALERT)
+                .setContentTitle(context.getString(R.string.notify_question_title))
+                .setContentText(question)
+                .setContentIntent(openIntent(run.threadId))
+        manager.notify(questionNotifId(run.id), builder.build())
+    }
+
+    override fun cancelQuestion(runId: RunId) {
+        manager.cancel(questionNotifId(runId))
+    }
+
+    private fun questionNotifId(runId: RunId): Int = (QUESTION_KEY_PREFIX + runId.value).hashCode()
 
     /** 需要无障碍服务。 */
     public fun notifyAccessibilityNeeded(text: String) {
@@ -89,12 +109,13 @@ public class UserNotifierImpl(
         title: String,
         text: String,
         runId: RunId?,
+        threadId: ThreadId? = null,
     ) {
         val builder =
             base(channel)
                 .setContentTitle(title)
                 .setContentText(text)
-        if (runId != null) builder.setContentIntent(openIntent())
+        if (runId != null) builder.setContentIntent(openIntent(threadId))
         manager.notify(id, builder.build())
     }
 
@@ -104,9 +125,18 @@ public class UserNotifierImpl(
             .setSmallIcon(android.R.drawable.stat_notify_chat)
             .setAutoCancel(true)
 
-    private fun openIntent(): PendingIntent {
-        val intent = context.packageManager.getLaunchIntentForPackage(context.packageName)
-        return PendingIntent.getActivity(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+    /** 点击通知打开应用；带 [threadId] 时直接进入该对话。不同对话使用不同请求码，避免共用 extra。 */
+    private fun openIntent(threadId: ThreadId?): PendingIntent {
+        val intent =
+            context.packageManager.getLaunchIntentForPackage(context.packageName)?.apply {
+                if (threadId != null) putExtra(ThreadLaunchExtras.EXTRA_THREAD_ID, threadId.value)
+            }
+        return PendingIntent.getActivity(
+            context,
+            (OPEN_KEY_PREFIX + (threadId?.value.orEmpty())).hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun actionIntent(
@@ -152,5 +182,7 @@ public class UserNotifierImpl(
         public const val ACTION_RESUME: String = "resume"
         public const val ACTION_CANCEL: String = "cancel"
         private const val NOTIF_A11Y = 7201
+        private const val QUESTION_KEY_PREFIX = "question:"
+        private const val OPEN_KEY_PREFIX = "open:"
     }
 }

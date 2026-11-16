@@ -17,6 +17,7 @@ import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
+import com.example.autop.task.ThreadLaunchExtras
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
@@ -140,7 +141,7 @@ public class PanelRunActions
             val intent =
                 context.packageManager
                     .getLaunchIntentForPackage(context.packageName)
-                    ?.putExtra(EXTRA_THREAD_ID, target.value)
+                    ?.putExtra(ThreadLaunchExtras.EXTRA_THREAD_ID, target.value)
                     ?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     ?: return
             context.startActivity(intent)
@@ -186,9 +187,6 @@ public class PanelRunActions
         public companion object {
             /** 日志 tag。 */
             private const val TAG: String = "PanelRunActions"
-
-            /** 「打开对话」跳转 extra 键（app 导航消费）。 */
-            public const val EXTRA_THREAD_ID: String = "autop.threadId"
 
             /** 过渡态兜底超时（毫秒）。 */
             private const val INTENT_TIMEOUT_MS: Long = 5_000L

@@ -29,4 +29,6 @@
     <string name="reminder_action_skip">跳过</string>
     <string name="reminder_snooze_minutes">%1$d 分钟后</string>
     <string name="reminder_body_hint">解锁后执行，或选择稍后提醒</string>
+    <string name="notify_question_title">需要你回答</string>
+    <string name="notify_blocked_text">运行在敏感操作前暂停，请决定继续还是结束</string>
 </resources>

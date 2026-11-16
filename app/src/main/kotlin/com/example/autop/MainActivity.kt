@@ -22,6 +22,7 @@ import com.example.autop.core.ui.theme.AutopTheme
 import com.example.autop.core.ui.theme.toAppearanceSettings
 import com.example.autop.feature.settings.debug.DebugPage
 import com.example.autop.feature.settings.me.update.UpdatePromptHost
+import com.example.autop.task.ThreadLaunchExtras
 import dagger.hilt.android.AndroidEntryPoint
 import java.util.Optional
 import javax.inject.Inject
@@ -44,7 +45,7 @@ class MainActivity : ComponentActivity() {
     @Inject lateinit var debugPage: Optional<DebugPage>
 
     /** 通知深链目标路由（如注入通道页；[com.example.autop.device.PairingDiscovery.EXTRA_OPEN_ROUTE]）。 */
-    private var openRoute by mutableStateOf<String?>(null)
+    private var openRoute by mutableStateOf<OpenRoute?>(null)
 
     /** 数据结构检查通过（或用户完成备份/清除）后为 true；拦截期间显示数据结构页（ADR-0032）。 */
     private var gateOpen by mutableStateOf(!DataSchemaState.blocked)
@@ -52,7 +53,7 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        openRoute = intent?.getStringExtra(EXTRA_OPEN_ROUTE)
+        openRoute = routeFrom(intent)
         setContent {
             // ADR-0032：拦截期间不读取任何用户数据。配置文件在数据结构确认前不能访问，否则 DataStore 可能重置它。
             if (!gateOpen) {
@@ -95,7 +96,15 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         // 通知深链（CLEAR_TOP|SINGLE_TOP 复用实例时）：更新目标路由触发导航。
-        intent.getStringExtra(EXTRA_OPEN_ROUTE)?.let { openRoute = it }
+        routeFrom(intent)?.let { openRoute = it }
+    }
+
+    /** 启动 Intent 中的打开请求：优先 open_route（页面路由），其次通知携带的对话 id。 */
+    private fun routeFrom(intent: Intent?): OpenRoute? {
+        val route =
+            intent?.getStringExtra(EXTRA_OPEN_ROUTE)
+                ?: intent?.getStringExtra(ThreadLaunchExtras.EXTRA_THREAD_ID)?.let { AutopRoutes.chatThread(it) }
+        return route?.let { OpenRoute(it) }
     }
 
     private companion object {

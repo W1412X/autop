@@ -10,6 +10,7 @@ import com.example.autop.core.common.Clock
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.task.UserNotifier
 import com.example.autop.task.impl.db.TasksDb
+import com.example.autop.task.impl.notify.RunAttentionNotifier
 import com.example.autop.task.impl.notify.UserNotifierImpl
 import com.example.autop.task.impl.reminder.LockReminder
 import com.example.autop.task.impl.store.AuditCleaner
@@ -47,6 +48,11 @@ public object TaskAgentModule {
     @Provides
     @Singleton
     public fun provideUserNotifierPort(impl: UserNotifierImpl): UserNotifier = impl
+
+    @Provides
+    @Singleton
+    public fun provideRunAttentionNotifier(notifier: UserNotifier): RunAttentionNotifier =
+        RunAttentionNotifier(notifier)
 
     @Provides
     @Singleton

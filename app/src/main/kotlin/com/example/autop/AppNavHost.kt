@@ -93,14 +93,14 @@ private val TOP_LEVEL_ROUTES: Set<String> =
 internal fun AppNavHost(
     showLabels: Boolean,
     startDestination: String = AutopRoutes.CHAT_LIST,
-    openRoute: String? = null,
+    openRoute: OpenRoute? = null,
     flowsEnabled: Boolean = false,
     debugPage: DebugPage? = null,
 ) {
     val navController = rememberNavController()
     // 通知深链（如配对发现通知 → 注入通道页）：路由变化即导航。
     LaunchedEffect(openRoute) {
-        if (openRoute != null) navController.navigate(openRoute)
+        openRoute?.let { navController.navigate(it.route) }
     }
     val backStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = backStackEntry?.destination?.route
