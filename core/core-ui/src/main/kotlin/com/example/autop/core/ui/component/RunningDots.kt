@@ -43,7 +43,7 @@ public fun RunningDots(modifier: Modifier = Modifier) {
     )
     Row(
         modifier = modifier.size(ICON_BOX),
-        horizontalArrangement = Arrangement.spacedBy(DOT_GAP),
+        horizontalArrangement = Arrangement.spacedBy(DOT_GAP, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         repeat(DOT_COUNT) { index ->
