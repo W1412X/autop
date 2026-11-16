@@ -9,8 +9,6 @@ package com.example.autop.feature.flows.author
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.scrollBy
-import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,7 +31,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -58,6 +55,7 @@ import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.VoiceErrorToast
 import com.example.autop.core.ui.component.llmErrorTextRes
+import com.example.autop.core.ui.component.rememberStickToBottom
 import com.example.autop.core.ui.component.rememberVoiceStarter
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
@@ -74,9 +72,6 @@ import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowIssue
 import com.example.autop.flow.IssueSeverity
 import com.example.autop.flow.Node
-
-/** 跟随底部时一次滚动的像素数：远大于任何单次增量，实际滚动被列表末尾截断。 */
-private const val FOLLOW_SCROLL_PX: Float = 1_000_000f
 
 /** 用户气泡最大宽度占屏幕的比例（与对话页一致）。 */
 private const val USER_BUBBLE_WIDTH_FRACTION: Float = 0.8f
@@ -100,25 +95,15 @@ public fun FlowAuthorScreen(
     val spacing = LocalSpacing.current
     val author = state.author
     val listState = rememberLazyListState()
-    // 是否跟随底部：流式输出时用户停在底部才跟随；手指一拖动就停止，滑回底部或发出新消息后恢复。
-    var follow by remember { mutableStateOf(true) }
-    LaunchedEffect(listState) {
-        listState.interactionSource.interactions.collect { if (it is DragInteraction.Start) follow = false }
-    }
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.isScrollInProgress }.collect { scrolling ->
-            if (!scrolling) follow = !listState.canScrollForward
-        }
-    }
-    LaunchedEffect(author.messages.size) { follow = true }
-    LaunchedEffect(author.messages.size, author.live?.text?.length, author.live?.thinking?.length, follow) {
-        // 直接滚到列表末尾，不对齐某一项的顶部：内容比屏幕还长时，对齐顶部会把视图反复拉回该项开头。
-        if (follow && (author.messages.isNotEmpty() || author.live != null)) listState.scrollBy(FOLLOW_SCROLL_PX)
+    val stick = rememberStickToBottom(listState)
+    // 用户发出消息后无条件回到最新（即便此前上滑）；其余增长只在用户停在底部时跟随。
+    LaunchedEffect(author.messages.size) {
+        if (author.messages.lastOrNull() is AuthorMessage.User) stick.follow()
     }
     // 草稿出现或更新：只定位到草稿卡片顶部一次，之后不干预滚动，用户可以自由上下滑。
     LaunchedEffect(author.draft) {
         if (author.draft != null) {
-            follow = false
+            stick.release()
             val intro = if (author.messages.isEmpty() && author.live == null) 1 else 0
             listState.animateScrollToItem(intro + author.messages.size)
         }

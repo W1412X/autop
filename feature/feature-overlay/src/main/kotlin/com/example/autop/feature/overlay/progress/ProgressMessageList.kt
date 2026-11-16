@@ -11,13 +11,13 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import com.example.autop.core.thread.ui.TimelineAction
 import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.core.thread.ui.TimelineRow
 import com.example.autop.core.thread.ui.TimelineStyle
+import com.example.autop.core.ui.component.rememberStickToBottom
 import com.example.autop.core.ui.theme.LocalSpacing
 
 /** 消息流：[entries] 为归并后的时间线条目（横幅除外），[onAction] 处理条目动作。 */
@@ -29,9 +29,7 @@ internal fun ProgressMessageList(
 ) {
     val messages = entries.filterNot { it.item is TimelineItem.Banner }
     val listState = rememberLazyListState()
-    LaunchedEffect(messages.size) {
-        if (messages.isNotEmpty()) listState.animateScrollToItem(messages.size - 1)
-    }
+    rememberStickToBottom(listState)
     BoxWithConstraints(modifier = modifier.fillMaxWidth()) {
         val style = TimelineStyle(availableWidth = maxWidth)
         LazyColumn(

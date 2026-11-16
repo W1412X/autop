@@ -17,7 +17,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -40,6 +39,7 @@ import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.ToastEffect
+import com.example.autop.core.ui.component.rememberStickToBottom
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
@@ -159,16 +159,12 @@ private fun ThreadTimeline(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
     val motion = LocalMotionEnabled.current
+    rememberStickToBottom(listState)
     val atBottom by remember {
         derivedStateOf {
             val info = listState.layoutInfo
             val lastVisible = info.visibleItemsInfo.lastOrNull()?.index ?: -1
             lastVisible >= info.totalItemsCount - 1
-        }
-    }
-    LaunchedEffect(entries.size, awaitingReply) {
-        if (entries.isNotEmpty() && atBottom) {
-            scrollToEnd(listState, motion)
         }
     }
     Box(modifier = modifier.fillMaxSize()) {
