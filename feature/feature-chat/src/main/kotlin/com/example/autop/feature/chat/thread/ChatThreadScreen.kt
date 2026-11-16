@@ -68,6 +68,7 @@ public fun ChatThreadScreen(
         ThreadHeader(state = state, onAction = onAction, onBack = onBack)
         ThreadTimeline(
             entries = state.entries.filterNot { (it.item as? TimelineItem.Banner)?.isLivePause() == true },
+            awaitingReply = state.awaitingReply,
             onAction = onAction,
             modifier = Modifier.weight(1f),
         )
@@ -147,6 +148,7 @@ private fun ThreadHeader(
 @Composable
 private fun ThreadTimeline(
     entries: List<TimelineEntry>,
+    awaitingReply: Boolean,
     onAction: (ChatThreadAction) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -160,7 +162,7 @@ private fun ThreadTimeline(
             lastVisible >= info.totalItemsCount - 1
         }
     }
-    LaunchedEffect(entries.size) {
+    LaunchedEffect(entries.size, awaitingReply) {
         if (entries.isNotEmpty() && atBottom) {
             scrollToEnd(listState, motion)
         }
@@ -176,12 +178,17 @@ private fun ThreadTimeline(
                     vertical = LocalSpacing.current.sm,
                 ),
         ) {
-            items(count = entries.size) { index ->
-                TimelineRow(
-                    entry = entries[index],
-                    onAction = { action -> onAction(action.toChatAction()) },
-                    modifier = Modifier.fillMaxWidth(),
-                )
+            val waitingCount = if (awaitingReply) 1 else 0
+            items(count = entries.size + waitingCount) { index ->
+                if (index < entries.size) {
+                    TimelineRow(
+                        entry = entries[index],
+                        onAction = { action -> onAction(action.toChatAction()) },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                } else {
+                    WaitingReplyRow(modifier = Modifier.fillMaxWidth())
+                }
             }
         }
         if (!atBottom && entries.isNotEmpty()) {
@@ -221,6 +228,7 @@ private fun noticeText(notice: ThreadNotice): String =
             ThreadNotice.IMAGE_FAILED -> R.string.thread_notice_image_failed
             ThreadNotice.STEER_FAILED -> R.string.thread_notice_steer_failed
             ThreadNotice.CAMERA_FAILED -> R.string.thread_notice_camera_failed
+            ThreadNotice.SEND_FAILED -> R.string.thread_notice_send_failed
         },
     )
 

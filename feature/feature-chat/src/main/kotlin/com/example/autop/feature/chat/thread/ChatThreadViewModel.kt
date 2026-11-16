@@ -20,6 +20,8 @@ import com.example.autop.agent.ThreadCreated
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolResultEvent
+import com.example.autop.agent.UserMessage
+import com.example.autop.agent.UserMessageKind
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.LogFiles
@@ -37,6 +39,7 @@ import com.example.autop.core.ui.component.joinVoiceText
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.SpeechInput
 import com.example.autop.feature.chat.NEW_THREAD
+import com.example.autop.llm.Block
 import com.example.autop.llm.ModelProfileStore
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunRecord
@@ -70,7 +73,41 @@ import javax.inject.Inject
 private data class TimelineInput(
     val history: List<ThreadEvent> = emptyList(),
     val live: List<AgentEvent> = emptyList(),
+    /** 刚发出、尚未在事件流中出现的用户消息文本（乐观显示，入库后清除）。 */
+    val outgoing: String? = null,
 )
+
+/** 发出消息后等待第一条输出的运行状态（这些状态下才显示等待占位）。 */
+private val AWAITING_REPLY_STATUSES: Set<RunStatus> =
+    setOf(RunStatus.QUEUED, RunStatus.WAITING_SCREEN, RunStatus.RUNNING)
+
+/** 事件是否为刚发出的那条用户消息（输入类，文本与待显示的一致）。 */
+private fun ThreadEvent.isEchoOf(outgoing: String?): Boolean {
+    if (outgoing == null) return false
+    val message = payload as? UserMessage ?: return false
+    if (message.kind != UserMessageKind.INPUT) return false
+    val text = message.blocks.filterIsInstance<Block.Text>().joinToString(separator = "") { it.text }
+    return text.trim() == outgoing
+}
+
+/** 把乐观显示的用户消息接在归并结果末尾（入库前只存在于界面，无 seq、不可分叉）。 */
+private fun withOutgoing(
+    entries: List<TimelineEntry>,
+    outgoing: String?,
+): List<TimelineEntry> =
+    if (outgoing == null) {
+        entries
+    } else {
+        val bubble = TimelineItem.UserBubble(text = outgoing, isSteer = false)
+        entries + TimelineEntry(item = bubble, seq = null, forkable = false)
+    }
+
+/** 运行已开始但末尾仍是用户消息（模型还没有任何输出）时，需要显示等待占位。 */
+private fun awaitingReplyOf(
+    entries: List<TimelineEntry>,
+    open: RunRecord?,
+): Boolean =
+    open != null && open.status in AWAITING_REPLY_STATUSES && entries.lastOrNull()?.item is TimelineItem.UserBubble
 
 /** 页面本地状态（输入、开关、弹层）。 */
 private data class ChatMeta(
@@ -350,6 +387,8 @@ public class ChatThreadViewModel
                 return
             }
             meta.update { it.copy(input = "", images = emptyList()) }
+            // 乐观显示：不等入库与运行创建，发出的消息立即出现在时间线末尾。
+            timeline.update { it.copy(outgoing = text.takeIf { t -> t.isNotBlank() }) }
             viewModelScope.launch {
                 val fresh = threadId == NEW_THREAD
                 val outcome =
@@ -360,6 +399,17 @@ public class ChatThreadViewModel
                         modelProfileId = meta.value.modelProfileId,
                         screenTools = !meta.value.chatOnly,
                     )
+                if (outcome is Outcome.Err) {
+                    // 发送失败：撤销乐观消息，把原文和图片放回输入框（不丢用户内容）。
+                    timeline.update { it.copy(outgoing = null) }
+                    meta.update {
+                        it.copy(
+                            input = it.input.ifEmpty { text },
+                            images = it.images.ifEmpty { images },
+                            notice = ThreadNotice.SEND_FAILED,
+                        )
+                    }
+                }
                 outcome.getOrNull()?.let { record ->
                     if (fresh) {
                         threadId = record.threadId.value
@@ -461,7 +511,7 @@ public class ChatThreadViewModel
                 viewModelScope.launch {
                     threadTitle.value = threadStore.titleOf(id)
                     meta.update { it.copy(modelProfileId = threadStore.modelProfileOf(id)) }
-                    timeline.value = TimelineInput()
+                    timeline.update { TimelineInput(outgoing = it.outgoing) }
                     // observeFrom 先回放已有事件再转实时（WP8.3）：新对话的用户输入事件
                     // 在入队时已落盘（WP8.1），backlog 一定包含它，不再丢。
                     threadStore.observeFrom(id, afterSeq = 0).collect { batch ->
@@ -475,6 +525,7 @@ public class ChatThreadViewModel
                             input.copy(
                                 history = input.history + batch,
                                 live = if (clearsLive) emptyList() else input.live,
+                                outgoing = if (batch.any { it.isEchoOf(input.outgoing) }) null else input.outgoing,
                             )
                         }
                     }
@@ -491,11 +542,17 @@ public class ChatThreadViewModel
             val chatConfig = configProvider.current()[UiConfig.CHAT]
             val rawSeq = metaState.sheet.rawSeq
             val rawEvent = rawSeq?.let { seq -> input.history.firstOrNull { it.seq == seq } }
+            val entries =
+                withOutgoing(
+                    mergeTimeline(input.history, input.live, chatConfig.stepGroupThreshold),
+                    input.outgoing,
+                )
             return ChatThreadUiState(
                 threadId = threadId,
                 title = input.history.firstNotNullOfOrNull { (it.payload as? ThreadCreated)?.title },
-                entries = mergeTimeline(input.history, input.live, chatConfig.stepGroupThreshold),
+                entries = entries,
                 running = open != null,
+                awaitingReply = awaitingReplyOf(entries, open),
                 accessibilityConnected = connected,
                 input = metaState.input,
                 modelProfileId = metaState.modelProfileId,

@@ -32,6 +32,9 @@ public enum class ThreadNotice {
 
     /** 拍照没有完成，没有添加图片。 */
     CAMERA_FAILED,
+
+    /** 发送失败（网络或启动错误）：原文已放回输入框。 */
+    SEND_FAILED,
 }
 
 /** 对话页弹层状态。 */
@@ -55,6 +58,8 @@ public data class ChatThreadUiState(
     val entries: List<TimelineEntry> = emptyList(),
     /** 本页是否有活跃 Run（输入框切到"补充指令…"）。 */
     val running: Boolean = false,
+    /** 运行已开始但模型还没有任何输出（末尾仍是用户消息）：时间线末尾显示等待占位。 */
+    val awaitingReply: Boolean = false,
     /** 无障碍已连接（false 时输入禁用并显示提示，docs/tech/08 §4.1）。 */
     val accessibilityConnected: Boolean = true,
     val input: String = "",
