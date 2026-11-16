@@ -3,7 +3,6 @@
  */
 package com.example.autop.core.ui.component
 
-import androidx.compose.foundation.gestures.scrollBy
 import androidx.compose.foundation.interaction.DragInteraction
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
@@ -64,20 +63,25 @@ public fun rememberStickToBottom(listState: LazyListState): StickToBottomState {
     return state
 }
 
-/** 贴到列表末尾：末项不可见时先定位到末项，再补齐末项底部与视口底部的差值。 */
+/**
+ * 贴到列表末尾：末项不可见时先定位到末项；末项高过视口、底部仍在视口外时，
+ * 再用 scrollToItem 的偏移量把超出部分卷进去（懒列表会在内容末端钳制住）。
+ *
+ * 已经能向前滚动才动作：贴底后布局仍会重测，若无条件滚动会自触发形成死循环。
+ */
 private suspend fun stickToBottom(listState: LazyListState) {
     val info = listState.layoutInfo
     val lastIndex = info.totalItemsCount - 1
-    val last = info.visibleItemsInfo.lastOrNull() ?: return
+    if (lastIndex < 0 || !listState.canScrollForward) return
+    val last = info.visibleItemsInfo.lastOrNull()
+    if (last == null || last.index < lastIndex) {
+        listState.scrollToItem(lastIndex)
+        return
+    }
+    val viewportBottom = info.viewportEndOffset - info.afterContentPadding
+    val overflow = last.offset + last.size - viewportBottom
     try {
-        if (last.index < lastIndex) {
-            listState.scrollToItem(lastIndex)
-            return
-        }
-        val viewportBottom = info.viewportEndOffset - info.afterContentPadding
-        val delta = viewportBottom - (last.offset + last.size)
-        // 只向下贴底；内容不足一屏时 delta 为正，不能再滚动（否则会反复触发自身）。
-        if (delta < 0) listState.scrollBy(delta.toFloat())
+        listState.scrollToItem(lastIndex, overflow.coerceAtLeast(0))
     } catch (_: CancellationException) {
         // 用户手势接管滚动：本次贴底作废，跟随状态已由 DragInteraction 分支关闭。
     }
