@@ -43,6 +43,11 @@ public interface OnboardingNavigator {
     /** 厂商后台设置页（[componentSpec] 为 `component:pkg/cls`，来自 DeviceQuirks `autostartIntent`）。 */
     public fun openVendorSettings(componentSpec: String)
 
-    /** 完成引导，进入主界面（`ui.onboarding.completed` 已由 ViewModel 写入）。 */
-    public fun finishOnboarding()
+    /**
+     * 引导收尾后进入主界面。
+     *
+     * @param openShellPairing 是否接着打开注入通道（无线调试配对）引导页（可跳过）。
+     *   首次引导点"开始使用"时为 true；老用户升级后同意协议（ADR-0033）时为 false，不重复引导。
+     */
+    public fun finishOnboarding(openShellPairing: Boolean)
 }

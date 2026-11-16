@@ -71,12 +71,16 @@ private fun OnboardingRoute(
         onPauseOrDispose { }
     }
     LaunchedEffect(state.completed) {
-        if (state.completed) navigator.finishOnboarding()
+        if (state.completed) navigator.finishOnboarding(openShellPairing = true)
     }
     // 老用户（引导已完成）升级后只需再同意一次协议，同意后直接进入主界面（ADR-0033）。
-    LaunchedEffect(agreement) {
+    // 健康检查模式（"我的"→权限检查）下协议早已同意、引导早已完成，条件恒成立，必须排除，
+    // 否则页面一打开就被收尾导航替换掉。
+    LaunchedEffect(agreement, healthMode) {
         val current = agreement ?: return@LaunchedEffect
-        if (current.agreed && current.completedBefore) navigator.finishOnboarding()
+        if (!healthMode && current.agreed && current.completedBefore) {
+            navigator.finishOnboarding(openShellPairing = false)
+        }
     }
     val activity = LocalContext.current.findActivity()
     val current = agreement

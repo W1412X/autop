@@ -378,8 +378,8 @@ private fun createOnboardingNavigator(
                 }
         }
 
-        override fun finishOnboarding() {
-            // 引导页出栈先入主界面再压注入通道引导页（可跳过：返回键即进主界面，
+        override fun finishOnboarding(openShellPairing: Boolean) {
+            // 引导页出栈后进入主界面；首次引导再压注入通道引导页（可跳过：返回键即进主界面，
             // 权限已就位，正是设置无线调试配对的时机）。
             navController.navigate(AutopRoutes.CHAT_LIST) {
                 navController.currentBackStackEntry
@@ -388,7 +388,9 @@ private fun createOnboardingNavigator(
                     ?.let { popUpTo(it) { inclusive = true } }
                 launchSingleTop = true
             }
-            navController.navigate(AutopRoutes.meSection(SettingsSection.SHELL.id))
+            if (openShellPairing) {
+                navController.navigate(AutopRoutes.meSection(SettingsSection.SHELL.id))
+            }
         }
     }
 
