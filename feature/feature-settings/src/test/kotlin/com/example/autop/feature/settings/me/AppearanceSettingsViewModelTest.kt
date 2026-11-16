@@ -78,21 +78,35 @@ class AppearanceSettingsViewModelTest {
     @Test
     fun `each appearance action writes its config path`() =
         runTest(testDispatcher) {
-            val cases =
+            val cases: List<Pair<MeAction, List<Pair<String, JsonPrimitive>>>> =
                 listOf(
-                    MeAction.SetDarkMode("DARK") to ("ui.appearance.darkMode" to JsonPrimitive("DARK")),
-                    MeAction.SetDynamicColor(true) to ("ui.appearance.dynamicColor" to JsonPrimitive(true)),
-                    MeAction.SetSeedIndex(3) to ("ui.appearance.seedIndex" to JsonPrimitive(3)),
-                    MeAction.SetFontScale(1.15) to ("ui.appearance.fontScale" to JsonPrimitive(1.15)),
-                    MeAction.SetIconScale(0.9) to ("ui.appearance.iconScale" to JsonPrimitive(0.9)),
-                    MeAction.SetDensity("COMPACT") to ("ui.appearance.density" to JsonPrimitive("COMPACT")),
-                    MeAction.SetMotionEnabled(false) to ("ui.appearance.motionEnabled" to JsonPrimitive(false)),
-                    MeAction.SetShieldEnabled(false) to ("device.touch.shieldEnabled" to JsonPrimitive(false)),
+                    MeAction.SetDarkMode("DARK") to
+                        listOf("ui.appearance.darkMode" to JsonPrimitive("DARK")),
+                    MeAction.SetDynamicColor(true) to
+                        listOf("ui.appearance.dynamicColor" to JsonPrimitive(true)),
+                    // 选回预设要同时清掉自定义色，避免两个来源同时生效。
+                    MeAction.SetSeedIndex(3) to
+                        listOf(
+                            "ui.appearance.seedIndex" to JsonPrimitive(3),
+                            "ui.appearance.customSeed" to JsonPrimitive(0),
+                        ),
+                    MeAction.SetCustomSeed(0xFF8E4A5EL) to
+                        listOf("ui.appearance.customSeed" to JsonPrimitive(0xFF8E4A5EL)),
+                    MeAction.SetFontScale(1.15) to
+                        listOf("ui.appearance.fontScale" to JsonPrimitive(1.15)),
+                    MeAction.SetIconScale(0.9) to
+                        listOf("ui.appearance.iconScale" to JsonPrimitive(0.9)),
+                    MeAction.SetDensity("COMPACT") to
+                        listOf("ui.appearance.density" to JsonPrimitive("COMPACT")),
+                    MeAction.SetMotionEnabled(false) to
+                        listOf("ui.appearance.motionEnabled" to JsonPrimitive(false)),
+                    MeAction.SetShieldEnabled(false) to
+                        listOf("device.touch.shieldEnabled" to JsonPrimitive(false)),
                 )
             for ((action, expected) in cases) {
                 val viewModel = createViewModel()
                 viewModel.onAction(action)
-                assertThat(editor.writes).containsExactly(expected)
+                assertThat(editor.writes).containsExactly(*expected.toTypedArray())
                 editor.writes.clear()
             }
         }
@@ -167,7 +181,8 @@ class AppearanceSettingsViewModelTest {
             editor.result = Outcome.Err(AppError(code = "config.invalid", message = "boom"))
             val viewModel = createViewModel()
             viewModel.onAction(MeAction.SetSeedIndex(2))
-            val (event, kv) = logger.errors.single()
+            // SetSeedIndex 现在同时写 seedIndex 与 customSeed，两次写入都会失败。
+            val (event, kv) = logger.errors.first()
             assertThat(event).isEqualTo("appearance_write_failed")
             assertThat(kv["path"]).isEqualTo("ui.appearance.seedIndex")
             assertThat(kv["code"]).isEqualTo("config.invalid")

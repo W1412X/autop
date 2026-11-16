@@ -17,6 +17,9 @@ import androidx.compose.runtime.setValue
 internal class MeSheetState {
     /** 外观分组的选择弹层类型；null 表示没有外观弹层。 */
     var appearance: SheetKind? by mutableStateOf(null)
+
+    /** 调色盘取色弹层（主题色列表里选“自定义”后打开）。 */
+    var customColor: Boolean by mutableStateOf(false)
     var windowType: Boolean by mutableStateOf(false)
     var displayMode: Boolean by mutableStateOf(false)
     var opacity: Boolean by mutableStateOf(false)

@@ -17,6 +17,9 @@ internal object AppearanceOptions {
     val FONT_SCALES: List<Double> = listOf(0.9, 1.0, 1.15, 1.3)
     val ICON_SCALES: List<Double> = listOf(0.9, 1.0, 1.15)
 
+    /** 主题色列表里的“自定义”项 id（选中后打开调色盘，不直接写配置）。 */
+    const val CUSTOM_SEED_ID: String = "custom"
+
     /** 输出语言档位（`ui.appearance.language` 原值）。 */
     const val LANG_SYSTEM: String = "system"
     const val LANG_ZH: String = "zh"

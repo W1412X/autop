@@ -7,8 +7,10 @@ import androidx.annotation.StringRes
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.config.UiAppearanceSection
+import com.example.autop.core.ui.component.OptionIcon
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.theme.DarkMode
+import com.example.autop.core.ui.theme.SeedColors
 import com.example.autop.core.ui.theme.UiDensity
 import com.example.autop.feature.settings.R
 import kotlin.math.roundToInt
@@ -28,7 +30,13 @@ internal enum class SheetKind(
     fun selectedId(appearance: UiAppearanceSection): String =
         when (this) {
             DARK_MODE -> appearance.darkMode
-            SEED -> appearance.seedIndex.toString()
+            SEED ->
+                if (appearance.customSeed != 0L) {
+                    AppearanceOptions.CUSTOM_SEED_ID
+                } else {
+                    // 旧版本档位可能超出当前预设数量，夹取到有效档位再显示。
+                    appearance.seedIndex.coerceIn(0, SeedColors.COUNT - 1).toString()
+                }
             FONT_SCALE -> appearance.fontScale.toString()
             ICON_SCALE -> appearance.iconScale.toString()
             DENSITY -> appearance.density
@@ -39,7 +47,8 @@ internal enum class SheetKind(
     fun toAction(id: String): MeAction =
         when (this) {
             DARK_MODE -> MeAction.SetDarkMode(id)
-            SEED -> MeAction.SetSeedIndex(id.toInt())
+            // 自定义项由 MeSheetHost 拦截（打开调色盘），不会走到这里。
+            SEED -> MeAction.SetSeedIndex(id.toIntOrNull() ?: 0)
             FONT_SCALE -> MeAction.SetFontScale(id.toDouble())
             ICON_SCALE -> MeAction.SetIconScale(id.toDouble())
             DENSITY -> MeAction.SetDensity(id)
@@ -53,8 +62,7 @@ internal fun SheetKind.options(): List<OptionItem> =
     when (this) {
         SheetKind.DARK_MODE ->
             AppearanceOptions.DARK_MODES.map { OptionItem(id = it, label = darkModeLabel(it)) }
-        SheetKind.SEED ->
-            AppearanceOptions.SEED_INDEXES.map { OptionItem(id = it.toString(), label = seedLabel(it)) }
+        SheetKind.SEED -> seedOptions()
         SheetKind.FONT_SCALE ->
             AppearanceOptions.FONT_SCALES.map { OptionItem(id = it.toString(), label = scaleLabel(it)) }
         SheetKind.ICON_SCALE ->
@@ -69,14 +77,41 @@ internal fun SheetKind.options(): List<OptionItem> =
 @Composable
 internal fun SheetKind.labelOf(id: String): String = options().firstOrNull { it.id == id }?.label ?: id
 
-/** 主题色档位文案（docs/tech/08 §1.1 预设主题色顺序）。 */
+/** 主题色设置行（及分组副标题）的当前值：自定义颜色优先于预设名。 */
+@Composable
+internal fun seedValueLabel(appearance: UiAppearanceSection): String =
+    if (appearance.customSeed != 0L) {
+        stringResource(R.string.me_seed_custom)
+    } else {
+        val seedIndex = appearance.seedIndex.coerceIn(0, SeedColors.COUNT - 1)
+        SheetKind.SEED.labelOf(seedIndex.toString())
+    }
+
+/** 主题色选项：预设（带色点）+ 末尾“自定义”入口。 */
+@Composable
+private fun seedOptions(): List<OptionItem> =
+    AppearanceOptions.SEED_INDEXES.map { index ->
+        OptionItem(
+            id = index.toString(),
+            label = seedLabel(index),
+            swatch = SeedColors.light(index).primary,
+        )
+    } +
+        OptionItem(
+            id = AppearanceOptions.CUSTOM_SEED_ID,
+            label = stringResource(R.string.me_seed_custom),
+            icon = OptionIcon.PALETTE,
+        )
+
+/** 主题色档位文案（docs/tech/08 §1.1 预设主题色顺序，须与 `SeedColors` 索引一致）。 */
 private val seedLabelRes: List<Int> =
     listOf(
         R.string.me_seed_lime,
         R.string.me_seed_lake,
-        R.string.me_seed_orange,
+        R.string.me_seed_mint,
+        R.string.me_seed_cocoa,
         R.string.me_seed_violet,
-        R.string.me_seed_graphite,
+        R.string.me_seed_rose,
     )
 
 /** 百分比换算（docs/tech/08 §1.2 档位以倍率存储、按百分比显示）。 */

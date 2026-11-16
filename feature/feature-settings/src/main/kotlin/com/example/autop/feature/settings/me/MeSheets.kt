@@ -24,11 +24,25 @@ internal fun MeSheetHost(
         kind = appearanceKind,
         appearance = state.appearance,
         onSelect = { id ->
-            appearanceKind?.let { onAction(it.toAction(id)) }
+            if (appearanceKind == SheetKind.SEED && id == AppearanceOptions.CUSTOM_SEED_ID) {
+                sheets.customColor = true
+            } else {
+                appearanceKind?.let { onAction(it.toAction(id)) }
+            }
             sheets.appearance = null
         },
         onDismiss = { sheets.appearance = null },
     )
+    if (sheets.customColor) {
+        ThemeColorSheet(
+            appearance = state.appearance,
+            onApply = { seedArgb ->
+                onAction(MeAction.SetCustomSeed(seedArgb))
+                sheets.customColor = false
+            },
+            onDismiss = { sheets.customColor = false },
+        )
+    }
     OverlaySheets(sheets = sheets, state = state, onAction = onAction)
     RuntimeSheets(sheets = sheets, state = state, onAction = onAction)
 }

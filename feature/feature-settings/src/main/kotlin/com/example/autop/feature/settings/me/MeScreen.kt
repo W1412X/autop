@@ -97,7 +97,7 @@ private fun groupSubtitle(
             stringResource(
                 R.string.me_sub_group_appearance,
                 SheetKind.DARK_MODE.labelOf(state.appearance.darkMode),
-                SheetKind.SEED.labelOf(state.appearance.seedIndex.toString()),
+                seedValueLabel(state.appearance),
             )
         MeGroup.ADVANCED -> stringResource(R.string.me_sub_group_advanced, stringResource(onOffRes(state.flowsEnabled)))
         MeGroup.ABOUT -> stringResource(R.string.me_sub_group_about, version)

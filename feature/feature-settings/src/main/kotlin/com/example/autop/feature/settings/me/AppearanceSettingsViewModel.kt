@@ -190,8 +190,13 @@ public class AppearanceSettingsViewModel
                     write(UiConfig.APPEARANCE.path + SUFFIX_DARK_MODE, JsonPrimitive(action.value))
                 is MeAction.SetDynamicColor ->
                     write(UiConfig.APPEARANCE.path + SUFFIX_DYNAMIC_COLOR, JsonPrimitive(action.enabled))
-                is MeAction.SetSeedIndex ->
+                is MeAction.SetSeedIndex -> {
                     write(UiConfig.APPEARANCE.path + SUFFIX_SEED_INDEX, JsonPrimitive(action.value))
+                    // 选回预设即关闭自定义色，避免两个来源同时生效。
+                    write(UiConfig.APPEARANCE.path + SUFFIX_CUSTOM_SEED, JsonPrimitive(0))
+                }
+                is MeAction.SetCustomSeed ->
+                    write(UiConfig.APPEARANCE.path + SUFFIX_CUSTOM_SEED, JsonPrimitive(action.value))
                 is MeAction.SetFontScale ->
                     write(UiConfig.APPEARANCE.path + SUFFIX_FONT_SCALE, JsonPrimitive(action.value))
                 is MeAction.SetIconScale ->
@@ -317,6 +322,7 @@ public class AppearanceSettingsViewModel
             const val SUFFIX_DARK_MODE = ".darkMode"
             const val SUFFIX_DYNAMIC_COLOR = ".dynamicColor"
             const val SUFFIX_SEED_INDEX = ".seedIndex"
+            const val SUFFIX_CUSTOM_SEED = ".customSeed"
             const val SUFFIX_FONT_SCALE = ".fontScale"
             const val SUFFIX_ICON_SCALE = ".iconScale"
             const val SUFFIX_DENSITY = ".density"

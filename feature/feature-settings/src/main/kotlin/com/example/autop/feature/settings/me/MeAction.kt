@@ -26,6 +26,11 @@ public sealed interface MeAction {
         val value: Int,
     ) : MeAction
 
+    /** 调色盘自选主题色（ARGB，0 = 未启用）。 */
+    public data class SetCustomSeed(
+        val value: Long,
+    ) : MeAction
+
     /** 文字大小（docs/tech/08 §1.2 档位）。 */
     public data class SetFontScale(
         val value: Double,

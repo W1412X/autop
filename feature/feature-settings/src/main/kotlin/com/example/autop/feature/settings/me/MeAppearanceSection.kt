@@ -35,7 +35,7 @@ internal fun AppearanceSection(
         OptionRow(
             title = stringResource(R.string.me_appearance_seed),
             subtitle = null,
-            value = SheetKind.SEED.labelOf(appearance.seedIndex.toString()),
+            value = seedValueLabel(appearance),
             onClick = { onOpenSheet(SheetKind.SEED) },
         )
         OptionRow(
