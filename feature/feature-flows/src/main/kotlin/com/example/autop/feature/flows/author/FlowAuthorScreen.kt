@@ -100,12 +100,14 @@ public fun FlowAuthorScreen(
     LaunchedEffect(author.messages.size) {
         if (author.messages.lastOrNull() is AuthorMessage.User) stick.follow()
     }
-    // 打开页面时恢复出来的草稿（修改既有流程/回到未结束会话）：直接贴底。
+    // 打开页面时就有的草稿（修改既有流程/运行中回到未结束会话）：直接贴底。
+    // 恢复的状态可能晚于首帧到达（修改既有流程要读库），此时以"草稿不是运行中产出的"为准。
     // 会话中后续产出的草稿仍定位到草稿卡顶部一次，之后不干预滚动。
+    val restoredDraft = remember { author.draft }
     var draftHandled by remember { mutableStateOf(false) }
     LaunchedEffect(author.draft) {
         val draft = author.draft ?: return@LaunchedEffect
-        if (!draftHandled && !author.busy) {
+        if (!draftHandled && (draft == restoredDraft || !author.busy)) {
             draftHandled = true
             stick.follow()
             return@LaunchedEffect
