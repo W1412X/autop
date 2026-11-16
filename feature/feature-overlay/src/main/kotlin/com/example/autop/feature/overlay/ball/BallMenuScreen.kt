@@ -141,7 +141,6 @@ private fun menuIconOf(action: BallMenuAction): ImageVector =
         BallMenuAction.ABORT_RUN -> AutopIcons.Stop
         BallMenuAction.RECORD -> AutopIcons.Record
         BallMenuAction.TOOL_TEST -> AutopIcons.Settings
-        BallMenuAction.HIDE_BALL -> AutopIcons.VisibilityOff
     }
 
 /** 动作 → 无障碍描述文案（视觉无文字，读屏仍可辨）。 */
@@ -156,6 +155,5 @@ private fun menuLabelOf(action: BallMenuAction): String =
             BallMenuAction.ABORT_RUN -> R.string.ball_menu_abort
             BallMenuAction.RECORD -> R.string.ball_menu_record
             BallMenuAction.TOOL_TEST -> R.string.ball_menu_tool_test
-            BallMenuAction.HIDE_BALL -> R.string.ball_menu_hide
         },
     )

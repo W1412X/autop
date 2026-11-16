@@ -79,7 +79,6 @@ public data class UiMemorySection(
 /** `ui.overlay`：悬浮球（05 §10）。 */
 @Serializable
 public data class UiOverlaySection(
-    @SerialName("enabled") val enabled: Boolean = true,
     @SerialName("windowType") val windowType: String = "auto",
     /** 悬浮球显示方式：auto=静置自动收拢（贴边→细条）；always=保持展开；edge=松手即收边细条。 */
     @SerialName("displayMode") val displayMode: String = "auto",

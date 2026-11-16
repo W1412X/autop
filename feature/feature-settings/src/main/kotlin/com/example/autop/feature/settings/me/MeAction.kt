@@ -56,11 +56,6 @@ public sealed interface MeAction {
         val value: String,
     ) : MeAction
 
-    /** 悬浮球是否显示（`ui.overlay.enabled`）。 */
-    public data class SetOverlayEnabled(
-        val enabled: Boolean,
-    ) : MeAction
-
     /** 悬浮球显示方式（`ui.overlay.displayMode`：auto / always / edge）。 */
     public data class SetOverlayDisplayMode(
         val value: String,

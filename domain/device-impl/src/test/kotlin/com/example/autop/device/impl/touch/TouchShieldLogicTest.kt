@@ -27,11 +27,6 @@ public class TouchShieldLogicTest {
     }
 
     @Test
-    public fun `overlay disabled keeps shield off as safety valve`() {
-        assertFalse(shield(active = true, overlayEnabled = false))
-    }
-
-    @Test
     public fun `force release suppresses interception until reset`() {
         // N191（安全关键）：用户中止后即使 Run 状态仍屏蔽也不得拦截，reset 后恢复。
         assertFalse(shield(active = true, forceReleased = true))
@@ -48,8 +43,7 @@ public class TouchShieldLogicTest {
     private fun shield(
         active: Boolean,
         actionDepth: Int = 0,
-        overlayEnabled: Boolean = true,
         forceReleased: Boolean = false,
         shieldEnabled: Boolean = true,
-    ): Boolean = shieldTouchable(active, actionDepth, overlayEnabled, forceReleased, shieldEnabled)
+    ): Boolean = shieldTouchable(active, actionDepth, forceReleased, shieldEnabled)
 }

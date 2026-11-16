@@ -440,21 +440,39 @@ public data class DeviceInputSection(
     }
 }
 
-/** `device.shell`：shell 注入通道（tool_optimize 02 §15）。 */
+/** `device.shell`：shell 注入通道（tool_optimize 02 §15；保活见 ADR-0037）。 */
 @Serializable
 public data class DeviceShellSection(
-    /** 单条 shell 命令的超时毫秒数；超时后关闭连接，命令按未执行处理。 */
+    /** 连接探测（空 shell 命令）的超时毫秒数；超时即判定连接已失效并关闭连接。 */
     @SerialName("commandTimeoutMs") val commandTimeoutMs: Long = 5000,
+    /** 保活巡逻间隔毫秒数：已连接时每隔此时间探测一次，未连接时每隔此时间检查是否需要重连。 */
+    @SerialName("keepAliveTickMs") val keepAliveTickMs: Long = 5000,
+    /** 重连失败后再次尝试的间隔毫秒数。 */
+    @SerialName("keepAliveRetryMs") val keepAliveRetryMs: Long = 30000,
+    /** 重连时等待无线调试连接端口被发现（mDNS）的超时毫秒数。 */
+    @SerialName("discoverTimeoutMs") val discoverTimeoutMs: Long = 5000,
 ) : ConfigSection {
     override fun validate(): List<String> =
-        if (commandTimeoutMs in COMMAND_TIMEOUT_RANGE) {
-            emptyList()
-        } else {
-            listOf("commandTimeoutMs must be within $COMMAND_TIMEOUT_RANGE, was $commandTimeoutMs")
+        buildList {
+            if (commandTimeoutMs !in COMMAND_TIMEOUT_RANGE) {
+                add("commandTimeoutMs must be within $COMMAND_TIMEOUT_RANGE, was $commandTimeoutMs")
+            }
+            if (keepAliveTickMs !in KEEP_ALIVE_TICK_RANGE) {
+                add("keepAliveTickMs must be within $KEEP_ALIVE_TICK_RANGE, was $keepAliveTickMs")
+            }
+            if (keepAliveRetryMs !in KEEP_ALIVE_RETRY_RANGE) {
+                add("keepAliveRetryMs must be within $KEEP_ALIVE_RETRY_RANGE, was $keepAliveRetryMs")
+            }
+            if (discoverTimeoutMs !in DISCOVER_TIMEOUT_RANGE) {
+                add("discoverTimeoutMs must be within $DISCOVER_TIMEOUT_RANGE, was $discoverTimeoutMs")
+            }
         }
 
     internal companion object {
         val COMMAND_TIMEOUT_RANGE: LongRange = 500L..60000L
+        val KEEP_ALIVE_TICK_RANGE: LongRange = 1000L..60000L
+        val KEEP_ALIVE_RETRY_RANGE: LongRange = 1000L..300000L
+        val DISCOVER_TIMEOUT_RANGE: LongRange = 1000L..60000L
     }
 }
 

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "device": {
     "screenLease": {
       "acquireTimeoutMs": 3000
@@ -126,10 +126,14 @@
       "clipboardRestoreDelayMs": 400
     },
     "shell": {
-      "commandTimeoutMs": 5000
+      "commandTimeoutMs": 5000,
+      "keepAliveTickMs": 5000,
+      "keepAliveRetryMs": 30000,
+      "discoverTimeoutMs": 5000
     },
     "apps": {
       "listLimit": 50
     }
   }
 }
+

@@ -9,7 +9,6 @@ import com.example.autop.agent.StateEntry
 import com.example.autop.agent.StateRequest
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.DeviceConfig
-import com.example.autop.core.config.UiConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.ShellInput
@@ -37,7 +36,7 @@ public class InputStateSource
                     render(PROMPT_ACCESSIBILITY, mapOf(VAR_ON to flag(connected), VAR_OFF to flag(!connected))),
                 )
             entries += StateEntry(KEY_SHELL, render(PROMPT_SHELL, shellVars()))
-            val shieldOn = req.config[DeviceConfig.TOUCH].shieldEnabled && req.config[UiConfig.OVERLAY].enabled
+            val shieldOn = req.config[DeviceConfig.TOUCH].shieldEnabled
             entries +=
                 StateEntry(
                     KEY_SHIELD,

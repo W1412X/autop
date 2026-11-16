@@ -20,7 +20,6 @@
  *   自检不过则拒绝本次注入并留痕（`inject_blocked_by_own_overlay`），不再盲点自家 UI。
  * - **强制解除**（N191，安全关键）：用户中止任务 `forceRelease()` 立即解除并抑制后续
  *   激活（Run 卡死也保证用户能操作手机），新 Run 开始 `reset()` 恢复。
- * - **安全阀**：`ui.overlay.enabled` 关闭（悬浮球不显示，无停止入口）时不屏蔽。
  */
 package com.example.autop.device.impl.touch
 
@@ -28,7 +27,6 @@ import android.view.WindowManager
 import com.example.autop.core.common.Logger
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceConfig
-import com.example.autop.core.config.UiConfig
 import com.example.autop.device.InjectionFootprint
 import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlaySpec
@@ -175,12 +173,9 @@ public class TouchShieldController
             shieldTouchable(
                 active = active,
                 actionDepth = actionDepth.get(),
-                overlayEnabled = overlayEnabled(),
                 forceReleased = forceReleased,
                 shieldEnabled = shieldEnabled(),
             )
-
-        private fun overlayEnabled(): Boolean = configProvider.current()[UiConfig.OVERLAY].enabled
 
         /** 触摸盾总开关（关闭后运行中不屏蔽用户触摸，N215）。 */
         private fun shieldEnabled(): Boolean = configProvider.current()[DeviceConfig.TOUCH].shieldEnabled
@@ -204,10 +199,9 @@ public class TouchShieldController
 internal fun shieldTouchable(
     active: Boolean,
     actionDepth: Int,
-    overlayEnabled: Boolean,
     forceReleased: Boolean,
     shieldEnabled: Boolean,
-): Boolean = active && shieldEnabled && !forceReleased && actionDepth == 0 && overlayEnabled
+): Boolean = active && shieldEnabled && !forceReleased && actionDepth == 0
 
 /**
  * 盾窗口 spec：铺满整个屏幕（MATCH_PARENT，<= 0 的宽高在触摸探针矩形判定里视为不存在，

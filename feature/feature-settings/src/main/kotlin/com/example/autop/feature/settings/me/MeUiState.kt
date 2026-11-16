@@ -40,8 +40,6 @@ public data class MeUiState(
     val embeddingProviderId: String = "none",
     /** `ui.overlay.windowType`（悬浮窗通道：auto / accessibility / application，docs/tech/05 §10）。 */
     val overlayWindowType: String = "auto",
-    /** `ui.overlay.enabled`（悬浮球是否显示）。 */
-    val overlayEnabled: Boolean = true,
     /** `ui.overlay.displayMode`（悬浮球显示方式：auto / always / edge）。 */
     val overlayDisplayMode: String = "auto",
     /** `ui.overlay.opacity`（球体与贴边小条透明度，1.0=完全不透明）。 */

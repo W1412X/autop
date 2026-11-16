@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 7,
+  "schemaVersion": 8,
   "ui": {
     "appearance": {
       "darkMode": "SYSTEM",
@@ -30,7 +30,6 @@
       "searchDebounceMs": 300
     },
     "overlay": {
-      "enabled": true,
       "windowType": "auto",
       "displayMode": "auto",
       "opacity": 1.0,

@@ -136,7 +136,6 @@ public class AppearanceSettingsViewModel
                     defaultModelName = profiles.firstOrNull { it.id == defaultId }?.displayName,
                     embeddingProviderId = snapshot[LlmConfig.EMBEDDING].provider,
                     overlayWindowType = snapshot[UiConfig.OVERLAY].windowType,
-                    overlayEnabled = snapshot[UiConfig.OVERLAY].enabled,
                     overlayDisplayMode = snapshot[UiConfig.OVERLAY].displayMode,
                     overlayOpacity = snapshot[UiConfig.OVERLAY].opacity,
                     hostPersistent = snapshot[TaskConfig.HOST].persistent,
@@ -203,7 +202,6 @@ public class AppearanceSettingsViewModel
                 is MeAction.SetLanguage ->
                     write(UiConfig.APPEARANCE.path + SUFFIX_LANGUAGE, JsonPrimitive(action.value))
                 is MeAction.SetOverlayWindowType -> write(OVERLAY_WINDOW_TYPE_PATH, JsonPrimitive(action.value))
-                is MeAction.SetOverlayEnabled -> write(OVERLAY_ENABLED_PATH, JsonPrimitive(action.enabled))
                 is MeAction.SetOverlayDisplayMode -> write(OVERLAY_DISPLAY_MODE_PATH, JsonPrimitive(action.value))
                 is MeAction.SetOverlayOpacity -> write(OVERLAY_OPACITY_PATH, JsonPrimitive(action.value))
                 is MeAction.SetHostPersistent -> write(HOST_PERSISTENT_PATH, JsonPrimitive(action.enabled))
@@ -327,9 +325,6 @@ public class AppearanceSettingsViewModel
 
             /** 悬浮窗通道写入路径（ui.overlay.windowType，docs/tech/05 §10）。 */
             const val OVERLAY_WINDOW_TYPE_PATH = "ui.overlay.windowType"
-
-            /** 悬浮球显隐写入路径（ui.overlay.enabled）。 */
-            const val OVERLAY_ENABLED_PATH = "ui.overlay.enabled"
 
             /** 悬浮球显示方式写入路径（ui.overlay.displayMode）。 */
             const val OVERLAY_DISPLAY_MODE_PATH = "ui.overlay.displayMode"

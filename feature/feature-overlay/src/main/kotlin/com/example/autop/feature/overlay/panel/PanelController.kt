@@ -18,7 +18,6 @@ import com.example.autop.device.OverlayHost
 import com.example.autop.feature.overlay.OverlayWindowIds
 import com.example.autop.feature.overlay.ball.BallStateHolder
 import com.example.autop.feature.overlay.composeOverlayView
-import com.example.autop.feature.overlay.progress.ProgressController
 import com.example.autop.llm.ModelProfileStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -36,7 +35,6 @@ public class PanelController
         private val host: OverlayHost,
         private val holder: BallStateHolder,
         private val actions: PanelRunActions,
-        private val progressController: ProgressController,
     ) {
         private val shownState = MutableStateFlow(false)
 
@@ -76,10 +74,9 @@ public class PanelController
                 remember(this) {
                     PanelCallbacks(
                         onSend = { text, modelProfileId ->
-                            actions.send(text, modelProfileId) {
-                                dismiss()
-                                progressController.show()
-                            }
+                            // 发送后只收起面板；执行中的进度由顶部控制条与运行详情面板呈现（ADR-0014 / N218），
+                            // 不再拉起旧进度窗（ProgressController 窗口保留，供悬浮球菜单手动打开）。
+                            actions.send(text, modelProfileId) { dismiss() }
                         },
                         onDismiss = ::dismiss,
                     )

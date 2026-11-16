@@ -20,7 +20,6 @@ class BallMenuLogicTest {
                     BallMenuAction.OPEN_APP,
                     BallMenuAction.RECORD,
                     BallMenuAction.TOOL_TEST,
-                    BallMenuAction.HIDE_BALL,
                 ),
             )
     }
@@ -33,7 +32,6 @@ class BallMenuLogicTest {
                     BallMenuAction.CREATE_TASK,
                     BallMenuAction.OPEN_APP,
                     BallMenuAction.RECORD,
-                    BallMenuAction.HIDE_BALL,
                 ),
             )
     }

@@ -30,9 +30,6 @@ public enum class BallMenuAction {
 
     /** 工具测试面板（两种状态都有；N198）。 */
     TOOL_TEST,
-
-    /** 隐藏悬浮球（空闲菜单）：写 `ui.overlay.enabled=false`，设置页可再开。 */
-    HIDE_BALL,
 }
 
 /**
@@ -54,7 +51,6 @@ public fun deriveBallMenu(
             BallMenuAction.OPEN_APP,
             BallMenuAction.RECORD.takeIf { flowsEnabled },
             BallMenuAction.TOOL_TEST.takeIf { toolTestEnabled },
-            BallMenuAction.HIDE_BALL,
         )
     } else {
         emptyList()

@@ -44,7 +44,6 @@
     <string name="ball_menu_abort">中止任务</string>
     <string name="ball_menu_tool_test">工具测试</string>
     <string name="ball_menu_record">录制流程</string>
-    <string name="ball_menu_hide">隐藏悬浮球</string>
 
     <!-- 配对卡（无线调试配对码输入小窗） -->
     <string name="pairing_card_title">发现可配对设备</string>

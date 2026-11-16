@@ -22,7 +22,7 @@ public data class ConfigMigration(
 )
 
 /** 配置（用户覆盖）文件的当前 schemaVersion。 */
-public const val CURRENT_SCHEMA_VERSION: Int = 7
+public const val CURRENT_SCHEMA_VERSION: Int = 8
 
 /**
  * 内置迁移链：v2 删除屏幕观测 v4 不再使用的配置键（docs/design/
@@ -51,6 +51,8 @@ public fun builtinConfigMigrations(): List<ConfigMigration> =
             val withoutTools = removeFromArray(cleaned, listOf("agent", "tools", "enabled"), REMOVED_TOOLS_V7)
             removeFromArray(withoutTools, listOf("flow", "recovery", "ladder"), REMOVED_RECOVERY_V7)
         },
+        // ADR-0037：device.shell 新增保活间隔键（仅增键，覆盖文件无需改写，旧文件缺键用默认值）。
+        ConfigMigration(from = 7, to = 8) { doc -> doc },
     )
 
 /** v2 删除的配置路径。 */

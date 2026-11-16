@@ -32,7 +32,7 @@ internal fun PermissionsSection(
     onAction: (MeAction) -> Unit,
 ) {
     PermissionSubsection(state = state, focus = focus, onOpen = onOpen, onAction = onAction)
-    OverlaySubsection(state = state, sheets = sheets, onAction = onAction)
+    OverlaySubsection(state = state, sheets = sheets)
     ExecutionSubsection(state = state, onOpen = onOpen, sheets = sheets, onAction = onAction)
 }
 
@@ -72,16 +72,9 @@ private fun PermissionSubsection(
 private fun OverlaySubsection(
     state: MeUiState,
     sheets: MeSheetState,
-    onAction: (MeAction) -> Unit,
 ) {
     Column {
         SectionTitle(text = stringResource(R.string.me_sub_section_overlay))
-        SwitchRow(
-            title = stringResource(R.string.me_overlay_enabled),
-            subtitle = null,
-            checked = state.overlayEnabled,
-            onCheckedChange = { onAction(MeAction.SetOverlayEnabled(it)) },
-        )
         OptionRow(
             title = stringResource(R.string.me_overlay_channel),
             subtitle = stringResource(R.string.me_sub_overlay_channel),

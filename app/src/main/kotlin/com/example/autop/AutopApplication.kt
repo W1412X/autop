@@ -10,6 +10,8 @@ import com.example.autop.core.platform.AndroidLogger
 import com.example.autop.core.platform.CrashLogger
 import com.example.autop.core.platform.DataSchemaState
 import com.example.autop.device.PairingDiscovery
+import com.example.autop.device.ScreenLease
+import com.example.autop.device.ShellInput
 import com.example.autop.device.UpdateChecker
 import com.example.autop.device.UserActivityMonitor
 import com.example.autop.device.VisualScreenParser
@@ -24,15 +26,16 @@ import com.example.autop.feature.overlay.panel.PanelController
 import com.example.autop.feature.overlay.probe.ProbeController
 import com.example.autop.feature.overlay.progress.ProgressController
 import com.example.autop.feature.overlay.record.RecordController
+import com.example.autop.task.RunService
 import com.example.autop.task.impl.InterruptedRunRecovery
 import com.example.autop.task.impl.di.AppScope
 import com.example.autop.task.impl.host.AgentHostStarter
+import com.example.autop.task.impl.notify.RunAttentionNotifier
 import com.example.autop.task.impl.schedule.AlarmSync
 import com.example.autop.task.impl.schedule.TriggerHub
 import com.example.autop.task.impl.store.AuditCleaner
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
@@ -90,9 +93,17 @@ class AutopApplication : Application() {
 
     @Inject lateinit var hostStarter: AgentHostStarter
 
+    @Inject lateinit var shellInput: ShellInput
+
     @Inject lateinit var runRecovery: InterruptedRunRecovery
 
     @Inject lateinit var auditCleaner: AuditCleaner
+
+    @Inject lateinit var runAttentionNotifier: RunAttentionNotifier
+
+    @Inject lateinit var runService: RunService
+
+    @Inject lateinit var screenLease: ScreenLease
 
     @Inject lateinit var androidLogger: AndroidLogger
 
@@ -142,18 +153,20 @@ class AutopApplication : Application() {
         overlayWindows.register(OverlayWindowIds.RUN_BAR, indicatorController.runBarFactory())
         overlayWindows.register(OverlayWindowIds.RUN_DETAIL, indicatorController.runDetailFactory())
         indicatorController.start()
-        // 悬浮球显隐随 ui.overlay.enabled 实时生效（菜单"隐藏悬浮球"/设置页开关立即收放）；
-        // 运行期顶部控制条承担提示与停止入口时隐藏悬浮球（功能保留，Run 收口自动回显）。
+        // 悬浮球常驻（ADR-0036）：占屏幕运行的状态条显示时让位
         appScope.launch {
-            combine(
-                configProvider.observe().map { it[UiConfig.OVERLAY].enabled },
-                indicatorController.barVisible,
-            ) { enabled, barVisible -> enabled && !barVisible }
-                .distinctUntilChanged()
-                .collect { show -> if (show) ballController.start() else ballController.hide() }
+            indicatorController.barVisible
+                .collect { barVisible -> if (barVisible) ballController.hide() else ballController.start() }
         }
         // 无线调试配对自动发现（未配对时后台监听可配对服务，发现即通知；配对成功自动停用）。
         pairingDiscovery.start(appScope)
+        // 已配对即拉起宿主服务：shell 保活巡逻（ShellKeepAlive）只在该服务里运行，没有它，
+        // 无线调试被关闭后的断开无人探测（ADR-0037）。独立协程，不能和下面的常驻收集串在同一协程里。
+        appScope.launch {
+            shellInput.paired.collect { paired -> if (paired) hostStarter.ensureRunning() }
+        }
+        // 后台运行的提问与策略拦截发通知（占屏幕时由悬浮窗处理，不发通知）
+        runAttentionNotifier.start(appScope, runService.observeActive(), screenLease.holder)
         // 应用更新静默检测（24h 节流，IO 协程，不阻塞界面；发现新版本由设置页横幅提示）。
         updateChecker.start(appScope)
         // 配对卡：发现即可配对设备即浮出输入小窗（零跳转，不依赖通知权限）。
