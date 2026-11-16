@@ -18,6 +18,23 @@ class ShellHostProcessTest {
     }
 
     @Test
+    fun `parses the process state character`() {
+        val stat = ShellHostProcess.parseStat("77 (sleep) Z 50 77 77 0 -1 4194304 1 0")
+        assertThat(stat?.state).isEqualTo('Z')
+    }
+
+    @Test
+    fun `zombie processes do not count as job members`() {
+        val stats =
+            listOf(
+                ProcStat(pid = 500L, ppid = 1L, pgrp = 500L, session = 500L, state = 'S'),
+                ProcStat(pid = 501L, ppid = 500L, pgrp = 500L, session = 500L, state = 'Z'),
+            )
+        val selected = ShellHostProcess.selectJobProcesses(500L, stats, self = 1L)
+        assertThat(selected).containsExactly(500L)
+    }
+
+    @Test
     fun `selects the process group leader its members and their descendants`() {
         val job = 1000L
         val stats =

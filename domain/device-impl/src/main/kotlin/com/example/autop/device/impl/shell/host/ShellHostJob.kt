@@ -3,6 +3,8 @@ package com.example.autop.device.impl.shell.host
 import android.system.OsConstants
 import java.io.File
 import java.io.InputStream
+import java.io.OutputStream
+import java.util.Locale
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.ScheduledFuture
@@ -24,7 +26,8 @@ internal data class ShellHostJobResult(
  * 到 `sh -c <命令>`，因此 pid 即进程组 id（setsid 之后 pgid = sid = pid）。
  * 这样不依赖 `Process.pid()`（Android 33 之前没有）。命令本身作为单个参数传递，不经二次拼接。
  *
- * 结束路径（正常退出、超时、取消）都会回收整个进程组，并扫描残留后代。
+ * 结束路径（正常退出、超时、取消）都会回收整个进程组，并扫描残留后代。宿主自身被强杀时，
+ * 不会执行这些路径；由包装脚本中的看门狗（见 [SCRIPT]）经 stdin 管道 EOF 回收进程组。
  */
 internal class ShellHostJob(
     val id: String,
@@ -57,6 +60,10 @@ internal class ShellHostJob(
     @Volatile
     private var timeoutFuture: ScheduledFuture<*>? = null
 
+    /** 宿主一端的 stdin 管道写端；job 结束后关闭。 */
+    @Volatile
+    private var stdinPipe: OutputStream? = null
+
     /** 未结束（尚未发布结果）为 true；占用 job 槽。 */
     val isActive: Boolean
         get() = finished.count > 0L
@@ -66,20 +73,24 @@ internal class ShellHostJob(
      */
     fun start(): Boolean {
         val pidFile = File.createTempFile("autop-job-", ".pid")
+        val graceArg = String.format(Locale.ROOT, "%.3f", killGraceMs / MS_PER_SECOND)
         val process =
-            runCatching { ProcessBuilder(SETSID, "sh", "-c", SCRIPT, pidFile.absolutePath, command).start() }
-                .getOrNull()
+            runCatching {
+                ProcessBuilder(SETSID, "sh", "-c", SCRIPT, pidFile.absolutePath, command, graceArg).start()
+            }.getOrNull()
         if (process == null) {
             pidFile.delete()
             return false
         }
-        runCatching { process.outputStream.close() }
+        // stdin 管道由宿主持有：宿主结束时管道关闭，包装脚本里的看门狗据此回收进程组。
+        stdinPipe = process.outputStream
         pumps += pump(process.inputStream, stdout)
         pumps += pump(process.errorStream, stderr)
         val pid = awaitPid(pidFile)
         pidFile.delete()
         if (pid == null) {
             process.destroy()
+            runCatching { process.outputStream.close() }
             return false
         }
         pgid = pid
@@ -148,6 +159,7 @@ internal class ShellHostJob(
         }
         cleanupAfterNormalExit()
         pumps.forEach { it.join(PUMP_JOIN_MS) }
+        runCatching { stdinPipe?.close() }
         durationMs = TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedNanos)
         finished.countDown()
     }
@@ -192,8 +204,34 @@ internal class ShellHostJob(
         }
 
     private companion object {
-        /** 脚本：先写出自身 pid（即进程组 id），再 exec 到真正的命令。$0 为 pid 文件，$1 为命令。 */
-        const val SCRIPT: String = "echo \$\$ > \"\$0\"; exec sh -c \"\$1\""
+        /**
+         * 包装脚本（宿主失联时回收 job，shell-exec 设计 §5.4）。$0 为 pid 文件，$1 为命令，$2 为回收宽限秒数。
+         *
+         * 宿主持有 job stdin 管道的写端。宿主不论以何种方式结束（正常退出或被 SIGKILL），内核都会关闭该写端，
+         * 看门狗在 `read` 上得到 EOF，于是 TERM 整个进程组、等待宽限、再 KILL。
+         * 宿主主动 TERM（取消、超时）时看门狗直接退出，不增加宿主侧的等待。
+         * 命令正常结束时，包装进程先 KILL 看门狗再退出，不产生额外等待。
+         */
+        val SCRIPT: String =
+            listOf(
+                "echo \$\$ > \"\$0\"",
+                "JOB=\$\$",
+                "exec 3<&0 </dev/null",
+                "(",
+                "  trap 'exit 0' TERM",
+                "  read -r _ <&3",
+                "  trap '' TERM",
+                "  kill -TERM -- -\"\$JOB\" 2>/dev/null",
+                "  sleep \"\$2\"",
+                "  kill -KILL -- -\"\$JOB\" 2>/dev/null",
+                ") &",
+                "W=\$!",
+                "sh -c \"\$1\" 3<&-",
+                "RC=\$?",
+                "kill -KILL \"\$W\" 2>/dev/null",
+                "exit \"\$RC\"",
+            ).joinToString("\n")
+        const val MS_PER_SECOND: Double = 1000.0
         const val SETSID: String = "setsid"
         const val PID_POLL_ATTEMPTS: Int = 60
         const val PID_POLL_MS: Long = 50L

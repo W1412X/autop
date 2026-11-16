@@ -5,12 +5,13 @@ import android.system.Os
 import android.system.OsConstants
 import java.io.File
 
-/** `/proc/<pid>/stat` 中用于回收判定的字段。 */
+/** `/proc/<pid>/stat` 中用于回收判定的字段；[state] 为进程状态字符（`Z` 表示僵尸，已退出）。 */
 internal data class ProcStat(
     val pid: Long,
     val ppid: Long,
     val pgrp: Long,
     val session: Long,
+    val state: Char = 'S',
 )
 
 /** 进程组与后代进程的查找、信号发送（shell-exec 设计 §5.4）。 */
@@ -28,8 +29,9 @@ internal object ShellHostProcess {
         val ppid = fields.getOrNull(FIELD_PPID)?.toLongOrNull()
         val pgrp = fields.getOrNull(FIELD_PGRP)?.toLongOrNull()
         val session = fields.getOrNull(FIELD_SESSION)?.toLongOrNull()
-        if (ppid == null || pgrp == null) return null
-        return pid?.let { p -> session?.let { s -> ProcStat(p, ppid, pgrp, s) } }
+        val state = fields.getOrNull(FIELD_STATE)?.firstOrNull()
+        if (ppid == null || pgrp == null || state == null) return null
+        return pid?.let { p -> session?.let { s -> ProcStat(p, ppid, pgrp, s, state) } }
     }
 
     /**
@@ -41,14 +43,16 @@ internal object ShellHostProcess {
         stats: List<ProcStat>,
         self: Long,
     ): Set<Long> {
+        // 僵尸与已死进程不再占用资源，也不应阻止回收判定。
+        val live = stats.filter { it.state != STATE_ZOMBIE && it.state != STATE_DEAD }
         val members = mutableSetOf<Long>()
-        for (s in stats) {
+        for (s in live) {
             if (s.pgrp == leaderPid || s.session == leaderPid) members += s.pid
         }
         var grew = true
         while (grew) {
             grew = false
-            for (s in stats) {
+            for (s in live) {
                 if (s.pid !in members && s.ppid in members) {
                     members += s.pid
                     grew = true
@@ -111,7 +115,10 @@ internal object ShellHostProcess {
     }
 
     /** `stat` 字段下标（以 `)` 之后的第一个字段 state 为 0）。 */
+    private const val FIELD_STATE = 0
     private const val FIELD_PPID = 1
+    private const val STATE_ZOMBIE = 'Z'
+    private const val STATE_DEAD = 'X'
     private const val FIELD_PGRP = 2
     private const val FIELD_SESSION = 3
     private const val STAT_FILE = "stat"
