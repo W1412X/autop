@@ -41,6 +41,7 @@ import com.example.autop.device.impl.shell.ShellKeepAliveImpl
 import com.example.autop.device.impl.speech.SystemSpeechInput
 import com.example.autop.device.impl.touch.TouchShieldController
 import com.example.autop.device.impl.update.GitHubUpdateChecker
+import com.example.autop.device.impl.update.UpdateReadyNotifier
 import com.example.autop.device.impl.vision.VisualScreenParserImpl
 import dagger.Module
 import dagger.Provides
@@ -133,5 +134,6 @@ public object DevicePortsModule {
         @ApplicationContext context: Context,
         dispatchers: DispatcherProvider,
         logger: Logger,
-    ): UpdateChecker = GitHubUpdateChecker(context, dispatchers, logger)
+        readyNotifier: UpdateReadyNotifier,
+    ): UpdateChecker = GitHubUpdateChecker(context, dispatchers, logger, readyNotifier)
 }

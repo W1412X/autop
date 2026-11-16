@@ -115,6 +115,7 @@ public class GitHubUpdateChecker
         @ApplicationContext private val context: Context,
         private val dispatchers: DispatcherProvider,
         private val logger: Logger,
+        private val readyNotifier: UpdateReadyNotifier,
         private val apiUrl: String = RELEASES_API_URL,
     ) : UpdateChecker {
         private val prefs: SharedPreferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -169,6 +170,11 @@ public class GitHubUpdateChecker
         }
 
         override fun canRequestInstall(): Boolean = context.packageManager.canRequestPackageInstalls()
+
+        override fun notifyReadyToInstall() {
+            val ready = _state.value as? UpdateState.ReadyToInstall ?: return
+            readyNotifier.notify(ready.info.versionName)
+        }
 
         override suspend fun checkNow(): Outcome<UpdateInfo?> = runCheck(manual = true)
 
@@ -319,6 +325,7 @@ public class GitHubUpdateChecker
                     ),
                 )
             }
+            readyNotifier.cancel()
             return catchingAsError(DeviceErrorCodes.INSTALL_FAILED) {
                 val uri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", ready.file)
                 context.startActivity(

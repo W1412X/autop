@@ -9,10 +9,14 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.example.autop.core.ui.component.AutopButton
 import com.example.autop.core.ui.component.AutopTextButton
@@ -26,6 +30,20 @@ private const val NOTES_MAX_LINES: Int = 8
 /** 全局新版本提示宿主：有待提示的新版本时显示弹窗，否则不占位。 */
 @Composable
 public fun UpdatePromptHost(viewModel: UpdatePromptViewModel = hiltViewModel()) {
+    val lifecycleOwner = LocalLifecycleOwner.current
+    DisposableEffect(lifecycleOwner, viewModel) {
+        // 应用可见（RESUMED）才算位于前台：自动拉起安装器只在此时进行（见 UpdatePromptViewModel）。
+        val observer =
+            LifecycleEventObserver { _, event ->
+                when (event) {
+                    Lifecycle.Event.ON_RESUME -> viewModel.onAppVisibilityChanged(true)
+                    Lifecycle.Event.ON_PAUSE -> viewModel.onAppVisibilityChanged(false)
+                    else -> Unit
+                }
+            }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
     val info by viewModel.prompt.collectAsStateWithLifecycle()
     info?.let { pending ->
         UpdatePromptDialog(

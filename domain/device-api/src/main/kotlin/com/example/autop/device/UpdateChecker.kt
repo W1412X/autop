@@ -117,6 +117,12 @@ public interface UpdateChecker {
     public fun canRequestInstall(): Boolean
 
     /**
+     * 为已下载完成的新版本发一条系统通知（点按回到应用，由应用前台时的自动安装接手）。
+     * 应用位于前台时不需要调用。重复调用只更新同一条通知，不重复提醒。
+     */
+    public fun notifyReadyToInstall()
+
+    /**
      * 在 [scope] 内启动后台周期检测（幂等）：启动时立即检测一次，之后每小时检测一次。
      * 自动检测静默进行，失败不改变状态，下一轮再试。
      */

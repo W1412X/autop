@@ -451,6 +451,8 @@ private class FakeUpdateChecker : UpdateChecker {
 
     override fun canRequestInstall(): Boolean = false
 
+    override fun notifyReadyToInstall() = Unit
+
     override fun start(scope: CoroutineScope) = Unit
 
     override suspend fun checkNow(): Outcome<UpdateInfo?> = Outcome.Ok(null)

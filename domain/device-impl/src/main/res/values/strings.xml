@@ -12,4 +12,7 @@
     <string name="pairing_working">正在使用配对码配对无线调试…</string>
     <string name="pairing_result_ok">无线调试配对成功，注入通道已连接</string>
     <string name="pairing_result_failed">无线调试配对失败，请检查配对码后重试</string>
+    <string name="update_channel_name">应用更新</string>
+    <string name="update_ready_title">新版本已下载</string>
+    <string name="update_ready_text">AutoP %1$s 已下载完成，点按打开应用即可安装</string>
 </resources>
