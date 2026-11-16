@@ -20,7 +20,6 @@ import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.example.autop.device.impl.adb.AdbClient
 import com.example.autop.device.impl.adb.AdbKey
-import com.example.autop.device.impl.adb.AdbMdns
 import com.example.autop.device.impl.adb.AdbPairingClient
 import com.example.autop.device.impl.adb.PreferenceAdbKeyStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -28,7 +27,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -36,11 +34,9 @@ import kotlinx.coroutines.withTimeoutOrNull
 import java.io.Closeable
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.resume
 
 private const val TAG = "AdbShellInput"
-private const val PREFS_NAME = "autop_adb"
-private const val KEY_CONNECT_PORT = "connect_port"
+private const val PREFS_NAME = ADB_PREFS_NAME
 private const val KEY_PAIRED = "paired"
 private const val ADB_HOST = "127.0.0.1"
 
@@ -55,6 +51,7 @@ public class AdbShellInput
         @ApplicationContext private val context: Context,
         private val dispatchers: DispatcherProvider,
         private val configProvider: ConfigProvider,
+        private val connectPorts: AdbConnectPorts,
     ) : ShellInput {
         private val prefs: SharedPreferences
             get() = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -184,7 +181,7 @@ public class AdbShellInput
             val port = discoverConnectPort()
             val opened = port?.let { openClient(it) }
             if (opened != null && port != null) {
-                prefs.edit { putInt(KEY_CONNECT_PORT, port) }
+                connectPorts.remember(port)
             }
             client = opened
             mutableState.value = if (opened != null) ShellState.Connected else ShellState.Disconnected
@@ -197,28 +194,12 @@ public class AdbShellInput
                 AdbClient(ADB_HOST, port, key).also { it.connect() }
             }.getOrElse { error ->
                 Log.w(TAG, "connect to adbd failed on port $port", error)
-                prefs.edit { remove(KEY_CONNECT_PORT) }
+                connectPorts.forget()
                 null
             }
 
-        /** 连接端口：先试持久化的上次端口（无线调试重启会变，失败落发现），再 mDNS 发现。 */
-        private suspend fun discoverConnectPort(): Int? {
-            val cached = prefs.getInt(KEY_CONNECT_PORT, -1)
-            if (cached > 0) return cached
-            val timeoutMs = configProvider.current()[DeviceConfig.SHELL].discoverTimeoutMs
-            return withTimeoutOrNull(timeoutMs) {
-                suspendCancellableCoroutine { continuation ->
-                    val mdns =
-                        AdbMdns(context, AdbMdns.TLS_CONNECT) { port ->
-                            if (continuation.isActive) {
-                                continuation.resume(if (port > 0) port else null)
-                            }
-                        }
-                    mdns.start()
-                    continuation.invokeOnCancellation { mdns.stop() }
-                }
-            }
-        }
+        /** 连接端口：先试上次成功的端口（无线调试重启会变，失败后落到发现），再 mDNS 发现。 */
+        private suspend fun discoverConnectPort(): Int? = connectPorts.cached() ?: connectPorts.discover()
 
         private fun closeClientLocked() {
             runCatching { (client as? Closeable)?.close() }

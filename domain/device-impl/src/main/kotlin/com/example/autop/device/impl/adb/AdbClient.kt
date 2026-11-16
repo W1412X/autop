@@ -135,12 +135,14 @@ class AdbClient(
         data: String,
     ) = write(AdbMessage(command, arg0, arg1, data))
 
-    private fun write(message: AdbMessage) {
+    /** 发送一个消息。持久流需要外部加锁串行化写入（见 [AdbV2Stream]）。 */
+    internal fun write(message: AdbMessage) {
         outputStream.write(message.toByteArray())
         outputStream.flush()
     }
 
-    private fun read(): AdbMessage {
+    /** 阻塞读取一个消息；连接关闭时抛异常。 */
+    internal fun read(): AdbMessage {
         val buffer = ByteBuffer.allocate(AdbMessage.HEADER_LENGTH).order(ByteOrder.LITTLE_ENDIAN)
 
         inputStream.readFully(buffer.array(), 0, 24)

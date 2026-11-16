@@ -13,6 +13,8 @@ public data class FeaturesSection(
     @SerialName("subtasks") val subtasks: Boolean = false,
     /** 流程（可重复自动化）总开关，默认关闭（Beta），docs/adr/0030-beta-feature-switch.md。 */
     @SerialName("flows") val flows: Boolean = false,
+    /** Shell 执行总闸（完全模式，shell-exec 设计 §2.5）：关闭时完全模式不可选，`run_shell` 不可见。 */
+    @SerialName("shellExec") val shellExec: Boolean = false,
 ) : ConfigSection {
     /** 某个 Beta 功能是否开启。 */
     public fun isEnabled(feature: BetaFeature): Boolean =
@@ -40,6 +42,9 @@ public object FeaturesConfig {
         when (feature) {
             BetaFeature.FLOWS -> "features.flows"
         }
+
+    /** Shell 执行总闸的配置路径（设置页写入，shell-exec 设计 §2.5）。 */
+    public const val SHELL_EXEC_PATH: String = "features.shellExec"
 
     public val ALL: List<ConfigKey<*>> = listOf(FEATURES)
 }

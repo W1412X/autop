@@ -22,6 +22,8 @@ import com.example.autop.agent.store.recall.SnippetReader
 import com.example.autop.agent.store.testing.NoopLogger
 import com.example.autop.agent.store.testing.SeqIdGenerator
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
+import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.llm.Block
@@ -93,6 +95,19 @@ public class ThreadStoreImplTest {
             assertThat(head.headSeq).isEqualTo(second.seq)
             assertThat(head.updatedAt).isEqualTo(1_010)
             assertThat(head.preview).isEqualTo("世界")
+        }
+
+    @Test
+    public fun `run mode is stored per thread and defaults to standard`(): Unit =
+        runBlocking {
+            val thread = store.createThread("t", null)
+            assertThat(store.runModeOf(thread)).isEqualTo(RunMode.STANDARD)
+
+            store.setRunMode(thread, RunMode.CHAT_ONLY)
+
+            assertThat(store.runModeOf(thread)).isEqualTo(RunMode.CHAT_ONLY)
+            assertThat(db.threadDao().byId(thread.value)!!.runMode).isEqualTo("chat_only")
+            assertThat(store.runModeOf(ThreadId("missing"))).isEqualTo(RunMode.STANDARD)
         }
 
     @Test

@@ -62,6 +62,7 @@ import androidx.compose.material.icons.outlined.Search
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.outlined.Stop
 import androidx.compose.material.icons.outlined.Swipe
+import androidx.compose.material.icons.outlined.Terminal
 import androidx.compose.material.icons.outlined.TouchApp
 import androidx.compose.material.icons.outlined.Visibility
 import androidx.compose.material.icons.outlined.VisibilityOff
@@ -143,6 +144,7 @@ public object AutopIcons {
     public val VisibilityOff: ImageVector = Icons.Outlined.VisibilityOff
     public val ListAlt: ImageVector = Icons.AutoMirrored.Outlined.ListAlt
     public val PhoneAndroid: ImageVector = Icons.Outlined.PhoneAndroid
+    public val Terminal: ImageVector = Icons.Outlined.Terminal
     public val ContentPaste: ImageVector = Icons.Outlined.ContentPaste
     public val HelpOutline: ImageVector = Icons.AutoMirrored.Outlined.HelpOutline
 

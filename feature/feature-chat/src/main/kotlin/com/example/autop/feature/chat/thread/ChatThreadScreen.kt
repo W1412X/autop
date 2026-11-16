@@ -36,6 +36,7 @@ import com.example.autop.core.thread.ui.TimelineRow
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTonalButton
+import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.ToastEffect
@@ -65,6 +66,9 @@ public fun ChatThreadScreen(
                 .fillMaxSize()
                 .statusBarsPadding(),
     ) {
+        state.shellBlock?.let { block ->
+            ShellBlockDialog(block = block, onDismiss = { onAction(ChatThreadAction.DismissShellBlock) })
+        }
         ThreadHeader(state = state, onAction = onAction, onBack = onBack)
         ThreadTimeline(
             entries = state.entries.filterNot { (it.item as? TimelineItem.Banner)?.isLivePause() == true },
@@ -237,3 +241,22 @@ private fun livePauseOf(state: ChatThreadUiState): TimelineItem.Banner? =
     state.entries.firstNotNullOfOrNull { entry -> (entry.item as? TimelineItem.Banner)?.takeIf { it.isLivePause() } }
 
 private fun TimelineItem.Banner.isLivePause(): Boolean = kind == BannerKind.PAUSED && !resolved
+
+/** 完全模式无法切换时的说明弹窗（ADR-0040 §2.4）。 */
+@Composable
+private fun ShellBlockDialog(
+    block: ShellBlock,
+    onDismiss: () -> Unit,
+) {
+    val text =
+        when (block) {
+            ShellBlock.SWITCH_OFF -> stringResource(R.string.thread_shell_block_switch_off)
+            ShellBlock.CHANNEL_DISCONNECTED -> stringResource(R.string.thread_shell_block_channel)
+        }
+    ConfirmDialog(
+        title = stringResource(R.string.thread_shell_block_title),
+        text = text,
+        onConfirm = onDismiss,
+        onDismiss = onDismiss,
+    )
+}

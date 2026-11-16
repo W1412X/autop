@@ -24,6 +24,7 @@ import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.flow.FlowDefinition
@@ -158,6 +159,13 @@ internal class PatchFlowNodeToolTest {
                 threadId: ThreadId,
                 title: String,
             ) = Unit
+
+            override suspend fun runModeOf(threadId: ThreadId): RunMode = RunMode.STANDARD
+
+            override suspend fun setRunMode(
+                threadId: ThreadId,
+                mode: RunMode,
+            ): Unit = Unit
 
             override suspend fun modelProfileOf(threadId: ThreadId): String? = null
 

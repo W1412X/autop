@@ -10,6 +10,7 @@ import com.example.autop.core.common.FlowId
 import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.flow.FlowDebugControl
 import com.example.autop.flow.FlowProgress
@@ -29,8 +30,8 @@ public interface RunService {
         images: List<ImageAttachment> = emptyList(),
         /** 会话级模型覆盖（ModelProfile id）；null 表示跟随全局默认。发送即持久化到该会话。 */
         modelProfileId: String? = null,
-        /** ADR-0035「只聊天」：false 时本轮不提供屏幕工具（不占用手机）。 */
-        screenTools: Boolean = true,
+        /** 运行模式（ADR-0040）：决定本轮可见的工具，仅影响这一次发送。 */
+        runMode: RunMode = RunMode.STANDARD,
     ): Outcome<RunRecord>
 
     /** 从 [atSeq] 处分叉源线程并发起对话（[text] 为 null 时沿用源消息继续）。 */

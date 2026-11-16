@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "device": {
     "screenLease": {
       "acquireTimeoutMs": 3000
@@ -129,7 +129,23 @@
       "commandTimeoutMs": 5000,
       "keepAliveTickMs": 5000,
       "keepAliveRetryMs": 30000,
-      "discoverTimeoutMs": 5000
+      "discoverTimeoutMs": 5000,
+      "exec": {
+        "hostPoolSize": 3,
+        "maxJobsPerRun": 4,
+        "defaultTimeoutMs": 30000,
+        "outputLimitBytes": 65536,
+        "commandMaxBytes": 2048,
+        "confirmTimeoutMs": 60000,
+        "hostAcquireWaitMs": 10000,
+        "jobSlotWaitMs": 10000,
+        "hostIdleCloseMs": 300000,
+        "rpcTimeoutMs": 5000,
+        "handshakeTimeoutMs": 5000,
+        "ackTimeoutMs": 5000,
+        "killGraceMs": 2000,
+        "waitChunkMs": 5000
+      }
     },
     "apps": {
       "listLimit": 50

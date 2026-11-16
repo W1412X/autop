@@ -82,7 +82,7 @@ class ConfigMigrationTest {
                 put("schemaVersion", 4)
                 put("agent", toolsDoc(listOf("tool.tap", "tool.scroll")))
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         assertThat(enabledIds(migrated))
             .containsExactly("tool.tap", "tool.tap_node", "tool.scroll", "tool.scroll_node")
             .inOrder()
@@ -95,7 +95,7 @@ class ConfigMigrationTest {
                 put("schemaVersion", 4)
                 put("agent", toolsDoc(listOf("tool.tap", "tool.tap_node", "tool.scroll", "tool.scroll_node")))
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         assertThat(enabledIds(migrated))
             .containsExactly("tool.tap", "tool.tap_node", "tool.scroll", "tool.scroll_node")
             .inOrder()
@@ -108,9 +108,9 @@ class ConfigMigrationTest {
                 put("schemaVersion", 4)
                 put("device", buildJsonObject { put("nodeAction", buildJsonObject { put("enabled", true) }) })
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         assertThat(migrated["device"]!!.jsonObject).doesNotContainKey("nodeAction")
-        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+        assertThat(schemaVersionOf(migrated)).isEqualTo(7)
     }
 
     @Test
@@ -120,13 +120,13 @@ class ConfigMigrationTest {
                 put("schemaVersion", 5)
                 put("agent", agentDoc(TOOLS_V5, SOURCES_V5))
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         // v6 插入 tool.intent；继续迁移到 v7 时 tool.open_uri 被删除（tool_optimize D6）。
         assertThat(enabledIds(migrated)).containsExactly("tool.intent", "tool.wait").inOrder()
         assertThat(sourceIds(migrated))
             .containsExactly("state.environment", "state.observe", "state.navigation", "state.budget")
             .inOrder()
-        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+        assertThat(schemaVersionOf(migrated)).isEqualTo(7)
     }
 
     @Test
@@ -138,7 +138,7 @@ class ConfigMigrationTest {
                 put("schemaVersion", 5)
                 put("agent", agentDoc(tools, sources))
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         // v7 删除 tool.open_uri（tool_optimize D6），其余顺序不变。
         assertThat(enabledIds(migrated)).containsExactly("tool.intent", "tool.wait").inOrder()
         assertThat(sourceIds(migrated)).isEqualTo(sources)
@@ -151,7 +151,7 @@ class ConfigMigrationTest {
                 put("schemaVersion", 5)
                 put("agent", agentDoc(listOf("tool.wait"), null))
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         assertThat(enabledIds(migrated)).containsExactly("tool.wait")
         assertThat(resolvePath(migrated, "agent.state")).isNull()
     }
@@ -192,7 +192,7 @@ class ConfigMigrationTest {
                     },
                 )
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         val breaker = resolvePath(migrated, "agent.breaker")!!.jsonObject
         assertThat(breaker).doesNotContainKey("stuckWarn")
         assertThat(breaker).containsKey("sameErrorWarn")
@@ -200,7 +200,7 @@ class ConfigMigrationTest {
         assertThat(serializer).doesNotContainKey("diffMaxRatio")
         assertThat(serializer).containsKey("textMaxChars")
         assertThat(resolvePath(migrated, "flow.author.analysis.role")).isNull()
-        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+        assertThat(schemaVersionOf(migrated)).isEqualTo(7)
     }
 
     @Test
@@ -211,7 +211,7 @@ class ConfigMigrationTest {
                 put("schemaVersion", 6)
                 put("agent", agentDoc(tools, null))
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         assertThat(enabledIds(migrated)).containsExactly("tool.tap", "tool.wait").inOrder()
     }
 
@@ -233,7 +233,7 @@ class ConfigMigrationTest {
                     },
                 )
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         val migratedLadder = resolvePath(migrated, "flow.recovery.ladder") as JsonArray
         assertThat(migratedLadder.map { it.jsonPrimitive.content })
             .containsExactly("recovery.wait_stable", "recovery.back_and_retry")
@@ -247,9 +247,9 @@ class ConfigMigrationTest {
                 put("schemaVersion", 6)
                 put("device", buildJsonObject { put("capture", buildJsonObject { put("timeoutMs", 1500) }) })
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
         assertThat(resolvePath(migrated, "device.capture.timeoutMs")).isEqualTo(JsonPrimitive(1500))
-        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+        assertThat(schemaVersionOf(migrated)).isEqualTo(7)
     }
 
     @Test
@@ -280,10 +280,32 @@ class ConfigMigrationTest {
                 )
                 put("device", buildJsonObject { put("nodeAction", buildJsonObject { put("enabled", true) }) })
             }
-        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
-        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations(), targetVersion = 7))
+        assertThat(schemaVersionOf(migrated)).isEqualTo(7)
         // v5 会在 tool.tap 之后补 tool.tap_node；v6 在 tool.open_uri 后插入 tool.intent（随后 v7 删 open_uri）。
         assertThat(enabledIds(migrated)).containsExactly("tool.intent", "tool.tap", "tool.tap_node").inOrder()
+    }
+
+    @Test
+    fun `v8 appends run_shell to enabled tools`() {
+        val doc =
+            putSchemaVersion(buildJsonObject { put("agent", agentDoc(tools = listOf("tool.tap"), sources = null)) }, 8)
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(enabledIds(migrated)).containsExactly("tool.tap", "tool.run_shell").inOrder()
+        assertThat(schemaVersionOf(migrated)).isEqualTo(CURRENT_SCHEMA_VERSION)
+    }
+
+    @Test
+    fun `v8 does not duplicate an existing run_shell entry`() {
+        val doc =
+            putSchemaVersion(
+                buildJsonObject {
+                    put("agent", agentDoc(tools = listOf("tool.tap", "tool.run_shell"), sources = null))
+                },
+                8,
+            )
+        val migrated = okOf(migrateConfig(doc, builtinConfigMigrations()))
+        assertThat(enabledIds(migrated)).containsExactly("tool.tap", "tool.run_shell").inOrder()
     }
 
     private fun agentDoc(

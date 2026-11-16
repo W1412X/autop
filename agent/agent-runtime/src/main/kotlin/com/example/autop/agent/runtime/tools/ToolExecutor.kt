@@ -97,8 +97,11 @@ internal class ToolExecutor(
      * ADR-0035：读写屏幕的工具首次执行前取得手机。忙时返回错误结果（附给模型的提示），不执行工具。
      * 无门（null）或非屏幕工具直接放行。
      */
-    private suspend fun gateScreen(tool: Tool): ToolOutput? {
-        if (!tool.touchesScreen) return null
+    private suspend fun gateScreen(
+        tool: Tool,
+        args: JsonObject,
+    ): ToolOutput? {
+        if (!tool.requiresScreen(args)) return null
         val gate = screenGate ?: return null
         if (gate.acquire() == ScreenAccess.HELD) return null
         return errors.errorOutput(
@@ -115,18 +118,9 @@ internal class ToolExecutor(
         args: JsonObject,
         ctx: ToolContext,
     ): ToolOutput {
-        val timeoutMs = ctx.config[AgentConfig.TOOLS].let { it.timeoutMs[tool.id] ?: it.defaultTimeoutMs }
+        val timeoutMs = timeoutFor(tool, args, ctx)
         return try {
-            withTimeout(timeoutMs) {
-                gateScreen(tool)?.let { return@withTimeout it }
-                when (tool.access) {
-                    ToolAccess.READ_SCREEN -> screenLock.withRead { invokeTool(tool, args, ctx) }
-                    ToolAccess.WRITE_SCREEN -> screenLock.withWrite { invokeTool(tool, args, ctx) }
-                    ToolAccess.READ_MEMORY -> memoryLock.withRead { invokeTool(tool, args, ctx) }
-                    ToolAccess.WRITE_MEMORY -> memoryLock.withWrite { invokeTool(tool, args, ctx) }
-                    else -> invokeTool(tool, args, ctx)
-                }
-            }
+            withTimeout(timeoutMs) { runGated(tool, args, ctx) }
         } catch (e: TimeoutCancellationException) {
             val hint =
                 if (tool.access == ToolAccess.WRITE_SCREEN) {
@@ -141,6 +135,41 @@ internal class ToolExecutor(
             errors.errorOutput(AgentErrorCodes.TOOL_CRASHED, e.message ?: e.toString())
         }
     }
+
+    /** 工具超时：工具自定义（ADR-0041）优先，否则取配置中的单工具或默认值。 */
+    private fun timeoutFor(
+        tool: Tool,
+        args: JsonObject,
+        ctx: ToolContext,
+    ): Long {
+        tool.timeoutMs(args)?.let { return it }
+        val tools = ctx.config[AgentConfig.TOOLS]
+        return tools.timeoutMs[tool.id] ?: tools.defaultTimeoutMs
+    }
+
+    /** preflight → 屏幕门 → 按 [Tool.access] 加读写锁执行。 */
+    private suspend fun runGated(
+        tool: Tool,
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolOutput {
+        tool.preflight(args, ctx)?.let { return it }
+        gateScreen(tool, args)?.let { return it }
+        return withAccessLock(tool, args, ctx)
+    }
+
+    private suspend fun withAccessLock(
+        tool: Tool,
+        args: JsonObject,
+        ctx: ToolContext,
+    ): ToolOutput =
+        when (tool.access) {
+            ToolAccess.READ_SCREEN -> screenLock.withRead { invokeTool(tool, args, ctx) }
+            ToolAccess.WRITE_SCREEN -> screenLock.withWrite { invokeTool(tool, args, ctx) }
+            ToolAccess.READ_MEMORY -> memoryLock.withRead { invokeTool(tool, args, ctx) }
+            ToolAccess.WRITE_MEMORY -> memoryLock.withWrite { invokeTool(tool, args, ctx) }
+            else -> invokeTool(tool, args, ctx)
+        }
 
     /** 普通工具直接 invoke；ScreenActionTool 走 prepare → 策略 → perform。 */
     private suspend fun invokeTool(

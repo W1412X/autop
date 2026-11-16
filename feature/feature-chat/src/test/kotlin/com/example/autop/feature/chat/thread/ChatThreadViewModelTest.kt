@@ -16,12 +16,15 @@ import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.LogFiles
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.core.thread.ui.ChatImageReader
 import com.example.autop.core.thread.ui.TimelineItem
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.ShellInput
+import com.example.autop.device.ShellState
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
@@ -124,6 +127,48 @@ public class ChatThreadViewModelTest {
             assertThat(hasUserText(viewModel, "新线程消息")).isTrue()
         }
 
+    @Test
+    public fun `run mode stays after a message is sent in the same thread`() =
+        runTest(testDispatcher) {
+            val viewModel = createViewModel(FakeChatThreadStore(), FakeChatRunService())
+            viewModel.bindThread("t1")
+
+            viewModel.onAction(ChatThreadAction.SetRunMode(RunMode.CHAT_ONLY))
+            viewModel.onAction(ChatThreadAction.SetInput("你好"))
+            viewModel.onAction(ChatThreadAction.Send)
+
+            assertThat(viewModel.uiState.value.runMode).isEqualTo(RunMode.CHAT_ONLY)
+        }
+
+    @Test
+    public fun `run mode is restored from the thread when it is reopened`() =
+        runTest(testDispatcher) {
+            val threads = FakeChatThreadStore()
+            val runService = FakeChatRunService()
+            val first = createViewModel(threads, runService)
+            first.bindThread("t1")
+            first.onAction(ChatThreadAction.SetRunMode(RunMode.CHAT_ONLY))
+
+            val reopened = createViewModel(threads, runService)
+            reopened.bindThread("t1")
+
+            assertThat(reopened.uiState.value.runMode).isEqualTo(RunMode.CHAT_ONLY)
+            assertThat(threads.runModeOf(ThreadId("t1"))).isEqualTo(RunMode.CHAT_ONLY)
+        }
+
+    @Test
+    public fun `fork persists the current run mode on the new thread`() =
+        runTest(testDispatcher) {
+            val threads = FakeChatThreadStore()
+            val viewModel = createViewModel(threads, FakeChatRunService(), FakeForkSession())
+            viewModel.bindThread("t1")
+            viewModel.onAction(ChatThreadAction.SetRunMode(RunMode.CHAT_ONLY))
+
+            viewModel.onAction(ChatThreadAction.ForkFrom(1))
+
+            assertThat(threads.runModeOf(ThreadId("t2"))).isEqualTo(RunMode.CHAT_ONLY)
+        }
+
     private fun hasUserText(
         viewModel: ChatThreadViewModel,
         text: String,
@@ -150,7 +195,41 @@ public class ChatThreadViewModelTest {
                     TestDispatcherProvider(testDispatcher),
                 ),
             speech = FakeSpeechInput(),
+            shellInput = FakeChatShellInput(),
         )
+}
+
+/** 只读 shell 通道状态（默认未连接，发送 FULL 模式时走阻断分支）。 */
+private class FakeChatShellInput : ShellInput {
+    override val state: StateFlow<ShellState> = MutableStateFlow(ShellState.Disconnected)
+    override val paired: StateFlow<Boolean> = MutableStateFlow(false)
+
+    override suspend fun pair(
+        pairingPort: Int,
+        pairCode: String,
+    ): Outcome<Unit> = error("unused")
+
+    override suspend fun connect(): Boolean = false
+
+    override suspend fun probe(): Boolean = false
+
+    override suspend fun tap(
+        x: Int,
+        y: Int,
+        durationMs: Long,
+    ): Boolean = error("unused")
+
+    override suspend fun swipe(
+        fromX: Int,
+        fromY: Int,
+        toX: Int,
+        toY: Int,
+        durationMs: Long,
+    ): Boolean = error("unused")
+
+    override suspend fun keyEvent(code: Int): Boolean = error("unused")
+
+    override suspend fun keyCombination(vararg codes: Int): Boolean = error("unused")
 }
 
 /** 一条用户输入消息载荷。 */
@@ -258,6 +337,17 @@ private class FakeChatThreadStore : ThreadStore {
         profileId: String?,
     ) = Unit
 
+    private val runModes = mutableMapOf<String, RunMode>()
+
+    override suspend fun runModeOf(threadId: ThreadId): RunMode = runModes[threadId.value] ?: RunMode.STANDARD
+
+    override suspend fun setRunMode(
+        threadId: ThreadId,
+        mode: RunMode,
+    ) {
+        runModes[threadId.value] = mode
+    }
+
     override suspend fun titleOf(threadId: ThreadId): String? = null
 
     override suspend fun delete(threadId: ThreadId): Unit = Unit
@@ -311,7 +401,7 @@ private class FakeChatRunService : RunService {
         text: String,
         images: List<ImageAttachment>,
         modelProfileId: String?,
-        screenTools: Boolean,
+        runMode: com.example.autop.core.common.RunMode,
     ): Outcome<RunRecord> = Outcome.Ok(record("r-new", threadId ?: ThreadId("thread-new")))
 
     override suspend fun forkAndRun(

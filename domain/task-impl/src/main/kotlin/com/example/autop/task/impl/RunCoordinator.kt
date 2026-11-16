@@ -16,6 +16,7 @@ import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.device.TouchShield
 import com.example.autop.flow.FlowDebugControl
@@ -64,9 +65,9 @@ public class RunCoordinator(
         text: String,
         images: List<ImageAttachment>,
         modelProfileId: String?,
-        screenTools: Boolean,
+        runMode: RunMode,
     ): Outcome<RunRecord> {
-        val result = executor.launchChat(threadId, text, images, modelProfileId, screenTools)
+        val result = executor.launchChat(threadId, text, images, modelProfileId, runMode)
         host.ensureRunning()
         return result
     }

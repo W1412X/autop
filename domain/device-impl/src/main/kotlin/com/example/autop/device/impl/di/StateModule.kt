@@ -10,6 +10,7 @@ import com.example.autop.device.impl.state.InputStateSource
 import com.example.autop.device.impl.state.NavigationStateSource
 import com.example.autop.device.impl.state.ObserveStateSource
 import com.example.autop.device.impl.state.PermissionStateSource
+import com.example.autop.device.impl.state.ShellToolStateSource
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -39,4 +40,9 @@ public object StateModule {
     @Provides
     @IntoSet
     public fun providePermissionStateSource(source: PermissionStateSource): RuntimeStateSource = source
+
+    /** shell 工具可用性（完全模式下报告，shell-exec 设计 §2.3）。 */
+    @Provides
+    @IntoSet
+    public fun provideShellToolStateSource(source: ShellToolStateSource): RuntimeStateSource = source
 }

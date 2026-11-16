@@ -4,6 +4,7 @@
 package com.example.autop.agent
 
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.filter
@@ -117,6 +118,15 @@ public interface ThreadStore {
     public suspend fun setModelProfile(
         threadId: ThreadId,
         profileId: String?,
+    )
+
+    /** 会话运行模式（ADR-0040、ADR-0043）；线程不存在或记录无法识别时为 [RunMode.STANDARD]。 */
+    public suspend fun runModeOf(threadId: ThreadId): RunMode
+
+    /** 记录会话运行模式（ADR-0043）：发送、切换、分叉时写入。 */
+    public suspend fun setRunMode(
+        threadId: ThreadId,
+        mode: RunMode,
     )
 
     /** 单个线程的标题（线程不存在给 null）；顶栏与标题精炼的覆盖判定用。 */

@@ -345,9 +345,9 @@ private fun OptionRowSwatch(color: Color) {
     }
 }
 
-/** 选项图标枚举 → 统一图标入口（纯一一映射）。 */
+/** 选项图标枚举 → 统一图标入口（纯一一映射）；输入框芯片等也复用它取图标。 */
 @Suppress("CyclomaticComplexMethod")
-private fun OptionIcon.vector(): ImageVector =
+public fun OptionIcon.vector(): ImageVector =
     when (this) {
         OptionIcon.EDIT -> AutopIcons.Edit
         OptionIcon.COPY -> AutopIcons.Copy
@@ -370,4 +370,7 @@ private fun OptionIcon.vector(): ImageVector =
         OptionIcon.AI -> AutopIcons.Psychology
         OptionIcon.SAVE_TASK -> AutopIcons.ListAlt
         OptionIcon.PALETTE -> AutopIcons.Palette
+        OptionIcon.MODE_CHAT_ONLY -> AutopIcons.ChatBubbleOutline
+        OptionIcon.MODE_STANDARD -> AutopIcons.PhoneAndroid
+        OptionIcon.MODE_FULL -> AutopIcons.Terminal
     }

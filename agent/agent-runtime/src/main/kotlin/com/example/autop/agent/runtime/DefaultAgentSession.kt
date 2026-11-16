@@ -20,6 +20,7 @@ import com.example.autop.agent.runtime.guard.Budget
 import com.example.autop.agent.runtime.guard.CircuitBreaker
 import com.example.autop.agent.runtime.notes.RunNotes
 import com.example.autop.agent.runtime.state.BudgetStateSource
+import com.example.autop.agent.runtime.state.RunModeStateSource
 import com.example.autop.agent.runtime.state.RuntimeStateTracker
 import com.example.autop.agent.runtime.state.ToolVisibilityStateSource
 import com.example.autop.agent.runtime.tools.RouterBuilder
@@ -144,6 +145,7 @@ internal class DefaultAgentSession(
                             BudgetStateSource.ID to BudgetStateSource(budget, services.prompts),
                             ToolVisibilityStateSource.ID to
                                 ToolVisibilityStateSource(routerBuild.hidden, services.prompts),
+                            RunModeStateSource.ID to RunModeStateSource(services.prompts),
                         ),
                 store = controller.toolStore,
                 prompts = services.prompts,

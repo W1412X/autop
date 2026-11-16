@@ -13,6 +13,7 @@ import com.example.autop.core.common.Capability
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.device.AccessibilityStatus
@@ -219,6 +220,13 @@ private class FakeThreadStore(
         title: String,
     ): Unit = Unit
 
+    override suspend fun runModeOf(threadId: ThreadId): RunMode = RunMode.STANDARD
+
+    override suspend fun setRunMode(
+        threadId: ThreadId,
+        mode: RunMode,
+    ): Unit = Unit
+
     override suspend fun modelProfileOf(threadId: ThreadId): String? = null
 
     override suspend fun setModelProfile(
@@ -249,7 +257,7 @@ private class FakeRunService : RunService {
         text: String,
         images: List<com.example.autop.core.common.ImageAttachment>,
         modelProfileId: String?,
-        screenTools: Boolean,
+        runMode: com.example.autop.core.common.RunMode,
     ): com.example.autop.core.common.Outcome<RunRecord> = error("unused")
 
     override suspend fun forkAndRun(

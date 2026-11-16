@@ -5,6 +5,7 @@
 package com.example.autop.feature.chat.thread
 
 import com.example.autop.core.common.ImageAttachment
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.config.UiChatSection
 import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.thread.ui.TimelineItem
@@ -68,8 +69,10 @@ public data class ChatThreadUiState(
     val modelOptions: List<OptionItem> = emptyList(),
     /** 全局默认模型 id（输入区芯片跟随默认时显示其名称与"默认"标记）。 */
     val defaultModelId: String? = null,
-    /** ADR-0035「只聊天」：开启时本轮发送不提供屏幕工具，不占用手机。 */
-    val chatOnly: Boolean = false,
+    /** 运行模式三档（ADR-0040）：本页发送时使用的档位。 */
+    val runMode: RunMode = RunMode.STANDARD,
+    /** 完全模式前置条件不满足时的阻断提示（非 null 时显示弹窗）。 */
+    val shellBlock: ShellBlock? = null,
     /** 系统语音识别是否可用（不可用时不显示麦克风）。 */
     val voiceAvailable: Boolean = false,
     /** 正在语音输入。 */
@@ -92,4 +95,13 @@ public data class ChatThreadUiState(
 ) {
     /** 本会话是否为分叉分支：路径上有分叉标记（分支自身的 ThreadCreated 总在路径末段）。 */
     val isBranch: Boolean get() = entries.any { it.item is TimelineItem.ForkMarker }
+}
+
+/** 完全模式无法切换的原因（ADR-0040 §2.4）。 */
+public enum class ShellBlock {
+    /** 设置中的 Shell 执行总闸未开启。 */
+    SWITCH_OFF,
+
+    /** 无线注入未连接。 */
+    CHANNEL_DISCONNECTED,
 }

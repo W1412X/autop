@@ -8,7 +8,8 @@ import com.example.autop.agent.ContextContributor
 import com.example.autop.agent.runtime.GoalContributor
 import com.example.autop.agent.runtime.OutputContributor
 import com.example.autop.agent.runtime.RoleContributor
-import com.example.autop.agent.runtime.RunModeContributor
+import com.example.autop.agent.runtime.RunOriginContributor
+import com.example.autop.agent.runtime.RunTiersContributor
 import com.example.autop.agent.runtime.SafetyContributor
 import com.example.autop.agent.runtime.ToolGuideContributor
 import com.example.autop.agent.runtime.TriggerContributor
@@ -43,7 +44,13 @@ public object AgentContextModule {
 
     @Provides
     @IntoSet
-    public fun provideRunModeContributor(prompts: PromptRepository): ContextContributor = RunModeContributor(prompts)
+    public fun provideRunOriginContributor(prompts: PromptRepository): ContextContributor =
+        RunOriginContributor(prompts)
+
+    /** 运行模式三档说明（ADR-0040 §2.3）。 */
+    @Provides
+    @IntoSet
+    public fun provideRunTiersContributor(prompts: PromptRepository): ContextContributor = RunTiersContributor(prompts)
 
     @Provides
     @IntoSet

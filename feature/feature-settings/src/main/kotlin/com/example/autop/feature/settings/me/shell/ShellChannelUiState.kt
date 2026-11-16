@@ -1,6 +1,6 @@
 /**
- * 注入通道子页状态（N200，docs/tech/08 §4.5 `me/shell`）：无线调试配对
- * （系统设置「使用配对码配对设备」弹窗里的配对端口与 6 位配对码）与连接状态。
+ * 注入通道子页状态（N200，docs/tech/08 §4.5 `me/shell`）：无线调试配对（系统设置「使用配对码配对设备」弹窗里的
+ * 配对端口与 6 位配对码）与连接状态；另含 Shell 执行总闸（shell-exec 设计 §2.5）。
  */
 package com.example.autop.feature.settings.me.shell
 
@@ -27,8 +27,12 @@ public data class ShellChannelUiState(
     val codeText: String = "",
     /** 配对/连接进行中。 */
     val busy: Boolean = false,
-    /** 后台自动搜索可配对设备中（未配对且尚未发现端口）。 */
+    /** 后台自动搜索无线调试中（未配对且尚未发现端口）。 */
     val discovering: Boolean = false,
     /** 配对提示（null=无）。 */
     val notice: ShellNotice? = null,
+    /** Shell 执行总闸是否开启（features.shellExec）。 */
+    val shellExecEnabled: Boolean = false,
+    /** 首次开启需要知情同意：弹窗显示中。 */
+    val shellExecConsentPending: Boolean = false,
 )

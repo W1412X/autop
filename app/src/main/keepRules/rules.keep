@@ -10,3 +10,8 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+# shell 宿主（ADR-0042）：由 app_process 以类名启动，R8 无法从代码中看出引用，必须保留入口。
+-keep class com.example.autop.device.impl.shell.host.ShellHostMain {
+    public static void main(java.lang.String[]);
+}

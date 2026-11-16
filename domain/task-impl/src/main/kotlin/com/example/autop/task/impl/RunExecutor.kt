@@ -16,6 +16,7 @@ import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.flatMap
 import com.example.autop.core.config.ConfigProvider
@@ -59,12 +60,14 @@ public class RunExecutor(
         text: String,
         images: List<ImageAttachment>,
         modelProfileId: String? = null,
-        screenTools: Boolean = true,
+        runMode: RunMode = RunMode.STANDARD,
     ): Outcome<RunRecord> {
         val placeholder = if (threadId == null) placeholderTitle(text) else null
         val thread = threadId ?: threadStore.createThread(title = placeholder, parent = null)
         // 发送即持久化会话级模型选择（null = 跟随默认），之后该会话的每一轮都用它。
         threadStore.setModelProfile(thread, modelProfileId)
+        // 发送即持久化本次的运行模式（ADR-0043）：之后切换页面、重新打开会话都沿用它。
+        threadStore.setRunMode(thread, runMode)
         if (modelProfileId != null) {
             logger.i(TAG, "chat_model_selected", "threadId" to thread.value, "profileId" to modelProfileId)
         }
@@ -78,7 +81,7 @@ public class RunExecutor(
                 thread,
                 blocks,
                 UserMessageKind.INPUT,
-                if (screenTools) emptyMap() else mapOf(SCREEN_TOOLS_VAR to "false"),
+                if (runMode == RunMode.STANDARD) emptyMap() else mapOf(RUN_MODE_VAR to runMode.id),
                 null,
             )
         if (placeholder != null && enqueued is Outcome.Ok) {

@@ -45,14 +45,14 @@ class ContextContributorsTest {
         }
 
     @Test
-    fun `run_mode 按 runMode 选模板`() =
+    fun `run_origin 按 runOrigin 选模板`() =
         runTest {
-            val background = RunModeContributor(prompts).contribute(req(vars = mapOf("runMode" to "background")))
-            val foreground = RunModeContributor(prompts).contribute(req(vars = emptyMap()))
+            val background = RunOriginContributor(prompts).contribute(req(vars = mapOf("runOrigin" to "background")))
+            val foreground = RunOriginContributor(prompts).contribute(req(vars = emptyMap()))
 
             assertThat(background?.placement).isEqualTo(Placement.SYSTEM_DYNAMIC)
-            assertThat(background?.promptIds).containsExactly("agent.system.run_mode.background", 1)
-            assertThat(foreground?.promptIds).containsExactly("agent.system.run_mode.foreground", 1)
+            assertThat(background?.promptIds).containsExactly("agent.system.run_origin.background", 1)
+            assertThat(foreground?.promptIds).containsExactly("agent.system.run_origin.foreground", 1)
         }
 
     @Test

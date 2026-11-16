@@ -12,8 +12,11 @@ import com.example.autop.device.ScreenLease
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
-/** ADR-0035「只聊天」：发送时写入入队变量，值为 "false" 时本轮不提供屏幕工具。 */
-internal const val SCREEN_TOOLS_VAR: String = "screenTools"
+/**
+ * ADR-0040：发送时写入入队变量，值为运行模式的稳定 id（[com.example.autop.core.common.RunMode.id]）。
+ * 缺失或非法时按标准模式处理。
+ */
+internal const val RUN_MODE_VAR: String = "runMode"
 
 internal class RunScreenGate(
     private val owner: String,

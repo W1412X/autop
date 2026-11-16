@@ -14,6 +14,7 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.testing.FakeClock
@@ -396,6 +397,13 @@ class ScreenObserverAutoTest {
             threadId: ThreadId,
             title: String,
         ) = unused()
+
+        override suspend fun runModeOf(threadId: ThreadId): RunMode = RunMode.STANDARD
+
+        override suspend fun setRunMode(
+            threadId: ThreadId,
+            mode: RunMode,
+        ): Unit = Unit
 
         override suspend fun modelProfileOf(threadId: ThreadId): String? = null
 

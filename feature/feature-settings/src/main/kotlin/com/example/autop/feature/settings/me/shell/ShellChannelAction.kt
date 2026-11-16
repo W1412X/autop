@@ -19,4 +19,15 @@ public sealed interface ShellChannelAction {
 
     /** 手动连接注入通道（无线调试已开启时）。 */
     public data object Connect : ShellChannelAction
+
+    /** Shell 执行总闸切换（开启会先弹知情同意）。 */
+    public data class SetShellExec(
+        val enabled: Boolean,
+    ) : ShellChannelAction
+
+    /** 知情同意：确认开启 Shell 执行。 */
+    public data object ConfirmShellExecConsent : ShellChannelAction
+
+    /** 知情同意：取消，保持关闭。 */
+    public data object DismissShellExecConsent : ShellChannelAction
 }

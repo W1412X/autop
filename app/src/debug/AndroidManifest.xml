@@ -7,6 +7,16 @@
             android:name=".PaymentTestActivity"
             android:exported="true"
             android:label="@string/payment_test_title" />
+        <!-- shell 执行真机验证入口（shell-exec 设计 §14，仅 debug）：adb am broadcast 触发。 -->
+        <receiver
+            android:name=".ShellExecDebugReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.example.autop.debug.SHELL_EXEC" />
+                <action android:name="com.example.autop.debug.SHELL_RELEASE" />
+                <action android:name="com.example.autop.debug.SHELL_CLOSE" />
+            </intent-filter>
+        </receiver>
     </application>
 
 </manifest>

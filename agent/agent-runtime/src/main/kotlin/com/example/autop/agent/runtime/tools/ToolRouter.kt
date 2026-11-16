@@ -19,6 +19,8 @@ import com.example.autop.llm.ToolSchema
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 
 /** 批次内跳过原因（WP5.2）。 */
 internal enum class SkipReason { AFTER_CONTROL, PREVIOUS_FAILED }
@@ -39,6 +41,7 @@ internal class ToolRouter(
 ) {
     private val byName: Map<String, Tool> = tools.associateBy { it.spec.name }
     private val byId: Map<String, Tool> = tools.associateBy { it.id }
+    private val json = Json { ignoreUnknownKeys = true }
 
     /** 注册检查（启动即失败，docs/tech/04 §3.3）。 */
     init {
@@ -89,10 +92,10 @@ internal class ToolRouter(
         var skip: SkipReason? = null
         var i = 0
         while (i < calls.size) {
-            val parallelRun = byName[calls[i].name]?.let(::isParallel) == true
+            val parallelRun = isParallelCall(calls[i])
             if (parallelRun) {
                 var end = i
-                while (end < calls.size && byName[calls[end].name]?.let(::isParallel) == true) end++
+                while (end < calls.size && isParallelCall(calls[end])) end++
                 val snapshot = skip
                 beforeEach()
                 coroutineScope {
@@ -151,7 +154,8 @@ internal class ToolRouter(
     ): SkipReason? =
         when {
             output.control != null -> SkipReason.AFTER_CONTROL
-            !output.ok && isWrite(tool) -> SkipReason.PREVIOUS_FAILED
+            // ADR-0041：确定未派发的失败不影响后续写操作；可能已派发的失败才跳过。
+            !output.ok && output.effectMayHaveHappened && isWrite(tool) -> SkipReason.PREVIOUS_FAILED
             else -> null
         }
 
@@ -191,11 +195,18 @@ internal class ToolRouter(
     }
 
     /**
-     * 只有 READ_MEMORY/READ_SYSTEM 可并行；READ_SCREEN 串行——observe/wait/screenshot
-     * 读写本 Run 的观测历史，必须有确定顺序（WP5.2）；WRITE_* 与 CONTROL 串行。
+     * 调用级并行判定（ADR-0041）：由工具按本次参数声明。默认只读的记忆类与系统类可并行；
+     * READ_SCREEN 串行——observe/wait/screenshot 读写本 Run 的观测历史，必须有确定顺序（WP5.2）。
+     * 参数解析失败按不可并行处理。
      */
-    private fun isParallel(tool: Tool): Boolean =
-        tool.access == ToolAccess.READ_MEMORY || tool.access == ToolAccess.READ_SYSTEM
+    private fun isParallelCall(call: Block.ToolCall): Boolean {
+        val tool = byName[call.name] ?: return false
+        val args = parseArgs(call.argsJson) ?: return false
+        return tool.parallelizable(args)
+    }
+
+    private fun parseArgs(argsJson: String): JsonObject? =
+        runCatching { json.parseToJsonElement(argsJson.ifEmpty { "{}" }) as? JsonObject }.getOrNull()
 
     private suspend fun enrich(
         outputs: List<ToolCallResult>,

@@ -1,0 +1,45 @@
+{
+  "schemaVersion": 1,
+  "rules": [
+    {
+      "id": "destructive_delete",
+      "labelKey": "run_shell_danger_destructive",
+      "patterns": ["rm -r", "rm -f", "--recursive", "--force", "rmdir", "pm clear", "cmd package clear"]
+    },
+    {
+      "id": "uninstall_disable",
+      "labelKey": "run_shell_danger_uninstall",
+      "patterns": ["pm uninstall", "pm disable", "cmd package uninstall", "cmd package disable"]
+    },
+    {
+      "id": "system_settings",
+      "labelKey": "run_shell_danger_settings",
+      "patterns": ["settings put", "settings delete", "appops set", "pm grant", "pm revoke"]
+    },
+    {
+      "id": "power",
+      "labelKey": "run_shell_danger_power",
+      "patterns": ["reboot", "shutdown", "svc power"]
+    },
+    {
+      "id": "raw_disk",
+      "labelKey": "run_shell_danger_raw_disk",
+      "patterns": [" dd ", "mkfs", "wipe"]
+    },
+    {
+      "id": "force_stop",
+      "labelKey": "run_shell_danger_force_stop",
+      "patterns": ["am force-stop", "am kill"]
+    },
+    {
+      "id": "resident",
+      "labelKey": "run_shell_danger_resident",
+      "patterns": ["nohup", "setsid"]
+    },
+    {
+      "id": "self_or_channel",
+      "labelKey": "run_shell_danger_self",
+      "patterns": ["{self}", "adbd", "adb_wifi"]
+    }
+  ]
+}

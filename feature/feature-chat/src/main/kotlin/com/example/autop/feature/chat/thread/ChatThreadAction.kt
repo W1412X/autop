@@ -7,6 +7,7 @@ package com.example.autop.feature.chat.thread
 
 import android.net.Uri
 import com.example.autop.agent.timeline.StepLink
+import com.example.autop.core.common.RunMode
 
 public sealed interface ChatThreadAction {
     /** 输入框变化。 */
@@ -29,10 +30,15 @@ public sealed interface ChatThreadAction {
         val profileId: String?,
     ) : ChatThreadAction
 
-    /** ADR-0035「只聊天」：开启后本轮发送不提供屏幕工具（不占用手机）。 */
-    public data class SetChatOnly(
-        val enabled: Boolean,
+    /** 运行模式三档（ADR-0040）：本页切换，下一次发送时生效；完全模式受前置条件约束。 */
+
+    public data class SetRunMode(
+        val mode: RunMode,
     ) : ChatThreadAction
+
+    /** 关闭「无法切换到完全模式」的提示（ADR-0040 §2.4）。 */
+
+    public data object DismissShellBlock : ChatThreadAction
 
     /** 在页面上提示一条错误（语音、拍照等的失败原因）。 */
     public data class ShowNotice(

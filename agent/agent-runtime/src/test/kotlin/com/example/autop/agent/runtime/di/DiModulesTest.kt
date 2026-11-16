@@ -53,7 +53,8 @@ class DiModulesTest {
                 AgentContextModule.provideRoleContributor(prompts),
                 AgentContextModule.provideSafetyContributor(prompts),
                 AgentContextModule.provideToolGuideContributor(prompts),
-                AgentContextModule.provideRunModeContributor(prompts),
+                AgentContextModule.provideRunOriginContributor(prompts),
+                AgentContextModule.provideRunTiersContributor(prompts),
                 AgentContextModule.provideTriggerContributor(prompts),
                 AgentContextModule.provideGoalContributor(prompts),
             )
@@ -63,7 +64,8 @@ class DiModulesTest {
                 "context.role",
                 "context.safety",
                 "context.tool_guide",
-                "context.run_mode",
+                "context.run_origin",
+                "context.run_tiers",
                 "context.trigger",
                 "context.goal",
             )

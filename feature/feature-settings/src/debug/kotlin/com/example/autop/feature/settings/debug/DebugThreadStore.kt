@@ -10,6 +10,7 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ThreadSummary
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -107,6 +108,13 @@ internal class DebugThreadStore(
     override suspend fun setModelProfile(
         threadId: ThreadId,
         profileId: String?,
+    ) = Unit
+
+    override suspend fun runModeOf(threadId: ThreadId): RunMode = RunMode.STANDARD
+
+    override suspend fun setRunMode(
+        threadId: ThreadId,
+        mode: RunMode,
     ) = Unit
 
     override suspend fun titleOf(threadId: ThreadId): String? = if (threadId.value == DEBUG_THREAD_ID) "debug" else null

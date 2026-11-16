@@ -451,28 +451,107 @@ public data class DeviceShellSection(
     @SerialName("keepAliveRetryMs") val keepAliveRetryMs: Long = 30000,
     /** 重连时等待无线调试连接端口被发现（mDNS）的超时毫秒数。 */
     @SerialName("discoverTimeoutMs") val discoverTimeoutMs: Long = 5000,
+    /** shell 执行的资源参数（`device.shell.exec.*`，shell-exec 设计 §9.1）。 */
+    @SerialName("exec") val exec: DeviceShellExecSection = DeviceShellExecSection(),
 ) : ConfigSection {
     override fun validate(): List<String> =
-        buildList {
-            if (commandTimeoutMs !in COMMAND_TIMEOUT_RANGE) {
-                add("commandTimeoutMs must be within $COMMAND_TIMEOUT_RANGE, was $commandTimeoutMs")
+        exec.validate() +
+            buildList {
+                if (commandTimeoutMs !in COMMAND_TIMEOUT_RANGE) {
+                    add("commandTimeoutMs must be within $COMMAND_TIMEOUT_RANGE, was $commandTimeoutMs")
+                }
+                if (keepAliveTickMs !in KEEP_ALIVE_TICK_RANGE) {
+                    add("keepAliveTickMs must be within $KEEP_ALIVE_TICK_RANGE, was $keepAliveTickMs")
+                }
+                if (keepAliveRetryMs !in KEEP_ALIVE_RETRY_RANGE) {
+                    add("keepAliveRetryMs must be within $KEEP_ALIVE_RETRY_RANGE, was $keepAliveRetryMs")
+                }
+                if (discoverTimeoutMs !in DISCOVER_TIMEOUT_RANGE) {
+                    add("discoverTimeoutMs must be within $DISCOVER_TIMEOUT_RANGE, was $discoverTimeoutMs")
+                }
             }
-            if (keepAliveTickMs !in KEEP_ALIVE_TICK_RANGE) {
-                add("keepAliveTickMs must be within $KEEP_ALIVE_TICK_RANGE, was $keepAliveTickMs")
-            }
-            if (keepAliveRetryMs !in KEEP_ALIVE_RETRY_RANGE) {
-                add("keepAliveRetryMs must be within $KEEP_ALIVE_RETRY_RANGE, was $keepAliveRetryMs")
-            }
-            if (discoverTimeoutMs !in DISCOVER_TIMEOUT_RANGE) {
-                add("discoverTimeoutMs must be within $DISCOVER_TIMEOUT_RANGE, was $discoverTimeoutMs")
-            }
-        }
 
     internal companion object {
         val COMMAND_TIMEOUT_RANGE: LongRange = 500L..60000L
         val KEEP_ALIVE_TICK_RANGE: LongRange = 1000L..60000L
         val KEEP_ALIVE_RETRY_RANGE: LongRange = 1000L..300000L
         val DISCOVER_TIMEOUT_RANGE: LongRange = 1000L..60000L
+    }
+}
+
+/**
+ * `device.shell.exec`：shell 执行的资源参数（shell-exec 设计 §9.1）。
+ * 默认值与 `core-config-impl/assets/config/device.json` 必须一致（有单测）。
+ */
+@Serializable
+public data class DeviceShellExecSection(
+    /** 全局同时存在的宿主上限，即最多几个 Run 同时具备 shell 能力。 */
+    @SerialName("hostPoolSize") val hostPoolSize: Int = 3,
+    /** 单个 Run 的并发 job 上限。 */
+    @SerialName("maxJobsPerRun") val maxJobsPerRun: Int = 4,
+    /** 模型未给 `timeout_ms` 时的命令时限（毫秒）。 */
+    @SerialName("defaultTimeoutMs") val defaultTimeoutMs: Long = 30000,
+    /** 每个 job 的输出上限（字节，stdout 与 stderr 合计）。 */
+    @SerialName("outputLimitBytes") val outputLimitBytes: Int = 65536,
+    /** 命令的 UTF-8 字节上限。 */
+    @SerialName("commandMaxBytes") val commandMaxBytes: Int = 2048,
+    /** 危险操作确认的等待上限（毫秒），超时按拒绝。 */
+    @SerialName("confirmTimeoutMs") val confirmTimeoutMs: Long = 60000,
+    /** 等待宿主槽位的上限（毫秒）。 */
+    @SerialName("hostAcquireWaitMs") val hostAcquireWaitMs: Long = 10000,
+    /** 等待 job 槽位的上限（毫秒）。 */
+    @SerialName("jobSlotWaitMs") val jobSlotWaitMs: Long = 10000,
+    /** 宿主空闲多久后关闭（毫秒）。 */
+    @SerialName("hostIdleCloseMs") val hostIdleCloseMs: Long = 300000,
+    /** 宿主控制请求的响应时限（毫秒）。 */
+    @SerialName("rpcTimeoutMs") val rpcTimeoutMs: Long = 5000,
+    /** 宿主启动握手的时限（毫秒）。 */
+    @SerialName("handshakeTimeoutMs") val handshakeTimeoutMs: Long = 5000,
+    /** 写入远端 stdin 时等待 ADB 确认的时限（毫秒）。 */
+    @SerialName("ackTimeoutMs") val ackTimeoutMs: Long = 5000,
+    /** 终止进程组时 SIGTERM 到 SIGKILL 的宽限（毫秒）。 */
+    @SerialName("killGraceMs") val killGraceMs: Long = 2000,
+    /** 客户端每次 `wait` 的等待时长（毫秒）。 */
+    @SerialName("waitChunkMs") val waitChunkMs: Long = 5000,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (defaultTimeoutMs < MIN_TIMEOUT_MS) add("exec.defaultTimeoutMs must be >= $MIN_TIMEOUT_MS")
+            for ((name, value, range) in rangeChecks()) {
+                if (value !in range) add("exec.$name must be within ${range.first}..${range.last}, was $value")
+            }
+        }
+
+    /** 各资源参数的取值范围：(配置键, 当前值, 允许区间)。 */
+    private fun rangeChecks(): List<Triple<String, Long, LongRange>> =
+        listOf(
+            Triple("hostPoolSize", hostPoolSize.toLong(), HOST_POOL_SIZE_RANGE),
+            Triple("maxJobsPerRun", maxJobsPerRun.toLong(), MAX_JOBS_RANGE),
+            Triple("outputLimitBytes", outputLimitBytes.toLong(), OUTPUT_LIMIT_RANGE),
+            Triple("commandMaxBytes", commandMaxBytes.toLong(), COMMAND_MAX_RANGE),
+            Triple("confirmTimeoutMs", confirmTimeoutMs, CONFIRM_TIMEOUT_RANGE),
+            Triple("hostAcquireWaitMs", hostAcquireWaitMs, WAIT_RANGE),
+            Triple("jobSlotWaitMs", jobSlotWaitMs, WAIT_RANGE),
+            Triple("hostIdleCloseMs", hostIdleCloseMs, HOST_IDLE_RANGE),
+            Triple("rpcTimeoutMs", rpcTimeoutMs, RPC_RANGE),
+            Triple("handshakeTimeoutMs", handshakeTimeoutMs, RPC_RANGE),
+            Triple("ackTimeoutMs", ackTimeoutMs, RPC_RANGE),
+            Triple("killGraceMs", killGraceMs, KILL_GRACE_RANGE),
+            Triple("waitChunkMs", waitChunkMs, WAIT_CHUNK_RANGE),
+        )
+
+    private companion object {
+        const val MIN_TIMEOUT_MS = 100L
+        val HOST_POOL_SIZE_RANGE = 1L..4L
+        val MAX_JOBS_RANGE = 1L..8L
+        val OUTPUT_LIMIT_RANGE = 4096L..1048576L
+        val COMMAND_MAX_RANGE = 256L..16384L
+        val CONFIRM_TIMEOUT_RANGE = 10000L..600000L
+        val WAIT_RANGE = 0L..60000L
+        val HOST_IDLE_RANGE = 30000L..3600000L
+        val RPC_RANGE = 1000L..30000L
+        val KILL_GRACE_RANGE = 0L..10000L
+        val WAIT_CHUNK_RANGE = 100L..30000L
     }
 }
 

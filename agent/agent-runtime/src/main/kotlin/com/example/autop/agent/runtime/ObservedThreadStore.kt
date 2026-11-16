@@ -9,6 +9,7 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ThreadSummary
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.sync.Mutex
@@ -86,6 +87,13 @@ internal class ObservedThreadStore(
         threadId: ThreadId,
         profileId: String?,
     ) = delegate.setModelProfile(threadId, profileId)
+
+    override suspend fun runModeOf(threadId: ThreadId): RunMode = delegate.runModeOf(threadId)
+
+    override suspend fun setRunMode(
+        threadId: ThreadId,
+        mode: RunMode,
+    ) = delegate.setRunMode(threadId, mode)
 
     override suspend fun titleOf(threadId: ThreadId): String? = delegate.titleOf(threadId)
 

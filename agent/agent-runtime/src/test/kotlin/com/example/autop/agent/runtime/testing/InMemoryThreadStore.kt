@@ -15,6 +15,7 @@ import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.SystemClock
 import com.example.autop.core.common.ThreadId
 import com.example.autop.llm.Block
@@ -139,6 +140,17 @@ internal class InMemoryThreadStore(
     ) {
         row(threadId).name = title
         changesFlow.tryEmit(Unit)
+    }
+
+    private val runModes = mutableMapOf<String, RunMode>()
+
+    override suspend fun runModeOf(threadId: ThreadId): RunMode = runModes[threadId.value] ?: RunMode.STANDARD
+
+    override suspend fun setRunMode(
+        threadId: ThreadId,
+        mode: RunMode,
+    ) {
+        runModes[threadId.value] = mode
     }
 
     override suspend fun modelProfileOf(threadId: ThreadId): String? = modelOverrides[threadId.value]

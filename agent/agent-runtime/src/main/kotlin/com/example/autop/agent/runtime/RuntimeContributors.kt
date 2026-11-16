@@ -1,7 +1,7 @@
 /**
  * runtime 内置的上下文贡献者（docs/tech/04 §3.10）：
  * context.role / context.safety / context.tool_guide（SYSTEM_STATIC）、
- * context.run_mode（SYSTEM_DYNAMIC）、context.trigger / context.goal（FIRST_USER）。
+ * context.run_origin（SYSTEM_DYNAMIC）、context.run_tiers（SYSTEM_STATIC）、context.trigger / context.goal（FIRST_USER）。
  */
 package com.example.autop.agent.runtime
 
@@ -107,23 +107,38 @@ internal class OutputContributor(
     }
 }
 
-/** `context.run_mode`：前台对话 / 后台任务（`vars["runMode"]`）。 */
-internal class RunModeContributor(
+/**
+ * `context.run_origin`：运行来源，前台对话 / 后台任务（`vars["runOrigin"]`）。
+ * 与运行模式三档（`vars["runMode"]`，ADR-0040）是两个概念，见 [RunTiersContributor]。
+ */
+internal class RunOriginContributor(
     prompts: PromptRepository,
 ) : TemplateContributor(prompts) {
-    override val id: String = "context.run_mode"
+    override val id: String = "context.run_origin"
     override val placement: Placement = Placement.SYSTEM_DYNAMIC
 
     override fun templateIdFor(req: ContextRequest): String {
-        val mode = if (req.vars[RUN_MODE] == MODE_BACKGROUND) MODE_BACKGROUND else MODE_FOREGROUND
-        return "agent.system.run_mode.$mode"
+        val origin = if (req.vars[RUN_ORIGIN] == ORIGIN_BACKGROUND) ORIGIN_BACKGROUND else ORIGIN_FOREGROUND
+        return "agent.system.run_origin.$origin"
     }
 
     private companion object {
-        const val RUN_MODE = "runMode"
-        const val MODE_BACKGROUND = "background"
-        const val MODE_FOREGROUND = "foreground"
+        const val RUN_ORIGIN = "runOrigin"
+        const val ORIGIN_BACKGROUND = "background"
+        const val ORIGIN_FOREGROUND = "foreground"
     }
+}
+
+/**
+ * `context.run_tiers`：运行模式三档的固定说明（ADR-0040 §2.3）。放在 system 中且不随 Run 变化，
+ * 保持前缀缓存稳定；当前档位由运行状态 `state.run_mode` 提供。
+ */
+internal class RunTiersContributor(
+    prompts: PromptRepository,
+) : TemplateContributor(prompts) {
+    override val id: String = "context.run_tiers"
+    override val templateId: String = "agent.system.run_tiers"
+    override val placement: Placement = Placement.SYSTEM_STATIC
 }
 
 /** `context.trigger`：触发事件（`vars` 中 `trigger.` 前缀的键，不可信数据）。 */

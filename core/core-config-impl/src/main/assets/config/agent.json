@@ -1,12 +1,13 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "agent": {
     "context": {
       "contributors": [
         "context.role",
         "context.safety",
         "context.tool_guide",
-        "context.run_mode",
+        "context.run_origin",
+        "context.run_tiers",
         "context.memory_index",
         "context.user_profile",
         "context.output",
@@ -55,7 +56,8 @@
         "tool.edit_flow",
         "tool.list_tasks",
         "tool.create_task",
-        "tool.update_task"
+        "tool.update_task",
+        "tool.run_shell"
       ],
       "defaultTimeoutMs": 60000,
       "timeoutMs": {
@@ -161,7 +163,7 @@
       "maxCharsPerNote": 400
     },
     "state": {
-      "sources": ["state.environment", "state.input", "state.observe", "state.navigation", "state.permissions", "state.budget", "state.tools"],
+      "sources": ["state.environment", "state.input", "state.observe", "state.navigation", "state.permissions", "state.budget", "state.tools", "state.run_mode", "state.shell"],
       "budgetLowRatio": 0.2
     }
   }

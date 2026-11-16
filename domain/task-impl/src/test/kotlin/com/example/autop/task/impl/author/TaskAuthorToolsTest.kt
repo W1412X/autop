@@ -16,6 +16,7 @@ import com.example.autop.agent.ToolInvokerFactory
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
@@ -183,6 +184,13 @@ class TaskAuthorToolsTest {
             threadId: ThreadId,
             title: String,
         ) = TODO()
+
+        override suspend fun runModeOf(threadId: ThreadId): RunMode = RunMode.STANDARD
+
+        override suspend fun setRunMode(
+            threadId: ThreadId,
+            mode: RunMode,
+        ): Unit = Unit
 
         override suspend fun modelProfileOf(threadId: ThreadId): String? = null
 

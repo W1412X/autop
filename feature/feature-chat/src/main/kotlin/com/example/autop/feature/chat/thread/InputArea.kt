@@ -6,38 +6,37 @@
  */
 package com.example.autop.feature.chat.thread
 
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.unit.dp
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.thread.ui.AttachImageButton
 import com.example.autop.core.thread.ui.PendingImageStrip
 import com.example.autop.core.ui.component.AutopComposer
+import com.example.autop.core.ui.component.AutopFlatChip
 import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.ComposerTrailing
 import com.example.autop.core.ui.component.InputBarSpec
+import com.example.autop.core.ui.component.OptionIcon
+import com.example.autop.core.ui.component.OptionItem
+import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.VoiceErrorToast
 import com.example.autop.core.ui.component.rememberVoiceStarter
+import com.example.autop.core.ui.component.vector
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.chat.R
-
-/** 只聊天开关：布局高度 24dp，Material 开关按 0.7 缩放后的视觉尺寸。 */
-private val SWITCH_BOX_HEIGHT = 24.dp
-private const val SWITCH_SCALE = 0.7f
 
 /**
  * 对话输入区。
@@ -91,8 +90,8 @@ internal fun InputArea(
                     defaultProfileId = state.defaultModelId,
                 )
                 Spacer(modifier = Modifier.weight(1f))
-                // ADR-0035「只聊天」：开启后本轮发送不提供屏幕工具，不占用手机；运行中不切换（下一轮生效）。
-                ChatOnlySwitch(chatOnly = state.chatOnly, running = state.running, onAction = onAction)
+                // ADR-0040：运行模式三档；完全模式受总闸与无线注入约束，运行中不切换（下一轮生效）。
+                RunModeSelector(runMode = state.runMode, running = state.running, onAction = onAction)
             },
             leading =
                 if (!state.running && state.images.size < state.maxImages) {
@@ -121,32 +120,74 @@ private fun composerTrailingOf(state: ChatThreadUiState): ComposerTrailing =
         else -> ComposerTrailing.SEND
     }
 
-/** 只聊天开关（ADR-0035）：文字与开关同排，布局高度 [SWITCH_BOX_HEIGHT]；运行中不可切换（下一轮生效）。 */
+/**
+ * 运行模式芯片（ADR-0040，方案 A）：与模型芯片同一套交互，芯片前置模式图标，点击弹出带图标与说明的选择面板。
+ * 运行中不可切换（下一轮生效）。
+ */
 @Composable
-private fun ChatOnlySwitch(
-    chatOnly: Boolean,
+private fun RunModeSelector(
+    runMode: RunMode,
     running: Boolean,
     onAction: (ChatThreadAction) -> Unit,
 ) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(
-            text = stringResource(R.string.thread_chat_only),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Box(
-            modifier = Modifier.padding(start = LocalSpacing.current.xs).height(SWITCH_BOX_HEIGHT),
-            contentAlignment = Alignment.Center,
-        ) {
-            Switch(
-                checked = chatOnly,
-                onCheckedChange = { onAction(ChatThreadAction.SetChatOnly(it)) },
-                enabled = !running,
-                modifier = Modifier.graphicsLayer(scaleX = SWITCH_SCALE, scaleY = SWITCH_SCALE),
+    var open by remember { mutableStateOf(false) }
+    AutopFlatChip(
+        text = stringResource(runModeLabelRes(runMode)),
+        icon = runModeIcon(runMode).vector(),
+        onClick = { if (!running) open = true },
+        labelTrailing = {
+            Text(
+                text = ARROW,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.padding(start = LocalSpacing.current.xs),
             )
-        }
+        },
+    )
+    if (open) {
+        OptionSheet(
+            title = stringResource(R.string.thread_run_mode_title),
+            options = RunMode.entries.map { modeOption(it) },
+            selectedId = runMode.id,
+            onSelect = { id -> RunMode.fromId(id)?.let { onAction(ChatThreadAction.SetRunMode(it)) } },
+            onDismiss = { open = false },
+        )
     }
 }
+
+@Composable
+private fun modeOption(mode: RunMode): OptionItem =
+    OptionItem(
+        id = mode.id,
+        label = stringResource(runModeLabelRes(mode)),
+        description = stringResource(runModeDescRes(mode)),
+        icon = runModeIcon(mode),
+    )
+
+/** 运行模式档位的图标（ADR-0040）。 */
+private fun runModeIcon(mode: RunMode): OptionIcon =
+    when (mode) {
+        RunMode.CHAT_ONLY -> OptionIcon.MODE_CHAT_ONLY
+        RunMode.STANDARD -> OptionIcon.MODE_STANDARD
+        RunMode.FULL -> OptionIcon.MODE_FULL
+    }
+
+/** 运行模式档位的名称资源（ADR-0040）。 */
+private fun runModeLabelRes(mode: RunMode): Int =
+    when (mode) {
+        RunMode.CHAT_ONLY -> R.string.thread_run_mode_chat_only
+        RunMode.STANDARD -> R.string.thread_run_mode_standard
+        RunMode.FULL -> R.string.thread_run_mode_full
+    }
+
+/** 运行模式档位的说明资源（ADR-0040）。 */
+private fun runModeDescRes(mode: RunMode): Int =
+    when (mode) {
+        RunMode.CHAT_ONLY -> R.string.thread_run_mode_chat_only_desc
+        RunMode.STANDARD -> R.string.thread_run_mode_standard_desc
+        RunMode.FULL -> R.string.thread_run_mode_full_desc
+    }
+
+private const val ARROW = "▾"
 
 /** 对话的附图按钮：读图失败、拍照失败时通过对话的通知条提示。 */
 @Composable

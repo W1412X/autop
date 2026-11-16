@@ -17,6 +17,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,6 +26,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import com.example.autop.core.ui.component.AutopButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTextButton
+import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusCard
 import com.example.autop.core.ui.component.SubPageTopBar
@@ -51,6 +53,7 @@ public fun ShellChannelScreen(
                 .fillMaxSize()
                 .statusBarsPadding(),
     ) {
+        ShellExecConsentDialog(state = state, onAction = onAction)
         SubPageTopBar(title = stringResource(R.string.me_shell_title), onBack = onBack)
         Column(
             modifier =
@@ -60,6 +63,8 @@ public fun ShellChannelScreen(
         ) {
             SectionTitle(text = stringResource(R.string.me_shell_section_status))
             ShellStatusCard(state = state, onAction = onAction)
+            SectionTitle(text = stringResource(R.string.me_shell_exec_section))
+            ShellExecCard(state = state, onAction = onAction)
             PairingGuideSection()
             SectionTitle(text = stringResource(R.string.me_shell_section_pair))
             PairingCard(state = state, onAction = onAction)
@@ -191,3 +196,42 @@ private fun noticeTextOf(notice: ShellNotice): String =
         ShellNotice.InputMissing -> stringResource(R.string.me_shell_input_missing)
         is ShellNotice.PairFailed -> stringResource(R.string.me_shell_pair_failed, notice.message)
     }
+
+/** Shell 执行总闸（shell-exec 设计 §2.5）：开关 + 说明；通道未连接时仍可开启，提示连接后可用。 */
+@Composable
+private fun ShellExecCard(
+    state: ShellChannelUiState,
+    onAction: (ShellChannelAction) -> Unit,
+) {
+    val connected = state.shellState == ShellState.Connected
+    StatusCard(
+        icon = AutopIcons.PhoneAndroid,
+        tint = MaterialTheme.colorScheme.primary,
+        title = stringResource(R.string.me_shell_exec_title),
+        subtitle = null,
+        trailing = {
+            Switch(
+                checked = state.shellExecEnabled,
+                onCheckedChange = { onAction(ShellChannelAction.SetShellExec(it)) },
+            )
+        },
+    ) {
+        StepText(textRes = R.string.me_shell_exec_desc)
+        if (!connected) StepText(textRes = R.string.me_shell_exec_offline)
+    }
+}
+
+/** 首次开启的知情同意弹窗（shell-exec 设计 §8）。 */
+@Composable
+private fun ShellExecConsentDialog(
+    state: ShellChannelUiState,
+    onAction: (ShellChannelAction) -> Unit,
+) {
+    if (!state.shellExecConsentPending) return
+    ConfirmDialog(
+        title = stringResource(R.string.me_shell_exec_consent_title),
+        text = stringResource(R.string.me_shell_exec_consent_text),
+        onConfirm = { onAction(ShellChannelAction.ConfirmShellExecConsent) },
+        onDismiss = { onAction(ShellChannelAction.DismissShellExecConsent) },
+    )
+}

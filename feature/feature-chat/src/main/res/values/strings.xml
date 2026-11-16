@@ -65,4 +65,14 @@
     <string name="chat_running_count">%1$d 个运行中</string>
     <string name="thread_waiting_reply">正在处理…</string>
     <string name="thread_notice_send_failed">发送失败，输入内容已保留</string>
-</resources>
+    <string name="thread_run_mode_title">运行模式</string>
+    <string name="thread_run_mode_chat_only">仅聊天</string>
+    <string name="thread_run_mode_chat_only_desc">只对话，不观察屏幕、不操作手机</string>
+    <string name="thread_run_mode_standard">标准模式</string>
+    <string name="thread_run_mode_standard_desc">观察与操作屏幕，不执行 shell 命令</string>
+    <string name="thread_run_mode_full">完全模式</string>
+    <string name="thread_run_mode_full_desc">标准模式 + 执行 shell 命令，危险命令会先请你确认</string>
+    <string name="thread_shell_block_title">无法切换到完全模式</string>
+    <string name="thread_shell_block_switch_off">完全模式需要先在「我的」中开启 Shell 执行。</string>
+    <string name="thread_shell_block_channel">完全模式需要先开启无线注入：在「我的」的注入通道中连接无线调试。</string>
+    <string name="thread_shell_block_confirm">知道了</string></resources>

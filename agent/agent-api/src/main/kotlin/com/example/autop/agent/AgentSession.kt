@@ -5,6 +5,7 @@ package com.example.autop.agent
 
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.llm.Block
@@ -33,8 +34,8 @@ public data class RunRequest(
     val replay: ReplayPlan? = null,
     /** ADR-0035：智能体按需占用屏幕的门；null 时屏幕工具不取得租约（仅用于测试与流程运行）。 */
     val screenGate: ScreenAccessGate? = null,
-    /** ADR-0035「只聊天」：false 时屏幕工具不出现在本次 Run 的工具列表中。 */
-    val screenTools: Boolean = true,
+    /** 运行模式（ADR-0040）：低于工具 `minMode` 的工具不出现在本次 Run 的工具列表中。 */
+    val runMode: RunMode = RunMode.STANDARD,
 )
 
 /** 按请求解析 provider：会话级覆盖优先，否则取默认模型（模型切换）。 */

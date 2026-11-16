@@ -48,8 +48,10 @@ internal class RouterBuilder(
             tools.filter { tool ->
                 // Beta 功能关闭时工具整体不存在：不进入状态消息，模型无从得知其存在（ADR-0030）。
                 if (tool.betaFeature?.let { !features.isEnabled(it) } == true) return@filter false
-                // ADR-0035「只聊天」：屏幕工具整体不进入本轮工具列表，也不记入隐藏清单（模型无从得知）。
-                if (!request.screenTools && isScreenTool(tool)) return@filter false
+                // ADR-0040：运行模式低于工具最低档位时整体不进入本轮工具列表，也不记入隐藏清单（模型无从得知）。
+                if (!request.runMode.includes(tool.minMode)) return@filter false
+                // shell-exec 设计 §2.2：运行期不可用（如总闸关闭、通道未连接）时同样静默过滤。
+                if (!tool.isAvailable(request.config)) return@filter false
                 val reason = hiddenReasonOf(tool, enabled, toolFilter, capabilities)
                 if (reason == null) {
                     true
@@ -67,8 +69,6 @@ internal class RouterBuilder(
             )
         return RouterBuild(router, hidden)
     }
-
-    private fun isScreenTool(tool: Tool): Boolean = tool.touchesScreen
 
     /** 首个不可见原因；null = 可见（与 [ToolRouter.visibleTools] 同一判定顺序）。 */
     private fun hiddenReasonOf(

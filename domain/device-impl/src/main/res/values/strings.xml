@@ -15,4 +15,16 @@
     <string name="update_channel_name">应用更新</string>
     <string name="update_ready_title">新版本已下载</string>
     <string name="update_ready_text">AutoP %1$s 已下载完成，点按打开应用即可安装</string>
-</resources>
+    <string name="run_shell_confirm">智能体想执行一条「%1$s」类命令（%2$s）：\n\n%3$s\n\n是否允许这一次执行？</string>
+    <string name="run_shell_option_allow">允许一次</string>
+    <string name="run_shell_option_deny">拒绝</string>
+    <string name="run_shell_mode_screen">屏幕操作，执行时会屏蔽用户触摸</string>
+    <string name="run_shell_mode_background">后台命令，不屏蔽用户触摸</string>
+    <string name="run_shell_danger_destructive">递归或强制删除、清空数据</string>
+    <string name="run_shell_danger_uninstall">卸载或禁用应用</string>
+    <string name="run_shell_danger_settings">修改系统设置或权限</string>
+    <string name="run_shell_danger_power">重启或关机</string>
+    <string name="run_shell_danger_raw_disk">磁盘或分区级写入</string>
+    <string name="run_shell_danger_force_stop">强制停止应用</string>
+    <string name="run_shell_danger_resident">常驻后台进程</string>
+    <string name="run_shell_danger_self">影响 AutoP 自身或无线调试通道</string></resources>

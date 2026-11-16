@@ -18,7 +18,8 @@ public data class AgentContextSection(
                 "context.role",
                 "context.safety",
                 "context.tool_guide",
-                "context.run_mode",
+                "context.run_origin",
+                "context.run_tiers",
                 "context.memory_index",
                 "context.user_profile",
                 "context.output",
@@ -79,6 +80,7 @@ public data class AgentToolsSection(
                 "tool.list_tasks",
                 "tool.create_task",
                 "tool.update_task",
+                "tool.run_shell",
             )
 
         public val DEFAULT_TIMEOUT_MS: Map<String, Long> =
@@ -226,6 +228,8 @@ public data class AgentStateSection(
                 "state.permissions",
                 "state.budget",
                 "state.tools",
+                "state.run_mode",
+                "state.shell",
             )
     }
 }

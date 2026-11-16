@@ -223,4 +223,8 @@
     <string name="task_author_leave_text">可以让它在后台继续运行，回到这个草稿时再查看；也可以取消本次生成。</string>
     <string name="task_author_leave_keep">后台运行</string>
     <string name="task_author_leave_cancel">取消运行</string>
-</resources>
+    <string name="task_edit_run_mode">运行模式</string>
+    <string name="task_edit_run_mode_standard">标准</string>
+    <string name="task_edit_run_mode_full">完全</string>
+    <string name="task_edit_run_mode_full_hint">完全模式下智能体可以执行 shell 命令。运行时需要无线注入已连接；危险命令仍会先请求确认。</string>
+    <string name="task_edit_run_mode_full_disabled">需要先在「我的」中开启 Shell 执行，才能选择完全模式。</string></resources>

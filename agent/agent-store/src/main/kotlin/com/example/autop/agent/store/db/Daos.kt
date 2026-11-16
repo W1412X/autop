@@ -28,6 +28,7 @@ internal const val LIVE_EVENTS_CTE: String =
         ") "
 
 /** 分支行读写。 */
+@Suppress("TooManyFunctions") // DAO 的方法面就是 threads 表的全部读写，拆分会让同一张表的 SQL 分散（与 ThreadStore 同理）
 @Dao
 public interface ThreadDao {
     @Insert
@@ -90,6 +91,12 @@ public interface ThreadDao {
     public suspend fun setModelProfile(
         id: String,
         profileId: String?,
+    )
+
+    @Query("UPDATE threads SET runMode = :mode WHERE id = :id")
+    public suspend fun setRunMode(
+        id: String,
+        mode: String,
     )
 
     @Query("DELETE FROM threads WHERE id = :id")

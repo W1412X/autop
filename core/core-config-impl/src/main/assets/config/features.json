@@ -1,7 +1,8 @@
 {
-  "schemaVersion": 8,
+  "schemaVersion": 9,
   "features": {
     "subtasks": false,
-    "flows": false
+    "flows": false,
+    "shellExec": false
   }
 }

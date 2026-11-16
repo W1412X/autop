@@ -20,8 +20,11 @@ import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Logger
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.DeviceConfig
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.config.FlowConfig
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.core.prompt.PromptRepository
@@ -317,20 +320,43 @@ public class RunRunner(
         record: RunRecord,
         task: Task?,
         entry: PendingEntry?,
-    ): RunRequest =
-        RunRequest(
+    ): RunRequest {
+        val config = configFor(task)
+        val tier = effectiveTier(entry, task, config)
+        return RunRequest(
             runId = record.id,
             threadId = record.threadId,
             // 输入已在入队时落盘（WP8.1）：这里必须传空，TurnLoop 不再重复写 INPUT（注意事项 9）。
             input = emptyList(),
             goal = task?.goal,
-            vars = (entry?.vars ?: emptyMap()) + mapOf(RUN_MODE_KEY to runMode(record.origin)),
-            config = configFor(task),
+            // 运行来源与运行模式档位分别用独立的变量键（ADR-0040）；档位同时放进变量，供 state.run_mode / state.shell 读取。
+            vars =
+                (entry?.vars ?: emptyMap()) +
+                    mapOf(
+                        RUN_ORIGIN_KEY to runOrigin(record.origin),
+                        RUN_MODE_VAR to tier.id,
+                    ),
+            config = config,
             toolFilter = task?.allowedTools,
             modelProfileId = threadStore.modelProfileOf(record.threadId),
             replay = replayPlan(record, task),
-            screenTools = entry?.vars?.get(SCREEN_TOOLS_VAR) != "false",
+            runMode = tier,
         )
+    }
+
+    /**
+     * 本次 Run 的运行模式（ADR-0040 §2.6）：发送侧指定 > 任务设置 > 标准模式。
+     * 完全模式需要 Shell 执行总闸开启，否则降为标准模式。
+     */
+    private fun effectiveTier(
+        entry: PendingEntry?,
+        task: Task?,
+        config: ConfigSnapshot,
+    ): RunMode {
+        val requested = RunMode.fromId(entry?.vars?.get(RUN_MODE_VAR)) ?: task?.runMode ?: RunMode.STANDARD
+        val shellAllowed = config[FeaturesConfig.FEATURES].shellExec
+        return if (requested == RunMode.FULL && !shellAllowed) RunMode.STANDARD else requested
+    }
 
     /**
      * 崩溃兜底（WP8.2）：线程里本 Run 的最后一条事件还不是 RunFinished 时补写一条
@@ -374,8 +400,8 @@ public class RunRunner(
         )
     }
 
-    private fun runMode(origin: RunOrigin): String =
-        if (origin == RunOrigin.CHAT) RUN_MODE_FOREGROUND else RUN_MODE_BACKGROUND
+    private fun runOrigin(origin: RunOrigin): String =
+        if (origin == RunOrigin.CHAT) RUN_ORIGIN_FOREGROUND else RUN_ORIGIN_BACKGROUND
 
     /** Task 覆盖层 + 策略覆盖层叠（docs/tech/07 §4.3）。 */
     private fun configFor(task: Task?) =
@@ -474,9 +500,9 @@ public class RunRunner(
 
     private companion object {
         const val TAG = "RunRunner"
-        const val RUN_MODE_KEY = "runMode"
-        const val RUN_MODE_FOREGROUND = "foreground"
-        const val RUN_MODE_BACKGROUND = "background"
+        const val RUN_ORIGIN_KEY = "runOrigin"
+        const val RUN_ORIGIN_FOREGROUND = "foreground"
+        const val RUN_ORIGIN_BACKGROUND = "background"
         const val KEY_POLICY = "policy"
         const val TRIGGER_PREFIX = "trigger."
         const val EXTRACTED_PREFIX = "extracted."

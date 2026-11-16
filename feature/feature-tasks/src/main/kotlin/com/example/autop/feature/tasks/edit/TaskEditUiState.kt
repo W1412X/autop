@@ -5,6 +5,7 @@
 
 package com.example.autop.feature.tasks.edit
 
+import com.example.autop.core.common.RunMode
 import com.example.autop.feature.tasks.cronTimeOf
 import com.example.autop.feature.tasks.isDailyCron
 import com.example.autop.feature.tasks.isWorkdayCron
@@ -27,6 +28,10 @@ public data class TaskEditUiState(
     val name: String = "",
     val goal: String = "",
     val needsScreen: Boolean = true,
+    /** 运行模式三档（ADR-0040 §2.6）：仅标准与完全可选，仅聊天不适用于任务。 */
+    val runMode: RunMode = RunMode.STANDARD,
+    /** Shell 执行总闸是否开启；关闭时不能选择完全模式。 */
+    val shellExecEnabled: Boolean = false,
     // 触发
     val triggerKind: EditTriggerKind = EditTriggerKind.MANUAL,
     val scheduleMode: EditScheduleMode = EditScheduleMode.DAILY,
@@ -125,6 +130,7 @@ internal fun TaskEditUiState.from(task: Task): TaskEditUiState {
         name = task.name,
         goal = task.goal,
         needsScreen = task.needsScreen,
+        runMode = task.runMode,
         executorFlow = task.executor == TaskExecutor.FLOW,
         flowId =
             task.flow

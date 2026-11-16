@@ -36,6 +36,8 @@ public data class ThreadEntity(
     val modelProfileId: String?,
     /** 线程来源（ThreadOrigin 的名字）：对话列表只显示 CHAT（ADR-0031）。 */
     val origin: String = "CHAT",
+    /** 会话运行模式（RunMode 的持久化 id）；默认标准（ADR-0040、ADR-0043）。 */
+    val runMode: String = "standard",
 )
 
 /**

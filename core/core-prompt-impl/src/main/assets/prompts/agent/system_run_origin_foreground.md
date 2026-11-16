@@ -1,5 +1,5 @@
 ---
-id: agent.system.run_mode.foreground
+id: agent.system.run_origin.foreground
 version: 1
 vars: []
 ---

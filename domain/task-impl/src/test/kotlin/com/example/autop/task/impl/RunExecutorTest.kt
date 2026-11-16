@@ -12,6 +12,7 @@ import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.UuidV7IdGenerator
@@ -78,6 +79,17 @@ public class RunExecutorTest {
                     .single()
                     .threadId,
             )
+        }
+
+    @Test
+    public fun `chat run mode is persisted on the thread when the message is sent`() =
+        runTest {
+            val fixture = ExecutorFixture(backgroundScope)
+
+            val result = fixture.executor.launchChat(null, "只聊天", images = emptyList(), runMode = RunMode.CHAT_ONLY)
+
+            val record = (result as Outcome.Ok).value
+            assertEquals(RunMode.CHAT_ONLY, fixture.threads.runModeOf(record.threadId))
         }
 
     @Test

@@ -22,7 +22,7 @@ public data class ConfigMigration(
 )
 
 /** 配置（用户覆盖）文件的当前 schemaVersion。 */
-public const val CURRENT_SCHEMA_VERSION: Int = 8
+public const val CURRENT_SCHEMA_VERSION: Int = 9
 
 /**
  * 内置迁移链：v2 删除屏幕观测 v4 不再使用的配置键（docs/design/
@@ -53,7 +53,69 @@ public fun builtinConfigMigrations(): List<ConfigMigration> =
         },
         // ADR-0037：device.shell 新增保活间隔键（仅增键，覆盖文件无需改写，旧文件缺键用默认值）。
         ConfigMigration(from = 7, to = 8) { doc -> doc },
+        // shell-exec（ADR-0040/0042）：features.shellExec 只新增键（缺失用默认值 false）；
+        // agent.tools.enabled 补入 tool.run_shell（缺失时追加，已存在不重复）。
+        ConfigMigration(from = 8, to = 9) { doc -> migrateV8ToV9(doc) },
     )
+
+/**
+ * v8 → v9：
+ * - `agent.tools.enabled` 补入 `tool.run_shell`；
+ * - 上下文片段 `context.run_mode`（运行来源）改名为 `context.run_origin`，并在其后补入 `context.run_tiers`；
+ * - 运行状态来源补入 `state.run_mode` 与 `state.shell`。
+ * 只改动数组，缺失的路径原样保留。
+ */
+private fun migrateV8ToV9(doc: JsonObject): JsonObject {
+    val withTool = appendAgentToolIfMissing(doc, "tool.run_shell")
+    val agent = withTool["agent"] as? JsonObject ?: return withTool
+    val withContext =
+        replaceArray(agent, "context", "contributors") { list ->
+            val renamed = renameId(list, "context.run_mode", "context.run_origin")
+            insertIdAfter(renamed, "context.run_origin", "context.run_tiers")
+        }
+    val withState =
+        replaceArray(withContext, "state", "sources") { list ->
+            appendIdIfMissing(appendIdIfMissing(list, "state.run_mode"), "state.shell")
+        }
+    return withTool.withChild("agent", withState)
+}
+
+/** 把数组中的 [from] 元素替换为 [to]（[to] 已存在时只删除 [from]，避免重复）。 */
+private fun renameId(
+    list: JsonArray,
+    from: String,
+    to: String,
+): JsonArray {
+    val ids = list.map { (it as? JsonPrimitive)?.contentOrNull }
+    if (from !in ids) return list
+    return if (to in ids) {
+        JsonArray(list.filter { (it as? JsonPrimitive)?.contentOrNull != from })
+    } else {
+        JsonArray(list.map { item -> if ((item as? JsonPrimitive)?.contentOrNull == from) JsonPrimitive(to) else item })
+    }
+}
+
+/** 数组末尾追加 [id]（已存在时原样返回）。 */
+private fun appendIdIfMissing(
+    list: JsonArray,
+    id: String,
+): JsonArray {
+    if (list.any { (it as? JsonPrimitive)?.contentOrNull == id }) return list
+    return JsonArray(list + JsonPrimitive(id))
+}
+
+/** 在 `agent.tools.enabled` 末尾追加 [toolId]（已存在或列表缺失时原样返回）。 */
+private fun appendAgentToolIfMissing(
+    doc: JsonObject,
+    toolId: String,
+): JsonObject {
+    val agent = doc["agent"] as? JsonObject ?: return doc
+    val tools = agent["tools"] as? JsonObject ?: return doc
+    val enabled = tools["enabled"] as? JsonArray ?: return doc
+    if (enabled.any { (it as? JsonPrimitive)?.contentOrNull == toolId }) return doc
+    val appended = JsonArray(enabled + JsonPrimitive(toolId))
+    return doc.withChild("agent", agent.withChild("tools", JsonObject(tools + ("enabled" to appended))))
+}
 
 /** v2 删除的配置路径。 */
 private val DELETE_PATHS_V2: List<String> =

@@ -12,7 +12,7 @@ import kotlinx.serialization.json.jsonPrimitive
 /** Task JSON 迁移。 */
 public object TaskJsonMigrations {
     /** 当前 Task JSON 结构版本。 */
-    public const val CURRENT_VERSION: Int = 1
+    public const val CURRENT_VERSION: Int = 2
 
     /** 读取 JSON 中的 schemaVersion（缺失视为 1）。 */
     public fun readVersion(
@@ -48,8 +48,8 @@ public object TaskJsonMigrations {
         return current
     }
 
-    /** 版本 n → n+1 的迁移（当前只有 v1 基线，无历史版本）。 */
-    private val MIGRATIONS: Map<Int, (String) -> String?> = emptyMap()
+    /** 版本 n → n+1 的迁移表。v1 → v2：新增 runMode（默认标准，缺失即标准），无需改写 JSON（ADR-0032）。 */
+    private val MIGRATIONS: Map<Int, (String) -> String?> = mapOf(1 to { raw -> raw })
 
     private const val KEY_SCHEMA_VERSION = "schemaVersion"
 

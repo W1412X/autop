@@ -20,6 +20,7 @@ import com.example.autop.agent.store.recall.IndexQueue
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.llm.Block
 import kotlinx.coroutines.CoroutineStart
@@ -248,6 +249,17 @@ public class ThreadStoreImpl(
         profileId: String?,
     ) {
         db.threadDao().setModelProfile(threadId.value, profileId)
+        changesFlow.tryEmit(Unit)
+    }
+
+    override suspend fun runModeOf(threadId: ThreadId): RunMode =
+        RunMode.fromId(db.threadDao().byId(threadId.value)?.runMode) ?: RunMode.STANDARD
+
+    override suspend fun setRunMode(
+        threadId: ThreadId,
+        mode: RunMode,
+    ) {
+        db.threadDao().setRunMode(threadId.value, mode.id)
         changesFlow.tryEmit(Unit)
     }
 

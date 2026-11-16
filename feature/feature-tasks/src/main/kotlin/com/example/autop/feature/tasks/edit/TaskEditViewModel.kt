@@ -11,6 +11,7 @@ import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.TASK_ID_ARG
 import com.example.autop.feature.tasks.TasksNavigator
@@ -56,7 +57,11 @@ public class TaskEditViewModel
 
         private val _uiState =
             MutableStateFlow(
-                TaskEditUiState(isNew = taskId == null, flowsEnabled = configProvider.current().flowsEnabled()),
+                TaskEditUiState(
+                    isNew = taskId == null,
+                    flowsEnabled = configProvider.current().flowsEnabled(),
+                    shellExecEnabled = configProvider.current()[FeaturesConfig.FEATURES].shellExec,
+                ),
             )
 
         public val uiState: StateFlow<TaskEditUiState> = _uiState
@@ -83,14 +88,11 @@ public class TaskEditViewModel
             navigator: TasksNavigator,
         ) {
             // 流程功能关闭时执行方式区块隐藏，流程相关动作不生效（ADR-0030）。
-            val flowAction =
-                action is TaskEditAction.SetExecutorFlow ||
-                    action is TaskEditAction.SetFlow ||
-                    action is TaskEditAction.SetFlowParam
-            if (flowAction && !_uiState.value.flowsEnabled) return
+            if (action.isFlowAction() && !_uiState.value.flowsEnabled) return
             when (action) {
                 is TaskEditAction.SetName -> _uiState.update { it.copy(name = action.value) }
                 is TaskEditAction.SetGoal -> _uiState.update { it.copy(goal = action.value) }
+                is TaskEditAction.SetRunMode -> _uiState.update { it.copy(runMode = action.mode) }
                 is TaskEditAction.SetNeedsScreen -> _uiState.update { it.copy(needsScreen = action.value) }
                 is TaskEditAction.SetExecutorFlow -> _uiState.update { it.copy(executorFlow = action.flow) }
                 is TaskEditAction.SetFlow ->
@@ -141,6 +143,11 @@ public class TaskEditViewModel
                 TaskEditAction.Back -> navigator.navigateBack()
             }
         }
+
+        private fun TaskEditAction.isFlowAction(): Boolean =
+            this is TaskEditAction.SetExecutorFlow ||
+                this is TaskEditAction.SetFlow ||
+                this is TaskEditAction.SetFlowParam
 
         private fun loadFlowOptions() {
             viewModelScope.launch {

@@ -24,7 +24,7 @@ class TemplateCatalogTest {
     @Test
     fun `tool templates describe every parameter in meta`() {
         val toolTemplates = templates.filterKeys { it.startsWith("tool.") }
-        assertThat(toolTemplates).hasSize(47)
+        assertThat(toolTemplates).hasSize(55)
         for ((_, template) in toolTemplates) {
             for ((key, value) in template.meta) {
                 assertThat(key).matches("param\\.[a-z0-9_]+")
@@ -166,10 +166,17 @@ class TemplateCatalogTest {
                 "agent.resume.reobserve",
                 "agent.system.output",
                 "agent.system.role",
-                "agent.system.run_mode.background",
-                "agent.system.run_mode.foreground",
+                "agent.system.run_origin.background",
+                "agent.system.run_origin.foreground",
                 "agent.system.safety",
                 "agent.system.tool_guide",
+                "agent.system.run_tiers",
+                "agent.state.run_mode.chat_only",
+                "agent.state.run_mode.standard",
+                "agent.state.run_mode.full",
+                "agent.state.shell.available",
+                "agent.state.shell.disabled",
+                "agent.state.shell.disconnected",
                 "agent.tool.cancelled_result",
                 "agent.tool.error_result",
                 "agent.tool.timeout_write_hint",
@@ -314,6 +321,14 @@ class TemplateCatalogTest {
                 "tool.update_plan",
                 "tool.update_task",
                 "tool.wait",
+                "tool.run_shell",
+                "tool.run_shell_hint_busy",
+                "tool.run_shell_hint_cancelled",
+                "tool.run_shell_hint_denied",
+                "tool.run_shell_hint_invalid",
+                "tool.run_shell_hint_timeout",
+                "tool.run_shell_hint_transport",
+                "tool.run_shell_hint_unavailable",
             )
     }
 }

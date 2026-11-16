@@ -21,6 +21,7 @@ import com.example.autop.agent.ThreadSummary
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.device.AccessibilityStatus
@@ -310,6 +311,17 @@ public class FakeThreadStore(
         threadId: ThreadId,
         title: String,
     ): Unit = Unit
+
+    private val runModes = mutableMapOf<String, RunMode>()
+
+    override suspend fun runModeOf(threadId: ThreadId): RunMode = runModes[threadId.value] ?: RunMode.STANDARD
+
+    override suspend fun setRunMode(
+        threadId: ThreadId,
+        mode: RunMode,
+    ) {
+        runModes[threadId.value] = mode
+    }
 
     override suspend fun modelProfileOf(threadId: ThreadId): String? = null
 

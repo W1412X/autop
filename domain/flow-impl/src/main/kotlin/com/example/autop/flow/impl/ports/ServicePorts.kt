@@ -180,7 +180,7 @@ internal class AgentPortImpl(
                     threadId = thread,
                     input = listOf(Block.Text(text)),
                     goal = text,
-                    vars = mapOf(RUN_MODE_KEY to RUN_MODE_BACKGROUND),
+                    vars = mapOf(RUN_ORIGIN_KEY to RUN_ORIGIN_BACKGROUND),
                     config = budgetConfig(maxSteps, maxDurationMs),
                     toolFilter = tools?.toSet(),
                 )
@@ -221,8 +221,8 @@ internal class AgentPortImpl(
     private companion object {
         const val HANDOFF_GOAL_PROMPT = "flow.recovery.handoff_goal"
         const val REACH_STATE_PROMPT = "flow.recovery.reach_state"
-        const val RUN_MODE_KEY = "runMode"
-        const val RUN_MODE_BACKGROUND = "background"
+        const val RUN_ORIGIN_KEY = "runOrigin"
+        const val RUN_ORIGIN_BACKGROUND = "background"
         const val TITLE_CHARS = 20
     }
 }

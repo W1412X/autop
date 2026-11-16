@@ -35,6 +35,7 @@ internal fun TaskEditUiState.buildTask(
         flow = if (executorFlow) FlowBinding(FlowId(flowId), flowParamsJson()) else null,
         trigger = buildTrigger(),
         needsScreen = needsScreen,
+        runMode = runMode,
         lockedBehavior = if (lockedRemind) LockedBehavior.REMIND else LockedBehavior.SKIP,
         priority = priority,
         createdAt = now,

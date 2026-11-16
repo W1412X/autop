@@ -3,6 +3,7 @@
  */
 package com.example.autop.feature.tasks.edit
 
+import com.example.autop.core.common.RunMode
 import java.time.LocalDate
 
 /** 编辑页意图。 */
@@ -130,6 +131,11 @@ public sealed interface TaskEditAction {
 
     /** 返回。 */
     public data object Back : TaskEditAction
+
+    /** 运行模式（ADR-0040）：标准或完全。 */
+    public data class SetRunMode(
+        val mode: RunMode,
+    ) : TaskEditAction
 }
 
 /** 触发方式（编辑态）。 */

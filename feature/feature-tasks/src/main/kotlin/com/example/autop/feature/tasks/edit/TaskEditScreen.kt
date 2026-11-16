@@ -4,13 +4,18 @@
 package com.example.autop.feature.tasks.edit
 
 import androidx.annotation.StringRes
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +23,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.ui.component.AutopButton
 import com.example.autop.core.ui.component.AutopInputBar
 import com.example.autop.core.ui.component.AutopTonalButton
@@ -106,6 +112,7 @@ private fun BasicSection(
             checked = state.needsScreen,
             onCheckedChange = { onAction(TaskEditAction.SetNeedsScreen(it)) },
         )
+        RunModeRow(state = state, onAction = onAction)
     }
 }
 
@@ -307,3 +314,44 @@ private fun errorText(code: String): String =
         TaskEditError.LIMIT.name -> stringResource(R.string.task_edit_error_limit)
         else -> stringResource(R.string.task_edit_save_failed, code)
     }
+
+/** 运行模式（ADR-0040 §2.6）：标准或完全；完全模式需要 Shell 执行总闸开启。 */
+@Composable
+private fun RunModeRow(
+    state: TaskEditUiState,
+    onAction: (TaskEditAction) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Column(modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge)) {
+        Text(text = stringResource(R.string.task_edit_run_mode), style = MaterialTheme.typography.titleSmall)
+        Row(
+            modifier = Modifier.padding(top = spacing.xs),
+            horizontalArrangement = Arrangement.spacedBy(spacing.xs),
+        ) {
+            FilterChip(
+                selected = state.runMode == RunMode.STANDARD,
+                onClick = { onAction(TaskEditAction.SetRunMode(RunMode.STANDARD)) },
+                label = { Text(stringResource(R.string.task_edit_run_mode_standard)) },
+            )
+            FilterChip(
+                selected = state.runMode == RunMode.FULL,
+                enabled = state.shellExecEnabled,
+                onClick = { onAction(TaskEditAction.SetRunMode(RunMode.FULL)) },
+                label = { Text(stringResource(R.string.task_edit_run_mode_full)) },
+            )
+        }
+        Text(
+            text =
+                stringResource(
+                    if (state.shellExecEnabled) {
+                        R.string.task_edit_run_mode_full_hint
+                    } else {
+                        R.string.task_edit_run_mode_full_disabled
+                    },
+                ),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(top = spacing.xs),
+        )
+    }
+}

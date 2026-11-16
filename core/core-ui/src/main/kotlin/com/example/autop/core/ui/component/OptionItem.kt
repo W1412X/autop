@@ -28,6 +28,15 @@ public enum class OptionIcon {
     AI,
     SAVE_TASK,
     PALETTE,
+
+    /** 运行模式：仅聊天（ADR-0040）。 */
+    MODE_CHAT_ONLY,
+
+    /** 运行模式：标准模式。 */
+    MODE_STANDARD,
+
+    /** 运行模式：完全模式（含 shell）。 */
+    MODE_FULL,
 }
 
 /** 选项语气：破坏性动作整行用 error 色。 */

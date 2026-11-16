@@ -26,9 +26,11 @@ import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.LogFiles
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.thread.ui.ChatImageReader
 import com.example.autop.core.thread.ui.TimelineEntry
@@ -37,6 +39,8 @@ import com.example.autop.core.thread.ui.mergeTimeline
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.component.joinVoiceText
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.ShellInput
+import com.example.autop.device.ShellState
 import com.example.autop.device.SpeechInput
 import com.example.autop.feature.chat.NEW_THREAD
 import com.example.autop.llm.Block
@@ -115,8 +119,10 @@ private data class ChatMeta(
     val images: List<ImageAttachment> = emptyList(),
     /** 会话级模型覆盖（null = 跟随默认）。 */
     val modelProfileId: String? = null,
-    /** 只聊天（ADR-0035）：本页内存状态，发送时决定本轮是否提供屏幕工具。 */
-    val chatOnly: Boolean = false,
+    /** 运行模式（ADR-0040）：下一次发送时生效；随线程持久化在 threads.db（ADR-0043），页面重建后沿用。 */
+    val runMode: RunMode = RunMode.STANDARD,
+    /** 完全模式无法切换时的阻断原因（非 null 时弹窗）。 */
+    val shellBlock: ShellBlock? = null,
     val sheet: ChatThreadSheet = ChatThreadSheet(),
     val notice: ThreadNotice? = null,
     val voiceError: String? = null,
@@ -143,6 +149,7 @@ public class ChatThreadViewModel
         private val logFiles: LogFiles,
         private val imageReader: ChatImageReader,
         private val speech: SpeechInput,
+        private val shellInput: ShellInput,
     ) : ViewModel() {
         /** 系统语音识别是否可用（设备没有识别服务时不显示麦克风）。 */
         private val voiceAvailable: Boolean = speech.available()
@@ -294,10 +301,36 @@ public class ChatThreadViewModel
             }
         }
 
-        /** 只聊天开关（ADR-0035）：只改页面内存状态，下一次发送时生效。 */
+        /**
+         * 运行模式（ADR-0040）：只改页面内存状态，下一次发送时生效。切到完全模式前检查 Shell 执行总闸与无线注入通道，不满足时只记录阻断原因。
+         */
         private fun updateChatOption(action: ChatThreadAction) {
-            if (action is ChatThreadAction.SetChatOnly) meta.update { it.copy(chatOnly = action.enabled) }
+            when (action) {
+                is ChatThreadAction.SetRunMode -> setRunMode(action.mode)
+                ChatThreadAction.DismissShellBlock -> meta.update { it.copy(shellBlock = null) }
+                else -> Unit
+            }
         }
+
+        private fun setRunMode(mode: RunMode) {
+            val block = if (mode == RunMode.FULL) shellBlockNow() else null
+            if (block != null) {
+                meta.update { it.copy(shellBlock = block) }
+                return
+            }
+            meta.update { it.copy(runMode = mode, shellBlock = null) }
+            if (threadId != NEW_THREAD) {
+                viewModelScope.launch { threadStore.setRunMode(ThreadId(threadId), mode) }
+            }
+        }
+
+        /** 完全模式的前置条件：总闸开启，且无线注入已连接。 */
+        private fun shellBlockNow(): ShellBlock? =
+            when {
+                !configProvider.current()[FeaturesConfig.FEATURES].shellExec -> ShellBlock.SWITCH_OFF
+                shellInput.state.value != ShellState.Connected -> ShellBlock.CHANNEL_DISCONNECTED
+                else -> null
+            }
 
         private fun handleAttachments(action: ChatThreadAction) {
             when (action) {
@@ -397,7 +430,7 @@ public class ChatThreadViewModel
                         text = text,
                         images = images,
                         modelProfileId = meta.value.modelProfileId,
-                        screenTools = !meta.value.chatOnly,
+                        runMode = meta.value.runMode,
                     )
                 if (outcome is Outcome.Err) {
                     // 发送失败：撤销乐观消息，把原文和图片放回输入框（不丢用户内容）。
@@ -486,6 +519,8 @@ public class ChatThreadViewModel
             meta.update { it.copy(sheet = it.sheet.copy(menuSeq = null)) }
             viewModelScope.launch {
                 agentSession.fork(ThreadId(threadId), seq, title = null).getOrNull()?.let { forked ->
+                    // 分叉线程沿用当前模式，并持久化（ADR-0043）。
+                    threadStore.setRunMode(forked, meta.value.runMode)
                     threadId = forked.value
                     startCollecting(forked.value)
                     navChannel.send(ChatNavEvent.ReplaceThread(forked.value))
@@ -510,7 +545,9 @@ public class ChatThreadViewModel
             collectJob =
                 viewModelScope.launch {
                     threadTitle.value = threadStore.titleOf(id)
-                    meta.update { it.copy(modelProfileId = threadStore.modelProfileOf(id)) }
+                    meta.update {
+                        it.copy(modelProfileId = threadStore.modelProfileOf(id), runMode = threadStore.runModeOf(id))
+                    }
                     timeline.update { TimelineInput(outgoing = it.outgoing) }
                     // observeFrom 先回放已有事件再转实时（WP8.3）：新对话的用户输入事件
                     // 在入队时已落盘（WP8.1），backlog 一定包含它，不再丢。
@@ -556,7 +593,8 @@ public class ChatThreadViewModel
                 accessibilityConnected = connected,
                 input = metaState.input,
                 modelProfileId = metaState.modelProfileId,
-                chatOnly = metaState.chatOnly,
+                runMode = metaState.runMode,
+                shellBlock = metaState.shellBlock,
                 voiceError = metaState.voiceError,
                 images = metaState.images,
                 maxImages = chatConfig.attachMaxImages,

@@ -14,6 +14,9 @@ public object UntrustedText {
     /** 剪贴板文本来源。 */
     public const val SOURCE_CLIPBOARD: String = "clipboard"
 
+    /** shell 命令的标准输出与标准错误（shell-exec 设计 §8）。 */
+    public const val SOURCE_SHELL: String = "shell"
+
     /** 用 `<untrusted source="[source]">…</untrusted>` 包装；去掉正文里的闭合标签，防止提前闭合。 */
     public fun wrap(
         source: String,

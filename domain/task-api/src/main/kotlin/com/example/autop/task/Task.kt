@@ -5,6 +5,7 @@ package com.example.autop.task
 
 import com.example.autop.agent.ReplayScript
 import com.example.autop.core.common.FlowId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.TaskId
 import com.example.autop.policy.PolicyOverrides
 import kotlinx.serialization.SerialName
@@ -29,6 +30,8 @@ public data class Task(
     val priority: Int = 0,
     val lockedBehavior: LockedBehavior = LockedBehavior.REMIND,
     val enabled: Boolean = true,
+    /** 运行模式三档（ADR-0040 §2.6）：任务触发时的档位；缺失按标准模式（旧任务行为不变）。 */
+    val runMode: RunMode = RunMode.STANDARD,
     /** finish.outputs 的 JSON Schema 子集（R1/C2）；后台任务结束时按它校验，不通过拒绝结束。 */
     val outputSchema: JsonObject? = null,
     /** 回放脚本（docs/tech/04 §3.12，R1/A6）：最近一次成功 Run 录制的动作序列；null = 无。 */
@@ -39,7 +42,7 @@ public data class Task(
     val flow: FlowBinding? = null,
     val createdAt: Long,
     val updatedAt: Long,
-    val schemaVersion: Int = 1,
+    val schemaVersion: Int = 2,
 )
 
 /** 任务的执行方式。 */
