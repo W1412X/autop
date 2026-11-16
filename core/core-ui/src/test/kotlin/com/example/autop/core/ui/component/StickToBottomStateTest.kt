@@ -4,6 +4,8 @@
  */
 package com.example.autop.core.ui.component
 
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
@@ -64,6 +66,37 @@ class StickToBottomStateTest {
             assertThat(listState.canScrollForward).isFalse()
             val lastVisible = listState.layoutInfo.visibleItemsInfo.last()
             assertThat(lastVisible.index).isEqualTo(99)
+        }
+    }
+
+    @Test
+    fun `growing tall last item follows without a scroll loop`() {
+        val listState = LazyListState()
+        val text = mutableStateOf("首行")
+        compose.setContent {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.height(400.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                contentPadding = PaddingValues(vertical = 8.dp),
+            ) {
+                items(1) { Text(text.value) }
+            }
+            rememberStickToBottom(listState)
+        }
+        compose.waitForIdle()
+
+        repeat(20) {
+            text.value += "\n" + "思考内容".repeat(20)
+            compose.waitForIdle()
+        }
+
+        compose.runOnIdle {
+            val info = listState.layoutInfo
+            val last = info.visibleItemsInfo.last()
+            assertThat(listState.canScrollForward).isFalse()
+            assertThat(last.offset + last.size)
+                .isEqualTo(info.viewportEndOffset - info.afterContentPadding)
         }
     }
 
