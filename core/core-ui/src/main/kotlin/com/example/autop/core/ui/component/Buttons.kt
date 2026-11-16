@@ -97,6 +97,7 @@ public fun AutopTextButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     destructive: Boolean = false,
+    enabled: Boolean = true,
 ) {
     val colors =
         if (destructive) {
@@ -107,6 +108,7 @@ public fun AutopTextButton(
     TextButton(
         onClick = onClick,
         modifier = modifier.height(AutopDimens.buttonHeight),
+        enabled = enabled,
         shape = MaterialTheme.shapes.small,
         colors = colors,
         contentPadding = PaddingValues(horizontal = AutopDimens.buttonPaddingH),

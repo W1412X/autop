@@ -41,12 +41,9 @@ import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.example.autop.agent.PlanItem
-import com.example.autop.agent.PlanStatus
 import com.example.autop.core.thread.ui.R
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.MarkdownText
-import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.AutopDimens
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalMotionEnabled
@@ -59,6 +56,7 @@ public fun TimelineRow(
     entry: TimelineEntry,
     onAction: (TimelineAction) -> Unit,
     modifier: Modifier = Modifier,
+    style: TimelineStyle = TimelineStyle(),
 ) {
     val seq = entry.seq
     val longPress: (() -> Unit)? =
@@ -68,7 +66,7 @@ public fun TimelineRow(
             null
         }
     when (val item = entry.item) {
-        is TimelineItem.UserBubble -> UserBubbleRow(item = item, modifier = modifier)
+        is TimelineItem.UserBubble -> UserBubbleRow(item = item, style = style, modifier = modifier)
         is TimelineItem.AssistantText ->
             AssistantTextRow(item = item, onLongClick = longPress, seq = seq, onAction = onAction, modifier = modifier)
         is TimelineItem.ThinkingBlock -> ThinkingRow(item = item, modifier = modifier)
@@ -100,10 +98,12 @@ public fun TimelineRow(
 @Composable
 private fun UserBubbleRow(
     item: TimelineItem.UserBubble,
+    style: TimelineStyle,
     modifier: Modifier = Modifier,
 ) {
     val spacing = LocalSpacing.current
-    val bubbleMaxWidth = LocalConfiguration.current.screenWidthDp.dp * USER_BUBBLE_WIDTH_FRACTION
+    val availableWidth = style.availableWidth ?: LocalConfiguration.current.screenWidthDp.dp
+    val bubbleMaxWidth = availableWidth * USER_BUBBLE_WIDTH_FRACTION
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.End,
@@ -280,64 +280,13 @@ private fun thinkingText(item: TimelineItem.ThinkingBlock): AnnotatedString =
         AnnotatedString(item.text)
     }
 
-/** 计划卡（PlanUpdated 覆盖式更新，docs/tech/08 §4.2 PlanCard）。 */
+/** 计划卡（PlanUpdated 覆盖式更新，docs/tech/08 §4.2 PlanCard）：渲染统一交给 [PlanCardView]，与进度悬浮窗共用。 */
 @Composable
 private fun PlanRow(
     item: TimelineItem.PlanCard,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier =
-            modifier
-                .fillMaxWidth()
-                .background(
-                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = AutopAlpha.BLOCK_FILL),
-                    shape = MaterialTheme.shapes.medium,
-                ).padding(all = LocalSpacing.current.md),
-        verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.xs),
-    ) {
-        Text(
-            text = stringResource(R.string.thread_plan_title),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        item.explanation?.let { explanation ->
-            Text(
-                text = explanation,
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
-        }
-        item.items.forEach { plan -> PlanLine(plan = plan) }
-    }
-}
-
-@Composable
-private fun PlanLine(plan: PlanItem) {
-    val icon =
-        when (plan.status) {
-            PlanStatus.PENDING -> AutopIcons.RadioButtonUnchecked
-            PlanStatus.IN_PROGRESS -> AutopIcons.Play
-            PlanStatus.DONE -> AutopIcons.CheckCircle
-            PlanStatus.DROPPED -> AutopIcons.Close
-        }
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Icon(
-            imageVector = icon,
-            contentDescription = null,
-            modifier = Modifier.size(IconSize.Xs.scaled()),
-            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
-        Text(
-            text = plan.step,
-            style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-            modifier =
-                Modifier
-                    .weight(1f)
-                    .padding(start = LocalSpacing.current.xs),
-        )
-    }
+    PlanCardView(items = item.items, explanation = item.explanation, modifier = modifier)
 }
 
 /** 分叉来源标记（docs/tech/08 §4.2 ForkMarker）：点击回源对话；标注继承条数（WP8.6）。 */

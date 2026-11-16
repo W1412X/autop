@@ -30,6 +30,10 @@
     <string name="step_wait">等待</string>
     <string name="thread_action_continue">继续</string>
     <string name="thread_action_end">结束</string>
+    <string name="thread_action_resuming">正在继续…</string>
+    <string name="thread_action_stopping">正在停止…</string>
+    <string name="thread_ask_self">自己输入</string>
+    <string name="thread_send">发送</string>
     <string name="thread_detail_args">参数</string>
     <string name="thread_detail_observation">观测</string>
     <string name="thread_detail_result">结果</string>
