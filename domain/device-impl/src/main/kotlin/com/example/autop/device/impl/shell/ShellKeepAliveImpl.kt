@@ -3,9 +3,12 @@
  * （connect 内部 mDNS 发现端口 → TLS 鉴权，与注入共用互斥锁）。
  * 连接成功后无需干预（断开由下一轮巡逻拾起）；未配对时空转，
  * 不反复 mDNS 打扰未开启无线调试的设备。
+ * 巡逻间隔与重试间隔来自 `device.shell`（ADR-0037），每轮重新读取，改配置即时生效。
  */
 package com.example.autop.device.impl.shell
 
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.DeviceConfig
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellKeepAlive
 import com.example.autop.device.ShellState
@@ -18,18 +21,13 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 import javax.inject.Singleton
 
-/** 巡逻间隔（已连接/未配对）。 */
-private const val TICK_MS = 15_000L
-
-/** 重连失败后的重试间隔。 */
-private const val RETRY_MS = 30_000L
-
 /** shell 通道保活器实现。 */
 @Singleton
 public class ShellKeepAliveImpl
     @Inject
     constructor(
         private val shellInput: ShellInput,
+        private val configProvider: ConfigProvider,
     ) : ShellKeepAlive {
         private var job: Job? = null
 
@@ -45,15 +43,20 @@ public class ShellKeepAliveImpl
             job = null
         }
 
-        /** 周期循环：已配对且断开 → 重连；成功长间隔巡逻，失败短间隔重试。 */
+        /** 周期循环：已连接则探测；已配对且断开则重连（失败走重试间隔）；其余按巡逻间隔空转。 */
         private suspend fun loop() {
             while (currentCoroutineContext().isActive) {
-                val reconnect = shellInput.paired.value && shellInput.state.value == ShellState.Disconnected
+                val cfg = configProvider.current()[DeviceConfig.SHELL]
                 val nextMs =
-                    if (reconnect) {
-                        if (shellInput.connect()) TICK_MS else RETRY_MS
-                    } else {
-                        TICK_MS
+                    when {
+                        // 已连接：每个周期探测一次。无线调试关闭后连接失效，探测会回落 Disconnected，下一轮重连
+                        shellInput.state.value == ShellState.Connected -> {
+                            shellInput.probe()
+                            cfg.keepAliveTickMs
+                        }
+                        shellInput.paired.value && shellInput.state.value == ShellState.Disconnected ->
+                            if (shellInput.connect()) cfg.keepAliveTickMs else cfg.keepAliveRetryMs
+                        else -> cfg.keepAliveTickMs
                     }
                 delay(nextMs)
             }

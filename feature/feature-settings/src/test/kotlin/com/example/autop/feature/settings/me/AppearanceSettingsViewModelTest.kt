@@ -331,6 +331,8 @@ private class FakeShellInput : ShellInput {
         pairCode: String,
     ): Outcome<Unit> = Outcome.Ok(Unit)
 
+    override suspend fun probe(): Boolean = true
+
     override suspend fun connect(): Boolean = true
 
     override suspend fun tap(

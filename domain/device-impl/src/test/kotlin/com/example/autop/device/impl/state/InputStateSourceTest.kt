@@ -73,6 +73,8 @@ class InputStateSourceTest {
             pairCode: String,
         ): Outcome<Unit> = unused()
 
+        override suspend fun probe(): Boolean = true
+
         override suspend fun connect(): Boolean = unused()
 
         override suspend fun tap(

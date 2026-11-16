@@ -41,6 +41,9 @@ public interface ShellInput {
     /** 重新发现端口并尝试连接（无线调试开启后调用）。 */
     public suspend fun connect(): Boolean
 
+    /** 探测已有连接是否仍可用。连接已失效（如无线调试被关闭）时回落 [ShellState.Disconnected] 并返回 false。 */
+    public suspend fun probe(): Boolean
+
     /** 坐标点击（屏幕像素）。 */
     public suspend fun tap(
         x: Int,

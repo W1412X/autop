@@ -14,6 +14,8 @@ import androidx.core.content.edit
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.DeviceConfig
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.example.autop.device.impl.adb.AdbClient
@@ -23,6 +25,7 @@ import com.example.autop.device.impl.adb.AdbPairingClient
 import com.example.autop.device.impl.adb.PreferenceAdbKeyStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -40,7 +43,9 @@ private const val PREFS_NAME = "autop_adb"
 private const val KEY_CONNECT_PORT = "connect_port"
 private const val KEY_PAIRED = "paired"
 private const val ADB_HOST = "127.0.0.1"
-private const val DISCOVER_TIMEOUT_MS = 5_000L
+
+/** 连接探测使用的 shell 命令，无副作用。 */
+private const val PROBE_COMMAND = "true"
 
 /** shell 注入通道：连接 adbd 后以 shell 身份注入输入事件。 */
 @Singleton
@@ -49,6 +54,7 @@ public class AdbShellInput
     constructor(
         @ApplicationContext private val context: Context,
         private val dispatchers: DispatcherProvider,
+        private val configProvider: ConfigProvider,
     ) : ShellInput {
         private val prefs: SharedPreferences
             get() = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -95,6 +101,22 @@ public class AdbShellInput
                         }
                         is Outcome.Err -> result
                     }
+                }
+            }
+
+        override suspend fun probe(): Boolean =
+            withContext(dispatchers.io) {
+                mutex.withLock {
+                    val active = client ?: return@withLock false
+                    val timeoutMs = configProvider.current()[DeviceConfig.SHELL].commandTimeoutMs
+                    val worker = async { runCatching { active.shellCommand(PROBE_COMMAND, null) }.isSuccess }
+                    val alive = withTimeoutOrNull(timeoutMs) { worker.await() } ?: false
+                    if (!alive) {
+                        Log.w(TAG, "shell probe failed, dropping connection")
+                        worker.cancel()
+                        closeClientLocked()
+                    }
+                    alive
                 }
             }
 
@@ -183,7 +205,8 @@ public class AdbShellInput
         private suspend fun discoverConnectPort(): Int? {
             val cached = prefs.getInt(KEY_CONNECT_PORT, -1)
             if (cached > 0) return cached
-            return withTimeoutOrNull(DISCOVER_TIMEOUT_MS) {
+            val timeoutMs = configProvider.current()[DeviceConfig.SHELL].discoverTimeoutMs
+            return withTimeoutOrNull(timeoutMs) {
                 suspendCancellableCoroutine { continuation ->
                     val mdns =
                         AdbMdns(context, AdbMdns.TLS_CONNECT) { port ->
