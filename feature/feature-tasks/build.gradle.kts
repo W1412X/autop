@@ -14,6 +14,12 @@ dependencies {
     // 任务可绑定流程：读取流程库与参数声明（docs/design/flows.md §9）。
     implementation(project(":domain:flow-api"))
     testImplementation(project(":core:core-testing"))
+    // 打开创作页的贴底行为需要真实布局验证。
+    debugImplementation(libs.compose.ui.test.manifest)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
 
 // 单测用 FakeConfigProvider 读取真实配置默认值（docs/tech/02 §5 的 autop.configDir 机制）。

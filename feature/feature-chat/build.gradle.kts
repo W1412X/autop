@@ -16,6 +16,10 @@ dependencies {
     // ChatThreadViewModelTest 用 Robolectric 造 Context（ChatImageReader 注入 @ApplicationContext）。
     testImplementation(libs.androidx.test.core)
     testImplementation(libs.robolectric)
+    // 打开对话页的贴底行为需要真实布局验证。
+    debugImplementation(libs.compose.ui.test.manifest)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
 }
 
 // 单测用 FakeConfigProvider 读取真实的配置默认值（docs/tech/02 §5 的 autop.configDir 机制，同 core-testing）。

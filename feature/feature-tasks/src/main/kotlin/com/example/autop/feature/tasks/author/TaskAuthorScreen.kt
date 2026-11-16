@@ -94,13 +94,20 @@ public fun TaskAuthorScreen(
     LaunchedEffect(author.messages.size) {
         if (author.messages.lastOrNull() is AuthorMessage.User) stick.follow()
     }
-    // 草稿出现或更新：只定位到草稿卡片顶部一次，之后不干预滚动。
+    // 打开页面时恢复出来的草稿（编辑既有任务/回到未结束会话）：直接贴底。
+    // 会话中后续产出的草稿仍定位到草稿卡顶部一次，之后不干预滚动。
+    var draftHandled by remember { mutableStateOf(false) }
     LaunchedEffect(author.draft) {
-        if (author.draft != null) {
-            stick.release()
-            val intro = if (!author.editing && author.messages.isEmpty() && author.live == null) 1 else 0
-            listState.animateScrollToItem(intro + author.messages.size)
+        val draft = author.draft ?: return@LaunchedEffect
+        if (!draftHandled && !author.busy) {
+            draftHandled = true
+            stick.follow()
+            return@LaunchedEffect
         }
+        draftHandled = true
+        stick.release()
+        val intro = if (!author.editing && author.messages.isEmpty() && author.live == null) 1 else 0
+        listState.animateScrollToItem(intro + author.messages.size)
     }
     Column(
         modifier =

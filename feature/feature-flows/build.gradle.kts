@@ -13,4 +13,10 @@ dependencies {
     implementation(project(":domain:task-api"))
     implementation(project(":agent:agent-api"))
     testImplementation(project(":core:core-testing"))
+    // 打开创作页的贴底行为需要真实布局验证。
+    debugImplementation(libs.compose.ui.test.manifest)
+    testImplementation(platform(libs.compose.bom))
+    testImplementation(libs.compose.ui.test.junit4)
+    testImplementation(libs.robolectric)
+    testImplementation(libs.androidx.test.core)
 }
