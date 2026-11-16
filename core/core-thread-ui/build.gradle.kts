@@ -21,5 +21,6 @@ dependencies {
     implementation(project(":agent:agent-api"))
     implementation(platform(libs.compose.bom))
     implementation(libs.compose.material.icons.extended)
+    implementation(libs.compose.ui.tooling.preview)
     testImplementation(project(":core:core-testing"))
 }
