@@ -264,7 +264,7 @@ private fun ActiveRunInfo?.toCard(threads: List<ThreadSummary>): ActiveRunCardMo
         runId = info.run.id.value,
         title = info.run.threadId.let { id -> threads.firstOrNull { it.threadId == id }?.title },
         currentStep = info.currentStep,
-        scene = chatSceneOf(info.state),
+        scene = chatSceneOf(info.displayState),
         seed = BallFaceDirector.seedOfEvent(info.run.id.value, info.stepCount),
     )
 }

@@ -76,7 +76,7 @@ internal fun runBarSpecOf(
             else ->
                 RunBarHint.Running(
                     title = hintTitleOf(active, previousHint, roll),
-                    scene = ballFaceSceneOf(active.state, active.toolId?.let(::categoryOfTool)),
+                    scene = ballFaceSceneOf(active.displayState, active.toolId?.let(::categoryOfTool)),
                     seed = BallFaceDirector.seedOfEvent(active.run.id.value, active.stepCount),
                 )
         }

@@ -99,6 +99,26 @@ public sealed interface AgentEvent {
     ) : AgentEvent
 }
 
+/**
+ * 当前模型请求是否仍在等待首个输出（占位表情与等待行的共用口径）。
+ *
+ * 每次模型请求开始（进入 [RunState.SAMPLING]）即为真；收到任一流式增量、工具调用开始、
+ * 助手消息或工具结果落库、或状态离开采样即为假；采样重试时重新等待。逐事件折叠 [current] 得到结果，
+ * 对话页、控制条与悬浮球共用这一函数，避免各处口径不一致。
+ */
+public fun nextAwaitingModel(
+    current: Boolean,
+    event: AgentEvent,
+): Boolean =
+    when (event) {
+        is AgentEvent.StateChanged -> event.state == RunState.SAMPLING
+        is AgentEvent.SampleRetrying -> true
+        is AgentEvent.TextDelta, is AgentEvent.ThinkingDelta, is AgentEvent.ToolCallStreaming -> false
+        is AgentEvent.Persisted ->
+            if (event.event.payload is AssistantMessage || event.event.payload is ToolResultEvent) false else current
+        else -> current
+    }
+
 /** 一次运行的控制句柄。 */
 public interface RunHandle {
     public val runId: RunId

@@ -130,4 +130,13 @@ public data class ActiveRunInfo(
     val toolTarget: String? = null,
     /** 根 Run 名下进行中的流程进度（run_flow/任务流程；无流程为 null，P1-2 进度互通）。 */
     val flow: FlowRunProgress? = null,
-)
+    /** 当前模型请求是否仍在等待首个输出（[nextAwaitingModel] 折叠得到）。 */
+    val awaitingModel: Boolean = false,
+) {
+    /**
+     * 展示用执行阶段：等待模型首个输出时按起跑（STARTING）处理，控制条、悬浮球与会话卡片
+     * 因此在每次模型请求的等待期都显示起跑表情与文案，而不只在整个运行的第一次请求。
+     */
+    public val displayState: RunState
+        get() = if (awaitingModel) RunState.STARTING else state
+}

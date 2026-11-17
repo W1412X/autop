@@ -46,6 +46,7 @@ import com.example.autop.core.ui.component.AutopChip
 import com.example.autop.core.ui.component.AutopComposer
 import com.example.autop.core.ui.component.AutopModelSelector
 import com.example.autop.core.ui.component.AutopTonalButton
+import com.example.autop.core.ui.component.AwaitingReplyLine
 import com.example.autop.core.ui.component.ComposerTrailing
 import com.example.autop.core.ui.component.InlineQuestionCard
 import com.example.autop.core.ui.component.InputBarSpec
@@ -153,9 +154,10 @@ public fun TaskAuthorScreen(
             author.live?.let { live -> item { LiveTurn(live = live) } }
             if (author.busy && author.live == null && author.pendingQuestion == null) {
                 item {
-                    ThinkingLine(
+                    AwaitingReplyLine(
                         text = stringResource(R.string.task_author_thinking),
-                        mood = BallFaceMood.RUNNING_START,
+                        faceSize = AUTHOR_FACE_SIZE,
+                        textStyle = MaterialTheme.typography.labelSmall,
                     )
                 }
             }
@@ -371,27 +373,12 @@ private fun LiveTurn(live: AuthorLive) {
             )
         }
         if (live.thinking.isBlank() && live.text.isBlank() && live.tool == null) {
-            ThinkingLine(text = stringResource(R.string.task_author_thinking), mood = BallFaceMood.RUNNING_START)
+            AwaitingReplyLine(
+                text = stringResource(R.string.task_author_thinking),
+                faceSize = AUTHOR_FACE_SIZE,
+                textStyle = MaterialTheme.typography.labelSmall,
+            )
         }
-    }
-}
-
-/** 生成等待行：起跑表情 + 一行小字。 */
-@Composable
-private fun ThinkingLine(
-    text: String,
-    mood: BallFaceMood,
-) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
-    ) {
-        AutopBallFace(mood = mood, modifier = Modifier.size(AUTHOR_FACE_SIZE))
-        Text(
-            text = text,
-            style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
     }
 }
 

@@ -22,6 +22,7 @@ import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolResultEvent
 import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
+import com.example.autop.agent.nextAwaitingModel
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.ImageAttachment
@@ -81,6 +82,8 @@ private data class TimelineInput(
     val live: List<AgentEvent> = emptyList(),
     /** 刚发出、尚未在事件流中出现的用户消息文本（乐观显示，入库后清除）。 */
     val outgoing: String? = null,
+    /** 当前模型请求是否仍在等待首个输出（[nextAwaitingModel] 折叠得到，随实时事件更新）。 */
+    val awaitingModel: Boolean = false,
 )
 
 /** 归并结果（只随时间线变化重算）：界面条目、线程标题、历史（取原始事件用）。 */
@@ -88,6 +91,7 @@ private data class MergedTimeline(
     val history: List<ThreadEvent> = emptyList(),
     val title: String? = null,
     val entries: List<TimelineEntry> = emptyList(),
+    val awaitingModel: Boolean = false,
 )
 
 /** 发出消息后等待第一条输出的运行状态（这些状态下才显示等待占位）。 */
@@ -115,12 +119,19 @@ private fun withOutgoing(
         entries + TimelineEntry(item = bubble, seq = null, forkable = false)
     }
 
-/** 运行已开始但末尾仍是用户消息（模型还没有任何输出）时，需要显示等待占位。 */
+/**
+ * 等待模型首个输出时显示占位：当前模型请求仍无输出（[awaitingModel]，覆盖每一次模型请求），
+ * 或运行刚开始、末尾仍是用户消息（启动阶段，事件尚未到达时的兜底）。
+ */
 private fun awaitingReplyOf(
     entries: List<TimelineEntry>,
     open: RunRecord?,
-): Boolean =
-    open != null && open.status in AWAITING_REPLY_STATUSES && entries.lastOrNull()?.item is TimelineItem.UserBubble
+    awaitingModel: Boolean,
+): Boolean {
+    if (open == null) return false
+    if (awaitingModel) return true
+    return open.status in AWAITING_REPLY_STATUSES && entries.lastOrNull()?.item is TimelineItem.UserBubble
+}
 
 /** 页面本地状态（输入、开关、弹层）。 */
 private data class ChatMeta(
@@ -206,6 +217,7 @@ public class ChatThreadViewModel
                                 mergeTimeline(input.history, input.live, chatConfig.stepGroupThreshold),
                                 input.outgoing,
                             ),
+                        awaitingModel = input.awaitingModel,
                     )
                 }.flowOn(dispatchers.default)
                 .stateIn(viewModelScope, SharingStarted.Eagerly, MergedTimeline())
@@ -277,20 +289,23 @@ public class ChatThreadViewModel
                     .flatMapLatest { runId ->
                         if (runId == null) emptyFlow() else runService.liveEvents(runId)
                     }.collect { event ->
-                        if (event is AgentEvent.SampleRetrying) {
-                            // 重试前丢弃本轮已显示的增量（WP6.6）。
-                            timeline.update {
-                                it.copy(
-                                    live =
-                                        it.live.filterNot { e ->
-                                            e is AgentEvent.TextDelta ||
-                                                e is AgentEvent.ThinkingDelta ||
-                                                e is AgentEvent.ToolCallStreaming
-                                        },
-                                )
+                        timeline.update { input ->
+                            val awaiting = nextAwaitingModel(input.awaitingModel, event)
+                            when (event) {
+                                // 重试前丢弃本轮已显示的增量（WP6.6）。
+                                is AgentEvent.SampleRetrying ->
+                                    input.copy(
+                                        awaitingModel = awaiting,
+                                        live =
+                                            input.live.filterNot { e ->
+                                                e is AgentEvent.TextDelta ||
+                                                    e is AgentEvent.ThinkingDelta ||
+                                                    e is AgentEvent.ToolCallStreaming
+                                            },
+                                    )
+                                is AgentEvent.Persisted -> input.copy(awaitingModel = awaiting)
+                                else -> input.copy(awaitingModel = awaiting, live = input.live + event)
                             }
-                        } else if (event !is AgentEvent.Persisted) {
-                            timeline.update { it.copy(live = it.live + event) }
                         }
                     }
             }
@@ -617,7 +632,7 @@ public class ChatThreadViewModel
                 title = input.title,
                 entries = entries,
                 running = open != null,
-                awaitingReply = awaitingReplyOf(entries, open),
+                awaitingReply = awaitingReplyOf(entries, open, input.awaitingModel),
                 accessibilityConnected = connected,
                 input = metaState.input,
                 modelProfileId = metaState.modelProfileId,

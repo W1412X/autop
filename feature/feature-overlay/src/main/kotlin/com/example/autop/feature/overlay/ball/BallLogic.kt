@@ -53,7 +53,7 @@ private fun runningMode(
         return BallMode.Running(
             stepCount = focus.stepCount,
             toolCategory = toolCategory,
-            state = focus.state,
+            state = focus.displayState,
             seed = BallFaceDirector.seedOfEvent(focus.run.id.value, focus.stepCount),
         )
     }

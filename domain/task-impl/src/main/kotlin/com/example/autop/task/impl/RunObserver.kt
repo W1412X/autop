@@ -12,6 +12,7 @@ import com.example.autop.agent.RunHandle
 import com.example.autop.agent.RunPaused
 import com.example.autop.agent.RunResumed
 import com.example.autop.agent.RunState
+import com.example.autop.agent.nextAwaitingModel
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
@@ -120,7 +121,16 @@ public class RunObserver(
                 }
             }
             launch {
-                handle.events.collect { event -> onEvent(runId, event) }
+                handle.events.collect { event ->
+                    _active.update { info ->
+                        if (info?.run?.id == runId) {
+                            info.copy(awaitingModel = nextAwaitingModel(info.awaitingModel, event))
+                        } else {
+                            info
+                        }
+                    }
+                    onEvent(runId, event)
+                }
             }
         }
 

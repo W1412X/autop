@@ -105,7 +105,7 @@ internal fun hintTitleOf(
     val flow = flowHintOf(active)
     if (flow != null) return flow
     val pool =
-        when (active.state) {
+        when (active.displayState) {
             RunState.SAMPLING -> THINKING
             RunState.STARTING -> STARTING
             RunState.COMPACTING -> COMPACTING
