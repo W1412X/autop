@@ -4,6 +4,7 @@
 package com.example.autop.feature.tasks
 
 import androidx.annotation.StringRes
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.theme.StatusTone
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -48,4 +49,16 @@ internal fun runStatusTone(statusName: String): StatusTone =
         "FAILED", "BUDGET_EXHAUSTED", "BREAKER_STOPPED" -> StatusTone.BLOCKED
         "BLOCKED" -> StatusTone.BLOCKED
         else -> StatusTone.NEUTRAL
+    }
+
+/** Run 状态名 → 表情（P1-11）：详情与流程执行记录共用，避免两套语义。 */
+internal fun runStatusFaceOf(statusName: String?): BallFaceMood =
+    when (statusName) {
+        "RUNNING" -> BallFaceMood.RUNNING
+        "WAITING_SCREEN", "WAITING_USER", "QUEUED" -> BallFaceMood.WAITING
+        "PAUSED", "CANCELLED", "EXPIRED", "INTERRUPTED" -> BallFaceMood.PAUSED
+        "SUCCEEDED" -> BallFaceMood.SUCCESS
+        "FAILED", "BUDGET_EXHAUSTED", "BREAKER_STOPPED" -> BallFaceMood.FAILURE
+        "BLOCKED" -> BallFaceMood.BLOCKED
+        else -> BallFaceMood.IDLE
     }

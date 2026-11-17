@@ -5,9 +5,11 @@ package com.example.autop.feature.tasks.list
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.autop.agent.PauseReason
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.TasksNavigator
 import com.example.autop.feature.tasks.flowsEnabled
@@ -150,6 +152,7 @@ public class TasksListViewModel
         ): TaskRowUi {
             val (kind, detail) = triggerOf(task)
             val spec = (task.trigger as? Trigger.Schedule)?.spec
+            val latest = runs.firstOrNull { it.taskId == task.id }
             return TaskRowUi(
                 id = task.id.value,
                 name = task.name,
@@ -158,7 +161,8 @@ public class TasksListViewModel
                 scheduleLabelRes = spec?.let { scheduleLabelRes(it) } ?: 0,
                 cooldownMinutes = (task.trigger as? Trigger.Condition)?.cooldownMs?.div(MINUTE_MS)?.toInt() ?: 0,
                 enabled = task.enabled,
-                lastRunStatus = runs.firstOrNull { it.taskId == task.id }?.status?.name,
+                lastRunStatus = latest?.status?.name,
+                faceMood = taskRowFaceOf(latest),
                 flowDisabled = task.executor == TaskExecutor.FLOW && !flowsOn,
             )
         }
@@ -187,3 +191,17 @@ public class TasksListViewModel
             const val STOP_TIMEOUT_MS = 5_000L
         }
     }
+
+/** 任务行前导表情：只看未收口 Run（已结束的保留状态图标与最近运行文案）；口径与对话列表一致。 */
+internal fun taskRowFaceOf(record: RunRecord?): BallFaceMood? =
+    record
+        ?.takeIf { it.status in RunStatus.OPEN }
+        ?.let {
+            when {
+                it.pauseReason == PauseReason.POLICY_BLOCKED -> BallFaceMood.BLOCKED
+                it.waitingQuestion != null -> BallFaceMood.WAITING
+                it.status == RunStatus.PAUSED -> BallFaceMood.PAUSED
+                it.status == RunStatus.WAITING_USER || it.status == RunStatus.WAITING_SCREEN -> BallFaceMood.WAITING
+                else -> BallFaceMood.RUNNING
+            }
+        }

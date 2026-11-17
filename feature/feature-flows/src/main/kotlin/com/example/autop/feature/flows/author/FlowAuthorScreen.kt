@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -54,6 +55,8 @@ import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.VoiceErrorToast
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.component.llmErrorTextRes
 import com.example.autop.core.ui.component.rememberStickToBottom
 import com.example.autop.core.ui.component.rememberVoiceStarter
@@ -154,11 +157,7 @@ public fun FlowAuthorScreen(
             author.live?.let { live -> item { LiveTurn(live = live) } }
             if (author.busy && author.live == null && author.waitingOnAi()) {
                 item {
-                    Text(
-                        text = stringResource(R.string.author_thinking),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                    ThinkingLine(text = stringResource(R.string.author_thinking), mood = BallFaceMood.RUNNING_START)
                 }
             }
             author.errorCode?.let { item { ErrorBanner(it) } }
@@ -327,6 +326,7 @@ private fun QuestionCard(
         modifier = Modifier.fillMaxWidth(),
         customPlaceholder = stringResource(R.string.author_custom_hint),
         interactive = pending,
+        faceMood = BallFaceMood.WAITING,
     )
 }
 
@@ -349,12 +349,27 @@ private fun LiveTurn(live: AuthorLive) {
             )
         }
         if (live.thinking.isBlank() && live.text.isBlank() && live.tool == null) {
-            Text(
-                text = stringResource(R.string.author_thinking),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            ThinkingLine(text = stringResource(R.string.author_thinking), mood = BallFaceMood.RUNNING_START)
         }
+    }
+}
+
+/** 生成等待行：起跑表情 + 一行小字。 */
+@Composable
+private fun ThinkingLine(
+    text: String,
+    mood: BallFaceMood,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
+    ) {
+        AutopBallFace(mood = mood, modifier = Modifier.size(AUTHOR_FACE_SIZE))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -373,11 +388,20 @@ private fun ThinkingBlock(
                 .clickable { manual = !expanded }
                 .padding(vertical = LocalSpacing.current.xs),
     ) {
-        Text(
-            text = stringResource(R.string.author_thinking_label, text.length),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
+        ) {
+            AutopBallFace(
+                mood = if (streaming) BallFaceMood.RUNNING else BallFaceMood.IDLE,
+                modifier = Modifier.size(AUTHOR_FACE_SIZE),
+            )
+            Text(
+                text = stringResource(R.string.author_thinking_label, text.length),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (expanded) {
             Text(
                 text = text + if (streaming) " ▍" else "",
@@ -399,6 +423,9 @@ private fun DemoConfirm(
         title = stringResource(R.string.author_demo_title),
         message = stringResource(R.string.author_demo_text, goal),
         modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge),
+        leading = {
+            AutopBallFace(mood = BallFaceMood.WAITING, modifier = Modifier.size(AUTHOR_FACE_SIZE))
+        },
         actions = {
             AutopButton(text = stringResource(R.string.author_demo_allow), onClick = {
                 onAction(FlowAuthorAction.Demonstration(true))
@@ -426,7 +453,13 @@ private fun DraftCard(
                 .background(MaterialTheme.colorScheme.surfaceVariant)
                 .padding(spacing.md),
     ) {
-        SectionTitle(text = stringResource(R.string.author_draft_title, draft.name))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AutopBallFace(mood = BallFaceMood.SUCCESS, modifier = Modifier.size(AUTHOR_FACE_SIZE))
+            SectionTitle(
+                text = stringResource(R.string.author_draft_title, draft.name),
+                modifier = Modifier.weight(1f),
+            )
+        }
         if (draft.description.isNotBlank()) {
             Text(
                 text = draft.description,
@@ -483,6 +516,9 @@ private fun IssueLine(issue: FlowIssue) {
 
 /** 图片读取或拍照失败的错误码（界面内部使用）。 */
 private const val AUTHOR_IMAGE_FAILED: String = "flow.author_image_failed"
+
+/** 创建页表情尺寸（P1-14：生成/提问/草稿三处 20dp）。 */
+private val AUTHOR_FACE_SIZE = 20.dp
 
 /** 离开页面的守卫：AI 运行中按返回（含系统返回键）时询问是后台运行、取消运行，还是留在本页。 */
 @Composable

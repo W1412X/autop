@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -23,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.example.autop.core.config.UiBannerSection
 import com.example.autop.core.thread.ui.AskQuestionCard
 import com.example.autop.core.thread.ui.BannerKind
@@ -37,9 +39,14 @@ import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.ToastEffect
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceMood
+import com.example.autop.core.ui.component.ballface.BallFaceVariant
 import com.example.autop.core.ui.component.rememberStickToBottom
+import com.example.autop.core.ui.theme.LocalSemanticColors
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
+import com.example.autop.core.ui.theme.tone
 import com.example.autop.feature.chat.R
 
 /**
@@ -135,6 +142,14 @@ private fun ThreadHeader(
                     horizontal = LocalSpacing.current.screenEdge,
                     vertical = LocalSpacing.current.sm,
                 ),
+            leading = {
+                AutopBallFace(
+                    mood = BallFaceMood.LOST,
+                    variant = BallFaceVariant.LINE,
+                    tint = LocalSemanticColors.current.tone(StatusTone.BLOCKED).foreground,
+                    modifier = Modifier.size(30.dp),
+                )
+            },
         )
     }
     ToastEffect(

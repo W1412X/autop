@@ -4,9 +4,11 @@
 package com.example.autop.feature.tasks.run
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -16,10 +18,12 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.unit.dp
 import com.example.autop.core.thread.ui.TimelineAction
 import com.example.autop.core.thread.ui.TimelineRow
 import com.example.autop.core.ui.component.AutopButton
@@ -31,9 +35,11 @@ import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.StatusChip
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.component.ballface.AutopBallFace
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.tasks.R
+import com.example.autop.feature.tasks.runStatusFaceOf
 import com.example.autop.feature.tasks.runStatusTextRes
 import com.example.autop.feature.tasks.runStatusTone
 
@@ -120,11 +126,19 @@ private fun TimelineSection(
 @Composable
 private fun StatusSection(state: RunDetailUiState) {
     val spacing = LocalSpacing.current
-    StatusChip(
-        text = stringResource(runStatusTextRes(state.statusName)),
-        tone = runStatusTone(state.statusName),
+    Row(
         modifier = Modifier.padding(spacing.screenEdge),
-    )
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AutopBallFace(
+            mood = runStatusFaceOf(state.statusName),
+            modifier = Modifier.padding(end = spacing.sm).size(STATUS_FACE_SIZE),
+        )
+        StatusChip(
+            text = stringResource(runStatusTextRes(state.statusName)),
+            tone = runStatusTone(state.statusName),
+        )
+    }
     ListRow(
         title = stringResource(R.string.run_detail_summary),
         subtitle = state.summary.ifBlank { stringResource(R.string.run_detail_no_summary) },
@@ -238,3 +252,6 @@ private fun RawDataDialog(
 
 private const val FORK_ID: String = "fork"
 private const val RAW_ID: String = "raw"
+
+/** 状态头表情尺寸（P1-11：24dp）。 */
+private val STATUS_FACE_SIZE = 24.dp

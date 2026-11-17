@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -29,6 +30,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTag
@@ -43,6 +45,8 @@ import com.example.autop.core.ui.component.OptionTone
 import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.TopLevelHeader
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.tasks.R
@@ -287,6 +291,12 @@ private fun WaitingBanner(
                 onClick = { onAction(TasksListAction.SkipWaiting(waiting.runId)) },
             )
         },
+        leading = {
+            AutopBallFace(
+                mood = BallFaceMood.WAITING,
+                modifier = Modifier.size(BANNER_FACE_SIZE),
+            )
+        },
     )
 }
 
@@ -301,7 +311,16 @@ private fun TaskRow(
     ListRow(
         title = row.name,
         subtitle = subtitleOf(row),
-        leading = AutopIcons.EventRepeat,
+        leading = if (row.faceMood != null) null else AutopIcons.EventRepeat,
+        leadingContent =
+            row.faceMood?.let { mood ->
+                {
+                    AutopBallFace(
+                        mood = mood,
+                        modifier = Modifier.size(ROW_FACE_SIZE),
+                    )
+                }
+            },
         trailing = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 if (row.flowDisabled) {
@@ -359,3 +378,9 @@ private fun groupLabelRes(tab: TasksTab): Int =
         TasksTab.SCHEDULE -> R.string.tasks_tab_schedule
         TasksTab.MANUAL -> R.string.tasks_tab_manual
     }
+
+/** 等待确认横幅前导表情尺寸（P1-9：24dp）。 */
+private val BANNER_FACE_SIZE = 24.dp
+
+/** 任务行前导表情尺寸（P1-10：28dp，行高不变）。 */
+private val ROW_FACE_SIZE = 28.dp

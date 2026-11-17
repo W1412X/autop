@@ -2,26 +2,32 @@
  * 对话列表页 ViewModel（docs/tech/08 §4.1，docs/standards/coding-standards §8）。
  *
  * 读：[ThreadStore.listThreads] 分页、[ThreadStore.observeChanges]（外部新建/追加/改名/
- * 删除即时刷新，N184）、[AccessibilityStatus.connected]、[RunService.observeActive]；
+ * 删除即时刷新，N184）、[AccessibilityStatus.connected]、[RunService.observeActive]、
+ * [RunService.observeRunningThreads] / [RunService.observeOpenRuns]（会话行实时表情）；
  * 写：[ThreadStore.rename] / [ThreadStore.delete]、[RunService.cancel]（停止运行中的 Run）。
  */
 package com.example.autop.feature.chat.list
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.autop.agent.PauseReason
+import com.example.autop.agent.RunState
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ThreadSummary
 import com.example.autop.core.common.Capability
 import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.core.common.ThreadId
-import com.example.autop.core.config.AgentConfig
-import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.ui.component.ballface.BallFaceDirector
+import com.example.autop.core.ui.component.ballface.BallFaceMood
+import com.example.autop.core.ui.component.ballface.BallFaceScene
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.ScreenLease
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.example.autop.task.ActiveRunInfo
+import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
+import com.example.autop.task.RunStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,6 +48,13 @@ private data class PageAccum(
     val failed: Boolean = false,
 )
 
+/** 实时运行输入：活跃卡片、运行集合与逐对话未收口 Run（行表情按它切换）。 */
+private data class LiveRuns(
+    val active: ActiveRunInfo?,
+    val running: Set<ThreadId>,
+    val open: Map<ThreadId, RunRecord>,
+)
+
 @OptIn(FlowPreview::class) // debounce 为 FlowPreview API（同 BrowseViewModel）
 @HiltViewModel
 public class ChatListViewModel
@@ -51,7 +64,6 @@ public class ChatListViewModel
         private val runService: RunService,
         private val accessibility: AccessibilityStatus,
         private val capabilities: PlatformCapabilities,
-        private val configProvider: ConfigProvider,
         private val shellInput: ShellInput,
         private val screenLease: ScreenLease,
     ) : ViewModel() {
@@ -64,30 +76,33 @@ public class ChatListViewModel
                 combine(
                     runService.observeActive(),
                     runService.observeRunningThreads(),
+                    runService.observeOpenRuns(),
                     screenLease.holder,
-                ) { active, running, holder ->
-                    // 头部卡片只为占用屏幕的运行显示；后台运行不占用卡片
-                    (if (active?.run?.id?.value == holder) active else null) to running
+                ) { active, running, openRuns, holder ->
+                    LiveRuns(
+                        // 头部卡片只为占用屏幕的运行显示；后台运行不占用卡片
+                        active = if (active?.run?.id?.value == holder) active else null,
+                        running = running,
+                        open = openRuns,
+                    )
                 },
                 page,
                 sheet,
                 shellInput.state,
-            ) { connected, activeAndRunning, accum, sheets, shell ->
-                val (active, running) = activeAndRunning
-                val budget = configProvider.current()[AgentConfig.BUDGET].maxSteps
+            ) { connected, live, accum, sheets, shell ->
                 ChatListUiState(
                     accessibilityConnected = connected,
                     restrictedSettings = capabilities.has(Capability.RESTRICTED_SETTINGS),
                     shellConnected = shell is ShellState.Connected,
-                    runningCount = running.size,
-                    threads = accum.items.map { toRow(it, running) },
+                    runningCount = live.running.size,
+                    threads = accum.items.map { toRow(it, live) },
                     paging =
                         ChatPaging(
                             loading = accum.loading,
                             endReached = accum.endReached,
                             failed = accum.failed,
                         ),
-                    active = active.toCard(budget, accum.items),
+                    active = live.active.toCard(accum.items),
                     sheet = sheets,
                 )
             }.stateIn(
@@ -213,7 +228,7 @@ public class ChatListViewModel
 
 private fun toRow(
     summary: ThreadSummary,
-    running: Set<ThreadId>,
+    live: LiveRuns,
 ): ChatThreadRow =
     ChatThreadRow(
         threadId = summary.threadId.value,
@@ -221,19 +236,46 @@ private fun toRow(
         preview = summary.preview,
         status = summary.lastRunStatus,
         updatedAt = summary.updatedAt,
-        running = summary.threadId in running,
+        faceMood = liveFaceOf(live.open[summary.threadId], running = summary.threadId in live.running),
     )
 
-private fun ActiveRunInfo?.toCard(
-    budget: Int,
-    threads: List<ThreadSummary>,
-): ActiveRunCardModel? {
+/**
+ * 会话行前导表情：优先按该对话未收口 Run 的实时状态，其次退回运行集合。
+ * ask_user（WAITING_USER）与暂停等中间态在 ThreadSummary 里看不到，必须走开放 Run。
+ */
+internal fun liveFaceOf(
+    record: RunRecord?,
+    running: Boolean,
+): BallFaceMood? =
+    when {
+        record == null -> if (running) BallFaceMood.RUNNING else null
+        record.pauseReason == PauseReason.POLICY_BLOCKED -> BallFaceMood.BLOCKED
+        record.waitingQuestion != null -> BallFaceMood.WAITING
+        record.status == RunStatus.PAUSED -> BallFaceMood.PAUSED
+        record.status == RunStatus.WAITING_USER || record.status == RunStatus.WAITING_SCREEN -> BallFaceMood.WAITING
+        record.status in RunStatus.OPEN -> BallFaceMood.RUNNING
+        running -> BallFaceMood.RUNNING
+        else -> null
+    }
+
+private fun ActiveRunInfo?.toCard(threads: List<ThreadSummary>): ActiveRunCardModel? {
     val info = this ?: return null
     return ActiveRunCardModel(
         runId = info.run.id.value,
         title = info.run.threadId.let { id -> threads.firstOrNull { it.threadId == id }?.title },
         currentStep = info.currentStep,
-        stepCount = info.stepCount,
-        budget = budget,
+        scene = chatSceneOf(info.state),
+        seed = BallFaceDirector.seedOfEvent(info.run.id.value, info.stepCount),
     )
 }
+
+/**
+ * Run 执行阶段 → 表情场景。对话卡片不知道当前工具类别，执行工具时按思考池处理；
+ * 悬浮球会按工具类别选池，两处语义同属一族。
+ */
+private fun chatSceneOf(state: RunState): BallFaceScene =
+    when (state) {
+        RunState.STARTING -> BallFaceScene.STARTING
+        RunState.COMPACTING -> BallFaceScene.COMPACTING
+        else -> BallFaceScene.SAMPLING
+    }

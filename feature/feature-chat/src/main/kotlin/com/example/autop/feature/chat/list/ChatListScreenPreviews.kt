@@ -6,6 +6,7 @@ package com.example.autop.feature.chat.list
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.autop.agent.RunOutcome
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.preview.PreviewTheme
 
 @Preview(name = "Chat list light")
@@ -41,6 +42,7 @@ private fun previewListState(): ChatListUiState {
                     title = "整理相册",
                     preview = "正在按拍摄时间归类…",
                     status = null,
+                    faceMood = BallFaceMood.RUNNING,
                     updatedAt = now - EARLIER_MS,
                 ),
                 ChatThreadRow(
@@ -50,14 +52,22 @@ private fun previewListState(): ChatListUiState {
                     status = RunOutcome.FAILED,
                     updatedAt = now - OLD_MS,
                 ),
+                ChatThreadRow(
+                    threadId = "t4",
+                    title = "订周五的会议室",
+                    preview = "需要你确认时间",
+                    status = null,
+                    faceMood = BallFaceMood.WAITING,
+                    updatedAt = now - OLDER_MS,
+                ),
             ),
         active =
             ActiveRunCardModel(
                 runId = "r1",
                 title = "清理微信缓存",
                 currentStep = "tap「存储」",
-                stepCount = 4,
-                budget = 20,
+                scene = com.example.autop.core.ui.component.ballface.BallFaceScene.SAMPLING,
+                seed = 1L,
             ),
     )
 }
@@ -65,3 +75,4 @@ private fun previewListState(): ChatListUiState {
 private const val RECENT_MS: Long = 180_000
 private const val EARLIER_MS: Long = 7_200_000
 private const val OLD_MS: Long = 259_200_000
+private const val OLDER_MS: Long = 345_600_000

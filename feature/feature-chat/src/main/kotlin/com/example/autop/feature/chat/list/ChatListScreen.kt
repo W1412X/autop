@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -27,6 +28,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import com.example.autop.agent.RunOutcome
 import com.example.autop.core.ui.component.AutopButton
@@ -44,8 +46,8 @@ import com.example.autop.core.ui.component.OptionSheet
 import com.example.autop.core.ui.component.OptionTone
 import com.example.autop.core.ui.component.PagedList
 import com.example.autop.core.ui.component.PagedListState
-import com.example.autop.core.ui.component.RunningDots
 import com.example.autop.core.ui.component.TopLevelHeader
+import com.example.autop.core.ui.component.ballface.AutopBallFace
 import com.example.autop.core.ui.component.subtitleParts
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -159,12 +161,15 @@ private fun ThreadRow(
                 row.status?.let { statusText(it) },
                 relativeAgeText(row.updatedAt),
             ),
-        leading = if (row.running) null else statusIcon(row.status),
+        leading = if (row.faceMood != null) null else statusIcon(row.status),
         leadingContent =
-            if (row.running) {
-                { RunningDots() }
-            } else {
-                null
+            row.faceMood?.let { mood ->
+                {
+                    AutopBallFace(
+                        mood = mood,
+                        modifier = Modifier.size(36.dp),
+                    )
+                }
             },
         modifier =
             Modifier

@@ -24,15 +24,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.InfoDialog
 import com.example.autop.core.ui.component.StatusBanner
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceMood
+import com.example.autop.core.ui.component.ballface.BallFaceVariant
 import com.example.autop.core.ui.theme.IconSize
+import com.example.autop.core.ui.theme.LocalSemanticColors
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.core.ui.theme.scaled
+import com.example.autop.core.ui.theme.tone
 import com.example.autop.feature.chat.R
 
 /**
@@ -135,6 +141,14 @@ private fun DisabledBanner(
         title = stringResource(R.string.chat_a11y_title),
         message = stringResource(R.string.chat_a11y_body),
         modifier = modifier.padding(horizontal = LocalSpacing.current.screenEdge),
+        leading = {
+            AutopBallFace(
+                mood = BallFaceMood.LOST,
+                variant = BallFaceVariant.LINE,
+                tint = LocalSemanticColors.current.tone(StatusTone.BLOCKED).foreground,
+                modifier = Modifier.size(30.dp),
+            )
+        },
         actions = {
             AutopTonalButton(
                 text = stringResource(R.string.chat_a11y_enable),

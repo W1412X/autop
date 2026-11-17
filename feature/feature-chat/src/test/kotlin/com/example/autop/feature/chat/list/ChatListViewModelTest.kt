@@ -6,6 +6,7 @@ package com.example.autop.feature.chat.list
 
 import com.example.autop.agent.AgentEvent
 import com.example.autop.agent.EventPayload
+import com.example.autop.agent.PauseReason
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ThreadSummary
@@ -15,14 +16,16 @@ import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
-import com.example.autop.core.testing.FakeConfigProvider
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.ScreenLease
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.example.autop.task.ActiveRunInfo
+import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
+import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.Dispatchers
@@ -137,13 +140,70 @@ class ChatListViewModelTest {
             assertThat(sheet.deleteThreadId).isNull()
         }
 
-    private fun createViewModel(store: ThreadStore): ChatListViewModel =
+    @Test
+    fun `row face follows the open run sub-state`() =
+        runTest(testDispatcher) {
+            val store = FakeThreadStore(listOf(summary("t1", "整理相册")))
+            val runs = FakeRunService()
+            val viewModel = createViewModel(store, runs)
+            assertThat(
+                viewModel.uiState.value.threads
+                    .single()
+                    .faceMood,
+            ).isNull()
+
+            runs.openRuns.value = mapOf(ThreadId("t1") to openRecord(ThreadId("t1")))
+            assertThat(
+                viewModel.uiState.value.threads
+                    .single()
+                    .faceMood,
+            ).isEqualTo(BallFaceMood.RUNNING)
+
+            // ask_user 只改持久化记录：行表情要立刻切到等待，而不是继续显示运行。
+            runs.openRuns.value =
+                mapOf(
+                    ThreadId("t1") to
+                        openRecord(ThreadId("t1"))
+                            .copy(status = RunStatus.WAITING_USER, waitingQuestion = "继续吗？"),
+                )
+            assertThat(
+                viewModel.uiState.value.threads
+                    .single()
+                    .faceMood,
+            ).isEqualTo(BallFaceMood.WAITING)
+        }
+
+    @Test
+    fun `open run maps pause and policy block to their faces`() {
+        val running = openRecord(ThreadId("t1"))
+        assertThat(liveFaceOf(null, running = false)).isNull()
+        assertThat(liveFaceOf(null, running = true)).isEqualTo(BallFaceMood.RUNNING)
+        assertThat(liveFaceOf(running, running = true)).isEqualTo(BallFaceMood.RUNNING)
+        assertThat(liveFaceOf(running.copy(status = RunStatus.PAUSED), running = true))
+            .isEqualTo(BallFaceMood.PAUSED)
+        assertThat(
+            liveFaceOf(
+                running.copy(pauseReason = PauseReason.POLICY_BLOCKED),
+                running = true,
+            ),
+        ).isEqualTo(BallFaceMood.BLOCKED)
+        assertThat(
+            liveFaceOf(
+                running.copy(status = RunStatus.SUCCEEDED),
+                running = false,
+            ),
+        ).isNull()
+    }
+
+    private fun createViewModel(
+        store: ThreadStore,
+        runService: RunService = FakeRunService(),
+    ): ChatListViewModel =
         ChatListViewModel(
             threadStore = store,
-            runService = FakeRunService(),
+            runService = runService,
             accessibility = FakeAccessibility(),
             capabilities = FakeCapabilities(),
-            configProvider = FakeConfigProvider(),
             shellInput = FakeShellInput(),
             screenLease = FakeScreenLease(),
         )
@@ -165,6 +225,24 @@ private fun summary(
         updatedAt = 0L,
         preview = null,
         lastRunStatus = null,
+    )
+
+/** 未收口 Run（RUNNING）记录，供行表情映射用。 */
+private fun openRecord(threadId: ThreadId): RunRecord =
+    RunRecord(
+        id = RunId("run-${threadId.value}"),
+        taskId = null,
+        threadId = threadId,
+        origin = RunOrigin.CHAT,
+        status = RunStatus.RUNNING,
+        triggerContext = emptyMap(),
+        createdAt = 0L,
+        startedAt = 0L,
+        endedAt = null,
+        summary = null,
+        errorCode = null,
+        pauseReason = null,
+        waitingQuestion = null,
     )
 
 /** 可换数据、可发变更信号的 [ThreadStore] 假实现。 */
@@ -247,10 +325,13 @@ private class FakeThreadStore(
 /** 只用 observeActive 的 [RunService] 假实现。 */
 private class FakeRunService : RunService {
     private val active = MutableStateFlow<ActiveRunInfo?>(null)
+    val openRuns = MutableStateFlow<Map<ThreadId, RunRecord>>(emptyMap())
 
     override fun observeActive(): StateFlow<ActiveRunInfo?> = active
 
     override fun observeRunningThreads(): StateFlow<Set<ThreadId>> = MutableStateFlow(emptySet())
+
+    override fun observeOpenRuns(): StateFlow<Map<ThreadId, RunRecord>> = openRuns
 
     override suspend fun startChat(
         threadId: ThreadId?,

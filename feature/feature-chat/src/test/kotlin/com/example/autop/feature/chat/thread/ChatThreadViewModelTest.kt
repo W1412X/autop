@@ -372,6 +372,8 @@ private class FakeChatRunService : RunService {
 
     override fun observeRunningThreads(): StateFlow<Set<ThreadId>> = MutableStateFlow(emptySet())
 
+    override fun observeOpenRuns(): StateFlow<Map<ThreadId, RunRecord>> = MutableStateFlow(emptyMap())
+
     override fun observeRun(runId: RunId): Flow<RunRecord> = flowOf(record(runId.value, ThreadId("t")))
 
     override fun liveEvents(runId: RunId): Flow<AgentEvent> = emptyFlow()

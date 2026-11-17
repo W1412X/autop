@@ -3,6 +3,8 @@
  */
 package com.example.autop.feature.tasks.list
 
+import com.example.autop.core.ui.component.ballface.BallFaceMood
+
 /** 列表页状态。 */
 public data class TasksListUiState(
     /** 流程 Beta 功能是否开启；关闭时不显示「流程」页签（ADR-0030）。 */
@@ -27,6 +29,8 @@ public data class TaskRowUi(
     val enabled: Boolean,
     /** 最近一次 Run 的状态名（无运行记录为 null）。 */
     val lastRunStatus: String?,
+    /** 任务当前有未收口 Run 时的行前导表情（运行/等待回答/暂停/拦截）；空闲为 null，保留图标。 */
+    val faceMood: BallFaceMood? = null,
     /** 流程任务且流程功能关闭：列表显示「失效」标签（ADR-0030）。 */
     val flowDisabled: Boolean = false,
 )

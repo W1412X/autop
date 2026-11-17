@@ -11,14 +11,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopOutlinedButton
@@ -29,6 +32,8 @@ import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.StatusChip
 import com.example.autop.core.ui.component.SubPageTopBar
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.flows.R
@@ -81,7 +86,11 @@ private fun SummaryBlock(
     val run = state.run ?: return
     val spacing = LocalSpacing.current
     Column(modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge)) {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AutopBallFace(
+                mood = flowRunFaceOf(run.status, paused = state.progress?.paused == true),
+                modifier = Modifier.padding(end = spacing.sm).size(STATUS_FACE_SIZE),
+            )
             StatusChip(text = runStatusLabel(run.status.name), tone = runStatusTone(run.status.name))
             Text(
                 text = durationText(run.durationMs),
@@ -203,7 +212,7 @@ private fun NodeBlock(
                     onClick = onToggle,
                 ).padding(horizontal = spacing.screenEdge, vertical = spacing.md),
     ) {
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
                 text = node.nodeName ?: if (isLog) node.message.orEmpty() else node.nodeId,
                 style = MaterialTheme.typography.bodyMedium,
@@ -240,3 +249,20 @@ private fun NodeBlock(
 }
 
 private const val ERROR_LINE_CHARS = 240
+
+/** 状态头表情尺寸（P1-12：24dp），与 Run 详情一致。 */
+private val STATUS_FACE_SIZE = 24.dp
+
+/** 流程运行状态 → 表情：与 Run 详情同一口径（暂停含单步停驻）；取消不做强负反馈。 */
+internal fun flowRunFaceOf(
+    status: FlowRunStatus,
+    paused: Boolean = false,
+): BallFaceMood =
+    when {
+        paused && status == FlowRunStatus.RUNNING -> BallFaceMood.PAUSED
+        status == FlowRunStatus.RUNNING -> BallFaceMood.RUNNING
+        status == FlowRunStatus.PAUSED -> BallFaceMood.PAUSED
+        status == FlowRunStatus.SUCCEEDED -> BallFaceMood.SUCCESS
+        status == FlowRunStatus.FAILED -> BallFaceMood.FAILURE
+        else -> BallFaceMood.PAUSED
+    }

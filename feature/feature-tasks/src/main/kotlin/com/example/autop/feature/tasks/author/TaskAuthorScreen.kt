@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
@@ -32,6 +33,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
@@ -52,6 +54,8 @@ import com.example.autop.core.ui.component.SectionTitle
 import com.example.autop.core.ui.component.StatusBanner
 import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.VoiceErrorToast
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.component.llmErrorTextRes
 import com.example.autop.core.ui.component.rememberStickToBottom
 import com.example.autop.core.ui.component.rememberVoiceStarter
@@ -149,10 +153,9 @@ public fun TaskAuthorScreen(
             author.live?.let { live -> item { LiveTurn(live = live) } }
             if (author.busy && author.live == null && author.pendingQuestion == null) {
                 item {
-                    Text(
+                    ThinkingLine(
                         text = stringResource(R.string.task_author_thinking),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        mood = BallFaceMood.RUNNING_START,
                     )
                 }
             }
@@ -259,6 +262,9 @@ private const val AUTHOR_LLM_UNAVAILABLE: String = "task.author_llm_unavailable"
 /** 图片读取或拍照失败的错误码（界面内部使用，不进入 LLM 错误）。 */
 private const val AUTHOR_IMAGE_FAILED: String = "task.author_image_failed"
 
+/** 创建页表情尺寸（P1-14：生成/提问/草稿三处 20dp）。 */
+private val AUTHOR_FACE_SIZE = 20.dp
+
 @Composable
 private fun ErrorBanner(code: String) {
     StatusBanner(
@@ -345,6 +351,7 @@ private fun QuestionCard(
         modifier = Modifier.fillMaxWidth(),
         customPlaceholder = stringResource(R.string.task_author_custom_hint),
         interactive = pending,
+        faceMood = BallFaceMood.WAITING,
     )
 }
 
@@ -364,12 +371,27 @@ private fun LiveTurn(live: AuthorLive) {
             )
         }
         if (live.thinking.isBlank() && live.text.isBlank() && live.tool == null) {
-            Text(
-                text = stringResource(R.string.task_author_thinking),
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-            )
+            ThinkingLine(text = stringResource(R.string.task_author_thinking), mood = BallFaceMood.RUNNING_START)
         }
+    }
+}
+
+/** 生成等待行：起跑表情 + 一行小字。 */
+@Composable
+private fun ThinkingLine(
+    text: String,
+    mood: BallFaceMood,
+) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
+    ) {
+        AutopBallFace(mood = mood, modifier = Modifier.size(AUTHOR_FACE_SIZE))
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
     }
 }
 
@@ -388,11 +410,20 @@ private fun ThinkingBlock(
                 .clickable { manual = !expanded }
                 .padding(vertical = LocalSpacing.current.xs),
     ) {
-        Text(
-            text = stringResource(R.string.task_author_thinking_label, text.length),
-            style = MaterialTheme.typography.labelMedium,
-            color = MaterialTheme.colorScheme.onSurfaceVariant,
-        )
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
+        ) {
+            AutopBallFace(
+                mood = if (streaming) BallFaceMood.RUNNING else BallFaceMood.IDLE,
+                modifier = Modifier.size(AUTHOR_FACE_SIZE),
+            )
+            Text(
+                text = stringResource(R.string.task_author_thinking_label, text.length),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         if (expanded) {
             Text(
                 text = text + if (streaming) " ▍" else "",
@@ -419,7 +450,13 @@ private fun DraftCard(
                 .padding(spacing.md),
         verticalArrangement = Arrangement.spacedBy(spacing.xs),
     ) {
-        SectionTitle(text = stringResource(R.string.task_author_draft_title, draft.name))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AutopBallFace(mood = BallFaceMood.SUCCESS, modifier = Modifier.size(AUTHOR_FACE_SIZE))
+            SectionTitle(
+                text = stringResource(R.string.task_author_draft_title, draft.name),
+                modifier = Modifier.weight(1f),
+            )
+        }
         if (draft.goal.isNotBlank()) {
             Text(
                 text = draft.goal,

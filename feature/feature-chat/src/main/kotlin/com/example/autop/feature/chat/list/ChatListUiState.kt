@@ -5,6 +5,8 @@
 package com.example.autop.feature.chat.list
 
 import com.example.autop.agent.RunOutcome
+import com.example.autop.core.ui.component.ballface.BallFaceMood
+import com.example.autop.core.ui.component.ballface.BallFaceScene
 
 /** 相对时间桶（文案在 strings，ViewModel 不接触资源）。 */
 public enum class AgeUnit {
@@ -27,8 +29,8 @@ public data class ChatThreadRow(
     val title: String?,
     val preview: String?,
     val status: RunOutcome?,
-    /** 该对话当前有运行中的运行。 */
-    val running: Boolean = false,
+    /** 运行中行的前导表情（运行/等待回答/暂停/拦截；null 表示显示空闲状态图标）。 */
+    val faceMood: BallFaceMood? = null,
     /** 最后更新时间（Unix epoch 毫秒；相对时间由 Screen 渲染时计算）。 */
     val updatedAt: Long,
 )
@@ -59,9 +61,10 @@ public data class ActiveRunCardModel(
     /** 对话 Run 的名称（线程标题；空则由 Screen 显示默认文案）。 */
     val title: String?,
     val currentStep: String?,
-    val stepCount: Int,
-    /** 步数预算（`agent.budget.maxSteps`，≤0=不限）；进度条 = stepCount / budget（不限时不定进度）。 */
-    val budget: Int,
+    /** 表情场景（由 Run 执行阶段决定，同一事件与悬浮球同口径）。 */
+    val scene: BallFaceScene,
+    /** 表情抽取种子（[BallFaceDirector.seedOfEvent]），同一事件各表面得到同一张脸。 */
+    val seed: Long,
 )
 
 /** 列表页弹层状态（null 表示无）。 */
