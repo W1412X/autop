@@ -36,7 +36,12 @@ public data class RunRequest(
     val screenGate: ScreenAccessGate? = null,
     /** 运行模式（ADR-0040）：低于工具 `minMode` 的工具不出现在本次 Run 的工具列表中。 */
     val runMode: RunMode = RunMode.STANDARD,
+    /** 本次 Run 明确禁用的工具 id（优先于 [toolFilter]）：不出现在工具列表中，模型无从调用。 */
+    val deniedTools: Set<String> = emptySet(),
 )
+
+/** 上下文变量：本次 Run 是已保存任务的运行（值为 "true"），目标按任务模板说明，不是新的用户请求。 */
+public const val TASK_RUN_VAR: String = "taskRun"
 
 /** 按请求解析 provider：会话级覆盖优先，否则取默认模型（模型切换）。 */
 public fun LlmGateway.forRequest(request: RunRequest): Outcome<LlmProvider> =

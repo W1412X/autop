@@ -13,6 +13,7 @@ import com.example.autop.agent.ReplayRecorder
 import com.example.autop.agent.RunFinished
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.RunRequest
+import com.example.autop.agent.TASK_RUN_VAR
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolResultEvent
@@ -335,9 +336,12 @@ public class RunRunner(
                     mapOf(
                         RUN_ORIGIN_KEY to runOrigin(record.origin),
                         RUN_MODE_VAR to tier.id,
-                    ),
+                    ) +
+                    (if (task != null) mapOf(TASK_RUN_VAR to "true") else emptyMap()),
             config = config,
             toolFilter = task?.allowedTools,
+            // 任务运行不能再创建或修改任务（否则会把目标当成新请求，建出重复任务）。
+            deniedTools = if (task != null) TASK_RUN_DENIED_TOOLS else emptySet(),
             modelProfileId = threadStore.modelProfileOf(record.threadId),
             replay = replayPlan(record, task),
             runMode = tier,
@@ -501,6 +505,9 @@ public class RunRunner(
     private companion object {
         const val TAG = "RunRunner"
         const val RUN_ORIGIN_KEY = "runOrigin"
+
+        /** 任务运行禁用的工具：任务不能再创建或修改任务。 */
+        val TASK_RUN_DENIED_TOOLS: Set<String> = setOf("tool.create_task", "tool.update_task")
         const val RUN_ORIGIN_FOREGROUND = "foreground"
         const val RUN_ORIGIN_BACKGROUND = "background"
         const val KEY_POLICY = "policy"

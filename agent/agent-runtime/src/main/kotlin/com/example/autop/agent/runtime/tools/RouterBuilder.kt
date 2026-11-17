@@ -52,7 +52,7 @@ internal class RouterBuilder(
                 if (!request.runMode.includes(tool.minMode)) return@filter false
                 // shell-exec 设计 §2.2：运行期不可用（如总闸关闭、通道未连接）时同样静默过滤。
                 if (!tool.isAvailable(request.config)) return@filter false
-                val reason = hiddenReasonOf(tool, enabled, toolFilter, capabilities)
+                val reason = hiddenReasonOf(tool, enabled, toolFilter, request.deniedTools, capabilities)
                 if (reason == null) {
                     true
                 } else {
@@ -75,11 +75,13 @@ internal class RouterBuilder(
         tool: Tool,
         enabled: Set<String>,
         toolFilter: Set<String>?,
+        denied: Set<String>,
         capabilities: Set<Capability>,
     ): String? =
         when {
             tool.id !in enabled -> HiddenTool.DISABLED
             toolFilter != null && tool.id !in toolFilter -> HiddenTool.FILTERED
+            tool.id in denied -> HiddenTool.FILTERED
             !tool.requiredCapabilities.all { it in capabilities } -> HiddenTool.CAPABILITY
             else -> null
         }

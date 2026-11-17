@@ -142,6 +142,7 @@ class TemplateCatalogTest {
                 "agent.compaction.last_observation",
                 "agent.compaction.summary_wrapper",
                 "agent.context.goal",
+                "agent.context.task_goal",
                 "agent.context.trigger",
                 "agent.fallback.json_protocol",
                 "agent.fallback.parse_error",

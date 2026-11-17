@@ -9,6 +9,7 @@ import com.example.autop.agent.ContextContributor
 import com.example.autop.agent.ContextPart
 import com.example.autop.agent.ContextRequest
 import com.example.autop.agent.Placement
+import com.example.autop.agent.TASK_RUN_VAR
 import com.example.autop.agent.runtime.rules.ImageRetentionRule
 import com.example.autop.agent.runtime.rules.LongTextTruncateRule
 import com.example.autop.agent.runtime.rules.ObservationDegradeRule
@@ -170,18 +171,25 @@ internal class TriggerContributor(
     }
 }
 
-/** `context.goal`：任务目标。 */
+/** `context.goal`：任务目标。已保存任务的运行用任务模板，说明目标不是新的用户请求。 */
 internal class GoalContributor(
     prompts: PromptRepository,
 ) : TemplateContributor(prompts) {
     override val id: String = "context.goal"
-    override val templateId: String = "agent.context.goal"
     override val placement: Placement = Placement.FIRST_USER
+
+    override fun templateIdFor(req: ContextRequest): String =
+        if (req.vars[TASK_RUN_VAR] == "true") TASK_GOAL_TEMPLATE else GOAL_TEMPLATE
 
     override fun vars(req: ContextRequest): Map<String, String> = mapOf("goal" to (req.goal ?: ""))
 
     override suspend fun contribute(req: ContextRequest): ContextPart? {
         if (req.goal.isNullOrBlank()) return null
         return super.contribute(req)
+    }
+
+    private companion object {
+        const val GOAL_TEMPLATE = "agent.context.goal"
+        const val TASK_GOAL_TEMPLATE = "agent.context.task_goal"
     }
 }
