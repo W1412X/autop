@@ -1,27 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  启动图标前景：轨道（线条极简，斜椭圆 + 恒星 + 行星）。
-  线色 #17171A，viewport 108（自适应图标画布），内容收在 66dp 安全区内；
-  背景层全透明（见 ic_launcher_background），monochrome 主题图标同用本矢量。
+  启动图标前景：开口环 + 缺口卫星点 + 两只竖胶囊眼（线条版）。
+  几何取自 1024 画布：环外径 1024 / 线宽 105.6 / 缺口 75.5° / 卫星 Ø264、轨道 537 /
+  眼睛 105.6×199.2。按最外缘（卫星外沿 669）缩到 66dp 安全圆内，
+  环外径约 50.5dp、线宽约 5.2dp；卫星外沿正好落在 r=33dp。
+  背景层为近白圆角卡片，monochrome 主题图标复用本矢量。
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 轨道：椭圆 rx31 ry13 绕中心 -30°（弧段用 x-axis-rotation 直接表达） -->
+    <!-- 开口环：0° 起点顺时针 284.5°，缺口留在右上 75.5° -->
     <path
-        android:pathData="M27.2,69.5 A31,13 -30 0 1 80.9,38.5 A31,13 -30 0 1 27.2,69.5"
+        android:pathData="M76.6509,54 A22.6509,22.6509 0 1 1 59.6708,32.0707"
         android:fillColor="#00000000"
-        android:strokeColor="#17171A"
-        android:strokeWidth="6.5"
+        android:strokeColor="#1A1C16"
+        android:strokeWidth="5.209"
         android:strokeLineCap="round" />
-    <!-- 中心恒星 -->
+    <!-- 卫星点：停在缺口中心偏上（45°），外沿贴 66dp 安全圆 -->
     <path
-        android:pathData="M47.5,54 A6.5,6.5 0 1 1 60.5,54 A6.5,6.5 0 1 1 47.5,54 Z"
-        android:fillColor="#17171A" />
-    <!-- 行星（落在轨道上） -->
+        android:fillColor="#1A1C16"
+        android:pathData="M72.731,28.7588 A6.5112,6.5112 0 1 1 72.731,41.7812 A6.5112,6.5112 0 1 1 72.731,28.7588 Z" />
+    <!-- 眼睛：105.6×199.2 竖胶囊，中心偏下 67 -->
     <path
-        android:pathData="M67.5,56 A5.5,5.5 0 1 1 78.5,56 A5.5,5.5 0 1 1 67.5,56 Z"
-        android:fillColor="#17171A" />
+        android:fillColor="#1A1C16"
+        android:pathData="M44.2775,54.9965 A2.6045,2.6045 0 0 1 49.4865,54.9965 L49.4865,59.6135 A2.6045,2.6045 0 0 1 44.2775,59.6135 Z M58.5135,54.9965 A2.6045,2.6045 0 0 1 63.7225,54.9965 L63.7225,59.6135 A2.6045,2.6045 0 0 1 58.5135,59.6135 Z" />
 </vector>
