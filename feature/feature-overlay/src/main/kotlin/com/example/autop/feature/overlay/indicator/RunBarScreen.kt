@@ -59,7 +59,7 @@ import kotlin.random.Random
 
 /** 图标按钮与状态表情尺寸（dp）。 */
 private val BUTTON_SIZE = 36.dp
-private val FACE_SIZE = 20.dp
+private val FACE_SIZE = 35.dp
 private val INFO_GAP = 8.dp
 private val BUTTON_GAP = 6.dp
 
