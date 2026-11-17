@@ -11,9 +11,9 @@ import com.example.autop.agent.AgentEvent
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.exceptionHandler
-import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.UiConfig
+import com.example.autop.core.ui.component.ballface.BallFaceVariant
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.flow.RecordingSession
 import com.example.autop.task.ActiveRunInfo
@@ -66,19 +66,21 @@ public class BallStateHolder
                 }
             }
 
-        /** 球渲染状态。 */
+        /** 球渲染状态：活跃会话 + 全部未收口会话（数字与拦截/等待）+ 无障碍 + 配置。 */
         public val uiState: StateFlow<BallUiState> =
             combine(
-                runService.observeActive(),
+                combine(runService.observeActive(), runService.observeOpenRuns()) { active, open -> active to open },
                 accessibility.connected,
-                configProvider.observe().map { configBits(it[AgentConfig.BUDGET].maxSteps, it) },
+                configProvider.observe().map { configBits(it) },
                 toolCategory,
                 recording.state.map { it.active },
-            ) { active, connected, bits, tool, isRecording ->
+            ) { (active, open), connected, bits, tool, isRecording ->
                 BallUiState(
-                    mode = deriveBallMode(active, connected, bits.maxSteps, tool, isRecording),
-                    breathMs = bits.breathMs,
+                    mode = deriveBallMode(active, open.values, connected, tool, isRecording),
+                    sessionCount = open.size,
                     motionEnabled = bits.motionEnabled,
+                    ballShape = bits.ballShape,
+                    ballSizeDp = bits.ballSizeDp,
                     doubleTapStops = bits.doubleTapStops,
                     opacity = bits.opacity,
                 )
@@ -230,14 +232,13 @@ public class BallStateHolder
                 }
         }
 
-        private fun configBits(
-            maxSteps: Int,
-            snapshot: com.example.autop.core.config.ConfigSnapshot,
-        ): ConfigBits =
+        private fun configBits(snapshot: com.example.autop.core.config.ConfigSnapshot): ConfigBits =
             ConfigBits(
-                maxSteps = maxSteps,
-                breathMs = snapshot[UiConfig.OVERLAY].breathMs,
                 motionEnabled = snapshot[UiConfig.APPEARANCE].motionEnabled,
+                ballShape =
+                    BallFaceVariant.entries.firstOrNull { it.name == snapshot[UiConfig.APPEARANCE].ballShape }
+                        ?: BallFaceVariant.SOLID,
+                ballSizeDp = snapshot[UiConfig.OVERLAY].ballSizeDp,
                 doubleTapStops = snapshot[UiConfig.OVERLAY].doubleTapStops,
                 opacity = snapshot[UiConfig.OVERLAY].opacity.toFloat(),
             )
@@ -260,9 +261,9 @@ public class BallStateHolder
 
 /** 配置聚合（combine 的中间量）。 */
 private data class ConfigBits(
-    val maxSteps: Int,
-    val breathMs: Long,
     val motionEnabled: Boolean,
+    val ballShape: BallFaceVariant,
+    val ballSizeDp: Int,
     val doubleTapStops: Boolean,
     val opacity: Float,
 )

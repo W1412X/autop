@@ -13,96 +13,111 @@ import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class BallLogicTest {
-    private fun activeRun(
+    private fun run(
+        id: String,
         status: RunStatus = RunStatus.RUNNING,
         pauseReason: PauseReason? = null,
-        waitingQuestion: String? = null,
+        question: String? = null,
+    ): RunRecord =
+        RunRecord(
+            id = RunId(id),
+            taskId = null,
+            threadId = ThreadId("thread-$id"),
+            origin = RunOrigin.CHAT,
+            status = status,
+            triggerContext = emptyMap(),
+            createdAt = 0L,
+            startedAt = null,
+            endedAt = null,
+            summary = null,
+            errorCode = null,
+            pauseReason = pauseReason,
+            waitingQuestion = question,
+            waitingOptions = emptyList(),
+        )
+
+    private fun active(
+        record: RunRecord,
         stepCount: Int = 3,
-    ): ActiveRunInfo {
-        val record =
-            RunRecord(
-                id = RunId("run-1"),
-                taskId = null,
-                threadId = ThreadId("thread-1"),
-                origin = RunOrigin.CHAT,
-                status = status,
-                triggerContext = emptyMap(),
-                createdAt = 0L,
-                startedAt = null,
-                endedAt = null,
-                summary = null,
-                errorCode = null,
-                pauseReason = pauseReason,
-                waitingQuestion = waitingQuestion,
-            )
-        return ActiveRunInfo(record, RunState.SAMPLING, null, stepCount, emptyList<PlanItem>())
-    }
+    ): ActiveRunInfo = ActiveRunInfo(record, RunState.SAMPLING, null, stepCount, emptyList<PlanItem>())
 
     @Test
     fun `accessibility disconnected wins over running`() {
-        val mode = deriveBallMode(activeRun(), accessibilityConnected = false, maxSteps = 40, toolCategory = null)
+        val run = run("r1")
+        val mode = deriveBallMode(active(run), listOf(run), accessibilityConnected = false, toolCategory = null)
         assertThat(mode).isEqualTo(BallMode.AccessibilityLost)
     }
 
     @Test
-    fun `no active run is idle`() {
-        val mode = deriveBallMode(null, accessibilityConnected = true, maxSteps = 40, toolCategory = null)
-        assertThat(mode).isEqualTo(BallMode.Idle)
-    }
-
-    @Test
-    fun `policy blocked is blocked`() {
-        val mode =
+    fun `no open runs is idle and recording shows only when nothing is open`() {
+        assertThat(deriveBallMode(null, emptyList(), accessibilityConnected = true, toolCategory = null))
+            .isEqualTo(BallMode.Idle)
+        assertThat(
+            deriveBallMode(null, emptyList(), accessibilityConnected = true, toolCategory = null, recording = true),
+        ).isEqualTo(BallMode.Recording)
+        val run = run("r1")
+        assertThat(
             deriveBallMode(
-                activeRun(pauseReason = PauseReason.POLICY_BLOCKED),
+                active(run),
+                listOf(run),
                 accessibilityConnected = true,
-                maxSteps = 40,
                 toolCategory = null,
-            )
-        assertThat(mode).isEqualTo(BallMode.Blocked)
+                recording = true,
+            ),
+        ).isInstanceOf(BallMode.Running::class.java)
     }
 
     @Test
-    fun `waiting question is waiting answer`() {
-        val mode =
-            deriveBallMode(
-                activeRun(waitingQuestion = "继续吗？"),
-                accessibilityConnected = true,
-                maxSteps = 40,
-                toolCategory = null,
-            )
-        assertThat(mode).isEqualTo(BallMode.WaitingAnswer)
+    fun `blocked beats waiting beats running beats paused across sessions`() {
+        val blocked = run("b", RunStatus.PAUSED, pauseReason = PauseReason.POLICY_BLOCKED)
+        val waiting = run("w", question = "继续吗？")
+        val running = run("r")
+        val paused = run("p", RunStatus.PAUSED, pauseReason = PauseReason.MANUAL)
+        assertThat(deriveBallMode(active(running), listOf(running, blocked), true, null))
+            .isEqualTo(BallMode.Blocked)
+        assertThat(deriveBallMode(active(running), listOf(running, waiting), true, null))
+            .isEqualTo(BallMode.WaitingAnswer)
+        assertThat(deriveBallMode(active(paused), listOf(paused, running), true, null))
+            .isInstanceOf(BallMode.Running::class.java)
+        assertThat(deriveBallMode(null, listOf(paused), true, null)).isEqualTo(BallMode.Paused)
     }
 
     @Test
-    fun `paused status is paused`() {
+    fun `running focuses the active session when it is running`() {
+        val run = run("r1")
         val mode =
             deriveBallMode(
-                activeRun(status = RunStatus.PAUSED, pauseReason = PauseReason.MANUAL),
+                active(run, stepCount = 10),
+                listOf(run),
                 accessibilityConnected = true,
-                maxSteps = 40,
-                toolCategory = null,
-            )
-        assertThat(mode).isEqualTo(BallMode.Paused)
-    }
-
-    @Test
-    fun `running carries progress and tool category`() {
-        val mode =
-            deriveBallMode(
-                activeRun(stepCount = 10),
-                accessibilityConnected = true,
-                maxSteps = 40,
                 toolCategory = ToolCategory.GESTURE,
             )
-        assertThat(mode)
-            .isEqualTo(BallMode.Running(stepCount = 10, progress = 0.25f, toolCategory = ToolCategory.GESTURE))
+        assertThat(mode).isInstanceOf(BallMode.Running::class.java)
+        val running = mode as BallMode.Running
+        assertThat(running.stepCount).isEqualTo(10)
+        assertThat(running.toolCategory).isEqualTo(ToolCategory.GESTURE)
+        assertThat(running.state).isEqualTo(RunState.SAMPLING)
     }
 
     @Test
-    fun `non positive budget yields null progress`() {
-        assertThat(progressOf(stepCount = 5, maxSteps = 0)).isNull()
-        assertThat(progressOf(stepCount = 50, maxSteps = 40)).isEqualTo(1f)
+    fun `background running session is used when the active one is paused`() {
+        val paused = run("p", RunStatus.PAUSED, pauseReason = PauseReason.MANUAL)
+        val running = run("r")
+        val mode = deriveBallMode(active(paused), listOf(paused, running), true, ToolCategory.TEXT)
+        assertThat(mode).isInstanceOf(BallMode.Running::class.java)
+        val focus = mode as BallMode.Running
+        assertThat(focus.toolCategory).isNull()
+        assertThat(focus.state).isEqualTo(RunState.SAMPLING)
+    }
+
+    @Test
+    fun `running seed is stable for the same run and step`() {
+        val run = run("r1")
+        val a = deriveBallMode(active(run, 4), listOf(run), true, null) as BallMode.Running
+        val b = deriveBallMode(active(run, 4), listOf(run), true, null) as BallMode.Running
+        val c = deriveBallMode(active(run, 5), listOf(run), true, null) as BallMode.Running
+        assertThat(a.seed).isEqualTo(b.seed)
+        assertThat(c.seed).isNotEqualTo(a.seed)
     }
 
     @Test

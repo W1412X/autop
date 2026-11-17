@@ -1,22 +1,30 @@
 /**
- * 悬浮球 UI 状态（docs/tech/08 §5.1 的六态）：由 `RunService.observeActive`、
- * 无障碍连接状态与配置推导（[deriveBallMode]）。
+ * 悬浮球 UI 状态（docs/tech/08 §5.1 的状态集合）：由 `RunService.observeActive`、
+ * 无障碍连接状态与配置推导（[deriveBallMode]）。球体本身只表达表情，不携带进度。
  */
 package com.example.autop.feature.overlay.ball
 
 import androidx.compose.runtime.Immutable
+import com.example.autop.agent.RunState
+import com.example.autop.core.ui.component.ballface.BallFaceVariant
 
 /** 悬浮球状态（docs/tech/08 §5.1）。 */
 public sealed interface BallMode {
     /** 空闲：单击展开圆弧菜单（即时创建 / 打开应用，N182）。 */
     public data object Idle : BallMode
 
-    /** 运行中：进度环 + 当前工具类别图标；双击可停止。 */
+    /**
+     * 运行中：表演态表情（工作中卫星绕行）；双击可停止。
+     *
+     * @property state Run 的执行阶段（起跑/思考/工具/整理），决定表情池。
+     * @property toolCategory 当前工具类别，只在 [RunState.EXECUTING_TOOLS] 时参与选池。
+     * @property seed 事件种子（[com.example.autop.core.ui.component.ballface.BallFaceDirector.seedOfEvent]）。
+     */
     public data class Running(
         val stepCount: Int,
-        /** 步数 / 预算（`agent.budget.maxSteps`）；预算非正时为 null（画不定进度圈）。 */
-        val progress: Float?,
         val toolCategory: ToolCategory?,
+        val state: RunState,
+        val seed: Long,
     ) : BallMode
 
     /** 等待回答：单击展开圆弧菜单（查看进度 / 中止，N182）。 */
@@ -35,7 +43,7 @@ public sealed interface BallMode {
     public data object Recording : BallMode
 }
 
-/** 当前工具类别（悬浮球中心图标，docs/tech/08 §5.1"中心图标换成当前工具类别图标"）。 */
+/** 当前工具类别（决定运行中表情池与卫星符号）。 */
 public enum class ToolCategory {
     /** 点按、滑动、手势类工具。 */
     GESTURE,
@@ -57,12 +65,16 @@ public enum class ToolCategory {
 @Immutable
 public data class BallUiState(
     val mode: BallMode = BallMode.Idle,
-    /** 呼吸光晕周期（`ui.overlay.breathMs`）。 */
-    val breathMs: Long = 1600,
     /** 动效开关（`ui.appearance.motionEnabled`，docs/tech/08 §6）。 */
     val motionEnabled: Boolean = true,
+    /** 球体形态（`ui.appearance.ballShape`）。 */
+    val ballShape: BallFaceVariant = BallFaceVariant.SOLID,
+    /** 悬浮球直径（dp，`ui.overlay.ballSizeDp`）。 */
+    val ballSizeDp: Int = DEFAULT_BALL_SIZE_DP,
     /** 双击停止开关（`ui.overlay.doubleTapStops`）。 */
     val doubleTapStops: Boolean = true,
+    /** 未收口会话数（运行中 + 等待 + 暂停）：运行中显示在卫星上，其它状态显示在角标上。 */
+    val sessionCount: Int = 0,
     /** 球体与贴边细条透明度（`ui.overlay.opacity`，1.0=完全不透明）。 */
     val opacity: Float = 1f,
 )

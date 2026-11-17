@@ -6,6 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import com.example.autop.agent.RunState
 import com.example.autop.core.ui.theme.AppearanceSettings
 import com.example.autop.core.ui.theme.AutopTheme
 import com.example.autop.core.ui.theme.DarkMode
@@ -66,7 +67,15 @@ internal fun BallIdleDarkPreview() =
 @Composable
 internal fun BallRunningPreview() =
     BallPreviewContent(
-        BallUiState(mode = BallMode.Running(stepCount = 12, progress = 0.3f, toolCategory = ToolCategory.GESTURE)),
+        BallUiState(
+            mode =
+                BallMode.Running(
+                    stepCount = 12,
+                    toolCategory = ToolCategory.GESTURE,
+                    state = RunState.EXECUTING_TOOLS,
+                    seed = 1L,
+                ),
+        ),
     )
 
 @Preview(name = "Ball waiting", showBackground = true)

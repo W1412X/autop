@@ -1,169 +1,54 @@
 /**
- * 悬浮球视觉参数（docs/tech/08 §5.1，N185）：各状态的环、光晕、角标与图标差异由
- * [ballVisualSpec] 纯函数推导（单测锁定差异矩阵），渲染与动效见 [BallVisual]。
+ * 悬浮球的表情映射（docs/tech/08 §5.1 + 设计稿 `ball-face-events.html`）：球状态 → 表情状态、
+ * 表演场景与无障碍描述。颜色不承载状态，状态只由表情与卫星符号表达。
  */
 package com.example.autop.feature.overlay.ball
 
-import androidx.compose.runtime.Immutable
-import com.example.autop.core.ui.theme.StatusTone
+import com.example.autop.agent.RunState
+import com.example.autop.core.ui.component.ballface.BallFaceMood
+import com.example.autop.core.ui.component.ballface.BallFaceScene
 import com.example.autop.feature.overlay.R
 
-/** 外圈环形态。 */
-public enum class RingKind {
-    /** 无环（空闲）。 */
-    NONE,
+/** 球状态 → 表情状态（固定态一态一张脸；运行中按场景抽取）。 */
+internal fun ballFaceMoodOf(mode: BallMode): BallFaceMood =
+    when (mode) {
+        BallMode.Idle -> BallFaceMood.IDLE
+        is BallMode.Running -> if (mode.state == RunState.STARTING) BallFaceMood.RUNNING_START else BallFaceMood.RUNNING
+        BallMode.WaitingAnswer -> BallFaceMood.WAITING
+        BallMode.Paused -> BallFaceMood.PAUSED
+        BallMode.Blocked -> BallFaceMood.BLOCKED
+        BallMode.AccessibilityLost -> BallFaceMood.LOST
+        BallMode.Recording -> BallFaceMood.RECORDING
+    }
 
-    /** 进度环（步数 / 预算，随步数增长）。 */
-    PROGRESS,
-
-    /** 不定进度环（预算未知的缺口弧，动效开启时旋转）。 */
-    INDETERMINATE,
-
-    /** 整圈状态环（非运行态）。 */
-    FULL,
-}
-
-/** 光晕形态（呼吸/脉冲属动效，动效关闭时一律无光晕）。 */
-public enum class HaloKind {
-    /** 无光晕。 */
-    NONE,
-
-    /** 呼吸光晕（运行中，alpha 起伏）。 */
-    BREATH,
-
-    /** 脉冲光晕（等待回答的提醒感）。 */
-    PULSE,
-}
-
-/** 右上角角标形态。 */
-public enum class BadgeKind {
-    /** 无角标。 */
-    NONE,
-
-    /** 静态圆点（动效关闭时的等待提醒）。 */
-    DOT,
-
-    /** 脉冲圆点（等待回答，缩放+透明度起伏）。 */
-    PULSE,
-}
-
-/** 球内呼吸灯形态（运行态新口径：取消外圈加载环与外侧光晕，改为球内呼吸灯）。 */
-public enum class InnerGlowKind {
-    /** 无内呼吸灯。 */
-    NONE,
-
-    /** 呼吸灯（状态色径向渐变在球内起伏）。 */
-    BREATH,
-}
-
-/** 悬浮球视觉参数（N185 状态差异化）。 */
-@Immutable
-public data class BallVisualSpec(
-    /** 外圈环语义色键（null = 无环）。 */
-    val ringTone: StatusTone?,
-    /** 外圈环形态。 */
-    val ringKind: RingKind,
-    /** 进度环比例（仅 [RingKind.PROGRESS]）。 */
-    val ringProgress: Float?,
-    /** 光晕形态。 */
-    val haloKind: HaloKind,
-    /** 角标形态。 */
-    val badgeKind: BadgeKind,
-    /** 中心图标透明度（无障碍断开时弱化）。 */
-    val iconAlpha: Float,
-    /** 球内呼吸灯形态（运行态）。 */
-    val innerGlow: InnerGlowKind = InnerGlowKind.NONE,
-)
-
-/** 无障碍断开时中心图标的弱化透明度。 */
-private const val ICON_ALPHA_DIM: Float = 0.55f
-
-/** 图标常态透明度。 */
-private const val ICON_ALPHA_FULL: Float = 1f
+/** 运行中球的表演场景。 */
+internal fun ballFaceSceneOf(mode: BallMode.Running): BallFaceScene = ballFaceSceneOf(mode.state, mode.toolCategory)
 
 /**
- * 状态 → 视觉参数（docs/tech/08 §5.1 表，N185）：
- * 空闲无环无光晕；运行中进度环（预算未知为不定环）+ 呼吸光晕；
- * 等待回答整圈等待环 + 脉冲角标（动效关闭时静态圆点，提醒不消失）；
- * 暂停 / 被拦截整圈状态环；无障碍断开整圈错误环 + 图标弱化。
- *
- * @param motionEnabled 动效是否开启（`ui.appearance.motionEnabled` ∧ `LocalMotionEnabled`）。
+ * 执行阶段 + 工具类别 → 表演场景（设计稿：起跑/思考/手势/文本/视觉/应用/整理）。
+ * 工具类别未知（OTHER 或尚无工具）时按思考池处理。
  */
-@Suppress("LongMethod") // 六态映射表：一个状态一个分支，拆开反而难读
-public fun ballVisualSpec(
-    mode: BallMode,
-    motionEnabled: Boolean,
-): BallVisualSpec =
-    when (mode) {
-        BallMode.Idle ->
-            BallVisualSpec(
-                ringTone = null,
-                ringKind = RingKind.NONE,
-                ringProgress = null,
-                haloKind = HaloKind.NONE,
-                badgeKind = BadgeKind.NONE,
-                iconAlpha = ICON_ALPHA_FULL,
-            )
-        BallMode.Recording ->
-            BallVisualSpec(
-                ringTone = StatusTone.WAITING,
-                ringKind = RingKind.FULL,
-                ringProgress = null,
-                haloKind = HaloKind.NONE,
-                badgeKind = BadgeKind.NONE,
-                iconAlpha = ICON_ALPHA_FULL,
-            )
-        is BallMode.Running ->
-            BallVisualSpec(
-                ringTone = StatusTone.RUNNING,
-                ringKind = RingKind.NONE,
-                ringProgress = null,
-                haloKind = HaloKind.NONE,
-                badgeKind = BadgeKind.NONE,
-                iconAlpha = ICON_ALPHA_FULL,
-                innerGlow = if (motionEnabled) InnerGlowKind.BREATH else InnerGlowKind.NONE,
-            )
-        BallMode.WaitingAnswer ->
-            BallVisualSpec(
-                ringTone = StatusTone.WAITING,
-                ringKind = RingKind.FULL,
-                ringProgress = null,
-                haloKind = if (motionEnabled) HaloKind.PULSE else HaloKind.NONE,
-                badgeKind = if (motionEnabled) BadgeKind.PULSE else BadgeKind.DOT,
-                iconAlpha = ICON_ALPHA_FULL,
-            )
-        BallMode.Paused ->
-            BallVisualSpec(
-                ringTone = StatusTone.PAUSED,
-                ringKind = RingKind.FULL,
-                ringProgress = null,
-                haloKind = HaloKind.NONE,
-                badgeKind = BadgeKind.NONE,
-                iconAlpha = ICON_ALPHA_FULL,
-            )
-        BallMode.Blocked ->
-            BallVisualSpec(
-                ringTone = StatusTone.BLOCKED,
-                ringKind = RingKind.FULL,
-                ringProgress = null,
-                haloKind = HaloKind.NONE,
-                badgeKind = BadgeKind.NONE,
-                iconAlpha = ICON_ALPHA_FULL,
-            )
-        BallMode.AccessibilityLost ->
-            BallVisualSpec(
-                ringTone = StatusTone.BLOCKED,
-                ringKind = RingKind.FULL,
-                ringProgress = null,
-                haloKind = HaloKind.NONE,
-                badgeKind = BadgeKind.NONE,
-                iconAlpha = ICON_ALPHA_DIM,
-            )
+internal fun ballFaceSceneOf(
+    state: RunState,
+    category: ToolCategory?,
+): BallFaceScene =
+    when (state) {
+        RunState.STARTING -> BallFaceScene.STARTING
+        RunState.COMPACTING -> BallFaceScene.COMPACTING
+        RunState.EXECUTING_TOOLS ->
+            when (category) {
+                ToolCategory.GESTURE -> BallFaceScene.GESTURE
+                ToolCategory.TEXT -> BallFaceScene.TEXT
+                ToolCategory.VISION -> BallFaceScene.VISION
+                ToolCategory.APP -> BallFaceScene.APP
+                ToolCategory.OTHER, null -> BallFaceScene.SAMPLING
+            }
+        else -> BallFaceScene.SAMPLING
     }
 
 /**
  * 球的无障碍描述文案（strings `overlay_ball_*_description`，N185 接线）：
- * 状态变化时描述同步变化（不只靠颜色区分）。
+ * 状态变化时描述同步变化（不只靠表情区分）。
  */
 public fun ballDescriptionOf(mode: BallMode): Int =
     when (mode) {
@@ -175,3 +60,12 @@ public fun ballDescriptionOf(mode: BallMode): Int =
         BallMode.Blocked -> R.string.overlay_ball_blocked_description
         BallMode.AccessibilityLost -> R.string.overlay_ball_accessibility_lost_description
     }
+
+/**
+ * 运行中的表演场景：多个会话同时运行时从全部表演脸中随机（[BallFaceScene.MIXED]）；
+ * 只有一个会话时保持按执行阶段与工具类别分池（单会话语义不丢）。
+ */
+internal fun ballFaceSceneOf(
+    mode: BallMode.Running,
+    sessionCount: Int,
+): BallFaceScene = if (sessionCount > 1) BallFaceScene.MIXED else ballFaceSceneOf(mode)

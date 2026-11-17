@@ -1,5 +1,5 @@
 /**
- * 顶部运行控制条（原执行期胶囊升级）：一行横排——呼吸状态点 + 操作信息（点按展开/收起
+ * 顶部运行控制条（原执行期胶囊升级）：一行横排——状态表情 + 操作信息（点按展开/收起
  * 下方运行详情面板）+ 状态图标按钮组。颜色取 [MaterialTheme.colorScheme]，动效遵守
  * [LocalMotionEnabled]：出入淡入淡出并从上滑入、图标交叉过渡、按压回弹、箭头旋转。
  * 窗口只包住条本身（可触摸但不吞条外触摸）。
@@ -31,7 +31,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
@@ -45,6 +44,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.ui.component.AutopIcons
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceScene
+import com.example.autop.core.ui.component.ballface.BallFaceSpec
 import com.example.autop.core.ui.theme.IconSize
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.scaled
@@ -52,24 +54,17 @@ import com.example.autop.feature.overlay.R
 import com.example.autop.feature.overlay.panel.ControlIntent
 import com.example.autop.feature.overlay.panel.ControlIntentKind
 import com.example.autop.feature.overlay.panel.controlIntentLabelRes
-import com.example.autop.feature.overlay.rememberBreath
 import com.example.autop.task.ActiveRunInfo
 import kotlin.random.Random
 
-/** 图标按钮与状态点尺寸（dp）。 */
+/** 图标按钮与状态表情尺寸（dp）。 */
 private val BUTTON_SIZE = 36.dp
-private val DOT_SIZE = 8.dp
+private val FACE_SIZE = 20.dp
 private val INFO_GAP = 8.dp
 private val BUTTON_GAP = 6.dp
 
 /** 入场从上方滑入的距离（dp）。 */
 private val SLIDE_DISTANCE = 12.dp
-
-/** 状态点呼吸缩放下限。 */
-private const val DOT_SCALE_MIN: Float = 0.7f
-
-/** 状态点呼吸半周期（毫秒）。 */
-private const val BREATH_HALF_MS: Long = 700L
 
 /** 按压回弹的缩放下限。 */
 private const val PRESSED_SCALE: Float = 0.88f
@@ -97,7 +92,6 @@ internal fun RunBarScreen(
 ) {
     val spec = rememberRunBarSpec(active)
     val motionOn = LocalMotionEnabled.current
-    val breath = rememberBreath(halfPeriodMs = BREATH_HALF_MS, enabled = motionOn && spec.hint is RunBarHint.Running)
     val appear = remember { Animatable(0f) }
     LaunchedEffect(visible, motionOn) {
         val target = if (visible) 1f else 0f
@@ -120,7 +114,7 @@ internal fun RunBarScreen(
                 .padding(horizontal = INFO_GAP * 2),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        StatusDot(hint = spec.hint, breath = breath)
+        StatusFace(hint = spec.hint)
         InfoArea(
             expanded = expanded,
             text = pendingHintTextOf(pending) ?: hintTextOf(spec.hint),
@@ -165,32 +159,21 @@ private fun rememberRunBarSpec(active: ActiveRunInfo): RunBarSpec {
     }
 }
 
-/** 状态点：运行中随呼吸起伏，其余静止（色即状态语义）。 */
+/** 状态表情：运行中随表情自身呼吸起伏，其余静态（表情即状态语义）。 */
 @Composable
-private fun StatusDot(
+private fun StatusFace(
     hint: RunBarHint,
-    breath: State<Float>,
     modifier: Modifier = Modifier,
 ) {
-    val colors = MaterialTheme.colorScheme
-    val color =
-        when (hint) {
-            is RunBarHint.Running -> colors.primary
-            RunBarHint.Paused -> colors.tertiary
-            RunBarHint.Blocked -> colors.error
-            RunBarHint.Waiting -> colors.secondary
-            RunBarHint.Queued -> colors.outline
-        }
-    Box(
-        modifier =
-            modifier
-                .size(DOT_SIZE)
-                .graphicsLayer {
-                    val scale = DOT_SCALE_MIN + (1f - DOT_SCALE_MIN) * breath.value
-                    scaleX = scale
-                    scaleY = scale
-                }.clip(CircleShape)
-                .background(color),
+    val running = hint as? RunBarHint.Running
+    AutopBallFace(
+        spec =
+            BallFaceSpec(
+                mood = runBarFaceOf(hint),
+                scene = running?.scene ?: BallFaceScene.SAMPLING,
+                seed = running?.seed ?: 0L,
+            ),
+        modifier = modifier.size(FACE_SIZE),
     )
 }
 
@@ -317,8 +300,6 @@ private fun iconOf(action: RunBarAction): ImageVector =
 @Composable
 private fun hintTextOf(hint: RunBarHint): String =
     when {
-        hint is RunBarHint.Running && hint.stepCount > 0 ->
-            stringResource(R.string.run_bar_running, hint.title, hint.stepCount)
         hint is RunBarHint.Running -> hint.title
         hint == RunBarHint.Paused -> stringResource(R.string.panel_status_paused)
         hint == RunBarHint.Blocked -> stringResource(R.string.panel_status_blocked)

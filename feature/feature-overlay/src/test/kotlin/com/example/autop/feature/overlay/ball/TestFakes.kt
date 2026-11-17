@@ -108,6 +108,8 @@ internal class FakeRunService(
 
     override fun observeRunningThreads(): StateFlow<Set<ThreadId>> = MutableStateFlow(emptySet())
 
+    override fun observeOpenRuns(): StateFlow<Map<ThreadId, RunRecord>> = MutableStateFlow(emptyMap())
+
     override fun observeRun(runId: RunId): Flow<RunRecord> = emptyFlow()
 
     override fun observeOpenRun(threadId: ThreadId): Flow<RunRecord?> = emptyFlow()

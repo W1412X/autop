@@ -7,6 +7,7 @@ import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.thread.ui.TimelineItem
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.overlay.R
 import com.example.autop.task.ActiveRunInfo
@@ -64,6 +65,37 @@ class ProgressLogicTest {
         assertThat(spec.tone).isEqualTo(StatusTone.NEUTRAL)
         assertThat(spec.chipText).isEqualTo(R.string.panel_status_queued)
         assertThat(spec.runControls).isFalse()
+    }
+
+    @Test
+    fun `face mood follows live run state`() {
+        assertThat(progressFaceMoodOf(activeRun(), finished = null)).isEqualTo(BallFaceMood.RUNNING)
+        assertThat(
+            progressFaceMoodOf(activeRun(status = RunStatus.WAITING_USER), finished = null),
+        ).isEqualTo(BallFaceMood.WAITING)
+        assertThat(
+            progressFaceMoodOf(activeRun(status = RunStatus.PAUSED), finished = null),
+        ).isEqualTo(BallFaceMood.PAUSED)
+        assertThat(
+            progressFaceMoodOf(activeRun(pauseReason = PauseReason.POLICY_BLOCKED), finished = null),
+        ).isEqualTo(BallFaceMood.BLOCKED)
+        assertThat(progressFaceMoodOf(active = null, finished = null)).isEqualTo(BallFaceMood.IDLE)
+    }
+
+    @Test
+    fun `face mood follows finished outcome`() {
+        assertThat(
+            progressFaceMoodOf(active = null, finished = meta(RunOutcome.SUCCEEDED)),
+        ).isEqualTo(BallFaceMood.SUCCESS)
+        assertThat(
+            progressFaceMoodOf(active = null, finished = meta(RunOutcome.FAILED)),
+        ).isEqualTo(BallFaceMood.FAILURE)
+        assertThat(
+            progressFaceMoodOf(active = null, finished = meta(RunOutcome.INTERRUPTED)),
+        ).isEqualTo(BallFaceMood.PAUSED)
+        assertThat(
+            progressFaceMoodOf(active = null, finished = meta(RunOutcome.CANCELLED)),
+        ).isEqualTo(BallFaceMood.IDLE)
     }
 
     @Test

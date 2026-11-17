@@ -1,96 +1,62 @@
 package com.example.autop.feature.overlay.ball
 
-import com.example.autop.core.ui.theme.StatusTone
-import com.example.autop.feature.overlay.R
+import com.example.autop.agent.RunState
+import com.example.autop.core.ui.component.ballface.BallFaceMood
+import com.example.autop.core.ui.component.ballface.BallFaceScene
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
-/** 悬浮球视觉差异矩阵单测（N185）：各状态的环/光晕/角标/图标参数与动效开关退化行为。 */
+/** 球状态 → 表情状态与表演场景的映射（颜色不承载状态，只看表情口径）。 */
 class BallVisualSpecTest {
     @Test
-    fun `idle has no ring halo or badge`() {
-        val spec = ballVisualSpec(BallMode.Idle, motionEnabled = true)
-        assertThat(spec.ringTone).isNull()
-        assertThat(spec.ringKind).isEqualTo(RingKind.NONE)
-        assertThat(spec.haloKind).isEqualTo(HaloKind.NONE)
-        assertThat(spec.badgeKind).isEqualTo(BadgeKind.NONE)
+    fun `fixed ball modes map to one fixed mood each`() {
+        assertThat(ballFaceMoodOf(BallMode.Idle)).isEqualTo(BallFaceMood.IDLE)
+        assertThat(ballFaceMoodOf(BallMode.WaitingAnswer)).isEqualTo(BallFaceMood.WAITING)
+        assertThat(ballFaceMoodOf(BallMode.Paused)).isEqualTo(BallFaceMood.PAUSED)
+        assertThat(ballFaceMoodOf(BallMode.Blocked)).isEqualTo(BallFaceMood.BLOCKED)
+        assertThat(ballFaceMoodOf(BallMode.AccessibilityLost)).isEqualTo(BallFaceMood.LOST)
+        assertThat(ballFaceMoodOf(BallMode.Recording)).isEqualTo(BallFaceMood.RECORDING)
     }
 
     @Test
-    fun `running draws inner breath glow without ring or outer halo when motion on`() {
-        val spec =
-            ballVisualSpec(
-                BallMode.Running(stepCount = 3, progress = 0.5f, toolCategory = ToolCategory.GESTURE),
-                motionEnabled = true,
+    fun `running in the starting phase uses the start mood`() {
+        val mode = running(RunState.STARTING, null)
+        assertThat(ballFaceMoodOf(mode)).isEqualTo(BallFaceMood.RUNNING_START)
+        assertThat(ballFaceSceneOf(mode)).isEqualTo(BallFaceScene.STARTING)
+    }
+
+    @Test
+    fun `running in sampling and compacting phases`() {
+        assertThat(ballFaceMoodOf(running(RunState.SAMPLING, null))).isEqualTo(BallFaceMood.RUNNING)
+        assertThat(ballFaceSceneOf(running(RunState.SAMPLING, null))).isEqualTo(BallFaceScene.SAMPLING)
+        assertThat(ballFaceSceneOf(running(RunState.COMPACTING, null))).isEqualTo(BallFaceScene.COMPACTING)
+    }
+
+    @Test
+    fun `tool categories pick their own scene`() {
+        val expected =
+            mapOf(
+                ToolCategory.GESTURE to BallFaceScene.GESTURE,
+                ToolCategory.TEXT to BallFaceScene.TEXT,
+                ToolCategory.VISION to BallFaceScene.VISION,
+                ToolCategory.APP to BallFaceScene.APP,
+                ToolCategory.OTHER to BallFaceScene.SAMPLING,
             )
-        assertThat(spec.ringTone).isEqualTo(StatusTone.RUNNING)
-        assertThat(spec.ringKind).isEqualTo(RingKind.NONE)
-        assertThat(spec.haloKind).isEqualTo(HaloKind.NONE)
-        assertThat(spec.innerGlow).isEqualTo(InnerGlowKind.BREATH)
+        for ((category, scene) in expected) {
+            assertThat(ballFaceSceneOf(running(RunState.EXECUTING_TOOLS, category))).isEqualTo(scene)
+        }
+        assertThat(ballFaceSceneOf(running(RunState.EXECUTING_TOOLS, null))).isEqualTo(BallFaceScene.SAMPLING)
     }
 
     @Test
-    fun `running without budget still draws inner breath glow`() {
-        val spec =
-            ballVisualSpec(
-                BallMode.Running(stepCount = 3, progress = null, toolCategory = null),
-                motionEnabled = true,
-            )
-        assertThat(spec.ringKind).isEqualTo(RingKind.NONE)
-        assertThat(spec.innerGlow).isEqualTo(InnerGlowKind.BREATH)
+    fun `several running sessions draw from the mixed pool`() {
+        val mode = running(RunState.EXECUTING_TOOLS, ToolCategory.GESTURE)
+        assertThat(ballFaceSceneOf(mode, sessionCount = 3)).isEqualTo(BallFaceScene.MIXED)
+        assertThat(ballFaceSceneOf(mode, sessionCount = 1)).isEqualTo(BallFaceScene.GESTURE)
     }
 
-    @Test
-    fun `motion off drops inner breath glow too`() {
-        val spec =
-            ballVisualSpec(
-                BallMode.Running(stepCount = 3, progress = 0.5f, toolCategory = null),
-                motionEnabled = false,
-            )
-        assertThat(spec.haloKind).isEqualTo(HaloKind.NONE)
-        assertThat(spec.ringKind).isEqualTo(RingKind.NONE)
-        assertThat(spec.innerGlow).isEqualTo(InnerGlowKind.NONE)
-    }
-
-    @Test
-    fun `waiting answer pulses badge with motion and shows static dot without`() {
-        val on = ballVisualSpec(BallMode.WaitingAnswer, motionEnabled = true)
-        assertThat(on.ringTone).isEqualTo(StatusTone.WAITING)
-        assertThat(on.ringKind).isEqualTo(RingKind.FULL)
-        assertThat(on.haloKind).isEqualTo(HaloKind.PULSE)
-        assertThat(on.badgeKind).isEqualTo(BadgeKind.PULSE)
-        val off = ballVisualSpec(BallMode.WaitingAnswer, motionEnabled = false)
-        assertThat(off.haloKind).isEqualTo(HaloKind.NONE)
-        assertThat(off.badgeKind).isEqualTo(BadgeKind.DOT)
-    }
-
-    @Test
-    fun `paused blocked and accessibility lost use full state rings`() {
-        val paused = ballVisualSpec(BallMode.Paused, motionEnabled = true)
-        assertThat(paused.ringTone).isEqualTo(StatusTone.PAUSED)
-        assertThat(paused.ringKind).isEqualTo(RingKind.FULL)
-        val blocked = ballVisualSpec(BallMode.Blocked, motionEnabled = true)
-        assertThat(blocked.ringTone).isEqualTo(StatusTone.BLOCKED)
-        val lost = ballVisualSpec(BallMode.AccessibilityLost, motionEnabled = true)
-        assertThat(lost.ringTone).isEqualTo(StatusTone.BLOCKED)
-    }
-
-    @Test
-    fun `accessibility lost dims center icon`() {
-        val spec = ballVisualSpec(BallMode.AccessibilityLost, motionEnabled = true)
-        assertThat(spec.iconAlpha).isLessThan(1f)
-    }
-
-    @Test
-    fun `ball description follows mode`() {
-        assertThat(ballDescriptionOf(BallMode.Idle)).isEqualTo(R.string.overlay_ball_description)
-        assertThat(
-            ballDescriptionOf(BallMode.Running(stepCount = 1, progress = null, toolCategory = null)),
-        ).isEqualTo(R.string.overlay_ball_running_description)
-        assertThat(ballDescriptionOf(BallMode.WaitingAnswer)).isEqualTo(R.string.overlay_ball_waiting_description)
-        assertThat(ballDescriptionOf(BallMode.Paused)).isEqualTo(R.string.overlay_ball_paused_description)
-        assertThat(ballDescriptionOf(BallMode.Blocked)).isEqualTo(R.string.overlay_ball_blocked_description)
-        assertThat(ballDescriptionOf(BallMode.AccessibilityLost))
-            .isEqualTo(R.string.overlay_ball_accessibility_lost_description)
-    }
+    private fun running(
+        state: RunState,
+        category: ToolCategory?,
+    ): BallMode.Running = BallMode.Running(stepCount = 1, toolCategory = category, state = state, seed = 1L)
 }

@@ -1,21 +1,15 @@
 package com.example.autop.feature.overlay.ball
 
-import com.example.autop.agent.RunState
-import com.example.autop.core.common.RunId
-import com.example.autop.core.common.ThreadId
-import com.example.autop.task.ActiveRunInfo
-import com.example.autop.task.RunOrigin
-import com.example.autop.task.RunRecord
-import com.example.autop.task.RunStatus
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
 
 class BallMenuLogicTest {
     @Test
-    fun `idle shows create task and open app in order`() {
-        assertThat(deriveBallMenu(null, toolTestEnabled = true, flowsEnabled = true))
+    fun `menu lists sessions first then new task and open app`() {
+        assertThat(deriveBallMenu(toolTestEnabled = true, flowsEnabled = true))
             .isEqualTo(
                 listOf(
+                    BallMenuAction.LIST,
                     BallMenuAction.CREATE_TASK,
                     BallMenuAction.OPEN_APP,
                     BallMenuAction.RECORD,
@@ -25,21 +19,18 @@ class BallMenuLogicTest {
     }
 
     @Test
-    fun `debug switch off hides tool test entry`() {
-        assertThat(deriveBallMenu(null, toolTestEnabled = false, flowsEnabled = true))
+    fun `beta and debug switches only hide their own entries`() {
+        assertThat(deriveBallMenu(toolTestEnabled = false, flowsEnabled = true))
             .isEqualTo(
                 listOf(
+                    BallMenuAction.LIST,
                     BallMenuAction.CREATE_TASK,
                     BallMenuAction.OPEN_APP,
                     BallMenuAction.RECORD,
                 ),
             )
-    }
-
-    @Test
-    fun `active run offers no ball interaction`() {
-        // 执行中交互走顶部控制条＋消息条（N218），悬浮球运行态菜单弃用。
-        assertThat(deriveBallMenu(activeRun(), toolTestEnabled = true, flowsEnabled = true)).isEmpty()
+        assertThat(deriveBallMenu(toolTestEnabled = false, flowsEnabled = false))
+            .isEqualTo(listOf(BallMenuAction.LIST, BallMenuAction.CREATE_TASK, BallMenuAction.OPEN_APP))
     }
 
     @Test
@@ -86,30 +77,5 @@ class BallMenuLogicTest {
             buttonSizePx = 48f,
             itemWidthPx = 76f,
             itemHeightPx = 76f,
-        )
-
-    private fun activeRun(): ActiveRunInfo =
-        ActiveRunInfo(
-            run =
-                RunRecord(
-                    id = RunId("run-1"),
-                    taskId = null,
-                    threadId = ThreadId("thread-1"),
-                    origin = RunOrigin.CHAT,
-                    status = RunStatus.RUNNING,
-                    triggerContext = emptyMap(),
-                    createdAt = 0L,
-                    startedAt = null,
-                    endedAt = null,
-                    summary = null,
-                    errorCode = null,
-                    pauseReason = null,
-                    waitingQuestion = null,
-                    waitingOptions = emptyList(),
-                ),
-            state = RunState.SAMPLING,
-            currentStep = null,
-            stepCount = 1,
-            plan = emptyList(),
         )
 }

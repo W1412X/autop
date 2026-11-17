@@ -22,10 +22,11 @@ internal fun panelSpec(
     context: Context,
     ballPosition: BallPosition,
     screenWidthPx: Int,
+    ballSizeDp: Int,
 ): OverlaySpec {
     val density = context.resources.displayMetrics.density
     val panelWidth = (AutopDimens.overlayPanelWidth.value * density).roundToInt()
-    val ballSize = (AutopDimens.overlayBall.value * density).roundToInt()
+    val ballSize = (ballSizeDp * density).roundToInt()
     val gap = (PANEL_GAP.value * density).roundToInt()
     return OverlaySpec(
         x = panelXOf(ballPosition.x, ballSize, panelWidth, screenWidthPx, gap),

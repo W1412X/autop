@@ -53,7 +53,10 @@ public class PanelController
         /** 展开输入面板（圆弧菜单「即时创建任务」，N182）。 */
         public fun showInput(screenWidthPx: Int) {
             shownState.value = true
-            host.show(OverlayWindowIds.PANEL, panelSpec(context, holder.position.value, screenWidthPx))
+            host.show(
+                OverlayWindowIds.PANEL,
+                panelSpec(context, holder.position.value, screenWidthPx, holder.uiState.value.ballSizeDp),
+            )
         }
 
         /** 收起输入面板。 */

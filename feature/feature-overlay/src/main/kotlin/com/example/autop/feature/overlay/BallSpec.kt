@@ -1,7 +1,7 @@
 /**
- * 悬浮球窗口 spec（docs/tech/08 §5.1）：球 52dp＋光晕外扩、可触摸不可聚焦、按球位置摆放。
- * N217：窗口比球每侧大出 [HALO_PAD]（呼吸光晕画在球外需要余量，见 [BALL_WINDOW_SIZE]），
- * 窗口以球为中心，x/y 为球左上角减去外扩。
+ * 悬浮球窗口 spec（docs/tech/08 §5.1）：球直径来自 `ui.overlay.ballSizeDp`（ADR-0046），
+ * 窗口比球每侧大出余量（呼吸光晕与卫星画在球外需要空间，见 [BallDims.haloPad]），
+ * 窗口以球为中心，x/y 为球左上角减去余量。
  * fullScreen=true（N22x）：默认悬浮窗被摆在系统栏之内、出屏坐标被钳回，贴边/细条形态
  * 的负坐标落不下去（球整体被推进屏内、离屏幕缘一大截）——必须拿物理屏幕坐标系
  * （与触摸盾同口径，见 [com.example.autop.device.OverlaySpec.fullScreen] 说明）。
@@ -9,26 +9,23 @@
 package com.example.autop.feature.overlay
 
 import android.content.Context
+import androidx.compose.ui.unit.dp
 import com.example.autop.device.OverlayGravity
 import com.example.autop.device.OverlaySpec
-import com.example.autop.feature.overlay.ball.BALL_SIZE
-import com.example.autop.feature.overlay.ball.BALL_WINDOW_SIZE
+import com.example.autop.feature.overlay.ball.BallDims
 import com.example.autop.feature.overlay.ball.BallPosition
-import com.example.autop.feature.overlay.ball.HALO_PAD
 import kotlin.math.roundToInt
 
-/** 球边长（px）：拖动钳制、吸附与唤出的基准尺寸。 */
-internal fun ballSizePx(context: Context): Int =
-    (BALL_SIZE.value * context.resources.displayMetrics.density).roundToInt()
-
-/** 球窗口 spec：位置为球左上角偏移外扩后的窗口左上角（px，相对 gravity TOP_LEFT）。 */
+/** 球窗口 spec：位置为球左上角偏移余量后的窗口左上角（px，相对 gravity TOP_LEFT）。 */
 internal fun ballSpec(
     context: Context,
     position: BallPosition,
+    ballSizeDp: Int,
 ): OverlaySpec {
     val density = context.resources.displayMetrics.density
-    val pad = (HALO_PAD.value * density).roundToInt()
-    val size = (BALL_WINDOW_SIZE.value * density).roundToInt()
+    val dims = BallDims(ballSizeDp.dp)
+    val pad = (dims.haloPad.value * density).roundToInt()
+    val size = (dims.windowDp.value * density).roundToInt()
     return OverlaySpec(
         x = position.x - pad,
         y = position.y - pad,

@@ -16,7 +16,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
@@ -29,7 +28,8 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.example.autop.core.ui.component.AutopIcons
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.device.UserActionType
 import com.example.autop.feature.overlay.R
@@ -127,10 +127,8 @@ private fun ActiveHeader(
 ) {
     val spacing = LocalSpacing.current
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(spacing.sm)) {
-        Icon(
-            imageVector = AutopIcons.Record,
-            contentDescription = null,
-            tint = MaterialTheme.colorScheme.error,
+        AutopBallFace(
+            mood = if (state.trialing) BallFaceMood.RUNNING else BallFaceMood.RECORDING,
             modifier = Modifier.size(spacing.lg),
         )
         Text(

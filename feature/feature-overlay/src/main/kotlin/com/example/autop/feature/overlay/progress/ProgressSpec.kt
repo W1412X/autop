@@ -28,13 +28,14 @@ private const val FALLBACK_MARGIN_DP: Float = 16f
 internal fun progressSpec(
     context: Context,
     ballPosition: BallPosition,
+    ballSizeDp: Int,
 ): OverlaySpec {
     val metrics = context.resources.displayMetrics
     val density = metrics.density
     val screenWidth = metrics.widthPixels
     val screenHeight = metrics.heightPixels
     val panelWidth = (AutopDimens.overlayPanelWidth.value * density).roundToInt()
-    val ballSize = (AutopDimens.overlayBall.value * density).roundToInt()
+    val ballSize = (ballSizeDp * density).roundToInt()
     val gap = (PANEL_GAP.value * density).roundToInt()
     val height = (screenHeight * HEIGHT_FRACTION).roundToInt()
     val ballX =

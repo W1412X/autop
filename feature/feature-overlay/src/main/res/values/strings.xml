@@ -40,6 +40,14 @@
     <string name="ball_menu_abort">中止任务</string>
     <string name="ball_menu_tool_test">工具测试</string>
     <string name="ball_menu_record">录制流程</string>
+    <string name="ball_menu_list">运行中的会话</string>
+    <string name="ball_menu_sessions_count">%1$d 个</string>
+    <string name="ball_menu_sessions_empty">暂无运行中的会话</string>
+    <string name="ball_menu_session_untitled">未命名对话</string>
+    <string name="ball_menu_session_waiting">等待你的回答</string>
+    <string name="ball_menu_session_blocked">已被拦截，需要你决定</string>
+    <string name="ball_menu_session_paused">已暂停</string>
+    <string name="ball_menu_session_running">运行中</string>
 
     <!-- 配对卡（无线调试配对码输入小窗） -->
     <string name="pairing_card_title">发现可配对设备</string>
@@ -100,7 +108,6 @@
     <string name="record_default_name">录制的流程</string>
 
     <!-- 顶部运行控制条（执行期胶囊升级） -->
-    <string name="run_bar_running">%1$s · 第 %2$d 步</string>
     <string name="run_bar_stop">中止</string>
 
     <!-- 任务进度悬浮窗（docs/tech/08 §5.3，N182） -->

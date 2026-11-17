@@ -19,9 +19,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopInputBar
-import com.example.autop.core.ui.component.AutopModelSelector
+import com.example.autop.core.ui.component.AutopModelChip
+import com.example.autop.core.ui.component.AutopModelPicker
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.OptionItem
+import com.example.autop.core.ui.component.rememberAutopModelPickerState
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.overlay.R
 
@@ -37,6 +39,7 @@ internal fun InputPanel(
 ) {
     var text by remember { mutableStateOf("") }
     var modelProfileId by remember { mutableStateOf<String?>(null) }
+    val picker = rememberAutopModelPickerState()
     val spacing = LocalSpacing.current
     AutopInputBar(
         value = text,
@@ -53,11 +56,11 @@ internal fun InputPanel(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        AutopModelSelector(
+        AutopModelChip(
+            state = picker,
             selectedId = modelProfileId,
             profiles = modelOptions,
             enabled = true,
-            onSelect = { modelProfileId = it },
         )
         Spacer(modifier = Modifier.weight(1f))
         AutopIconButton(
@@ -71,4 +74,12 @@ internal fun InputPanel(
             },
         )
     }
+    // 悬浮窗里不能开弹层（Dialog 需要 Activity 窗口 token，否则闪退），列表就地展开，面板窗口高度随内容增长。
+    AutopModelPicker(
+        state = picker,
+        selectedId = modelProfileId,
+        profiles = modelOptions,
+        onSelect = { modelProfileId = it },
+        inline = true,
+    )
 }

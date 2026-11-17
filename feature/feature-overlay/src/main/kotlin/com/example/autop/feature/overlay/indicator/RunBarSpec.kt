@@ -6,6 +6,11 @@
 package com.example.autop.feature.overlay.indicator
 
 import com.example.autop.agent.PauseReason
+import com.example.autop.core.ui.component.ballface.BallFaceDirector
+import com.example.autop.core.ui.component.ballface.BallFaceMood
+import com.example.autop.core.ui.component.ballface.BallFaceScene
+import com.example.autop.feature.overlay.ball.ballFaceSceneOf
+import com.example.autop.feature.overlay.ball.categoryOfTool
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunStatus
 
@@ -23,10 +28,14 @@ internal enum class RunBarAction {
 
 /** 控制条状态提示。 */
 internal sealed interface RunBarHint {
-    /** 运行中：标题（[hintTitleOf] 变体文案）+ 步数。 */
+    /**
+     * 运行中：标题（[hintTitleOf] 变体文案）。不显示步数：没有真实总量，步数只是计数。
+     * [scene] 与 [seed] 与悬浮球同源（同一事件得到同一张脸）。
+     */
     data class Running(
         val title: String,
-        val stepCount: Int,
+        val scene: BallFaceScene,
+        val seed: Long,
     ) : RunBarHint
 
     /** 已暂停。 */
@@ -67,7 +76,8 @@ internal fun runBarSpecOf(
             else ->
                 RunBarHint.Running(
                     title = hintTitleOf(active, previousHint, roll),
-                    stepCount = active.stepCount,
+                    scene = ballFaceSceneOf(active.state, active.toolId?.let(::categoryOfTool)),
+                    seed = BallFaceDirector.seedOfEvent(active.run.id.value, active.stepCount),
                 )
         }
     val buttons =
@@ -78,3 +88,13 @@ internal fun runBarSpecOf(
         }
     return RunBarSpec(hint = hint, buttons = buttons)
 }
+
+/** 控制条前导表情：与悬浮球同一套状态 → 表情口径（P1-8）。 */
+internal fun runBarFaceOf(hint: RunBarHint): BallFaceMood =
+    when (hint) {
+        is RunBarHint.Running -> BallFaceMood.RUNNING
+        RunBarHint.Paused -> BallFaceMood.PAUSED
+        RunBarHint.Blocked -> BallFaceMood.BLOCKED
+        RunBarHint.Waiting -> BallFaceMood.WAITING
+        RunBarHint.Queued -> BallFaceMood.IDLE
+    }

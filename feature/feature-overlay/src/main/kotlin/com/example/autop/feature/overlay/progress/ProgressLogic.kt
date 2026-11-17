@@ -10,6 +10,7 @@ import com.example.autop.agent.PauseReason
 import com.example.autop.agent.RunOutcome
 import com.example.autop.core.thread.ui.TimelineEntry
 import com.example.autop.core.thread.ui.TimelineItem
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.overlay.R
 import com.example.autop.task.ActiveRunInfo
@@ -96,6 +97,48 @@ public fun progressHeaderSpec(
                 hint = null,
                 runControls = false,
             )
+    }
+
+/**
+ * 头部表情：运行中按暂停/等待/拦截优先，结束后按结果，未开始为空闲。
+ * 与 [progressHeaderSpec] 同源，避免色条和表情说两种话。
+ */
+internal fun progressFaceMoodOf(
+    active: ActiveRunInfo?,
+    finished: TimelineItem.RunMeta?,
+): BallFaceMood =
+    when {
+        active != null -> {
+            val status = active.run.status
+            when {
+                active.run.pauseReason == PauseReason.POLICY_BLOCKED -> BallFaceMood.BLOCKED
+                active.run.waitingQuestion != null -> BallFaceMood.WAITING
+                status == RunStatus.PAUSED -> BallFaceMood.PAUSED
+                status == RunStatus.WAITING_USER || status == RunStatus.WAITING_SCREEN -> BallFaceMood.WAITING
+                status == RunStatus.RUNNING -> BallFaceMood.RUNNING
+                status == RunStatus.SUCCEEDED -> BallFaceMood.SUCCESS
+                status in failureStatuses -> BallFaceMood.FAILURE
+                else -> BallFaceMood.IDLE
+            }
+        }
+        finished != null -> moodOfOutcome(finished.outcome)
+        else -> BallFaceMood.IDLE
+    }
+
+private val failureStatuses =
+    setOf(
+        RunStatus.FAILED,
+        RunStatus.BUDGET_EXHAUSTED,
+        RunStatus.BREAKER_STOPPED,
+        RunStatus.BLOCKED,
+    )
+
+private fun moodOfOutcome(outcome: RunOutcome): BallFaceMood =
+    when (outcome) {
+        RunOutcome.SUCCEEDED -> BallFaceMood.SUCCESS
+        RunOutcome.FAILED, RunOutcome.BREAKER_STOPPED -> BallFaceMood.FAILURE
+        RunOutcome.BUDGET_EXHAUSTED, RunOutcome.INTERRUPTED -> BallFaceMood.PAUSED
+        RunOutcome.CANCELLED, RunOutcome.EXPIRED -> BallFaceMood.IDLE
     }
 
 /**

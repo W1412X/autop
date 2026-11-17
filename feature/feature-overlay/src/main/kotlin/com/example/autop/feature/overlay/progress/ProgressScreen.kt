@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -31,6 +32,8 @@ import com.example.autop.core.ui.component.AutopIconButton
 import com.example.autop.core.ui.component.AutopIcons
 import com.example.autop.core.ui.component.AutopTonalButton
 import com.example.autop.core.ui.component.StatusChip
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.LocalSemanticColors
 import com.example.autop.core.ui.theme.LocalSpacing
@@ -67,9 +70,11 @@ internal fun ProgressScreen(
                 ).padding(all = spacing.md),
         verticalArrangement = Arrangement.spacedBy(spacing.sm),
     ) {
-        val header = progressHeaderSpec(active = active, finished = finishedMetaOf(entries))
+        val finished = finishedMetaOf(entries)
+        val header = progressHeaderSpec(active = active, finished = finished)
         HeaderBlock(
             header = header,
+            faceMood = progressFaceMoodOf(active = active, finished = finished),
             currentStep = flowHintOf(active) ?: active?.currentStep,
             onClose = callbacks.onClose,
         )
@@ -87,12 +92,13 @@ internal fun ProgressScreen(
 }
 
 /**
- * 头部（N185）：状态色条 + 氛围色头部块（标题/状态徽标/关闭）+ 提示行；
+ * 头部（N185/N247）：状态色条 + 氛围色头部块（表情/标题/状态徽标/关闭）+ 提示行；
  * 色条与氛围色随状态语义过渡，提示行在等待回答/暂停/拦截与当前步骤间切换。
  */
 @Composable
 private fun HeaderBlock(
     header: ProgressHeaderSpec,
+    faceMood: BallFaceMood,
     currentStep: String?,
     onClose: () -> Unit,
     modifier: Modifier = Modifier,
@@ -129,28 +135,46 @@ private fun HeaderBlock(
                     ).padding(all = spacing.sm),
             verticalArrangement = Arrangement.spacedBy(spacing.xs),
         ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(spacing.sm),
-            ) {
-                Text(
-                    text = stringResource(R.string.progress_title),
-                    style = MaterialTheme.typography.titleSmall,
-                    maxLines = 1,
-                    modifier = Modifier.weight(1f),
-                )
-                StatusChip(
-                    text = stringResource(header.chipText),
-                    tone = header.tone,
-                )
-                AutopIconButton(
-                    icon = AutopIcons.Close,
-                    contentDescription = stringResource(R.string.progress_close),
-                    onClick = onClose,
-                )
-            }
+            HeaderTitleRow(
+                faceMood = faceMood,
+                header = header,
+                onClose = onClose,
+            )
             HeaderHint(hint = header.hint, currentStep = currentStep, tint = foreground)
         }
+    }
+}
+
+@Composable
+private fun HeaderTitleRow(
+    faceMood: BallFaceMood,
+    header: ProgressHeaderSpec,
+    onClose: () -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(spacing.sm),
+    ) {
+        AutopBallFace(
+            mood = faceMood,
+            modifier = Modifier.size(30.dp),
+        )
+        Text(
+            text = stringResource(R.string.progress_title),
+            style = MaterialTheme.typography.titleSmall,
+            maxLines = 1,
+            modifier = Modifier.weight(1f),
+        )
+        StatusChip(
+            text = stringResource(header.chipText),
+            tone = header.tone,
+        )
+        AutopIconButton(
+            icon = AutopIcons.Close,
+            contentDescription = stringResource(R.string.progress_close),
+            onClick = onClose,
+        )
     }
 }
 

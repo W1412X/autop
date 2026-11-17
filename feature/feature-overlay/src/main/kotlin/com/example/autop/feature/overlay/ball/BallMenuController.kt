@@ -8,11 +8,18 @@ package com.example.autop.feature.overlay.ball
 import android.content.Context
 import android.view.View
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.dp
+import com.example.autop.agent.ThreadStore
+import com.example.autop.core.common.DispatcherProvider
+import com.example.autop.core.common.Logger
+import com.example.autop.core.common.ThreadId
+import com.example.autop.core.common.exceptionHandler
 import com.example.autop.core.config.BetaFeature
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.FeaturesConfig
@@ -28,8 +35,15 @@ import com.example.autop.feature.overlay.panel.PanelRunActions
 import com.example.autop.feature.overlay.probe.ProbeController
 import com.example.autop.feature.overlay.progress.ProgressController
 import com.example.autop.feature.overlay.record.RecordController
+import com.example.autop.task.RunService
 import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -48,8 +62,25 @@ public class BallMenuController
         private val probeController: ProbeController,
         private val recordController: RecordController,
         private val configProvider: ConfigProvider,
+        private val runService: RunService,
+        private val threadStore: ThreadStore,
+        dispatchers: DispatcherProvider,
+        logger: Logger,
     ) {
         private val openState = MutableStateFlow(false)
+
+        private val scope =
+            CoroutineScope(SupervisorJob() + dispatchers.main + logger.exceptionHandler("BallMenuController"))
+
+        /**
+         * 菜单会话小脸（列表按钮用）：随未收口会话与标题预先计算并保持最新。
+         * 菜单弹出时已经有当前值；若让 Composable 自己异步计算，首帧会是空列表，列表按钮先灰、再变成小脸，肉眼可见地闪一下。
+         */
+        private val menuSessions: StateFlow<List<MenuSession>> =
+            runService
+                .observeOpenRuns()
+                .map { open -> menuSessionsOf(open, threadStore::titleOf) }
+                .stateIn(scope, SharingStarted.Eagerly, emptyList())
 
         /** 菜单窗口内容工厂（app 组装层注册到 `OverlayWindowManager`）。 */
         public fun menuFactory(): (Context, OverlayLifecycleOwner) -> View =
@@ -82,12 +113,14 @@ public class BallMenuController
         /** 菜单内容：按钮集合随活跃 Run 条件变化，位置环绕球心。 */
         @Composable
         private fun MenuContent() {
-            val active by actions.active.collectAsState()
             val config by configProvider.observe().collectAsState()
+            val openRuns by runService.observeOpenRuns().collectAsState()
+            val sessions by menuSessions.collectAsState()
             val position by holder.position.collectAsState()
             val density = LocalDensity.current
             val windowSize = LocalWindowInfo.current.containerSize
-            val ballSizePx = with(density) { BALL_SIZE.toPx() }
+            val ballSizeDp = config[UiConfig.OVERLAY].ballSizeDp
+            val ballSizePx = with(density) { ballSizeDp.dp.toPx() }
             val centerX =
                 if (position.x == BallStateHolder.UNSET) {
                     windowSize.width / 2f
@@ -102,19 +135,24 @@ public class BallMenuController
                 }
             val callbacks =
                 remember(this) {
-                    BallMenuCallbacks(onAction = ::onAction, onDismiss = ::dismiss)
+                    BallMenuCallbacks(onAction = ::onAction, onOpenSession = ::onOpenSession, onDismiss = ::dismiss)
                 }
-            BallMenuScreen(
-                actions =
-                    deriveBallMenu(
-                        active = active,
-                        toolTestEnabled = config[UiConfig.DEBUG].verboseLogging,
-                        flowsEnabled = config[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS),
-                    ),
-                ballCenterX = centerX,
-                ballCenterY = centerY,
-                callbacks = callbacks,
-            )
+            CompositionLocalProvider(LocalBallDims provides BallDims(ballSizeDp.dp)) {
+                BallMenuScreen(
+                    actions =
+                        deriveBallMenu(
+                            toolTestEnabled = config[UiConfig.DEBUG].verboseLogging,
+                            flowsEnabled = config[FeaturesConfig.FEATURES].isEnabled(BetaFeature.FLOWS),
+                            running = openRuns.isNotEmpty(),
+                            showActionsWhileRunning = config[UiConfig.APPEARANCE].petMenuActionsWhileRunning,
+                        ),
+                    sessions = sessions,
+                    motionEnabled = config[UiConfig.APPEARANCE].motionEnabled,
+                    ballCenterX = centerX,
+                    ballCenterY = centerY,
+                    callbacks = callbacks,
+                )
+            }
         }
 
         /** 动作分发（先收起菜单再执行，N182）。
@@ -125,6 +163,7 @@ public class BallMenuController
         private fun onAction(action: BallMenuAction) {
             dismiss()
             when (action) {
+                BallMenuAction.LIST -> Unit
                 BallMenuAction.CREATE_TASK -> panelController.showInput(screenWidthPx())
                 BallMenuAction.OPEN_APP -> actions.openApp()
                 BallMenuAction.VIEW_PROGRESS -> progressController.show()
@@ -132,6 +171,12 @@ public class BallMenuController
                 BallMenuAction.RECORD -> recordController.show()
                 BallMenuAction.TOOL_TEST -> probeController.show()
             }
+        }
+
+        /** 打开运行中会话的对话页（与通知点击同一路径，ThreadLaunchExtras）。 */
+        private fun onOpenSession(threadId: ThreadId) {
+            dismiss()
+            actions.openThread(threadId)
         }
 
         private fun screenWidthPx(): Int = context.resources.displayMetrics.widthPixels

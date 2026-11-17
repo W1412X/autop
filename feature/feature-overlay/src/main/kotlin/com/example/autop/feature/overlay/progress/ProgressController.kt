@@ -189,7 +189,10 @@ public class ProgressController
         public fun show() {
             if (visibleState.value) return
             visibleState.value = true
-            host.show(OverlayWindowIds.PROGRESS, progressSpec(context, holder.position.value))
+            host.show(
+                OverlayWindowIds.PROGRESS,
+                progressSpec(context, holder.position.value, holder.uiState.value.ballSizeDp),
+            )
         }
 
         /** 收起进度悬浮窗。 */

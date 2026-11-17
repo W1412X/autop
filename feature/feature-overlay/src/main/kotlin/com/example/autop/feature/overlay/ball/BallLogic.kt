@@ -8,48 +8,63 @@
  */
 package com.example.autop.feature.overlay.ball
 
-import com.example.autop.agent.PauseReason
+import com.example.autop.agent.RunState
+import com.example.autop.core.ui.component.ballface.BallFaceDirector
 import com.example.autop.task.ActiveRunInfo
-import com.example.autop.task.RunStatus
+import com.example.autop.task.RunRecord
 import kotlin.math.roundToInt
 
 /**
- * 由活跃 Run、无障碍连接状态推导球状态（docs/tech/08 §5.1 表）。
+ * 由全部未收口会话、活跃 Run 与无障碍连接状态推导球状态（N226）。
  *
- * 优先级：无障碍断开（球仍在 application 通道可见时的提醒）> 被拦截 >
- * 等待回答 > 已暂停 > 运行中 > 空闲。
- *
- * @param maxSteps 步数预算（`agent.budget.maxSteps`），非正时进度为 null。
+ * 优先级：无障碍断开 > 录制（仅无会话时）> 拦截 > 等待回答 > 运行中 > 已暂停 > 空闲。
+ * 任一会话被拦截或等待你的回答时，球以该状态为准；其它会话的进展不再左右表情。
+ * 运行中的数字（会话数）由 [BallUiState.sessionCount] 给出，这里只决定状态。
  */
 public fun deriveBallMode(
     active: ActiveRunInfo?,
+    openRuns: Collection<RunRecord>,
     accessibilityConnected: Boolean,
-    maxSteps: Int,
     toolCategory: ToolCategory?,
     recording: Boolean = false,
 ): BallMode {
-    val run = active?.run
+    val statuses = openRuns.map(::menuSessionStatusOf).toSet()
     return when {
         !accessibilityConnected -> BallMode.AccessibilityLost
-        recording && run == null -> BallMode.Recording
-        run == null -> BallMode.Idle
-        run.pauseReason == PauseReason.POLICY_BLOCKED -> BallMode.Blocked
-        run.waitingQuestion != null -> BallMode.WaitingAnswer
-        run.status == RunStatus.PAUSED -> BallMode.Paused
-        else -> BallMode.Running(active.stepCount, progressOf(active.stepCount, maxSteps), toolCategory)
+        openRuns.isEmpty() -> if (recording) BallMode.Recording else BallMode.Idle
+        MenuSessionStatus.BLOCKED in statuses -> BallMode.Blocked
+        MenuSessionStatus.WAITING in statuses -> BallMode.WaitingAnswer
+        MenuSessionStatus.RUNNING in statuses -> runningMode(active, openRuns, toolCategory)
+        else -> BallMode.Paused
     }
 }
 
-/** 步数进度（0f..1f）；预算非正返回 null。 */
-public fun progressOf(
-    stepCount: Int,
-    maxSteps: Int,
-): Float? =
-    if (maxSteps <= 0) {
-        null
-    } else {
-        (stepCount.toFloat() / maxSteps).coerceIn(0f, 1f)
+/**
+ * 运行中：活跃会话正在运行时取它的执行阶段与工具类别（单会话语义）；否则任取一个运行中的会话，
+ * 阶段按思考处理。
+ */
+private fun runningMode(
+    active: ActiveRunInfo?,
+    openRuns: Collection<RunRecord>,
+    toolCategory: ToolCategory?,
+): BallMode.Running {
+    val focus = active?.takeIf { menuSessionStatusOf(it.run) == MenuSessionStatus.RUNNING }
+    if (focus != null) {
+        return BallMode.Running(
+            stepCount = focus.stepCount,
+            toolCategory = toolCategory,
+            state = focus.state,
+            seed = BallFaceDirector.seedOfEvent(focus.run.id.value, focus.stepCount),
+        )
     }
+    val run = openRuns.first { menuSessionStatusOf(it) == MenuSessionStatus.RUNNING }
+    return BallMode.Running(
+        stepCount = 0,
+        toolCategory = null,
+        state = RunState.SAMPLING,
+        seed = BallFaceDirector.seedOfEvent(run.id.value, 0),
+    )
+}
 
 /** 工具 id → 类别（tool.* 前缀按动作语义归类；docs/tech/08 §5.1）。 */
 public fun categoryOfTool(toolName: String): ToolCategory =

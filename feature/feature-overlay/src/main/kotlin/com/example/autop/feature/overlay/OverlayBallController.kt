@@ -10,17 +10,23 @@ import android.content.Intent
 import android.provider.Settings
 import android.view.View
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.unit.dp
+import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.UiConfig
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayHost
 import com.example.autop.feature.overlay.ball.BallCallbacks
+import com.example.autop.feature.overlay.ball.BallDims
 import com.example.autop.feature.overlay.ball.BallMenuController
 import com.example.autop.feature.overlay.ball.BallPosition
 import com.example.autop.feature.overlay.ball.BallPositionStore
 import com.example.autop.feature.overlay.ball.BallScreen
 import com.example.autop.feature.overlay.ball.BallStateHolder
+import com.example.autop.feature.overlay.ball.LocalBallDims
 import com.example.autop.task.RunService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
@@ -38,6 +44,7 @@ public class OverlayBallController
         private val holder: BallStateHolder,
         private val positionStore: BallPositionStore,
         private val ballMenuController: BallMenuController,
+        private val configProvider: ConfigProvider,
     ) : BallCallbacks {
         /** 球窗口内容工厂（app 组装层注册到 `OverlayWindowManager`）。 */
         public fun ballFactory(): (Context, OverlayLifecycleOwner) -> View =
@@ -47,7 +54,11 @@ public class OverlayBallController
 
         /** 显示球窗口（通道可用时附着；位置取持久化值或原点，首帧摆放默认位置）。 */
         public fun start() {
-            host.show(OverlayWindowIds.BALL, ballSpec(context, positionStore.load() ?: BallPosition(0, 0)))
+            val ballSizeDp = configProvider.current()[UiConfig.OVERLAY].ballSizeDp
+            host.show(
+                OverlayWindowIds.BALL,
+                ballSpec(context, positionStore.load() ?: BallPosition(0, 0), ballSizeDp),
+            )
         }
 
         /** 隐藏球窗口（`ui.overlay.enabled` 关闭时调用）。 */
@@ -117,11 +128,14 @@ public class OverlayBallController
         private fun BallContent() {
             val uiState by holder.uiState.collectAsState()
             val position by holder.position.collectAsState()
-            LaunchedEffect(position) {
+            val ballSizeDp = uiState.ballSizeDp
+            LaunchedEffect(position, ballSizeDp) {
                 if (position.x != BallStateHolder.UNSET) {
-                    host.update(OverlayWindowIds.BALL, ballSpec(context, position))
+                    host.update(OverlayWindowIds.BALL, ballSpec(context, position, ballSizeDp))
                 }
             }
-            BallScreen(uiState, position, callbacks = this)
+            CompositionLocalProvider(LocalBallDims provides BallDims(ballSizeDp.dp)) {
+                BallScreen(uiState, position, callbacks = this)
+            }
         }
     }

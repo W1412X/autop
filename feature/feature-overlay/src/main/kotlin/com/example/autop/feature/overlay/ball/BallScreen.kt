@@ -49,12 +49,12 @@ internal fun BallScreen(
 ) {
     val density = LocalDensity.current
     // N192：屏幕尺寸取真实 Display 尺寸（LocalConfiguration 随旋转重组，横竖屏都正确）；
-    // 不能用 LocalWindowInfo.containerSize——那是球窗口自身尺寸（52dp），
+    // 不能用 LocalWindowInfo.containerSize——那是球窗口自身尺寸（球直径加余量），
     // 拖动钳制会把球钉在原地附近，拖不到屏幕边缘。
     val config = LocalConfiguration.current
     val screenWidthPx = with(density) { config.screenWidthDp.dp.toPx() }.roundToInt()
     val screenHeightPx = with(density) { config.screenHeightDp.dp.toPx() }.roundToInt()
-    val ballSizePx = with(density) { BALL_SIZE.toPx() }.roundToInt()
+    val ballSizePx = with(density) { uiState.ballSizeDp.dp.toPx() }.roundToInt()
     val sliverPx = with(density) { SLIVER_WIDTH.toPx() }.roundToInt()
     val magnetPx = with(density) { MAGNET_SIZE.toPx() }.roundToInt()
     val viewport =
@@ -94,7 +94,7 @@ internal fun BallScreen(
                 }.ballGestures(tap, callbacks, current),
     ) {
         when (position.dock) {
-            BallDock.SLIVER -> BallSliver(uiState, position.side)
+            BallDock.SLIVER -> BallSliver(position.side)
             BallDock.EDGE, BallDock.NONE -> BallVisual(uiState)
         }
     }
