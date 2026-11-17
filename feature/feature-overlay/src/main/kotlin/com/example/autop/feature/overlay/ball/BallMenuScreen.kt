@@ -122,8 +122,11 @@ private const val BADGE_MAX: Int = 99
 /** 待机浮动：每个按钮的半周期错开量（毫秒）。 */
 private const val BOB_STEP_MS: Long = 130L
 
-/** 弹出时的弹簧阻尼（略带回弹）。 */
-private const val ENTER_DAMPING: Float = 0.55f
+/** 弹出时的弹簧阻尼：临界阻尼（无超调），按钮只朝圆弧目标单调移动，不先冲过头再收回。 */
+private const val ENTER_DAMPING: Float = Spring.DampingRatioNoBouncy
+
+/** 按下/松开的弹簧阻尼（略带回弹，松开时轻微回弹）。 */
+private const val PRESS_DAMPING: Float = 0.55f
 
 /** 圆弧菜单回调（由 BallMenuController 实现）。 */
 internal class BallMenuCallbacks(
@@ -243,7 +246,7 @@ private fun MenuButton(
     val pressed by interaction.collectIsPressedAsState()
     val press by animateFloatAsState(
         targetValue = if (pressed) PRESS_SCALE else 1f,
-        animationSpec = spring(dampingRatio = ENTER_DAMPING, stiffness = Spring.StiffnessMedium),
+        animationSpec = spring(dampingRatio = PRESS_DAMPING, stiffness = Spring.StiffnessMedium),
         label = "ball_menu_press",
     )
     val bob = rememberBreath(BOB_HALF_PERIOD_MS + index * BOB_STEP_MS, enabled = motion)
