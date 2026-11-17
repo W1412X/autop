@@ -9,6 +9,9 @@ package com.example.autop.core.ui.theme
 import androidx.annotation.ChecksSdkIntAtLeast
 import androidx.compose.runtime.Immutable
 import com.example.autop.core.config.UiAppearanceSection
+import com.example.autop.core.ui.component.ballface.BallFaceColor
+import com.example.autop.core.ui.component.ballface.BallFaceDirector
+import com.example.autop.core.ui.component.ballface.BallFaceVariant
 
 /** 深色模式选项。 */
 public enum class DarkMode {
@@ -46,6 +49,14 @@ public data class AppearanceSettings(
     public val iconScale: Float = 1f,
     public val density: UiDensity = UiDensity.STANDARD,
     public val motionEnabled: Boolean = true,
+    /** 球体形态（悬浮球、控制条、卡片、横幅统一读取）。 */
+    public val ballShape: BallFaceVariant = BallFaceVariant.SOLID,
+    /** 悬浮球颜色：跟随主题色或固定黑、白（ADR-0045）。 */
+    public val ballColor: BallFaceColor = BallFaceColor.THEME,
+    /** 表情换脸间隔（毫秒，ADR-0045）。 */
+    public val petRerollMs: Long = BallFaceDirector.THINK_REROLL_MS,
+    /** 表情最短驻留（毫秒，ADR-0045）：0 表示不驻留。 */
+    public val petFaceMinHoldMs: Long = BallFaceDirector.MIN_HOLD_MS,
 )
 
 /**
@@ -67,6 +78,10 @@ public fun UiAppearanceSection.toAppearanceSettings(
         iconScale = iconScale.toFloat(),
         density = UiDensity.entries.firstOrNull { it.name == density } ?: UiDensity.STANDARD,
         motionEnabled = motionEnabled && systemAnimationsEnabled,
+        ballShape = BallFaceVariant.entries.firstOrNull { it.name == ballShape } ?: BallFaceVariant.SOLID,
+        ballColor = BallFaceColor.entries.firstOrNull { it.name == ballColor } ?: BallFaceColor.THEME,
+        petRerollMs = petRerollMs,
+        petFaceMinHoldMs = petFaceMinHoldMs,
     )
 
 /** 动态取色最低 API（Android 12 / S）。 */

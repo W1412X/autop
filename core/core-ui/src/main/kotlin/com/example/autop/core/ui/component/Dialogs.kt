@@ -145,39 +145,58 @@ public fun OptionSheet(
         sheetState = sheetState,
         shape = MaterialTheme.shapes.extraLarge,
     ) {
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
-                    .padding(bottom = LocalSpacing.current.xl),
-            verticalArrangement = Arrangement.spacedBy(AutopDimens.optionRowGap),
-        ) {
-            if (title != null) {
-                Text(
-                    text = title,
-                    style = MaterialTheme.typography.titleMedium,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier =
-                        Modifier.padding(
-                            start = LocalSpacing.current.lg,
-                            end = LocalSpacing.current.lg,
-                            top = LocalSpacing.current.sm,
-                            bottom = LocalSpacing.current.xs,
-                        ),
-                )
-            }
-            options.forEach { item ->
-                OptionSheetRow(
-                    item = item,
-                    selected = item.id == selectedId,
-                    onClick = {
-                        onSelect(item.id)
-                        onDismiss()
-                    },
-                )
-            }
+        OptionList(
+            title = title,
+            options = options,
+            selectedId = selectedId,
+            onPick = { id ->
+                onSelect(id)
+                onDismiss()
+            },
+        )
+    }
+}
+
+/**
+ * 选项列表本体：弹层（[OptionSheet]）与内嵌选择（overlay 的模型选择）共用，行样式与交互完全一致。
+ * 可滚动；调用方负责给出有界高度。
+ */
+@Composable
+internal fun OptionList(
+    title: String?,
+    options: List<OptionItem>,
+    selectedId: String?,
+    onPick: (String) -> Unit,
+) {
+    Column(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(bottom = LocalSpacing.current.xl),
+        verticalArrangement = Arrangement.spacedBy(AutopDimens.optionRowGap),
+    ) {
+        if (title != null) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier =
+                    Modifier.padding(
+                        start = LocalSpacing.current.lg,
+                        end = LocalSpacing.current.lg,
+                        top = LocalSpacing.current.sm,
+                        bottom = LocalSpacing.current.xs,
+                    ),
+            )
+        }
+        options.forEach { item ->
+            OptionSheetRow(
+                item = item,
+                selected = item.id == selectedId,
+                onClick = { onPick(item.id) },
+            )
         }
     }
 }

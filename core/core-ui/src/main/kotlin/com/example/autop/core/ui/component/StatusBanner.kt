@@ -37,6 +37,7 @@ import com.example.autop.core.ui.theme.tone
  * @param modifier 组合修饰。
  * @param title 标题（titleSmall；null 表示无标题的单行说明式横幅）。
  * @param actions 操作按钮行（放 [AutopTonalButton] 等；null 表示无操作）。
+ * @param leading 自定义前置图形（如表情脸）；null 时用语义图标。
  */
 @Composable
 public fun StatusBanner(
@@ -46,6 +47,7 @@ public fun StatusBanner(
     title: String? = null,
     actions: (@Composable RowScope.() -> Unit)? = null,
     compact: Boolean = false,
+    leading: (@Composable () -> Unit)? = null,
 ) {
     if (compact) {
         CompactStatusBanner(tone = tone, message = message, modifier = modifier, actions = actions)
@@ -59,12 +61,16 @@ public fun StatusBanner(
                 .padding(LocalSpacing.current.md),
         verticalAlignment = Alignment.Top,
     ) {
-        Icon(
-            imageVector = statusToneIcon(tone),
-            contentDescription = null,
-            modifier = Modifier.size(IconSize.Sm.scaled()),
-            tint = semantic.foreground,
-        )
+        if (leading != null) {
+            leading()
+        } else {
+            Icon(
+                imageVector = statusToneIcon(tone),
+                contentDescription = null,
+                modifier = Modifier.size(IconSize.Sm.scaled()),
+                tint = semantic.foreground,
+            )
+        }
         Spacer(modifier = Modifier.width(LocalSpacing.current.sm))
         Column(modifier = Modifier.weight(1f)) {
             if (title != null) {

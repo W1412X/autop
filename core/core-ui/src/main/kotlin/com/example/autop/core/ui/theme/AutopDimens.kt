@@ -43,7 +43,6 @@ public object AutopDimens {
 
     /** 运行过程截图展开后的显示宽度（高度按原图比例）。 */
     public val stepScreenshotWidth: Dp = 220.dp
-    public val overlayBall: Dp = 52.dp
     public val overlayPanelWidth: Dp = 300.dp
     public val minTouchTarget: Dp = 48.dp
 

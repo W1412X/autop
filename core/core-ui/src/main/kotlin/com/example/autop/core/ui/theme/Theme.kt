@@ -14,12 +14,31 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.ProvidableCompositionLocal
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.platform.LocalContext
+import com.example.autop.core.ui.component.ballface.BallFaceColor
+import com.example.autop.core.ui.component.ballface.BallFaceDirector
+import com.example.autop.core.ui.component.ballface.BallFaceVariant
 
 /**
  * 动效总开关。false 时所有动效静止（shimmer、悬浮球呼吸、展开动画等，
  * docs/tech/08 §6）：用户关闭动效或系统动画缩放为 0。
  */
 public val LocalMotionEnabled: ProvidableCompositionLocal<Boolean> = staticCompositionLocalOf { true }
+
+/** 球体形态（设置页 `ui.appearance.ballShape`）：所有表情表面统一读取。 */
+public val LocalBallShape: ProvidableCompositionLocal<BallFaceVariant> =
+    staticCompositionLocalOf { BallFaceVariant.SOLID }
+
+/** 悬浮球颜色（设置页 `ui.appearance.ballColor`）：所有表情表面统一读取。 */
+public val LocalBallFaceColor: ProvidableCompositionLocal<BallFaceColor> =
+    staticCompositionLocalOf { BallFaceColor.THEME }
+
+/** 表情换脸间隔（设置页 `ui.appearance.petRerollMs`，毫秒）：多会话混合池与思考段共用。 */
+public val LocalBallRerollMs: ProvidableCompositionLocal<Long> =
+    staticCompositionLocalOf { BallFaceDirector.THINK_REROLL_MS }
+
+/** 表情最短驻留（设置页 `ui.appearance.petFaceMinHoldMs`，毫秒，0 = 不驻留）：所有小脸共用。 */
+public val LocalBallFaceMinHoldMs: ProvidableCompositionLocal<Long> =
+    staticCompositionLocalOf { BallFaceDirector.MIN_HOLD_MS }
 
 /**
  * 应用主题入口。[appearance.dynamicColor] 已由 app 根部按设备能力闸门
@@ -82,6 +101,10 @@ private fun AutopThemeLocals(
         LocalIconScale provides appearance.iconScale,
         LocalSemanticColors provides autopSemanticColors(colorScheme),
         LocalMotionEnabled provides appearance.motionEnabled,
+        LocalBallShape provides appearance.ballShape,
+        LocalBallFaceColor provides appearance.ballColor,
+        LocalBallRerollMs provides appearance.petRerollMs,
+        LocalBallFaceMinHoldMs provides appearance.petFaceMinHoldMs,
     ) {
         MaterialTheme(
             colorScheme = colorScheme,

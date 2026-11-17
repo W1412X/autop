@@ -7,8 +7,10 @@ package com.example.autop.core.ui.component
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -16,7 +18,11 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import com.example.autop.core.ui.component.ballface.AutopBallFace
+import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.theme.AutopAlpha
 import com.example.autop.core.ui.theme.LocalSpacing
 
@@ -27,6 +33,7 @@ import com.example.autop.core.ui.theme.LocalSpacing
  * @param customLabel 「自己输入」入口文案（由调用方取 strings）。
  * @param customPlaceholder 展开后输入框的占位文案，空串不显示。
  * @param sendDescription 发送按钮的无障碍描述。
+ * @param faceMood 问题前的表情（AI 创建页传“等待回答”），null 不显示。
  * @param onAnswer 回答回调（选项文字或自由输入文字）。展开的输入框在回答后清空并收起。
  */
 @Composable
@@ -39,6 +46,7 @@ public fun InlineQuestionCard(
     modifier: Modifier = Modifier,
     customPlaceholder: String = "",
     interactive: Boolean = true,
+    faceMood: BallFaceMood? = null,
 ) {
     Column(
         modifier =
@@ -50,7 +58,15 @@ public fun InlineQuestionCard(
                 ).padding(all = LocalSpacing.current.md),
         verticalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
     ) {
-        Text(text = question, style = MaterialTheme.typography.bodyMedium)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(LocalSpacing.current.sm),
+        ) {
+            if (faceMood != null) {
+                AutopBallFace(mood = faceMood, modifier = Modifier.size(QUESTION_FACE_SIZE))
+            }
+            Text(text = question, style = MaterialTheme.typography.bodyMedium, modifier = Modifier.weight(1f))
+        }
         if (interactive) {
             options.forEach { option ->
                 AutopOptionRow(text = option, onClick = { onAnswer(option) })
@@ -103,3 +119,6 @@ private fun InlineCustomAnswer(
 
 /** 内嵌输入框的最大行数。 */
 private const val INLINE_INPUT_MAX_LINES: Int = 3
+
+/** 问题前表情尺寸（P1-14：20dp）。 */
+private val QUESTION_FACE_SIZE = 20.dp
