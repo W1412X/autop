@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 9,
+  "schemaVersion": 12,
   "memory": {
     "path": {
       "maxSegmentChars": 64,

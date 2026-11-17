@@ -19,9 +19,46 @@ public data class UiAppearanceSection(
     @SerialName("iconScale") val iconScale: Double = 1.0,
     @SerialName("density") val density: String = "STANDARD",
     @SerialName("motionEnabled") val motionEnabled: Boolean = true,
+    /** 悬浮球与全部表情的球体形态：`SOLID` 实心圆（默认）/ `LINE` 线条开口环。 */
+    @SerialName("ballShape") val ballShape: String = "SOLID",
+    /** 悬浮球颜色：`THEME` 跟随主题色（默认）/ `BLACK` 固定黑 / `WHITE` 固定白。 */
+    @SerialName("ballColor") val ballColor: String = "THEME",
+    /** 表情最短驻留（毫秒，0 = 不驻留）：表情切换后至少停留这么久；等待回答、拦截、断开立即显示。 */
+    @SerialName("petFaceMinHoldMs") val petFaceMinHoldMs: Long = 2500,
+    /** 多会话混合池与思考段的换脸间隔（毫秒）。 */
+    @SerialName("petRerollMs") val petRerollMs: Long = 2500,
+    /** 运行中是否显示“新建会话”“打开应用”（false 时只在没有运行会话时显示）。 */
+    @SerialName("petMenuActionsWhileRunning") val petMenuActionsWhileRunning: Boolean = true,
     /** 输出语言（`system` 跟随系统 / `zh` 中文 / `en` English）：决定助手面向用户的输出语言。 */
     @SerialName("language") val language: String = "system",
-) : ConfigSection
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (ballShape !in BALL_SHAPES) add("ballShape must be one of $BALL_SHAPES, was '$ballShape'")
+            if (ballColor !in BALL_COLORS) add("ballColor must be one of $BALL_COLORS, was '$ballColor'")
+            if (petFaceMinHoldMs !in 0L..PET_HOLD_MAX_MS) {
+                add("petFaceMinHoldMs must be in 0..$PET_HOLD_MAX_MS, was $petFaceMinHoldMs")
+            }
+            if (petRerollMs !in PET_REROLL_MIN_MS..PET_REROLL_MAX_MS) {
+                add("petRerollMs must be in $PET_REROLL_MIN_MS..$PET_REROLL_MAX_MS, was $petRerollMs")
+            }
+        }
+
+    public companion object {
+        /** 球体形态取值。 */
+        public val BALL_SHAPES: Set<String> = setOf("SOLID", "LINE")
+
+        /** 悬浮球颜色取值。 */
+        public val BALL_COLORS: Set<String> = setOf("THEME", "BLACK", "WHITE")
+    }
+}
+
+/** `ui.appearance.petFaceMinHoldMs` 上限（毫秒）。 */
+private const val PET_HOLD_MAX_MS: Long = 10000L
+
+/** `ui.appearance.petRerollMs` 取值范围（毫秒）。 */
+private const val PET_REROLL_MIN_MS: Long = 500L
+private const val PET_REROLL_MAX_MS: Long = 10000L
 
 /** `ui.nav`：底部导航。 */
 @Serializable
@@ -89,6 +126,8 @@ public data class UiOverlaySection(
     @SerialName("edgeHideRatio") val edgeHideRatio: Double = 0.8,
     @SerialName("breathMs") val breathMs: Long = 1600,
     @SerialName("doubleTapStops") val doubleTapStops: Boolean = true,
+    /** 悬浮球直径（dp）：窗口、表情、细条、菜单半径与面板定位都按它等比推出。 */
+    @SerialName("ballSizeDp") val ballSizeDp: Int = 44,
 ) : ConfigSection {
     override fun validate(): List<String> =
         buildList {
@@ -97,6 +136,9 @@ public data class UiOverlaySection(
             }
             if (opacity !in OPACITY_MIN..OPACITY_MAX) {
                 add("opacity must be in $OPACITY_MIN..$OPACITY_MAX, was $opacity")
+            }
+            if (ballSizeDp !in BALL_SIZE_MIN_DP..BALL_SIZE_MAX_DP) {
+                add("ballSizeDp must be in $BALL_SIZE_MIN_DP..$BALL_SIZE_MAX_DP, was $ballSizeDp")
             }
         }
 
@@ -109,6 +151,10 @@ public data class UiOverlaySection(
 /** 悬浮球透明度下限/上限。 */
 private const val OPACITY_MIN: Double = 0.5
 private const val OPACITY_MAX: Double = 1.0
+
+/** 悬浮球直径取值范围（dp，`ui.overlay.ballSizeDp`）。 */
+private const val BALL_SIZE_MIN_DP: Int = 32
+private const val BALL_SIZE_MAX_DP: Int = 72
 
 /** `ui.indicator`：执行期状态指示（屏幕边缘光 + 顶部运行控制条；ADR-0014）。颜色取自主题，不在配置里。 */
 @Serializable

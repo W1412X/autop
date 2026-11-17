@@ -22,7 +22,7 @@ public data class ConfigMigration(
 )
 
 /** 配置（用户覆盖）文件的当前 schemaVersion。 */
-public const val CURRENT_SCHEMA_VERSION: Int = 9
+public const val CURRENT_SCHEMA_VERSION: Int = 12
 
 /**
  * 内置迁移链：v2 删除屏幕观测 v4 不再使用的配置键（docs/design/
@@ -56,6 +56,12 @@ public fun builtinConfigMigrations(): List<ConfigMigration> =
         // shell-exec（ADR-0040/0042）：features.shellExec 只新增键（缺失用默认值 false）；
         // agent.tools.enabled 补入 tool.run_shell（缺失时追加，已存在不重复）。
         ConfigMigration(from = 8, to = 9) { doc -> migrateV8ToV9(doc) },
+        // ui.ballShape 新增（缺失用默认值 SOLID），仅增键，覆盖文件无需改写。
+        ConfigMigration(from = 9, to = 10) { doc -> doc },
+        // ADR-0045：ui.appearance 新增桌宠键（ballColor 等），仅增键，覆盖文件无需改写。
+        ConfigMigration(from = 10, to = 11) { doc -> doc },
+        // ADR-0046：ui.overlay 新增 ballSizeDp，仅增键，覆盖文件无需改写。
+        ConfigMigration(from = 11, to = 12) { doc -> doc },
     )
 
 /**

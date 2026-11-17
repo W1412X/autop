@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 9,
+  "schemaVersion": 12,
   "ui": {
     "appearance": {
       "darkMode": "SYSTEM",
@@ -10,6 +10,11 @@
       "iconScale": 1.0,
       "density": "STANDARD",
       "motionEnabled": true,
+      "ballShape": "SOLID",
+      "ballColor": "THEME",
+      "petFaceMinHoldMs": 2500,
+      "petRerollMs": 2500,
+      "petMenuActionsWhileRunning": true,
       "language": "system"
     },
     "nav": {
@@ -33,6 +38,7 @@
     "overlay": {
       "windowType": "auto",
       "displayMode": "auto",
+      "ballSizeDp": 44,
       "opacity": 1.0,
       "edgeHideRatio": 0.8,
       "breathMs": 1600,
