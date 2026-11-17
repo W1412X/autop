@@ -138,6 +138,9 @@
     <string name="task_detail_no_runs">还没有运行记录</string>
     <string name="task_detail_not_found">任务不存在或已删除</string>
     <string name="task_detail_running">已开始运行</string>
+    <string name="task_run_stop">停止</string>
+    <string name="task_run_stop_title">停止这次运行？</string>
+    <string name="task_run_stop_text">停止后不会继续执行后续步骤，已完成的步骤会保留在运行记录里。</string>
     <string name="task_detail_run_failed">运行失败：%1$s</string>
     <string name="task_detail_trigger">触发</string>
     <string name="task_detail_goal">目标</string>

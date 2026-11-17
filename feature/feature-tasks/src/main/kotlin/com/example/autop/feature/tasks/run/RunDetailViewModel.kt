@@ -99,6 +99,7 @@ public class RunDetailViewModel
                 RunDetailAction.Continue -> continueFrom()
                 RunDetailAction.ResumeInterrupted -> resumeInterrupted()
                 RunDetailAction.Back -> navigator.navigateBack()
+                RunDetailAction.Stop -> record.value?.let { runService.cancel(it.id) }
                 is RunDetailAction.Timeline -> onTimeline(action.action, navigator)
                 is RunDetailAction.Fork -> forkAt(action.seq)
                 is RunDetailAction.ShowRaw -> showRaw(action.seq)
@@ -128,6 +129,7 @@ public class RunDetailViewModel
                 rawText = ov.rawText,
                 feedback = current,
                 canResume = run?.status == RunStatus.INTERRUPTED,
+                canStop = run?.status in RunStatus.OPEN,
             )
 
         /** 过程条目动作：快捷入口与分叉标记经导航回调；长按打开菜单；暂停/停止直接作用于 Run。 */

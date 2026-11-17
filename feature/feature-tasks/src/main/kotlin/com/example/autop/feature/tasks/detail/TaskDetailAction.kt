@@ -16,6 +16,11 @@ public sealed interface TaskDetailAction {
         val runId: String,
     ) : TaskDetailAction
 
+    /** 停止一条运行中的记录（调用方已确认）。 */
+    public data class StopRun(
+        val runId: String,
+    ) : TaskDetailAction
+
     /** 返回。 */
     public data object Back : TaskDetailAction
 }

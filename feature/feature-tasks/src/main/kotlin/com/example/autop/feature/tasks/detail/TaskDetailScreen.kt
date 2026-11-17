@@ -5,18 +5,27 @@ package com.example.autop.feature.tasks.detail
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopButton
 import com.example.autop.core.ui.component.AutopTag
+import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.AutopTonalButton
+import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ListRow
 import com.example.autop.core.ui.component.SectionTitle
@@ -37,6 +46,7 @@ public fun TaskDetailScreen(
     state: TaskDetailUiState,
     onAction: (TaskDetailAction) -> Unit,
 ) {
+    var stopTarget by remember { mutableStateOf<String?>(null) }
     if (state.notFound) {
         Column(modifier = Modifier.fillMaxSize().statusBarsPadding()) {
             SubPageTopBar(
@@ -77,17 +87,53 @@ public fun TaskDetailScreen(
             }
             item { FeedbackBanner(feedback = state.feedback) }
             item { SectionTitle(text = stringResource(R.string.task_detail_runs)) }
-            if (state.runs.isEmpty()) {
-                item {
-                    ListRow(title = stringResource(R.string.task_detail_no_runs), subtitle = "")
-                }
-            } else {
-                items(state.runs, key = { it.runId }) { run ->
-                    RunRow(run = run, onClick = { onAction(TaskDetailAction.OpenRun(run.runId)) })
-                }
-            }
+            runItems(runs = state.runs, onAction = onAction, onStop = { stopTarget = it })
         }
     }
+    stopTarget?.let { runId ->
+        StopRunDialog(
+            onConfirm = {
+                onAction(TaskDetailAction.StopRun(runId))
+                stopTarget = null
+            },
+            onDismiss = { stopTarget = null },
+        )
+    }
+}
+
+/** 运行记录列表行（空列表显示占位）。 */
+private fun LazyListScope.runItems(
+    runs: List<RunRowUi>,
+    onAction: (TaskDetailAction) -> Unit,
+    onStop: (String) -> Unit,
+) {
+    if (runs.isEmpty()) {
+        item {
+            ListRow(title = stringResource(R.string.task_detail_no_runs), subtitle = "")
+        }
+    } else {
+        items(runs, key = { it.runId }) { run ->
+            RunRow(
+                run = run,
+                onClick = { onAction(TaskDetailAction.OpenRun(run.runId)) },
+                onStop = { onStop(run.runId) },
+            )
+        }
+    }
+}
+
+/** 停止运行的二次确认（停止不可恢复）。 */
+@Composable
+private fun StopRunDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ConfirmDialog(
+        title = stringResource(R.string.task_run_stop_title),
+        text = stringResource(R.string.task_run_stop_text),
+        onConfirm = onConfirm,
+        onDismiss = onDismiss,
+    )
 }
 
 @Composable
@@ -160,15 +206,24 @@ private fun FeedbackBanner(feedback: TaskDetailFeedback?) {
 private fun RunRow(
     run: RunRowUi,
     onClick: () -> Unit,
+    onStop: () -> Unit,
 ) {
     ListRow(
         title = run.summary.ifBlank { stringResource(runStatusTextRes(run.statusName)) },
         subtitle = "${stringResource(runStatusTextRes(run.statusName))} · ${run.originName} · ${run.timeText}",
         trailing = {
-            StatusChip(
-                text = stringResource(runStatusTextRes(run.statusName)),
-                tone = runStatusTone(run.statusName),
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                StatusChip(
+                    text = stringResource(runStatusTextRes(run.statusName)),
+                    tone = runStatusTone(run.statusName),
+                )
+                if (run.stoppable) {
+                    AutopTextButton(
+                        text = stringResource(R.string.task_run_stop),
+                        onClick = onStop,
+                    )
+                }
+            }
         },
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
     )

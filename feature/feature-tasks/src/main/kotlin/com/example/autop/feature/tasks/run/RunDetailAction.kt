@@ -16,6 +16,9 @@ public sealed interface RunDetailAction {
     /** 返回。 */
     public data object Back : RunDetailAction
 
+    /** 停止这次运行（调用方已确认）。 */
+    public data object Stop : RunDetailAction
+
     /** 过程条目发出的动作（快捷入口、长按、分叉标记、暂停横幅等）。 */
     public data class Timeline(
         val action: TimelineAction,

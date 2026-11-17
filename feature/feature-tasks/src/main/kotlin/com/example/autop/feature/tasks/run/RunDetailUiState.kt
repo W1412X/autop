@@ -24,6 +24,8 @@ public data class RunDetailUiState(
     val feedback: RunDetailFeedback? = null,
     /** 状态为 INTERRUPTED 时可“继续执行”（docs/tech/04 §3.11）。 */
     val canResume: Boolean = false,
+    /** 运行未收口时可停止（状态区给出停止入口）。 */
+    val canStop: Boolean = false,
 )
 
 /** 长按过程条目的菜单：[seq] 为条目序号，[forkable] 为可否从这里分叉。 */

@@ -29,6 +29,8 @@ public data class RunRowUi(
     val originName: String,
     val summary: String,
     val timeText: String,
+    /** 运行中（未收口）：行上显示停止入口。 */
+    val stoppable: Boolean = false,
 )
 
 /** 立即运行的反馈（成功标记或错误码）。 */

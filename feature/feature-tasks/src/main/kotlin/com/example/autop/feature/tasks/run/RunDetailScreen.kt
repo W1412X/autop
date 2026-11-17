@@ -18,6 +18,10 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
@@ -27,6 +31,8 @@ import androidx.compose.ui.unit.dp
 import com.example.autop.core.thread.ui.TimelineAction
 import com.example.autop.core.thread.ui.TimelineRow
 import com.example.autop.core.ui.component.AutopButton
+import com.example.autop.core.ui.component.AutopOutlinedButton
+import com.example.autop.core.ui.component.ConfirmDialog
 import com.example.autop.core.ui.component.EmptyState
 import com.example.autop.core.ui.component.ListRow
 import com.example.autop.core.ui.component.OptionItem
@@ -64,7 +70,7 @@ public fun RunDetailScreen(
         state.entryMenu?.let { menu -> EntryMenuSheet(menu = menu, onAction = onAction) }
         state.rawText?.let { text -> RawDataDialog(text = text, onAction = onAction) }
         LazyColumn(modifier = Modifier.fillMaxSize()) {
-            item { StatusSection(state = state) }
+            item { StatusSection(state = state, onAction = onAction) }
             if (state.canResume) {
                 item {
                     AutopButton(
@@ -124,8 +130,12 @@ private fun TimelineSection(
 }
 
 @Composable
-private fun StatusSection(state: RunDetailUiState) {
+private fun StatusSection(
+    state: RunDetailUiState,
+    onAction: (RunDetailAction) -> Unit,
+) {
     val spacing = LocalSpacing.current
+    var confirmStop by remember { mutableStateOf(false) }
     Row(
         modifier = Modifier.padding(spacing.screenEdge),
         verticalAlignment = Alignment.CenterVertically,
@@ -137,6 +147,24 @@ private fun StatusSection(state: RunDetailUiState) {
         StatusChip(
             text = stringResource(runStatusTextRes(state.statusName)),
             tone = runStatusTone(state.statusName),
+        )
+    }
+    if (state.canStop) {
+        AutopOutlinedButton(
+            text = stringResource(R.string.task_run_stop),
+            onClick = { confirmStop = true },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
+        )
+    }
+    if (confirmStop) {
+        ConfirmDialog(
+            title = stringResource(R.string.task_run_stop_title),
+            text = stringResource(R.string.task_run_stop_text),
+            onConfirm = {
+                onAction(RunDetailAction.Stop)
+                confirmStop = false
+            },
+            onDismiss = { confirmStop = false },
         )
     }
     ListRow(

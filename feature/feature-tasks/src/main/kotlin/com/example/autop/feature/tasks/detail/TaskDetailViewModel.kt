@@ -8,6 +8,7 @@ import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.RunId
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.feature.tasks.RUN_LIMIT
@@ -19,6 +20,7 @@ import com.example.autop.feature.tasks.scheduleLabelRes
 import com.example.autop.feature.tasks.scheduleTimeText
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunService
+import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
 import com.example.autop.task.TaskExecutor
 import com.example.autop.task.TaskRepository
@@ -88,6 +90,7 @@ public class TaskDetailViewModel
                 TaskDetailAction.RunNow -> runNow()
                 TaskDetailAction.OpenEdit -> navigator.openEdit(taskId)
                 is TaskDetailAction.OpenRun -> navigator.openRun(action.runId)
+                is TaskDetailAction.StopRun -> runService.cancel(RunId(action.runId))
                 TaskDetailAction.Back -> navigator.navigateBack()
             }
         }
@@ -140,6 +143,7 @@ public class TaskDetailViewModel
                 originName = run.origin.name,
                 summary = run.summary.orEmpty(),
                 timeText = formatTime(run.startedAt ?: run.createdAt),
+                stoppable = run.status in RunStatus.OPEN,
             )
 
         private companion object {
