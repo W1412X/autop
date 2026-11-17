@@ -9,6 +9,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.drawable.Icon
 import androidx.core.app.NotificationCompat
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.ThreadId
@@ -19,6 +20,7 @@ import com.example.autop.task.ThreadLaunchExtras
 import com.example.autop.task.UserNotifier
 import com.example.autop.task.impl.R
 import dagger.hilt.android.qualifiers.ApplicationContext
+import java.util.concurrent.ConcurrentHashMap
 
 /** 用户通知。 */
 public class UserNotifierImpl(
@@ -27,6 +29,9 @@ public class UserNotifierImpl(
 ) : UserNotifier {
     private val manager: NotificationManager =
         context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+    /** 通知大图标：静态表情位图按帧缓存（渲染一次，重复通知复用）。 */
+    private val faceIcons = ConcurrentHashMap<NotifyFace, Icon>()
 
     override fun notifyResult(run: RunRecord) {
         ensureChannels()
@@ -38,6 +43,7 @@ public class UserNotifierImpl(
             text = summary,
             runId = run.id,
             threadId = run.threadId,
+            face = notifyFaceOf(run.status),
         )
     }
 
@@ -62,7 +68,7 @@ public class UserNotifierImpl(
     override fun notifyBlocked(run: RunRecord) {
         ensureChannels()
         val builder =
-            base(CHANNEL_ALERT)
+            base(CHANNEL_ALERT, NotifyFace.BLOCKED)
                 .setContentTitle(context.getString(R.string.notify_blocked_title))
                 .setContentText(context.getString(R.string.notify_blocked_text))
                 .setContentIntent(openIntent(run.threadId))
@@ -80,7 +86,7 @@ public class UserNotifierImpl(
     ) {
         ensureChannels()
         val builder =
-            base(CHANNEL_ALERT)
+            base(CHANNEL_ALERT, NotifyFace.WAITING)
                 .setContentTitle(context.getString(R.string.notify_question_title))
                 .setContentText(question)
                 .setContentIntent(openIntent(run.threadId))
@@ -97,7 +103,7 @@ public class UserNotifierImpl(
     public fun notifyAccessibilityNeeded(text: String) {
         ensureChannels()
         val builder =
-            base(CHANNEL_ALERT)
+            base(CHANNEL_ALERT, NotifyFace.LOST)
                 .setContentTitle(context.getString(R.string.notify_a11y_title))
                 .setContentText(text)
         manager.notify(NOTIF_A11Y, builder.build())
@@ -110,20 +116,29 @@ public class UserNotifierImpl(
         text: String,
         runId: RunId?,
         threadId: ThreadId? = null,
+        face: NotifyFace = NotifyFace.IDLE,
     ) {
         val builder =
-            base(channel)
+            base(channel, face)
                 .setContentTitle(title)
                 .setContentText(text)
         if (runId != null) builder.setContentIntent(openIntent(threadId))
         manager.notify(id, builder.build())
     }
 
-    private fun base(channel: String): NotificationCompat.Builder =
+    private fun base(
+        channel: String,
+        face: NotifyFace,
+    ): NotificationCompat.Builder =
         NotificationCompat
             .Builder(context, channel)
             .setSmallIcon(android.R.drawable.stat_notify_chat)
+            .setLargeIcon(faceIconOf(face))
             .setAutoCancel(true)
+
+    /** 静态表情大图标（P1-15）：按帧缓存位图，避免每条通知重复绘制。 */
+    private fun faceIconOf(face: NotifyFace): Icon =
+        faceIcons.getOrPut(face) { Icon.createWithBitmap(NotifyFacePainter.render(face)) }
 
     /** 点击通知打开应用；带 [threadId] 时直接进入该对话。不同对话使用不同请求码，避免共用 extra。 */
     private fun openIntent(threadId: ThreadId?): PendingIntent {

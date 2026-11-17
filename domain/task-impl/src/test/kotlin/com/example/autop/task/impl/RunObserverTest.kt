@@ -86,6 +86,40 @@ public class RunObserverTest {
         }
 
     @Test
+    public fun `open runs follow persisted status`() =
+        runTest {
+            val fixture = ObserverFixture()
+            val record = fixture.saveRecord()
+            val handle = ObserverFakeHandle(record.id)
+            fixture.observer.begin(record, handle)
+            backgroundScope.launch { fixture.observer.watch(record.id, handle) }
+            pumpObserver(fixture)
+
+            val started = fixture.observer.openRuns.value[record.threadId]
+            assertEquals(record.id, started?.id)
+
+            fixture.runStore.save(
+                record.copy(
+                    status = RunStatus.WAITING_USER,
+                    waitingQuestion = "继续吗？",
+                    waitingOptions = listOf("是"),
+                ),
+            )
+            pumpObserver(fixture)
+
+            val open = fixture.observer.openRuns.value[record.threadId]
+            assertEquals(RunStatus.WAITING_USER, open?.status)
+            assertEquals("继续吗？", open?.waitingQuestion)
+
+            fixture.observer.finish(
+                record.id,
+                RunFinished(status = RunOutcome.SUCCEEDED, summary = "ok"),
+            )
+            pumpObserver(fixture)
+            assertNull(fixture.observer.openRuns.value[record.threadId])
+        }
+
+    @Test
     public fun `ask_user waiting state is reflected in active record`() =
         runTest {
             val fixture = ObserverFixture()

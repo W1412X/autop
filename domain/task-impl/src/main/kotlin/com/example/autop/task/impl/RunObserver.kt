@@ -52,10 +52,15 @@ public class RunObserver(
     private val eventFlows = ConcurrentHashMap<RunId, MutableSharedFlow<AgentEvent>>()
     private val _active = MutableStateFlow<ActiveRunInfo?>(null)
     private val _runningThreads = MutableStateFlow<Set<ThreadId>>(emptySet())
+    private val _openRuns = MutableStateFlow<Map<ThreadId, RunRecord>>(emptyMap())
     private val threadOf = ConcurrentHashMap<RunId, ThreadId>()
+    private val recordsOf = ConcurrentHashMap<RunId, RunRecord>()
 
     /** 正在运行的对话集合（每个对话只要有运行中的运行就在里面）。 */
     val runningThreads: StateFlow<Set<ThreadId>> = _runningThreads.asStateFlow()
+
+    /** 全部未收口 Run（按对话索引，同对话取最近创建的一个）：列表行显示运行/等待/暂停等实时表情。 */
+    val openRuns: StateFlow<Map<ThreadId, RunRecord>> = _openRuns.asStateFlow()
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
 
     /** 当前活跃 Run（悬浮球与对话页使用）；流程执行时附带根 Run 名下的流程进度（P1-2）。 */
@@ -72,7 +77,9 @@ public class RunObserver(
         handles[record.id] = handle
         _active.value = ActiveRunInfo(record, RunState.STARTING, null, 0, emptyList())
         threadOf[record.id] = record.threadId
+        recordsOf[record.id] = record
         _runningThreads.value = threadOf.values.toSet()
+        publishOpenRuns()
     }
 
     fun handleOf(runId: RunId): RunHandle? = handles[runId]
@@ -107,6 +114,8 @@ public class RunObserver(
                 // 记录快照跟随持久化（N179）：ask_user 的 WAITING_USER/waitingQuestion、
                 // 暂停原因等只写 runStore，不跟随则对话页 AskCard 读旧快照永不显示。
                 runStore.observe(runId).collect { record ->
+                    recordsOf[runId] = record
+                    publishOpenRuns()
                     _active.update { info -> if (info?.run?.id == runId) info.copy(run = record) else info }
                 }
             }
@@ -137,8 +146,19 @@ public class RunObserver(
         handles.remove(runId)
         eventFlows.remove(runId)
         threadOf.remove(runId)
+        recordsOf.remove(runId)
         _runningThreads.value = threadOf.values.toSet()
+        publishOpenRuns()
         _active.update { info -> if (info?.run?.id == runId) null else info }
+    }
+
+    /** 未收口 Run 按对话索引（同对话保留最近创建的一个）。 */
+    private fun publishOpenRuns() {
+        _openRuns.value =
+            recordsOf.values
+                .filter { it.status in RunStatus.OPEN }
+                .groupBy { it.threadId }
+                .mapValues { (_, runs) -> runs.maxBy { it.createdAt } }
     }
 
     private suspend fun onEvent(

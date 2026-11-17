@@ -102,6 +102,9 @@ public interface RunService {
     /** 正在运行的对话集合（有运行中的运行即在内）：对话列表用它显示运行中状态。 */
     public fun observeRunningThreads(): StateFlow<Set<ThreadId>>
 
+    /** 全部未收口 Run（按对话索引）：对话列表行显示运行/等待/暂停等实时状态。 */
+    public fun observeOpenRuns(): StateFlow<Map<ThreadId, RunRecord>>
+
     /** Run 记录流（对话页状态条与问题卡片使用）。 */
     public fun observeRun(runId: RunId): Flow<RunRecord>
 

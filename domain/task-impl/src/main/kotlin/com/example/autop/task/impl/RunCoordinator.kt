@@ -222,6 +222,8 @@ public class RunCoordinator(
 
     override fun observeRunningThreads(): StateFlow<Set<ThreadId>> = observer.runningThreads
 
+    override fun observeOpenRuns(): StateFlow<Map<ThreadId, RunRecord>> = observer.openRuns
+
     override fun observeRun(runId: RunId): Flow<RunRecord> = observer.observeRun(runId)
 
     /** 线程未收口的 Run（WP8.5）：最近创建的一个开放状态 Run，没有则 null。 */
