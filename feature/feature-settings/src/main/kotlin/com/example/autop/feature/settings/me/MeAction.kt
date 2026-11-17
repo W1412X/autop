@@ -51,6 +51,31 @@ public sealed interface MeAction {
         val enabled: Boolean,
     ) : MeAction
 
+    /** 球体形态（`ui.appearance.ballShape`：SOLID 实心 / LINE 线条）。 */
+    public data class SetBallShape(
+        val value: String,
+    ) : MeAction
+
+    /** 小脸颜色（`ui.appearance.ballColor`：THEME 跟随主题 / BLACK 黑 / WHITE 白）。 */
+    public data class SetBallColor(
+        val value: String,
+    ) : MeAction
+
+    /** 表情最短驻留（毫秒，`ui.appearance.petFaceMinHoldMs`；0 = 不驻留）。 */
+    public data class SetPetFaceMinHoldMs(
+        val value: Long,
+    ) : MeAction
+
+    /** 换脸间隔（毫秒，`ui.appearance.petRerollMs`）。 */
+    public data class SetPetRerollMs(
+        val value: Long,
+    ) : MeAction
+
+    /** 运行中显示“新建会话”“打开应用”（`ui.appearance.petMenuActionsWhileRunning`）。 */
+    public data class SetPetMenuActionsWhileRunning(
+        val enabled: Boolean,
+    ) : MeAction
+
     /** 输出语言（`ui.appearance.language`：system / zh / en）。 */
     public data class SetLanguage(
         val value: String,

@@ -100,6 +100,16 @@ class AppearanceSettingsViewModelTest {
                         listOf("ui.appearance.density" to JsonPrimitive("COMPACT")),
                     MeAction.SetMotionEnabled(false) to
                         listOf("ui.appearance.motionEnabled" to JsonPrimitive(false)),
+                    MeAction.SetBallShape("LINE") to
+                        listOf("ui.appearance.ballShape" to JsonPrimitive("LINE")),
+                    MeAction.SetBallColor("BLACK") to
+                        listOf("ui.appearance.ballColor" to JsonPrimitive("BLACK")),
+                    MeAction.SetPetFaceMinHoldMs(1_500L) to
+                        listOf("ui.appearance.petFaceMinHoldMs" to JsonPrimitive(1_500L)),
+                    MeAction.SetPetRerollMs(3_000L) to
+                        listOf("ui.appearance.petRerollMs" to JsonPrimitive(3_000L)),
+                    MeAction.SetPetMenuActionsWhileRunning(false) to
+                        listOf("ui.appearance.petMenuActionsWhileRunning" to JsonPrimitive(false)),
                     MeAction.SetShieldEnabled(false) to
                         listOf("device.touch.shieldEnabled" to JsonPrimitive(false)),
                 )

@@ -204,6 +204,13 @@ public class AppearanceSettingsViewModel
                 is MeAction.SetDensity -> write(UiConfig.APPEARANCE.path + SUFFIX_DENSITY, JsonPrimitive(action.value))
                 is MeAction.SetMotionEnabled ->
                     write(UiConfig.APPEARANCE.path + SUFFIX_MOTION_ENABLED, JsonPrimitive(action.enabled))
+                is MeAction.SetBallShape ->
+                    write(UiConfig.APPEARANCE.path + SUFFIX_BALL_SHAPE, JsonPrimitive(action.value))
+                is MeAction.SetBallColor,
+                is MeAction.SetPetFaceMinHoldMs,
+                is MeAction.SetPetRerollMs,
+                is MeAction.SetPetMenuActionsWhileRunning,
+                -> writePetSetting(action)
                 is MeAction.SetLanguage ->
                     write(UiConfig.APPEARANCE.path + SUFFIX_LANGUAGE, JsonPrimitive(action.value))
                 is MeAction.SetOverlayWindowType -> write(OVERLAY_WINDOW_TYPE_PATH, JsonPrimitive(action.value))
@@ -234,6 +241,19 @@ public class AppearanceSettingsViewModel
                 MeAction.CheckUpdate -> checkUpdate()
                 MeAction.DownloadUpdate -> downloadUpdate()
                 MeAction.InstallUpdate -> installUpdate()
+            }
+        }
+
+        /** 小脸与桌宠配置写入（ADR-0045）：只接收 [onAction] 分派的四种动作。 */
+        private fun writePetSetting(action: MeAction) {
+            val path = UiConfig.APPEARANCE.path
+            when (action) {
+                is MeAction.SetBallColor -> write(path + SUFFIX_BALL_COLOR, JsonPrimitive(action.value))
+                is MeAction.SetPetFaceMinHoldMs -> write(path + SUFFIX_PET_FACE_MIN_HOLD, JsonPrimitive(action.value))
+                is MeAction.SetPetRerollMs -> write(path + SUFFIX_PET_REROLL, JsonPrimitive(action.value))
+                is MeAction.SetPetMenuActionsWhileRunning ->
+                    write(path + SUFFIX_PET_MENU_ACTIONS, JsonPrimitive(action.enabled))
+                else -> Unit
             }
         }
 
@@ -327,6 +347,11 @@ public class AppearanceSettingsViewModel
             const val SUFFIX_ICON_SCALE = ".iconScale"
             const val SUFFIX_DENSITY = ".density"
             const val SUFFIX_MOTION_ENABLED = ".motionEnabled"
+            const val SUFFIX_BALL_SHAPE = ".ballShape"
+            const val SUFFIX_BALL_COLOR = ".ballColor"
+            const val SUFFIX_PET_FACE_MIN_HOLD = ".petFaceMinHoldMs"
+            const val SUFFIX_PET_REROLL = ".petRerollMs"
+            const val SUFFIX_PET_MENU_ACTIONS = ".petMenuActionsWhileRunning"
             const val SUFFIX_LANGUAGE = ".language"
 
             /** 悬浮窗通道写入路径（ui.overlay.windowType，docs/tech/05 §10）。 */
