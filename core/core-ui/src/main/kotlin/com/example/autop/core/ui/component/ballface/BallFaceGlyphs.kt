@@ -9,6 +9,10 @@
 package com.example.autop.core.ui.component.ballface
 
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.StrokeJoin
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.vector.PathParser
 
 /** 卫星符号。[NONE] 只有卫星圆底（空闲）。 */
@@ -105,7 +109,23 @@ internal data class BallGlyphPart(
     val path: Path,
     val strokeWidth: Float = 0f,
     val dash: List<Float> = emptyList(),
-)
+) {
+    /**
+     * 描边样式，构造时一次算好（含虚线效果）。绘制时直接复用，避免每帧创建描边与原生的虚线效果对象。
+     * 填充段为 null。
+     */
+    val stroke: Stroke? =
+        if (strokeWidth > 0f) {
+            Stroke(
+                width = strokeWidth,
+                cap = StrokeCap.Round,
+                join = StrokeJoin.Round,
+                pathEffect = if (dash.isEmpty()) null else PathEffect.dashPathEffect(dash.toFloatArray()),
+            )
+        } else {
+            null
+        }
+}
 
 /** 符号的完整几何：若干段 + 可选的局部变换（只有怒气纹使用）。 */
 internal data class BallGlyph(

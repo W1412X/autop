@@ -33,12 +33,13 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.withTransform
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextMeasurer
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.drawText
@@ -133,12 +134,14 @@ private fun HeldBallFace(
         rememberFaceClock(enabled = motion, rerollSeconds = rerollSeconds, jitterSeed = if (idle) spec.seed else null)
     val performed = rememberBallFaceExpression(scene = scene, seed = spec.seed, reroll = clock.rerolls.value)
     val measurer = rememberTextMeasurer()
+    val density = LocalDensity.current.density
+    val labels = remember(measurer, density) { LabelLayouts(measurer, density) }
     val label =
         spec.count?.takeIf { it > 0 }?.let { count ->
             FaceLabel(
                 text = if (count > MAX_DIGIT) "$MAX_DIGIT+" else count.toString(),
                 inSatellite = fixed == null,
-                measurer = measurer,
+                labels = labels,
             )
         }
     BallFaceCanvas(
@@ -149,7 +152,7 @@ private fun HeldBallFace(
                 palette =
                     facePaletteOf(spec.paint, spec.tint, MaterialTheme.colorScheme, LocalBallFaceColor.current),
                 label = label,
-                measurer = measurer,
+                labels = labels,
             ),
         motion = motion,
         clock = clock,
@@ -207,15 +210,37 @@ private class FaceStyle(
     val variant: BallFaceVariant,
     val palette: FacePalette,
     val label: FaceLabel?,
-    val measurer: TextMeasurer,
+    val labels: LabelLayouts,
 )
 
 /** 会话数字：[inSatellite] 为真时替代卫星符号，否则画在卫星角标上。 */
 private class FaceLabel(
     val text: String,
     val inSatellite: Boolean,
-    val measurer: TextMeasurer,
+    val labels: LabelLayouts,
 )
+
+/**
+ * 数字与 z 的排版缓存：字形排版只做一次（按文字与字号），颜色与透明度在绘制时施加，
+ * 不再每帧重新排版。[density] 与组合时的 LocalDensity 一致，字号按它换算成 sp。
+ */
+private class LabelLayouts(
+    private val measurer: TextMeasurer,
+    private val density: Float,
+) {
+    private val layouts = HashMap<Pair<String, Float>, TextLayoutResult>()
+
+    fun of(
+        text: String,
+        sizeUnits: Float,
+    ): TextLayoutResult =
+        layouts.getOrPut(text to sizeUnits) {
+            measurer.measure(
+                text = text,
+                style = TextStyle(fontSize = (sizeUnits / density).sp, fontWeight = FontWeight.Bold),
+            )
+        }
+}
 
 @Composable
 private fun BallFaceCanvas(
@@ -335,8 +360,10 @@ private fun DrawScope.drawFloatingZ(
     style: FaceStyle,
 ) {
     val alpha = sin(PI * phase).toFloat()
+    // 首尾几乎全透明时不画，省掉绘制；肉眼看不出差别。
+    if (alpha < Z_MIN_ALPHA) return
     drawLabelText(
-        measurer = style.measurer,
+        labels = style.labels,
         text = "z",
         sizeUnits = Z_UNITS,
         center = Offset(Z_X + Z_DX * phase, Z_Y - Z_DY * phase),
@@ -359,7 +386,7 @@ private fun DrawScope.drawHead(
                 useCenter = false,
                 topLeft = Offset(-RING_CENTER_RADIUS, -RING_CENTER_RADIUS),
                 size = Size(RING_CENTER_RADIUS * 2f, RING_CENTER_RADIUS * 2f),
-                style = Stroke(width = RING_STROKE, cap = StrokeCap.Round),
+                style = RING_STYLE,
             )
     }
 }
@@ -405,24 +432,10 @@ private fun DrawScope.drawEyeForm(
         return
     }
     when (form) {
-        BallEyeForm.JOY ->
-            drawPath(
-                path = quadPath(-44f, 40f, 0f, -124f, 44f, 40f),
-                color = color,
-                style = Stroke(width = JOY_STROKE, cap = StrokeCap.Round),
-            )
+        BallEyeForm.JOY -> drawPath(path = JOY_PATH, color = color, style = JOY_STYLE)
         BallEyeForm.PAIN ->
-            drawPath(
-                path = painPath(side),
-                color = color,
-                style = Stroke(width = PAIN_STROKE, cap = StrokeCap.Round, join = StrokeJoin.Round),
-            )
-        BallEyeForm.X ->
-            drawPath(
-                path = crossPath(),
-                color = color,
-                style = Stroke(width = PAIN_STROKE, cap = StrokeCap.Round),
-            )
+            drawPath(path = if (side < 0f) PAIN_PATH_LEFT else PAIN_PATH_RIGHT, color = color, style = PAIN_STYLE)
+        BallEyeForm.X -> drawPath(path = CROSS_PATH, color = color, style = CROSS_STYLE)
         else -> Unit
     }
 }
@@ -482,7 +495,7 @@ private fun DrawScope.drawSatellite(
         val label = style.label
         if (label != null && !label.inSatellite) {
             drawCircle(color = palette.eye, radius = BADGE_RADIUS, center = BADGE_CENTER)
-            drawLabelText(label.measurer, label.text, BADGE_DIGIT_UNITS, BADGE_CENTER, palette.body)
+            drawLabelText(label.labels, label.text, BADGE_DIGIT_UNITS, BADGE_CENTER, palette.body)
         }
     }
 }
@@ -510,7 +523,7 @@ private fun DrawScope.drawContent(
     when (content) {
         is SatelliteContent.Glyph -> drawGlyph(ballGlyphOf(content.symbol), color)
         is SatelliteContent.Digits ->
-            style.label?.let { label -> drawLabelText(label.measurer, content.text, DIGIT_UNITS, Offset.Zero, color) }
+            style.label?.let { label -> drawLabelText(label.labels, content.text, DIGIT_UNITS, Offset.Zero, color) }
     }
 }
 
@@ -530,24 +543,16 @@ private fun DrawScope.drawGlyph(
  * 数字：字号以设计单位给出，换算成 sp 后在当前缩放下得到设计单位的像素大小；在卫星局部坐标里居中绘制。
  */
 private fun DrawScope.drawLabelText(
-    measurer: TextMeasurer,
+    labels: LabelLayouts,
     text: String,
     sizeUnits: Float,
     center: Offset,
     color: Color,
 ) {
-    val layout =
-        measurer.measure(
-            text = text,
-            style =
-                TextStyle(
-                    color = color,
-                    fontSize = (sizeUnits / density).sp,
-                    fontWeight = FontWeight.Bold,
-                ),
-        )
+    val layout = labels.of(text, sizeUnits)
     drawText(
         textLayoutResult = layout,
+        color = color,
         topLeft = Offset(center.x - layout.size.width / 2f, center.y - layout.size.height / 2f),
     )
 }
@@ -556,25 +561,14 @@ private fun DrawScope.drawGlyphPart(
     part: BallGlyphPart,
     color: Color,
 ) {
-    if (part.strokeWidth > 0f) {
-        drawPath(
-            path = part.path,
-            color = color,
-            style =
-                Stroke(
-                    width = part.strokeWidth,
-                    cap = StrokeCap.Round,
-                    join = StrokeJoin.Round,
-                    pathEffect = dashOf(part.dash),
-                ),
-        )
+    // 描边样式在 [BallGlyphPart] 构造时已算好，这里只绘制。
+    val stroke = part.stroke
+    if (stroke != null) {
+        drawPath(path = part.path, color = color, style = stroke)
     } else {
         drawPath(path = part.path, color = color)
     }
 }
-
-private fun dashOf(intervals: List<Float>): PathEffect? =
-    if (intervals.isEmpty()) null else PathEffect.dashPathEffect(intervals.toFloatArray())
 
 private fun quadPath(
     sx: Float,
@@ -648,6 +642,21 @@ private fun Color.withAlpha(alpha: Float): Color = copy(alpha = this.alpha * alp
 
 /** 拖动时视线的最大偏移（设计单位）。 */
 private const val DRAG_GAZE_UNITS: Float = 60f
+
+/** 浮动 z 的透明度下限：低于它不绘制。 */
+private const val Z_MIN_ALPHA: Float = 0.01f
+
+/** 笑眼、痛眼、叉眼的几何与描边：固定不变，预先构造，绘制时复用。 */
+private val JOY_PATH = quadPath(-44f, 40f, 0f, -124f, 44f, 40f)
+private val JOY_STYLE = Stroke(width = JOY_STROKE, cap = StrokeCap.Round)
+private val PAIN_PATH_LEFT = painPath(-1f)
+private val PAIN_PATH_RIGHT = painPath(1f)
+private val PAIN_STYLE = Stroke(width = PAIN_STROKE, cap = StrokeCap.Round, join = StrokeJoin.Round)
+private val CROSS_PATH = crossPath()
+private val CROSS_STYLE = Stroke(width = PAIN_STROKE, cap = StrokeCap.Round)
+
+/** 线条版开口环的描边：固定不变，预先构造。 */
+private val RING_STYLE = Stroke(width = RING_STROKE, cap = StrokeCap.Round)
 
 /** 浮动 z 的起点与位移、字号（设计单位）。 */
 private const val Z_X: Float = 430f
