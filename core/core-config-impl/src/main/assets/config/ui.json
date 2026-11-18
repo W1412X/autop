@@ -64,7 +64,7 @@
       "yawnMs": 1500,
       "greetMs": 1200,
       "flingPxPerMs": 1.0,
-      "tickSec": 60,
+      "recentTouchSec": 120,
       "zCount": 2,
       "zIntervalMs": 2000
     },

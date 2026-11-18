@@ -95,20 +95,24 @@ public data class BallZStyle(
     val intervalSec: Float = 2f,
 )
 
-/** 空闲时的环境状态（只在 [BallFaceMood.IDLE] 下生效，状态表情优先）。 */
-public enum class BallAmbientMode {
-    /** 普通空闲：轮换中性表情池。 */
-    NONE,
-
-    /** 睡眠：眼睛半闭、头微低，卫星慢绕，稳定浮出 z。 */
-    SLEEP,
-
-    /** 充电：卫星绕行变快，眼睛眯成笑眼。 */
-    CHARGING,
-
-    /** 低电量（未充电）：眼睛下垂，卫星慢。不做报警表情。 */
-    TIRED,
-}
+/**
+ * 常态池的数据上下文：由悬浮层与表情切换同节奏（5–10 秒）采样，决定各表情的权重。
+ * 全部为 false 时只有基础脸在池中。
+ */
+public data class BallPoolContext(
+    /** 夜间时段（睡眠脸的权重上升）。 */
+    val night: Boolean = false,
+    /** 晨间时段（哈欠、招手的权重上升）。 */
+    val morning: Boolean = false,
+    /** 充电中（充电脸的权重上升）。 */
+    val charging: Boolean = false,
+    /** 低电量且未充电（疲倦脸的权重上升）。 */
+    val lowBattery: Boolean = false,
+    /** 网络断开（扫视、抬头找的权重上升，表示在找信号）。 */
+    val offline: Boolean = false,
+    /** 最近有过触摸（点按、拖动、唤出、招手的权重上升）。 */
+    val recentTouch: Boolean = false,
+)
 
 /**
  * 空闲时的手势反应（瞬时，结束后回到环境状态或空闲表情）。卫星一律慢绕，不做快转。
@@ -148,7 +152,7 @@ public enum class BallReaction {
  * @property count 会话数字（悬浮球）。运行中显示在卫星上；其余状态显示在卫星角标上；null 不显示。
  * @property tint 强制单色（横幅、通知等跟随文字色的位置）。
  * @property motionEnabled 与 `ui.appearance.motionEnabled` 求与；关闭时只画静态落帧。
- * @property ambient 空闲时的环境状态（睡眠、充电、低电量）；只在 IDLE 下生效。
+ * @property poolContext 常态池的数据上下文，决定空闲时各表情的权重（只在 IDLE 下生效）。
  * @property reaction 空闲时的手势反应；只在 IDLE 下生效，优先于环境状态。
  * @property offline 网络断开：卫星每隔一段时间停住，像在找信号。
  * @property gazeDirection 拖动时的视线方向，每轴 -1 到 1（相对球半径）；只在 IDLE 且 [reaction] 为 DRAG 时生效。
@@ -163,7 +167,7 @@ public data class BallFaceSpec(
     val tint: Color? = null,
     val motionEnabled: Boolean = true,
     val count: Int? = null,
-    val ambient: BallAmbientMode = BallAmbientMode.NONE,
+    val poolContext: BallPoolContext = BallPoolContext(),
     /** 睡眠 z 的数量与出现间隔（只在睡眠时生效）。 */
     val zStyle: BallZStyle = BallZStyle(),
     val reaction: BallReaction? = null,

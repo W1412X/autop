@@ -6,26 +6,24 @@ import org.junit.Test
 class BallFaceAmbientTest {
     @Test
     fun `sleep face floats a z and keeps the satellite slow`() {
-        val sleep = ambientExpressionOf(BallAmbientMode.SLEEP)
-        assertThat(sleep?.floatingZ).isTrue()
-        assertThat(sleep?.satellite).isEqualTo(BallSatelliteMotion.Orbit(60f))
+        assertThat(SLEEP_EXPRESSION.floatingZ).isTrue()
+        assertThat(SLEEP_EXPRESSION.satellite).isEqualTo(BallSatelliteMotion.Orbit(60f))
     }
 
     @Test
-    fun `no ambient mode and no reaction leave the idle pool in charge`() {
-        assertThat(ambientExpressionOf(BallAmbientMode.NONE)).isNull()
-        assertThat(idleOverrideOf(BallFaceMood.IDLE, BallAmbientMode.NONE, null)).isNull()
+    fun `no reaction means no override and the pool takes over`() {
+        assertThat(reactionOverrideOf(BallFaceMood.IDLE, null)).isNull()
     }
 
     @Test
-    fun `status moods ignore reactions and ambient modes`() {
-        assertThat(idleOverrideOf(BallFaceMood.WAITING, BallAmbientMode.SLEEP, BallReaction.TAP)).isNull()
-        assertThat(idleOverrideOf(BallFaceMood.RUNNING, BallAmbientMode.CHARGING, null)).isNull()
+    fun `status moods ignore reactions`() {
+        assertThat(reactionOverrideOf(BallFaceMood.WAITING, BallReaction.TAP)).isNull()
+        assertThat(reactionOverrideOf(BallFaceMood.RUNNING, BallReaction.FLING)).isNull()
     }
 
     @Test
-    fun `reaction takes priority over ambient mode while idle`() {
-        assertThat(idleOverrideOf(BallFaceMood.IDLE, BallAmbientMode.SLEEP, BallReaction.TAP))
+    fun `reaction overrides the idle pool`() {
+        assertThat(reactionOverrideOf(BallFaceMood.IDLE, BallReaction.TAP))
             .isEqualTo(reactionExpressionOf(BallReaction.TAP))
     }
 
@@ -48,10 +46,8 @@ class BallFaceAmbientTest {
 
     @Test
     fun `floating z time is only drawn in motion and only for the sleep face`() {
-        val sleep = ambientExpressionOf(BallAmbientMode.SLEEP)!!
-        assertThat(ballFaceFrameOf(sleep, 1.2f, motion = true).zTime).isEqualTo(1.2f)
-        assertThat(ballFaceFrameOf(sleep, 1.2f, motion = false).zTime).isNull()
-        val calm = BallFaceExpressions.calm
-        assertThat(ballFaceFrameOf(calm, 1.2f, motion = true).zTime).isNull()
+        assertThat(ballFaceFrameOf(SLEEP_EXPRESSION, 1.2f, motion = true).zTime).isEqualTo(1.2f)
+        assertThat(ballFaceFrameOf(SLEEP_EXPRESSION, 1.2f, motion = false).zTime).isNull()
+        assertThat(ballFaceFrameOf(BallFaceExpressions.calm, 1.2f, motion = true).zTime).isNull()
     }
 }

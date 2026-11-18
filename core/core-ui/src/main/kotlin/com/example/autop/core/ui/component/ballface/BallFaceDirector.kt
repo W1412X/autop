@@ -3,6 +3,9 @@
  *
  * 同一事件的种子相同，所以悬浮球、控制条、卡片、横幅各自抽取时得到同一场景下的同一套候选，
  * 语义不会打架。种子与抽取完全可复现，单测用固定种子锁定抽取序列。
+ *
+ * 空闲池是数据驱动的：每张脸有权重，权重随 [BallPoolContext]（时段、电量、网络、最近触摸）变化，
+ * 权重为 0 的脸不在池中。
  */
 package com.example.autop.core.ui.component.ballface
 
@@ -19,7 +22,13 @@ public object BallFaceDirector {
     /** 表情淡入淡出时长（毫秒）：换眼型、换符号时的交叉淡入；动效关闭时为 0。 */
     public const val CROSSFADE_MS: Int = 200
 
-    /** 场景 → 候选池（设计稿 POOLS 原序）。 */
+    /**
+     * 空闲轮换与数据采样共用的事件种子。悬浮球没有运行时固定用 0；采样节奏与表情切换节奏都由
+     * [idleRerollSeconds] 按此种子推出，两者的间隔序列一致。
+     */
+    public const val IDLE_SEED: Long = 0L
+
+    /** 场景 → 候选池（设计稿 POOLS 原序）。空闲场景返回全部加权候选（含权重为 0 的）。 */
     public fun poolOf(scene: BallFaceScene): List<BallFaceExpression> =
         when (scene) {
             BallFaceScene.STARTING ->
@@ -50,7 +59,7 @@ public object BallFaceDirector {
             BallFaceScene.APP ->
                 listOf(BallFaceExpressions.appLook, BallFaceExpressions.appTilt, BallFaceExpressions.appFar)
             BallFaceScene.COMPACTING -> listOf(BallFaceExpressions.compact, BallFaceExpressions.compactBreath)
-            BallFaceScene.IDLE -> IDLE_POOL
+            BallFaceScene.IDLE -> IDLE_ENTRIES.map { it.expression }
             BallFaceScene.MIXED -> PERFORMANCE_SCENES.flatMap { poolOf(it) }
         }
 
@@ -76,6 +85,25 @@ public object BallFaceDirector {
         val pool = poolOf(scene)
         val candidates = pool.filter { it != previous }.ifEmpty { pool }
         return candidates[Random(seed).nextInt(candidates.size)]
+    }
+
+    /**
+     * 空闲池的数据驱动抽取：只抽权重大于 0 的表情，按权重决定概率，剔除 [previous] 保证不重复。
+     * 同一 [seed] 与同一 [context] 得到同一结果。基础 13 张脸的权重始终大于 0，池子不会为空。
+     */
+    internal fun pickIdle(
+        seed: Long,
+        previous: BallFaceExpression?,
+        context: BallPoolContext,
+    ): BallFaceExpression {
+        val weighted = IDLE_ENTRIES.map { it.expression to it.weightOf(context) }.filter { it.second > 0 }
+        val candidates = weighted.filter { it.first != previous }.ifEmpty { weighted }
+        var x = Random(seed).nextInt(candidates.sumOf { it.second })
+        for ((expression, weight) in candidates) {
+            if (x < weight) return expression
+            x -= weight
+        }
+        return candidates.last().first
     }
 
     /**
@@ -108,12 +136,6 @@ public object BallFaceDirector {
     private const val SEED_MIX: Long = 31L
     private const val EVENT_MIX: Long = 1_000L
 
-    /**
-     * 空闲池卫星绕行周期（秒）：与平静脸一致。池内的表演脸原本绕行 2.6 秒一圈，空闲时改为慢绕，
-     * 运行中的表演池不受影响。
-     */
-    private const val IDLE_ORBIT_SEC: Float = 30f
-
     /** 空闲轮换间隔的区间（秒）。 */
     public const val IDLE_REROLL_MIN_SEC: Float = 5f
     public const val IDLE_REROLL_MAX_SEC: Float = 10f
@@ -125,22 +147,4 @@ public object BallFaceDirector {
     /** 下一次眨眼前的间隔（秒），取值在 [BLINK_MIN_GAP_SEC]、[BLINK_MAX_GAP_SEC] 之间。 */
     public fun blinkGapSec(random: Random): Float =
         BLINK_MIN_GAP_SEC + random.nextFloat() * (BLINK_MAX_GAP_SEC - BLINK_MIN_GAP_SEC)
-
-    /** 空闲池：中性表情，不含运行、等待、拦截、出错、暂停等状态语义（设计决定，见方案预览）。 */
-    private val IDLE_POOL: List<BallFaceExpression> =
-        listOf(
-            BallFaceExpressions.calm,
-            BallFaceExpressions.peek,
-            BallFaceExpressions.focus,
-            BallFaceExpressions.startWide,
-            BallFaceExpressions.startTilt,
-            BallFaceExpressions.startOpen,
-            BallFaceExpressions.thinkCurious,
-            BallFaceExpressions.appLook,
-            BallFaceExpressions.appTilt,
-            BallFaceExpressions.appFar,
-            BallFaceExpressions.gestureWatch,
-            BallFaceExpressions.textSide,
-            BallFaceExpressions.visionScan,
-        ).map { it.copy(satellite = BallSatelliteMotion.Orbit(IDLE_ORBIT_SEC)) }
 }

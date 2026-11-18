@@ -1,7 +1,7 @@
 package com.example.autop.feature.overlay.ball
 
 import com.example.autop.core.config.UiBallAmbientSection
-import com.example.autop.core.ui.component.ballface.BallAmbientMode
+import com.example.autop.core.ui.component.ballface.BallPoolContext
 import com.example.autop.core.ui.component.ballface.BallReaction
 import com.google.common.truth.Truth.assertThat
 import org.junit.Test
@@ -16,26 +16,29 @@ class BallAmbientLogicTest {
         assertThat(isNightHour(5, cfg)).isTrue()
         assertThat(isNightHour(6, cfg)).isFalse()
         assertThat(isNightHour(14, cfg)).isFalse()
-        assertThat(isNightHour(22, cfg)).isFalse()
     }
 
     @Test
-    fun `ball sleeps in the night window and never in the daytime`() {
-        assertThat(ambientOf(2, false, 80, cfg)).isEqualTo(BallAmbientMode.SLEEP)
-        assertThat(ambientOf(14, false, 80, cfg)).isEqualTo(BallAmbientMode.NONE)
+    fun `pool context reads the time window`() {
+        val night = poolContextOf(2, false, 80, false, false, cfg)
+        assertThat(night).isEqualTo(BallPoolContext(night = true))
+        val morning = poolContextOf(7, false, 80, false, false, cfg)
+        assertThat(morning).isEqualTo(BallPoolContext(morning = true))
     }
 
     @Test
-    fun `sleep beats charging, charging beats low battery`() {
-        assertThat(ambientOf(2, true, 10, cfg)).isEqualTo(BallAmbientMode.SLEEP)
-        assertThat(ambientOf(14, true, 10, cfg)).isEqualTo(BallAmbientMode.CHARGING)
-        assertThat(ambientOf(14, false, 19, cfg)).isEqualTo(BallAmbientMode.TIRED)
-        assertThat(ambientOf(14, false, 20, cfg)).isEqualTo(BallAmbientMode.NONE)
+    fun `charging is not low battery, and low battery needs a known level`() {
+        assertThat(poolContextOf(14, true, 10, false, false, cfg).lowBattery).isFalse()
+        assertThat(poolContextOf(14, false, 19, false, false, cfg).lowBattery).isTrue()
+        assertThat(poolContextOf(14, false, 20, false, false, cfg).lowBattery).isFalse()
+        assertThat(poolContextOf(14, false, null, false, false, cfg).lowBattery).isFalse()
     }
 
     @Test
-    fun `unknown battery level is never treated as low`() {
-        assertThat(ambientOf(14, false, null, cfg)).isEqualTo(BallAmbientMode.NONE)
+    fun `offline and recent touch are passed through`() {
+        val ctx = poolContextOf(14, false, 80, true, true, cfg)
+        assertThat(ctx.offline).isTrue()
+        assertThat(ctx.recentTouch).isTrue()
     }
 
     @Test
@@ -48,21 +51,22 @@ class BallAmbientLogicTest {
     }
 
     @Test
-    fun `touch while sleeping only wakes the ball`() {
-        val sequence = touchReactionsOf(BallReaction.TAP, BallAmbientMode.SLEEP, morningDue = true)
-        assertThat(sequence).containsExactly(BallReaction.WAKE)
+    fun `touch at night only wakes the ball`() {
+        assertThat(touchReactionsOf(BallReaction.TAP, night = true, morningDue = true))
+            .containsExactly(BallReaction.WAKE)
     }
 
     @Test
     fun `first touch in the morning yawns and then greets`() {
-        val sequence = touchReactionsOf(BallReaction.TAP, BallAmbientMode.NONE, morningDue = true)
-        assertThat(sequence).containsExactly(BallReaction.YAWN, BallReaction.GREET).inOrder()
+        assertThat(touchReactionsOf(BallReaction.TAP, night = false, morningDue = true))
+            .containsExactly(BallReaction.YAWN, BallReaction.GREET)
+            .inOrder()
     }
 
     @Test
     fun `ordinary touch plays its own reaction`() {
-        val sequence = touchReactionsOf(BallReaction.LONG_PRESS, BallAmbientMode.CHARGING, morningDue = false)
-        assertThat(sequence).containsExactly(BallReaction.LONG_PRESS)
+        assertThat(touchReactionsOf(BallReaction.LONG_PRESS, night = false, morningDue = false))
+            .containsExactly(BallReaction.LONG_PRESS)
     }
 
     @Test

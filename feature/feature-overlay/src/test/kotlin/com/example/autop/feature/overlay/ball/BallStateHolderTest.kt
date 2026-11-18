@@ -5,8 +5,11 @@ import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.device.DeviceState
 import com.example.autop.device.DeviceStateProvider
+import com.example.autop.device.UserActivityMonitor
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Test
@@ -151,6 +154,7 @@ class BallStateHolderTest {
             dispatchers = TestDispatcherProvider(UnconfinedTestDispatcher()),
             clock = FakeClock(0L),
             deviceState = FakeDeviceState(),
+            userActivity = FakeUserActivity(),
             greetingStore = FakeGreetingStore(),
         )
 
@@ -166,6 +170,17 @@ class BallStateHolderTest {
             )
 
         override val changes: Flow<DeviceState> = emptyFlow()
+    }
+
+    private class FakeUserActivity : UserActivityMonitor {
+        override val userTouches: SharedFlow<Long> = MutableSharedFlow()
+
+        override fun lastUserTouchAt(): Long? = null
+
+        override fun markSelfActionWindow(
+            startMs: Long,
+            endMs: Long,
+        ) = Unit
     }
 
     private class FakeGreetingStore : BallGreetingStore {

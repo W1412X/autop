@@ -121,8 +121,8 @@ private fun HeldBallFace(
     modifier: Modifier,
 ) {
     val motion = spec.motionEnabled && LocalMotionEnabled.current
-    // 空闲态的手势反应与环境状态（睡眠、充电、低电量）优先于表演池；状态表情不受影响。
-    val fixed = fixedBallFaceExpressionOf(spec.mood) ?: idleOverrideOf(spec.mood, spec.ambient, spec.reaction)
+    // 空闲态的手势反应优先于常态池；状态表情不受影响。常态池（含睡眠等数据驱动的脸）在下面抽取。
+    val fixed = fixedBallFaceExpressionOf(spec.mood) ?: reactionOverrideOf(spec.mood, spec.reaction)
     val scene = if (spec.mood == BallFaceMood.RUNNING_START) BallFaceScene.STARTING else spec.scene
     // 思考段与混合池的轮换序号由同一条逐帧时钟推进（不另起协程）：只在序号变化时重组。
     val rerolls = fixed == null && (scene == BallFaceScene.SAMPLING || scene == BallFaceScene.MIXED)
@@ -131,7 +131,13 @@ private fun HeldBallFace(
     val idle = fixed == null && scene == BallFaceScene.IDLE
     val clock =
         rememberFaceClock(enabled = motion, rerollSeconds = rerollSeconds, jitterSeed = if (idle) spec.seed else null)
-    val performed = rememberBallFaceExpression(scene = scene, seed = spec.seed, reroll = clock.rerolls.value)
+    val performed =
+        rememberBallFaceExpression(
+            scene = scene,
+            seed = spec.seed,
+            reroll = clock.rerolls.value,
+            context = spec.poolContext,
+        )
     val measurer = rememberTextMeasurer()
     val density = LocalDensity.current.density
     val labels = remember(measurer, density) { LabelLayouts(measurer, density) }
@@ -174,9 +180,10 @@ internal fun rememberBallFaceExpression(
     scene: BallFaceScene,
     seed: Long,
     reroll: Int,
+    context: BallPoolContext,
 ): BallFaceExpression {
     val track = remember(scene) { DirectorTrack(scene) }
-    return track.choose(seed, reroll)
+    return track.choose(seed, reroll, context)
 }
 
 /** 记住上一次的抽取，保证同一场景内相邻两次不重复。 */
@@ -186,19 +193,25 @@ private class DirectorTrack(
     private var key: Pair<Long, Int>? = null
     private var chosen: BallFaceExpression? = null
 
+    /**
+     * 同一序号内结果不变。缓存键只含种子与序号，不含数据上下文：数据中途变化不会让表情重抽，
+     * 新数据只在下一次切换（下一个序号）时生效，表情不会因为采样而闪动。
+     */
     fun choose(
         seed: Long,
         reroll: Int,
+        context: BallPoolContext,
     ): BallFaceExpression {
         val current = chosen
         val next = seed to reroll
         if (current != null && next == key) return current
+        val eventSeed = BallFaceDirector.seedOf(seed, reroll)
         val picked =
-            BallFaceDirector.pick(
-                scene = scene,
-                seed = BallFaceDirector.seedOf(seed, reroll),
-                previous = current,
-            )
+            if (scene == BallFaceScene.IDLE) {
+                BallFaceDirector.pickIdle(seed = eventSeed, previous = current, context = context)
+            } else {
+                BallFaceDirector.pick(scene = scene, seed = eventSeed, previous = current)
+            }
         key = next
         chosen = picked
         return picked

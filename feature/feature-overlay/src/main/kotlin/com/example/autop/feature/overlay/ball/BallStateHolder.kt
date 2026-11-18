@@ -16,11 +16,14 @@ import com.example.autop.core.common.exceptionHandler
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.UiBallAmbientSection
 import com.example.autop.core.config.UiConfig
+import com.example.autop.core.ui.component.ballface.BallFaceDirector
 import com.example.autop.core.ui.component.ballface.BallFaceVariant
+import com.example.autop.core.ui.component.ballface.BallPoolContext
 import com.example.autop.core.ui.component.ballface.BallReaction
 import com.example.autop.core.ui.component.ballface.BallZStyle
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.DeviceStateProvider
+import com.example.autop.device.UserActivityMonitor
 import com.example.autop.flow.RecordingSession
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunService
@@ -61,6 +64,7 @@ public class BallStateHolder
         dispatchers: DispatcherProvider,
         private val clock: Clock,
         private val deviceState: DeviceStateProvider,
+        private val userActivity: UserActivityMonitor,
         private val greetingStore: BallGreetingStore,
     ) {
         private val scope =
@@ -86,15 +90,26 @@ public class BallStateHolder
 
         private var reactionJob: Job? = null
 
-        /** 环境快照（睡眠时段、充电、低电量、网络）：按 `ui.ballAmbient.tickSec` 重算。 */
-        private val ambientSnapshot: StateFlow<BallAmbientSnapshot> =
+        /** 球上的最近一次触摸（本地记录，与监测器时间戳取较晚者；最近触摸的判定用它）。 */
+        private val localTouchAt = MutableStateFlow(0L)
+
+        /**
+         * 常态池的数据上下文，与表情切换同节奏采样：间隔序列与空闲轮换一致（[BallFaceDirector.idleRerollSeconds]，
+         * 种子 [BallFaceDirector.IDLE_SEED]）。每次采样读一次电量、充电、网络和触摸时间；值不变时 StateFlow 不发射，
+         * 不会触发重组。
+         */
+        private val poolContextState: StateFlow<BallPoolContext> =
             flow {
+                emit(Unit)
+                var index = 1
                 while (true) {
+                    val seconds = BallFaceDirector.idleRerollSeconds(BallFaceDirector.IDLE_SEED, index)
+                    delay((seconds * MILLIS_PER_SECOND_F).toLong())
+                    index++
                     emit(Unit)
-                    delay(configProvider.current()[UiConfig.BALL_AMBIENT].tickSec * MILLIS_PER_SECOND)
                 }
-            }.map { snapshotNow() }
-                .stateIn(scope, SharingStarted.Eagerly, snapshotNow())
+            }.map { sampleContext() }
+                .stateIn(scope, SharingStarted.Eagerly, sampleContext())
 
         /** 基础球状态：活跃会话 + 全部未收口会话（数字与拦截/等待）+ 无障碍 + 配置。 */
         private val baseUiState: StateFlow<BallUiState> =
@@ -117,12 +132,11 @@ public class BallStateHolder
                 )
             }.stateIn(scope, SharingStarted.Eagerly, BallUiState())
 
-        /** 球渲染状态：基础状态叠加环境快照、手势反应与拖动视线。 */
+        /** 球渲染状态：基础状态叠加常态池上下文、手势反应与拖动视线。 */
         public val uiState: StateFlow<BallUiState> =
-            combine(baseUiState, ambientSnapshot, reactionState, gazeState) { base, snapshot, reaction, gaze ->
+            combine(baseUiState, poolContextState, reactionState, gazeState) { base, pool, reaction, gaze ->
                 base.copy(
-                    ambient = snapshot.ambient,
-                    offline = snapshot.offline,
+                    poolContext = pool,
                     reaction = reaction,
                     gazeDirection = gaze,
                 )
@@ -154,10 +168,11 @@ public class BallStateHolder
          */
         public fun onTouchGesture(kind: BallReaction) {
             val now = clock.nowMillis()
+            localTouchAt.value = now
             val cfg = configProvider.current()[UiConfig.BALL_AMBIENT]
             val today = epochDayOf(now)
             val morning = morningGreetDue(hourOf(now), greetingStore.lastGreetDay(), today, cfg)
-            val sequence = touchReactionsOf(kind, ambientSnapshot.value.ambient, morning)
+            val sequence = touchReactionsOf(kind, poolContextState.value.night, morning)
             if (BallReaction.YAWN in sequence) greetingStore.markGreetDay(today)
             playSequence(sequence, cfg)
         }
@@ -172,6 +187,7 @@ public class BallStateHolder
             gazeState.value = Offset((dxPx / radius).coerceIn(-1f, 1f), (dyPx / radius).coerceIn(-1f, 1f))
             if (reactionState.value != BallReaction.DRAG) {
                 reactionJob?.cancel()
+                localTouchAt.value = clock.nowMillis()
                 reactionState.value = BallReaction.DRAG
             }
         }
@@ -204,14 +220,21 @@ public class BallStateHolder
                 }
         }
 
-        /** 当前环境快照：睡眠时段、充电与电量；网络类型为 none 视为断开。 */
-        private fun snapshotNow(): BallAmbientSnapshot {
+        /**
+         * 采样一次常态池上下文：时段、充电与电量、网络（none 视为断开）、最近触摸（窗口由 `recentTouchSec` 决定）。
+         */
+        private fun sampleContext(): BallPoolContext {
             val cfg = configProvider.current()[UiConfig.BALL_AMBIENT]
             val now = clock.nowMillis()
             val device = deviceState.current()
-            return BallAmbientSnapshot(
-                ambient = ambientOf(hourOf(now), device.charging, device.batteryPercent, cfg),
+            val lastTouch = maxOf(userActivity.lastUserTouchAt() ?: 0L, localTouchAt.value)
+            return poolContextOf(
+                hour = hourOf(now),
+                charging = device.charging,
+                batteryPercent = device.batteryPercent,
                 offline = device.networkType == NETWORK_NONE,
+                recentTouch = now - lastTouch < cfg.recentTouchSec * MILLIS_PER_SECOND,
+                cfg = cfg,
             )
         }
 

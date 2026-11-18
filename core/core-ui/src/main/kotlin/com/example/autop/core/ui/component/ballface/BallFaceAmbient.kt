@@ -1,22 +1,63 @@
 /**
- * 空闲态的环境表情与手势反应（设计预览 ambient-animations）：睡眠、充电、低电量，以及点按、长按、拖动、
- * 甩出、唤出、唤醒、晨间哈欠与招手。
+ * 空闲态的表情定义：数据驱动的常态池（睡眠、充电、疲倦、哈欠、招手、点按、拖动、唤出）与手势反应。
  *
- * 规则：只在 [BallFaceMood.IDLE] 下生效，状态表情（等待、拦截、运行等）始终优先。
- * 卫星一律慢绕（周期不短于 30 秒，表演脸的 2.6 秒快转不在此列），不做快速旋转。
+ * - 常态池：每张脸有权重，权重随 [BallPoolContext] 变化（时段、电量、网络、最近触摸）；权重为 0 的不在池中。
+ * - 手势反应：点按、长按、甩出等事件的瞬时覆盖，优先于常态池；结束后回到常态池。
+ * - 只在 [BallFaceMood.IDLE] 下生效，状态表情（等待、拦截、运行等）始终优先。
+ *
+ * 空闲时卫星一律慢绕（周期不短于 30 秒，睡眠 60 秒、疲倦 50 秒），不做快速旋转。
  */
 package com.example.autop.core.ui.component.ballface
 
-/** 睡眠、充电、低电量的表情；[BallAmbientMode.NONE] 返回 null（走空闲轮换池）。 */
-public fun ambientExpressionOf(mode: BallAmbientMode): BallFaceExpression? =
-    when (mode) {
-        BallAmbientMode.NONE -> null
-        BallAmbientMode.SLEEP -> SLEEP_EXPRESSION
-        BallAmbientMode.CHARGING -> CHARGING_EXPRESSION
-        BallAmbientMode.TIRED -> TIRED_EXPRESSION
-    }
+/** 空闲卫星绕行的最慢周期下限（秒）：池内脸的卫星不快于它。 */
+private const val IDLE_ORBIT_MIN_SEC: Float = 30f
 
-/** 手势反应的表情。 */
+/** 基础脸的权重：不依赖数据，始终在池中。 */
+private const val BASE_WEIGHT: Int = 10
+
+/** 把卫星周期压到不快于 [IDLE_ORBIT_MIN_SEC] 之慢；已经更慢的（睡眠、疲倦）保持原样。 */
+private fun BallFaceExpression.slowed(): BallFaceExpression {
+    val orbit = satellite as? BallSatelliteMotion.Orbit ?: return this
+    if (orbit.periodSec >= IDLE_ORBIT_MIN_SEC) return this
+    return copy(satellite = BallSatelliteMotion.Orbit(IDLE_ORBIT_MIN_SEC))
+}
+
+private fun base(
+    expression: BallFaceExpression,
+    weightOf: (BallPoolContext) -> Int = { BASE_WEIGHT },
+): IdleEntry = IdleEntry(expression.slowed(), weightOf)
+
+/**
+ * 常态池全部候选与权重。基础 13 张始终在池中；睡眠、充电、疲倦、哈欠、招手、点按、拖动、唤出
+ * 只在对应数据出现时有权重。权重数值是设计预览里的建议值，可以在这里调。
+ */
+internal val IDLE_ENTRIES: List<IdleEntry> by lazy {
+    listOf(
+        base(BallFaceExpressions.calm),
+        base(BallFaceExpressions.peek),
+        base(BallFaceExpressions.focus),
+        base(BallFaceExpressions.startWide),
+        base(BallFaceExpressions.startTilt),
+        base(BallFaceExpressions.startOpen),
+        base(BallFaceExpressions.thinkCurious),
+        base(BallFaceExpressions.appLook) { if (it.offline) 30 else BASE_WEIGHT },
+        base(BallFaceExpressions.appTilt),
+        base(BallFaceExpressions.appFar),
+        base(BallFaceExpressions.gestureWatch),
+        base(BallFaceExpressions.textSide),
+        base(BallFaceExpressions.visionScan) { if (it.offline) 30 else BASE_WEIGHT },
+        IdleEntry(SLEEP_EXPRESSION) { if (it.night) 150 else 0 },
+        IdleEntry(TIRED_EXPRESSION) { if (it.lowBattery) 40 else 0 },
+        IdleEntry(YAWN_EXPRESSION) { if (it.morning) 30 else 0 },
+        IdleEntry(GREET_EXPRESSION) { (if (it.morning) 15 else 0) + (if (it.recentTouch) 5 else 0) },
+        // 充电的笑眼与点按的眯眼外观相同，合并为一张：两种数据的权重相加。
+        IdleEntry(TAP_EXPRESSION) { (if (it.recentTouch) 20 else 0) + (if (it.charging) 40 else 0) },
+        IdleEntry(DRAG_EXPRESSION) { if (it.recentTouch) 8 else 0 },
+        IdleEntry(REVEAL_EXPRESSION) { if (it.recentTouch) 6 else 0 },
+    )
+}
+
+/** 手势反应的表情（空闲时覆盖常态池）。 */
 public fun reactionExpressionOf(reaction: BallReaction): BallFaceExpression =
     when (reaction) {
         BallReaction.TAP -> TAP_EXPRESSION
@@ -30,23 +71,18 @@ public fun reactionExpressionOf(reaction: BallReaction): BallFaceExpression =
     }
 
 /**
- * 空闲态的覆盖表情：手势反应优先，其次是环境状态。两者都没有时返回 null（走表演池的空闲轮换）。
- * 非空闲状态一律返回 null，状态表情不受影响。
+ * 空闲时的手势反应覆盖：只在 [BallFaceMood.IDLE] 且有反应时返回表情，否则返回 null（走常态池）。
  */
-public fun idleOverrideOf(
+public fun reactionOverrideOf(
     mood: BallFaceMood,
-    ambient: BallAmbientMode,
     reaction: BallReaction?,
-): BallFaceExpression? {
-    if (mood != BallFaceMood.IDLE) return null
-    return reaction?.let { reactionExpressionOf(it) } ?: ambientExpressionOf(ambient)
-}
+): BallFaceExpression? = if (mood == BallFaceMood.IDLE) reaction?.let { reactionExpressionOf(it) } else null
 
 /** 卫星慢绕的周期（秒）：与空闲平静脸一致。 */
 private const val SLOW_ORBIT_SEC: Float = 30f
 
 /** 睡眠：眼睛半闭、视线下垂、头微低，卫星每分钟一圈，稳定浮出 z。 */
-private val SLEEP_EXPRESSION: BallFaceExpression =
+internal val SLEEP_EXPRESSION: BallFaceExpression =
     BallFaceExpression(
         left = BallEyeForm.CLOSED,
         right = BallEyeForm.CLOSED,
@@ -57,18 +93,8 @@ private val SLEEP_EXPRESSION: BallFaceExpression =
         floatingZ = true,
     )
 
-/** 充电：卫星绕行变快（约 1.4 秒一圈），眼睛眯成笑眼。 */
-private val CHARGING_EXPRESSION: BallFaceExpression =
-    BallFaceExpression(
-        left = BallEyeForm.SQUINT,
-        right = BallEyeForm.SQUINT,
-        gaze = BallGaze.Point(0f, 4f),
-        satellite = BallSatelliteMotion.Orbit(1.4f),
-        breathSec = 2f,
-    )
-
-/** 低电量：眼睛下垂，卫星慢（50 秒一圈）。 */
-private val TIRED_EXPRESSION: BallFaceExpression =
+/** 疲倦（低电量）：眼睛下垂，卫星慢（50 秒一圈）。 */
+internal val TIRED_EXPRESSION: BallFaceExpression =
     BallFaceExpression(
         left = BallEyeForm.HALF,
         right = BallEyeForm.HALF,
@@ -79,7 +105,7 @@ private val TIRED_EXPRESSION: BallFaceExpression =
         breathSec = 4f,
     )
 
-private val TAP_EXPRESSION: BallFaceExpression =
+internal val TAP_EXPRESSION: BallFaceExpression =
     BallFaceExpression(
         left = BallEyeForm.SQUINT,
         right = BallEyeForm.SQUINT,
@@ -102,7 +128,7 @@ private val LONG_PRESS_EXPRESSION: BallFaceExpression =
     )
 
 /** 拖动：眼睛半睁，视线由拖动方向决定（见 [BallFaceSpec.gazeDirection]）。 */
-private val DRAG_EXPRESSION: BallFaceExpression =
+internal val DRAG_EXPRESSION: BallFaceExpression =
     BallFaceExpression(
         left = BallEyeForm.HALF,
         right = BallEyeForm.HALF,
@@ -121,7 +147,7 @@ private val FLING_EXPRESSION: BallFaceExpression =
         breathSec = 1.5f,
     )
 
-private val REVEAL_EXPRESSION: BallFaceExpression =
+internal val REVEAL_EXPRESSION: BallFaceExpression =
     BallFaceExpression(
         left = BallEyeForm.SQUINT,
         right = BallEyeForm.OPEN,
@@ -132,7 +158,7 @@ private val REVEAL_EXPRESSION: BallFaceExpression =
         breathSec = 2f,
     )
 
-/** 唤醒：与平静脸相同，睡眠结束后平稳睁眼，没有额外动作。 */
+/** 唤醒：与平静脸相同，睡眠中被触摸后平稳睁眼，没有额外动作。 */
 private val WAKE_EXPRESSION: BallFaceExpression =
     BallFaceExpression(
         left = BallEyeForm.OPEN,
@@ -142,7 +168,7 @@ private val WAKE_EXPRESSION: BallFaceExpression =
         breathSec = 4f,
     )
 
-private val YAWN_EXPRESSION: BallFaceExpression =
+internal val YAWN_EXPRESSION: BallFaceExpression =
     BallFaceExpression(
         left = BallEyeForm.CLOSED,
         right = BallEyeForm.CLOSED,
@@ -152,7 +178,7 @@ private val YAWN_EXPRESSION: BallFaceExpression =
         breathSec = 3f,
     )
 
-private val GREET_EXPRESSION: BallFaceExpression =
+internal val GREET_EXPRESSION: BallFaceExpression =
     BallFaceExpression(
         left = BallEyeForm.SQUINT,
         right = BallEyeForm.OPEN,

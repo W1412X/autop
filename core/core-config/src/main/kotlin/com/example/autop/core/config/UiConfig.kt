@@ -212,8 +212,8 @@ public data class UiBallAmbientSection(
     @SerialName("greetMs") val greetMs: Long = 1200,
     /** 甩出判定速度（px/ms）：松手时拖动的平均速度不低于它即视为甩到边缘。 */
     @SerialName("flingPxPerMs") val flingPxPerMs: Double = 1.0,
-    /** 环境状态（睡眠、充电、电量、网络）重算间隔（秒）。 */
-    @SerialName("tickSec") val tickSec: Long = 60,
+    /** 最近触摸的判定窗口（秒）：窗口内有过触摸，常态池里的点按、拖动、招手等权重上升。 */
+    @SerialName("recentTouchSec") val recentTouchSec: Long = 120,
     /** 睡眠时同时飘动的 z 个数（1 到 4）。 */
     @SerialName("zCount") val zCount: Int = 2,
     /** 睡眠时相邻 z 出现的间隔（毫秒，1000 到 5000）。 */
@@ -246,7 +246,9 @@ public data class UiBallAmbientSection(
                 }
             }
             if (flingPxPerMs !in FLING_MIN..FLING_MAX) add("flingPxPerMs must be in $FLING_MIN..$FLING_MAX")
-            if (tickSec !in TICK_MIN_SEC..TICK_MAX_SEC) add("tickSec must be in $TICK_MIN_SEC..$TICK_MAX_SEC")
+            if (recentTouchSec !in RECENT_TOUCH_MIN_SEC..RECENT_TOUCH_MAX_SEC) {
+                add("recentTouchSec must be in $RECENT_TOUCH_MIN_SEC..$RECENT_TOUCH_MAX_SEC")
+            }
             if (zCount !in Z_COUNT_MIN..Z_COUNT_MAX) add("zCount must be in $Z_COUNT_MIN..$Z_COUNT_MAX, was $zCount")
             if (zIntervalMs !in Z_INTERVAL_MIN_MS..Z_INTERVAL_MAX_MS) {
                 add("zIntervalMs must be in $Z_INTERVAL_MIN_MS..$Z_INTERVAL_MAX_MS ms, was $zIntervalMs")
@@ -260,8 +262,8 @@ private const val DURATION_MIN_MS: Long = 100
 private const val DURATION_MAX_MS: Long = 10_000
 private const val FLING_MIN: Double = 0.1
 private const val FLING_MAX: Double = 10.0
-private const val TICK_MIN_SEC: Long = 10
-private const val TICK_MAX_SEC: Long = 600
+private const val RECENT_TOUCH_MIN_SEC: Long = 10
+private const val RECENT_TOUCH_MAX_SEC: Long = 3600
 private const val Z_COUNT_MIN: Int = 1
 private const val Z_COUNT_MAX: Int = 4
 private const val Z_INTERVAL_MIN_MS: Long = 1_000
