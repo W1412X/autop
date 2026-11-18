@@ -154,10 +154,11 @@ internal class TriggerContributor(
         val trigger = req.vars.filterKeys { it.startsWith(PREFIX) }
         val source = trigger["${PREFIX}source"].orEmpty()
         val details =
-            trigger
-                .filterKeys { it != "${PREFIX}source" }
-                .entries
-                .joinToString("\n") { (key, value) -> "${key.removePrefix(PREFIX)}: $value" }
+            encodeTriggerFields(
+                trigger
+                    .filterKeys { it != "${PREFIX}source" }
+                    .mapKeys { (key, _) -> key.removePrefix(PREFIX) },
+            )
         return mapOf("source" to source, "details" to details)
     }
 

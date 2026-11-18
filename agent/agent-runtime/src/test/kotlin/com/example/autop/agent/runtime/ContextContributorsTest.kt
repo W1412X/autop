@@ -64,7 +64,7 @@ class ContextContributorsTest {
 
             assertThat(none).isNull()
             assertThat(part?.placement).isEqualTo(Placement.FIRST_USER)
-            assertThat(part?.promptIds).containsExactly("agent.context.trigger", 1)
+            assertThat(part?.promptIds).containsExactly("agent.context.trigger", 2)
             assertThat(part?.text).contains("通知")
         }
 

@@ -1,15 +1,20 @@
 /**
  * 条件触发中枢（docs/tech/07 §4.2）：订阅 tasks 变化，对被启用条件任务引用的
  * source 收集事件；过滤 → 闸门 → 可选 LLM 判定 → 全局每小时上限 → 入队。
+ *
+ * 并发约定：闸门记录、每小时窗口、拦截留痕去重等状态只在 [mutex] 内读写。LLM 判定在锁外执行，
+ * 判定返回后在锁内重新检查闸门与每小时上限。这样慢调用不会阻塞其他任务，判定期间被其他事件抢先触发的情况也会被拦住。
  */
 package com.example.autop.task.impl.schedule
 
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Logger
+import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.common.ThreadId
+import com.example.autop.core.common.runCatchingCancellable
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.task.ConditionEvaluator
@@ -18,6 +23,7 @@ import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
+import com.example.autop.task.TaskErrorCodes
 import com.example.autop.task.Trigger
 import com.example.autop.task.TriggerEvent
 import com.example.autop.task.TriggerSource
@@ -64,7 +70,7 @@ public class TriggerHub(
         sources.forEach { source ->
             source
                 .events()
-                .onEach { event -> onEvent(event) }
+                .onEach { event -> onEventSafely(event) }
                 .launchIn(scope)
         }
     }
@@ -102,7 +108,27 @@ public class TriggerHub(
                 .enabledTasks()
                 .filter { matchesSource(it, event.sourceId) }
                 .sortedByDescending { it.priority }
-        tasks.forEach { dispatch(it, event, origin = RunOrigin.CONDITION) }
+        tasks.forEach { dispatchSafely(it, event, origin = RunOrigin.CONDITION) }
+    }
+
+    /** 单个事件的失败只记日志。收集不能因此停止，否则该源之后的事件全部丢失。 */
+    private suspend fun onEventSafely(event: TriggerEvent) {
+        val outcome = runCatchingCancellable(TaskErrorCodes.EVENT_FAILED) { onEvent(event) }
+        if (outcome is Outcome.Err) {
+            logger.w(TAG, "event_failed", "sourceId" to event.sourceId, error = outcome.error.cause)
+        }
+    }
+
+    /** 单个任务的派发失败只影响该任务，同一事件的其他任务照常处理。 */
+    private suspend fun dispatchSafely(
+        task: Task,
+        event: TriggerEvent,
+        origin: RunOrigin,
+    ) {
+        val outcome = runCatchingCancellable(TaskErrorCodes.DISPATCH_FAILED) { dispatch(task, event, origin) }
+        if (outcome is Outcome.Err) {
+            logger.w(TAG, "dispatch_failed", "taskId" to task.id.value, error = outcome.error.cause)
+        }
     }
 
     private fun matchesSource(
@@ -114,11 +140,9 @@ public class TriggerHub(
     }
 
     /**
-     * 单任务的过滤 → 闸门 → 判定 → 入队（试运行复用同一逻辑，只是不入队）。
-     * 非条件触发（定时/手动）没有条件约束，直接放行——此前返回"不匹配"，
-     * 定时任务到点全被 `filter_not_match` 静默拦掉。
+     * 单任务的过滤 → 闸门 → 判定（试运行复用同一逻辑，只是不入队）。
+     * 非条件触发（定时/手动）没有条件约束，直接放行。
      */
-    @Suppress("ReturnCount") // 过滤/闸门/判定逐级早退是评估链的自然结构
     public suspend fun evaluate(
         task: Task,
         event: TriggerEvent,
@@ -127,59 +151,117 @@ public class TriggerHub(
         if (!FilterEvaluator.matches(trigger.filter, event.fields)) {
             return Evaluation(FilterResult(false), null, null)
         }
+        val gate = gateReason(task, trigger, event)
+        if (gate != null) return Evaluation(FilterResult(true), gate, null)
+        return Evaluation(FilterResult(true), null, judge(trigger, event))
+    }
+
+    /**
+     * 派发分三段：
+     * 1. 锁内预检：过滤、闸门、每小时余量（只查不扣，不调用 LLM）；
+     * 2. 锁外 LLM 判定；
+     * 3. 锁内重新检查闸门与每小时上限后扣额度、记状态、入队。
+     * 第 3 段必须重新检查：判定期间同一任务可能已被其他事件触发，冷却与每日上限要以最新状态为准。
+     */
+    private suspend fun dispatch(
+        task: Task,
+        event: TriggerEvent,
+        origin: RunOrigin,
+    ) {
+        val trigger = task.trigger as? Trigger.Condition
+        val admitted = mutex.withLock { admit(task, trigger, event, origin) }
+        if (!admitted) return
+        val judged = trigger?.let { judge(it, event) }
+        if (judged != null && !judged.match) {
+            logger.d(TAG, "llm_not_match", "taskId" to task.id.value, "source" to event.sourceId)
+            mutex.withLock { recordBlocked(task, event, origin, CODE_LLM_NOT_MATCH, TEXT_LLM_NOT_MATCH) }
+            return
+        }
+        mutex.withLock { commit(task, trigger, event, origin, judged) }
+    }
+
+    /** 锁内预检。返回 false 表示已停止派发（需要留痕的已经留痕）。 */
+    private suspend fun admit(
+        task: Task,
+        trigger: Trigger.Condition?,
+        event: TriggerEvent,
+        origin: RunOrigin,
+    ): Boolean {
+        if (trigger != null) {
+            if (!FilterEvaluator.matches(trigger.filter, event.fields)) {
+                logger.d(TAG, "filter_not_match", "taskId" to task.id.value, "source" to event.sourceId)
+                return false
+            }
+            if (!gateAllows(task, trigger, event, origin)) return false
+        }
+        if (!hasHourRoom()) {
+            logger.w(TAG, "global_hour_limit")
+            recordBlocked(task, event, origin, CODE_HOUR_LIMIT, TEXT_HOUR_LIMIT)
+            return false
+        }
+        return true
+    }
+
+    /** 锁内落账：重新检查闸门与每小时上限，通过后扣额度、写状态、入队。 */
+    private suspend fun commit(
+        task: Task,
+        trigger: Trigger.Condition?,
+        event: TriggerEvent,
+        origin: RunOrigin,
+        judged: ConditionResult?,
+    ) {
+        if (trigger != null && !gateAllows(task, trigger, event, origin)) return
+        if (!hasHourRoom()) {
+            logger.w(TAG, "global_hour_limit")
+            recordBlocked(task, event, origin, CODE_HOUR_LIMIT, TEXT_HOUR_LIMIT)
+            return
+        }
+        hourWindow.addLast(clock.nowMillis())
         val state = stateStore.get(task.id)
+        val zone = java.time.ZoneId.systemDefault()
+        val window = configProvider.current()[TaskConfig.DEDUPE].window
+        stateStore.save(task.id, FireGate.record(state, event.key, clock.nowMillis(), zone, window))
+        val vars = buildVars(event, judged)
+        logger.i(TAG, "trigger_fired", "taskId" to task.id.value, "origin" to origin.name)
+        runner.enqueueTask(task, origin, vars)
+    }
+
+    /** 闸门拦截原因（名称），通过返回 null。只读，不改状态。 */
+    private suspend fun gateReason(
+        task: Task,
+        trigger: Trigger.Condition,
+        event: TriggerEvent,
+    ): String? {
         val verdict =
             FireGate.check(
-                state = state,
+                state = stateStore.get(task.id),
                 key = event.key,
                 nowMillis = clock.nowMillis(),
                 cooldownMs = trigger.cooldownMs,
                 dailyLimit = trigger.dailyLimit,
                 zone = java.time.ZoneId.systemDefault(),
             )
-        if (verdict is FireGate.Verdict.Blocked) {
-            return Evaluation(FilterResult(true), verdict.reason.name, null)
-        }
-        val judged = judge(trigger, event)
-        return Evaluation(FilterResult(true), null, judged)
+        return (verdict as? FireGate.Verdict.Blocked)?.reason?.name
     }
 
-    @Suppress("ReturnCount") // 闸门逐条早退（07 §4.2 伪代码同构）
-    private suspend fun dispatch(
+    /** 闸门检查：拦截时留痕并返回 false。 */
+    private suspend fun gateAllows(
         task: Task,
+        trigger: Trigger.Condition,
         event: TriggerEvent,
         origin: RunOrigin,
-    ) {
-        mutex.withLock {
-            val result = evaluate(task, event)
-            if (!result.filter.match) {
-                logger.d(TAG, "filter_not_match", "taskId" to task.id.value, "source" to event.sourceId)
-                return
-            }
-            if (result.gate != null) {
-                logger.d(TAG, "gate_blocked", "taskId" to task.id.value, "reason" to result.gate)
-                recordBlocked(task, event, origin, "gate_" + result.gate.lowercase(), gateText(result.gate))
-                return
-            }
-            val judged = result.judged
-            if (judged != null && !judged.match) {
-                logger.d(TAG, "llm_not_match", "taskId" to task.id.value, "source" to event.sourceId)
-                recordBlocked(task, event, origin, CODE_LLM_NOT_MATCH, TEXT_LLM_NOT_MATCH)
-                return
-            }
-            if (!allowGlobalHour()) {
-                logger.w(TAG, "global_hour_limit")
-                recordBlocked(task, event, origin, CODE_HOUR_LIMIT, TEXT_HOUR_LIMIT)
-                return
-            }
-            val state = stateStore.get(task.id)
-            val zone = java.time.ZoneId.systemDefault()
-            val window = configProvider.current()[TaskConfig.DEDUPE].window
-            stateStore.save(task.id, FireGate.record(state, event.key, clock.nowMillis(), zone, window))
-            val vars = buildVars(event, judged)
-            logger.i(TAG, "trigger_fired", "taskId" to task.id.value, "origin" to origin.name)
-            runner.enqueueTask(task, origin, vars)
-        }
+    ): Boolean {
+        val reason = gateReason(task, trigger, event) ?: return true
+        logger.d(TAG, "gate_blocked", "taskId" to task.id.value, "reason" to reason)
+        recordBlocked(task, event, origin, "gate_" + reason.lowercase(), gateText(reason))
+        return false
+    }
+
+    /** 每小时窗口：先剔除一小时前的记录，再判断是否还有余量。只查不扣。 */
+    private fun hasHourRoom(): Boolean {
+        val cutoff = clock.nowMillis() - HOUR_MS
+        while (hourWindow.isNotEmpty() && hourWindow.first < cutoff) hourWindow.pollFirst()
+        return hourWindow.size < configProvider.current()[TaskConfig.CONDITIONS].maxPerHour
     }
 
     /** 变量映射：trigger.* + trigger.extracted.* + trigger.source（docs/tech/07 §4.2）。 */
@@ -194,6 +276,9 @@ public class TriggerHub(
         return vars
     }
 
+    /**
+     * LLM 判定。判定器抛异常与返回错误一样，按 `onEvaluatorError` 处理，不会让事件处理中断。
+     */
     private suspend fun judge(
         trigger: Trigger.Condition,
         event: TriggerEvent,
@@ -201,9 +286,15 @@ public class TriggerHub(
         val condition = trigger.llmCondition
         val evaluator = evaluators.firstOrNull()
         if (condition == null || evaluator == null) return null
-        return when (val outcome = evaluator.evaluate(condition, event)) {
-            is com.example.autop.core.common.Outcome.Ok -> outcome.value
-            is com.example.autop.core.common.Outcome.Err -> {
+        val called = runCatchingCancellable(TaskErrorCodes.EVALUATOR_CRASHED) { evaluator.evaluate(condition, event) }
+        val outcome: Outcome<ConditionResult> =
+            when (called) {
+                is Outcome.Ok -> called.value
+                is Outcome.Err -> Outcome.Err(called.error)
+            }
+        return when (outcome) {
+            is Outcome.Ok -> outcome.value
+            is Outcome.Err -> {
                 logger.w(TAG, "evaluator_failed", "error" to outcome.error.code)
                 if (configProvider.current()[TaskConfig.CONDITIONS].onEvaluatorError == ON_ERROR_FIRE) {
                     ConditionResult(match = true, reason = "evaluator_error_fired")
@@ -212,16 +303,6 @@ public class TriggerHub(
                 }
             }
         }
-    }
-
-    /** 全局每小时上限（docs/tech/07 §4.2）。 */
-    private fun allowGlobalHour(): Boolean {
-        val now = clock.nowMillis()
-        val cutoff = now - HOUR_MS
-        while (hourWindow.isNotEmpty() && hourWindow.peekFirst() < cutoff) hourWindow.pollFirst()
-        if (hourWindow.size >= configProvider.current()[TaskConfig.CONDITIONS].maxPerHour) return false
-        hourWindow.addLast(now)
-        return true
     }
 
     /**

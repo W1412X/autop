@@ -8,6 +8,7 @@ import com.example.autop.agent.CompactionInput
 import com.example.autop.agent.PlanItem
 import com.example.autop.agent.RenderItem
 import com.example.autop.agent.runtime.TokenEstimator
+import com.example.autop.agent.runtime.encodeTriggerFields
 import com.example.autop.agent.runtime.notes.renderNotesBlock
 import com.example.autop.agent.runtime.planText
 import com.example.autop.core.common.getOrNull
@@ -66,7 +67,7 @@ internal class BaselineAssembler(
     fun triggerText(vars: Map<String, String>): String {
         val trigger = vars.filterKeys { it.startsWith(PREFIX) }
         if (trigger.isEmpty()) return ""
-        return trigger.entries.joinToString("\n") { (key, value) -> "${key.removePrefix(PREFIX)}: $value" }
+        return encodeTriggerFields(trigger.mapKeys { (key, _) -> key.removePrefix(PREFIX) })
     }
 
     /** `agent.compaction.last_observation` 包装的最后观测（USER 消息；差量用 fullBlocks）。 */

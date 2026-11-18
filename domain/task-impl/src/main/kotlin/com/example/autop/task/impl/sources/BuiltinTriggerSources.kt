@@ -81,10 +81,11 @@ public class AppForegroundSource(
             .scan(null as String?) { prev, state -> state.foregroundPackage?.takeIf { it != prev } ?: prev }
             .filter { it != null }
             .map { pkg ->
+                val at = System.currentTimeMillis()
                 TriggerEvent(
                     sourceId = ID,
-                    key = pkg.orEmpty(),
-                    occurredAt = System.currentTimeMillis(),
+                    key = stateKey(pkg.orEmpty(), at),
+                    occurredAt = at,
                     fields = mapOf("package" to pkg.orEmpty()),
                 )
             }
@@ -107,10 +108,11 @@ public class ChargingSource(
             .scan(null as Boolean?) { prev, state -> state.charging.takeIf { it != prev } ?: prev }
             .filter { it != null }
             .map { charging ->
+                val at = System.currentTimeMillis()
                 TriggerEvent(
                     sourceId = ID,
-                    key = charging.toString(),
-                    occurredAt = System.currentTimeMillis(),
+                    key = stateKey(charging.toString(), at),
+                    occurredAt = at,
                     fields =
                         mapOf(
                             "charging" to charging.toString(),
@@ -137,10 +139,11 @@ public class NetworkSource(
             .scan(null as String?) { prev, state -> state.networkType.takeIf { it != prev } ?: prev }
             .filter { it != null }
             .map { type ->
+                val at = System.currentTimeMillis()
                 TriggerEvent(
                     sourceId = ID,
-                    key = type.orEmpty(),
-                    occurredAt = System.currentTimeMillis(),
+                    key = stateKey(type.orEmpty(), at),
+                    occurredAt = at,
                     fields = mapOf("type" to type.orEmpty()),
                 )
             }
@@ -175,3 +178,12 @@ public class ScreenUnlockSource : TriggerSource {
         public const val ID: String = "trigger.screen_unlock"
     }
 }
+
+/**
+ * 状态型源的事件 key 带上发生时刻。状态值会反复出现（充电 true→false→true），只用状态值做 key 时，
+ * FireGate 的去重会让同一任务之后永远不再触发（docs/tech/07 §4.2）。
+ */
+private fun stateKey(
+    value: String,
+    atMillis: Long,
+): String = "$value@$atMillis"

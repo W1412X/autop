@@ -58,7 +58,7 @@ class BaselineAssemblerTest {
     fun `triggerText 渲染 trigger 前缀键`() {
         val text = assembler.triggerText(mapOf("trigger.source" to "通知", "trigger.time" to "9点", "other" to "x"))
 
-        assertThat(text).isEqualTo("source: 通知\ntime: 9点")
+        assertThat(text).isEqualTo("""{"source":"通知","time":"9点"}""")
         assertThat(assembler.triggerText(mapOf("other" to "x"))).isEmpty()
     }
 

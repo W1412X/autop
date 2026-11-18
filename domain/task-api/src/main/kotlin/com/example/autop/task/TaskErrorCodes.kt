@@ -24,4 +24,13 @@ public object TaskErrorCodes {
 
     /** 流程 Beta 功能关闭（docs/adr/0030-beta-feature-switch.md）：不能绑定或运行流程。 */
     public const val FLOW_DISABLED: String = "task.flow_disabled"
+
+    /** 单个事件处理失败：只记日志，不影响同一事件源的后续事件。 */
+    public const val EVENT_FAILED: String = "task.event_failed"
+
+    /** 单个任务的派发失败：只影响该任务，同一事件的其他任务照常处理。 */
+    public const val DISPATCH_FAILED: String = "task.dispatch_failed"
+
+    /** 条件判定器抛出异常（非 Outcome.Err 的返回），按 onEvaluatorError 处理。 */
+    public const val EVALUATOR_CRASHED: String = "task.evaluator_crashed"
 }
