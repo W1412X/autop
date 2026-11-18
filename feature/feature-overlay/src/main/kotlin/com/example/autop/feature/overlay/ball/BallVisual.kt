@@ -86,6 +86,7 @@ internal fun BallVisual(
                     reaction = uiState.reaction,
                     offline = uiState.offline,
                     gazeDirection = uiState.gazeDirection,
+                    zStyle = uiState.zStyle,
                 ),
             modifier = Modifier.align(Alignment.Center).size(dims.faceDp),
         )

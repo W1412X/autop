@@ -10,6 +10,7 @@ import com.example.autop.agent.RunState
 import com.example.autop.core.ui.component.ballface.BallAmbientMode
 import com.example.autop.core.ui.component.ballface.BallFaceVariant
 import com.example.autop.core.ui.component.ballface.BallReaction
+import com.example.autop.core.ui.component.ballface.BallZStyle
 
 /** 悬浮球状态（docs/tech/08 §5.1）。 */
 public sealed interface BallMode {
@@ -80,6 +81,8 @@ public data class BallUiState(
     val sessionCount: Int = 0,
     /** 球体与贴边细条透明度（`ui.overlay.opacity`，1.0=完全不透明）。 */
     val opacity: Float = 1f,
+    /** 睡眠时浮动 z 的数量与间隔（`ui.ballAmbient.zCount`、`zIntervalMs`）。 */
+    val zStyle: BallZStyle = BallZStyle(),
     /** 空闲时的环境状态（睡眠、充电、低电量）。 */
     val ambient: BallAmbientMode = BallAmbientMode.NONE,
     /** 当前手势反应（空闲时生效；null 表示没有反应）。 */

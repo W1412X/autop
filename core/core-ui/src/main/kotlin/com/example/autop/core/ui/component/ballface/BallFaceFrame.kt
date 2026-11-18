@@ -59,8 +59,8 @@ internal data class BallFaceFrame(
     val tilt: Float,
     val shake: Float,
     val satellite: SatelliteFrame,
-    /** 浮动 z 的周期内相位（0 到 1）；null 表示不画 z。 */
-    val zPhase: Float? = null,
+    /** 浮动 z 的时刻（秒）；null 表示不画 z。多个 z 的位置由 [floatingZsOf] 按此时刻与 [BallZStyle] 推出。 */
+    val zTime: Float? = null,
 )
 
 /** 切换表情的过渡时长（秒）：与 [BallFaceDirector.CROSSFADE_MS] 一致。 */
@@ -96,16 +96,13 @@ internal fun ballFaceFrameOf(
         tilt = e.tilt + if (drifting) sin(t * TILT_WOBBLE_RATE) * TILT_WOBBLE else 0f,
         shake = if (motion && e.shake != 0f) sin(t * SHAKE_RATE) * e.shake else 0f,
         satellite = satelliteFrameOf(e, satT, satDeg, motion, digits),
-        zPhase = if (motion && e.floatingZ) zPhaseOf(t) else null,
+        zTime = if (motion && e.floatingZ) t else null,
     )
 }
 
 /** 网络断开时卫星停住的周期与停住时长（秒）：每个周期末尾停 [OFFLINE_PAUSE_SEC]。 */
 private const val OFFLINE_CYCLE_SEC: Float = 4f
 private const val OFFLINE_PAUSE_SEC: Float = 1.2f
-
-/** 浮动 z 的周期（秒）。 */
-private const val Z_PERIOD_SEC: Float = 2.4f
 
 /** 卫星停住时的“卫星时间”：只累计未停住的时间，停住期间保持不变，因此卫星不会跳位。 */
 internal fun pausedTimeOf(t: Float): Float {
@@ -114,9 +111,6 @@ internal fun pausedTimeOf(t: Float): Float {
     val pausedNow = (within - (OFFLINE_CYCLE_SEC - OFFLINE_PAUSE_SEC)).coerceIn(0f, OFFLINE_PAUSE_SEC)
     return t - (cycles * OFFLINE_PAUSE_SEC + pausedNow)
 }
-
-/** z 的周期内相位：0 为刚升起，1 为完全淡出。 */
-internal fun zPhaseOf(t: Float): Float = (t % Z_PERIOD_SEC) / Z_PERIOD_SEC
 
 private fun satelliteFrameOf(
     e: BallFaceExpression,
@@ -158,7 +152,7 @@ internal fun blendFrames(
         tilt = lerp(from.tilt, to.tilt, k),
         shake = lerp(from.shake, to.shake, k),
         satellite = blendSatellite(from.satellite, to.satellite, k),
-        zPhase = to.zPhase,
+        zTime = to.zTime,
     )
 
 /** 三次缓入缓出：起止速度为零，过渡两端不突兀。 */

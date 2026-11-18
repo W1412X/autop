@@ -86,6 +86,15 @@ public enum class BallFacePaint {
     INVERSE,
 }
 
+/**
+ * 睡眠时浮动 z 的样式。[count] 为同时存在的 z 个数，[intervalSec] 为相邻 z 出现的间隔（秒）。
+ * 数值来自 `ui.ballAmbient`（zCount、zIntervalMs）。
+ */
+public data class BallZStyle(
+    val count: Int = 2,
+    val intervalSec: Float = 2f,
+)
+
 /** 空闲时的环境状态（只在 [BallFaceMood.IDLE] 下生效，状态表情优先）。 */
 public enum class BallAmbientMode {
     /** 普通空闲：轮换中性表情池。 */
@@ -155,6 +164,8 @@ public data class BallFaceSpec(
     val motionEnabled: Boolean = true,
     val count: Int? = null,
     val ambient: BallAmbientMode = BallAmbientMode.NONE,
+    /** 睡眠 z 的数量与出现间隔（只在睡眠时生效）。 */
+    val zStyle: BallZStyle = BallZStyle(),
     val reaction: BallReaction? = null,
     val offline: Boolean = false,
     val gazeDirection: Offset? = null,

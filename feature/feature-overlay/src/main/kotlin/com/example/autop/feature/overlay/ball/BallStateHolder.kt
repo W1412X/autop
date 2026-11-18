@@ -18,6 +18,7 @@ import com.example.autop.core.config.UiBallAmbientSection
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.ui.component.ballface.BallFaceVariant
 import com.example.autop.core.ui.component.ballface.BallReaction
+import com.example.autop.core.ui.component.ballface.BallZStyle
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.DeviceStateProvider
 import com.example.autop.flow.RecordingSession
@@ -112,6 +113,7 @@ public class BallStateHolder
                     ballSizeDp = bits.ballSizeDp,
                     doubleTapStops = bits.doubleTapStops,
                     opacity = bits.opacity,
+                    zStyle = bits.zStyle,
                 )
             }.stateIn(scope, SharingStarted.Eagerly, BallUiState())
 
@@ -356,6 +358,10 @@ public class BallStateHolder
                 ballSizeDp = snapshot[UiConfig.OVERLAY].ballSizeDp,
                 doubleTapStops = snapshot[UiConfig.OVERLAY].doubleTapStops,
                 opacity = snapshot[UiConfig.OVERLAY].opacity.toFloat(),
+                zStyle =
+                    snapshot[UiConfig.BALL_AMBIENT].let { ambient ->
+                        BallZStyle(count = ambient.zCount, intervalSec = ambient.zIntervalMs / MILLIS_PER_SECOND_F)
+                    },
             )
 
         /** 未摆放/未持久化的位置标记。 */
@@ -373,6 +379,7 @@ public class BallStateHolder
             private const val DISPLAY_MODE_ALWAYS: String = "always"
 
             private const val MILLIS_PER_SECOND: Long = 1_000L
+            private const val MILLIS_PER_SECOND_F: Float = 1_000f
 
             /** `DeviceState.networkType` 无网络时的取值。 */
             private const val NETWORK_NONE: String = "none"
@@ -386,4 +393,5 @@ private data class ConfigBits(
     val ballSizeDp: Int,
     val doubleTapStops: Boolean,
     val opacity: Float,
+    val zStyle: BallZStyle,
 )

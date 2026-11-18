@@ -47,11 +47,11 @@ class BallFaceAmbientTest {
     }
 
     @Test
-    fun `floating z phase is only drawn in motion and only for the sleep face`() {
+    fun `floating z time is only drawn in motion and only for the sleep face`() {
         val sleep = ambientExpressionOf(BallAmbientMode.SLEEP)!!
-        assertThat(ballFaceFrameOf(sleep, 1.2f, motion = true).zPhase).isWithin(1e-4f).of(0.5f)
-        assertThat(ballFaceFrameOf(sleep, 1.2f, motion = false).zPhase).isNull()
+        assertThat(ballFaceFrameOf(sleep, 1.2f, motion = true).zTime).isEqualTo(1.2f)
+        assertThat(ballFaceFrameOf(sleep, 1.2f, motion = false).zTime).isNull()
         val calm = BallFaceExpressions.calm
-        assertThat(ballFaceFrameOf(calm, 1.2f, motion = true).zPhase).isNull()
+        assertThat(ballFaceFrameOf(calm, 1.2f, motion = true).zTime).isNull()
     }
 }

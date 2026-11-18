@@ -64,7 +64,9 @@
       "yawnMs": 1500,
       "greetMs": 1200,
       "flingPxPerMs": 1.0,
-      "tickSec": 60
+      "tickSec": 60,
+      "zCount": 2,
+      "zIntervalMs": 2000
     },
     "motion": {
       "expandMs": 200,

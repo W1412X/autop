@@ -53,8 +53,7 @@ import com.example.autop.core.ui.theme.LocalBallShape
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.PetColors
 import kotlinx.coroutines.delay
-import kotlin.math.PI
-import kotlin.math.sin
+import kotlin.math.roundToInt
 import kotlin.random.Random
 
 /** 表情渲染（参数形式）。 */
@@ -153,6 +152,7 @@ private fun HeldBallFace(
                     facePaletteOf(spec.paint, spec.tint, MaterialTheme.colorScheme, LocalBallFaceColor.current),
                 label = label,
                 labels = labels,
+                zStyle = spec.zStyle,
             ),
         motion = motion,
         clock = clock,
@@ -211,6 +211,7 @@ private class FaceStyle(
     val palette: FacePalette,
     val label: FaceLabel?,
     val labels: LabelLayouts,
+    val zStyle: BallZStyle,
 )
 
 /** 会话数字：[inSatellite] 为真时替代卫星符号，否则画在卫星角标上。 */
@@ -351,24 +352,26 @@ private fun DrawScope.drawFace(
         drawEye(frame.right, side = 1f, frame = frame, color = eyeColor)
         drawSatellite(frame.satellite, style)
     }
-    frame.zPhase?.let { drawFloatingZ(it, style) }
+    frame.zTime?.let { drawFloatingZ(it, style) }
 }
 
-/** 浮动 z：从头顶右侧升起，正弦淡入淡出；位置在球体外侧，不压在盘面上。 */
+/**
+ * 浮动 z：多个 z 从小到大连续升起，位置与透明度由 [floatingZsOf] 给出。
+ * 字号取整后再排版，避免每帧的小数字号都生成新的排版缓存。
+ */
 private fun DrawScope.drawFloatingZ(
-    phase: Float,
+    t: Float,
     style: FaceStyle,
 ) {
-    val alpha = sin(PI * phase).toFloat()
-    // 首尾几乎全透明时不画，省掉绘制；肉眼看不出差别。
-    if (alpha < Z_MIN_ALPHA) return
-    drawLabelText(
-        labels = style.labels,
-        text = "z",
-        sizeUnits = Z_UNITS,
-        center = Offset(Z_X + Z_DX * phase, Z_Y - Z_DY * phase),
-        color = style.palette.body.withAlpha(alpha),
-    )
+    for (z in floatingZsOf(t, style.zStyle)) {
+        drawLabelText(
+            labels = style.labels,
+            text = "z",
+            sizeUnits = z.size.roundToInt().toFloat(),
+            center = Offset(z.x, z.y),
+            color = style.palette.body.withAlpha(z.alpha),
+        )
+    }
 }
 
 /** 球体：实心盘，或线条版的开口环（缺口在右上）。 */
@@ -643,9 +646,6 @@ private fun Color.withAlpha(alpha: Float): Color = copy(alpha = this.alpha * alp
 /** 拖动时视线的最大偏移（设计单位）。 */
 private const val DRAG_GAZE_UNITS: Float = 60f
 
-/** 浮动 z 的透明度下限：低于它不绘制。 */
-private const val Z_MIN_ALPHA: Float = 0.01f
-
 /** 笑眼、痛眼、叉眼的几何与描边：固定不变，预先构造，绘制时复用。 */
 private val JOY_PATH = quadPath(-44f, 40f, 0f, -124f, 44f, 40f)
 private val JOY_STYLE = Stroke(width = JOY_STROKE, cap = StrokeCap.Round)
@@ -657,13 +657,6 @@ private val CROSS_STYLE = Stroke(width = PAIN_STROKE, cap = StrokeCap.Round)
 
 /** 线条版开口环的描边：固定不变，预先构造。 */
 private val RING_STYLE = Stroke(width = RING_STROKE, cap = StrokeCap.Round)
-
-/** 浮动 z 的起点与位移、字号（设计单位）。 */
-private const val Z_X: Float = 430f
-private const val Z_Y: Float = -430f
-private const val Z_DX: Float = 60f
-private const val Z_DY: Float = 220f
-private const val Z_UNITS: Float = 150f
 
 /** 静态落帧的时刻（秒）：与设计稿 `MOTION=false` 时的 t 一致。 */
 internal const val STATIC_TIME_SEC: Float = 1.35f
