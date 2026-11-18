@@ -26,6 +26,9 @@
       --accent-soft: #D5E3FF;
       --on-accent: #FFFFFF;
       --max: 1120px;
+      --face: #1A1C16;
+      --face-eye: #F9FAEF;
+      --face-sat: #2F5FA5;
     }
     @media (prefers-color-scheme: dark) {
       :root {
@@ -40,6 +43,9 @@
         --accent-strong: #C3D8FF;
         --accent-soft: #134786;
         --on-accent: #00305F;
+        --face: #E2E3D8;
+        --face-eye: #12140E;
+        --face-sat: #A9C7FF;
       }
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -55,6 +61,13 @@
     img { display: block; max-width: 100%; }
     a { color: inherit; }
     .wrap { width: 100%; max-width: var(--max); margin: 0 auto; padding: 0 32px; }
+
+    /* 表情小脸（实心：盘面 + 镂空眼 + 卫星） */
+    .face { display: block; width: var(--s, 96px); height: var(--s, 96px); flex: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+    .face svg { width: 100%; height: 100%; display: block; overflow: visible; }
+    .face .disc { fill: var(--face); }
+    .face .satc { fill: var(--face-sat); }
+    .face .eye { fill: var(--face-eye); stroke: var(--face-eye); stroke-linecap: round; stroke-linejoin: round; }
 
     .site-header { border-bottom: 1px solid var(--line); }
     .header-inner {
@@ -120,21 +133,7 @@
       align-items: center;
       gap: 64px;
     }
-    .hero-ball {
-      width: 104px;
-      height: 104px;
-      margin-bottom: 26px;
-      color: var(--text);
-      cursor: pointer;
-      user-select: none;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .hero-ball svg { width: 100%; height: 100%; display: block; overflow: visible; will-change: transform; }
-    .hero-ball .b-ring { fill: none; stroke: currentColor; stroke-width: 5.209; stroke-linecap: round; }
-    .hero-ball .b-dot, .hero-ball .b-cap { fill: currentColor; }
-    .hero-ball .b-arc { display: none; fill: none; stroke: currentColor; stroke-width: 5.209; stroke-linecap: round; }
-    .hero-ball.happy .b-cap { display: none; }
-    .hero-ball.happy .b-arc { display: inline; }
+    .hero-ball { --s: 112px; margin: 0 0 26px -6px; cursor: pointer; }
     .eyebrow {
       color: var(--accent);
       font-size: 12px;
@@ -185,7 +184,8 @@
       margin-top: 44px;
     }
     .feature { padding: 26px 0 30px; border-top: 1px solid var(--line); }
-    .num { display: block; margin-bottom: 10px; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .1em; }
+    .feat-top { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 10px; }
+    .num { display: block; color: var(--accent); font-size: 12px; font-weight: 700; letter-spacing: .1em; }
     .feature h3 { font-size: 19px; letter-spacing: -.01em; margin-bottom: 10px; }
     .feature p { color: var(--muted); font-size: 15px; line-height: 1.75; }
 
@@ -197,6 +197,7 @@
     }
     .split-reverse { grid-template-columns: 240px minmax(0, 1fr); }
     .split h2 { margin-bottom: 22px; }
+    .split-copy .face { margin-bottom: 18px; }
     .body { color: var(--muted); font-size: 15.5px; line-height: 1.85; max-width: 40em; }
     .body + .body { margin-top: 14px; }
     .phone-figure { margin: 0; text-align: center; }
@@ -216,6 +217,7 @@
 
     .notes { display: grid; grid-template-columns: repeat(3, 1fr); gap: 48px; }
     .note { border-top: 1px solid var(--line); padding-top: 22px; }
+    .note .face { margin-bottom: 14px; }
     .note h3 { font-size: 17px; letter-spacing: -.01em; margin-bottom: 10px; }
     .note p { color: var(--muted); font-size: 14.5px; line-height: 1.75; }
 
@@ -229,12 +231,14 @@
       border: 1px solid var(--line);
       border-radius: 24px;
     }
+    .cta-main { display: flex; align-items: center; gap: 28px; }
     .cta h2 { font-size: clamp(24px, 3vw, 32px); margin-bottom: 12px; }
     .cta p { max-width: 560px; color: var(--muted); font-size: 14.5px; line-height: 1.75; }
     .cta .btn { flex-shrink: 0; }
 
     .site-footer { border-top: 1px solid var(--line); padding: 32px 0 44px; color: var(--faint); font-size: 13px; }
-    .footer-inner { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+    .footer-inner { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex-wrap: wrap; }
+    .footer-left { display: flex; align-items: center; gap: 12px; }
     .site-footer a { color: var(--muted); text-decoration: none; }
     .site-footer a:hover { color: var(--text); }
 
@@ -258,6 +262,7 @@
       .shots { gap: 20px; }
       .shots .phone { padding: 5px; border-radius: 20px; }
       .shots .phone img { border-radius: 15px; }
+      .cta-main { flex-direction: column; align-items: flex-start; }
     }
     @media (max-width: 380px) {
       .shots { grid-template-columns: 1fr; }
@@ -291,20 +296,7 @@
     <section class="hero">
       <div class="wrap hero-grid">
         <div class="hero-copy">
-          <div class="hero-ball" id="heroBall" role="img" aria-label="AutoP 图标，点一下会做出反应">
-            <svg viewBox="27 27 54 54" aria-hidden="true">
-              <path class="b-ring" d="M76.6509 54 A22.6509 22.6509 0 1 1 59.6708 32.0707"/>
-              <g class="b-sat">
-                <path class="b-dot" d="M72.731 28.7588 A6.5112 6.5112 0 1 1 72.731 41.7812 A6.5112 6.5112 0 1 1 72.731 28.7588 Z"/>
-              </g>
-              <g class="b-eyes">
-                <rect class="b-cap b-eye-l" x="44.2775" y="52.392" width="5.209" height="9.826" rx="2.6045"/>
-                <rect class="b-cap b-eye-r" x="58.5135" y="52.392" width="5.209" height="9.826" rx="2.6045"/>
-                <path class="b-arc" d="M43.6 58.2 Q46.88 52.6 50.2 58.2"/>
-                <path class="b-arc" d="M57.9 58.2 Q61.12 52.6 64.4 58.2"/>
-              </g>
-            </svg>
-          </div>
+          <div class="face hero-ball" data-expr="calm" role="img" aria-label="AutoP 表情球，点一下会开心"></div>
           <p class="eyebrow">Android 11+ · 通用操作 Agent</p>
           <h1>一句话，<br>让手机自己把事做完。</h1>
           <p class="lede">AutoP 在 Android 手机上看屏幕、动手操作，由大模型规划每一步。屏幕可以从无障碍节点树、端侧视觉模型或视觉大模型读取；点击和滑动优先走节点动作，也可以通过无线调试配对用 shell 注入，等同真实触摸。不需要 root，Android 11 及以上的手机装上就能用。</p>
@@ -329,32 +321,32 @@
         <h2>把手机交给它，<br>你只管说要做什么。</h2>
         <div class="features">
           <article class="feature">
-            <span class="num">01</span>
+            <div class="feat-top"><span class="num">01</span><span class="face" data-expr="wink" style="--s:44px" aria-hidden="true"></span></div>
             <h3>一句话下达任务</h3>
             <p>在对话页或悬浮球里说「把屏幕亮度调到 50%」「在微信里告诉张三明天的会推迟到 4 点」。Agent 列出计划并逐步执行，运行中可以补充指令，也可以一键停止。</p>
           </article>
           <article class="feature">
-            <span class="num">02</span>
+            <div class="feat-top"><span class="num">02</span><span class="face" data-expr="peek" style="--s:44px" aria-hidden="true"></span></div>
             <h3>看懂屏幕</h3>
             <p>默认走无障碍节点树，成本最低；应用屏蔽节点时换端侧视觉模型，再不够交给视觉大模型。三种方式输出同一种归一化坐标，操作层不关心画面从哪里来。</p>
           </article>
           <article class="feature">
-            <span class="num">03</span>
+            <div class="feat-top"><span class="num">03</span><span class="face" data-expr="focus" style="--s:44px" aria-hidden="true"></span></div>
             <h3>点得稳，滑得稳</h3>
             <p>优先走系统无障碍节点动作；连接无线调试后，坐标手势走 shell 注入，等同真实触摸，未连接时回落到无障碍注入。按应用记住哪种方式有效，滚动按容器计算距离。</p>
           </article>
           <article class="feature">
-            <span class="num">04</span>
+            <div class="feat-top"><span class="num">04</span><span class="face" data-expr="expect" style="--s:44px" aria-hidden="true"></span></div>
             <h3>到点或到时自己做</h3>
             <p>手动、定时、条件三种触发。通知到达、App 进入前台、充电、网络变化、解锁都能成为开始信号，带冷却期、每日上限和重复事件去重。</p>
           </article>
           <article class="feature">
-            <span class="num">05</span>
+            <div class="feat-top"><span class="num">05</span><span class="face" data-expr="joy" style="--s:44px" aria-hidden="true"></span></div>
             <h3>悬浮球与执行期</h3>
             <p>全局悬浮球带圆弧菜单和进度面板；Agent 操作手机时，屏幕四周有随主题色流动的柔光，顶部显示步数胶囊。执行期间触摸盾挡住误触，暂停或停止后立即解除。</p>
           </article>
           <article class="feature">
-            <span class="num">06</span>
+            <div class="feat-top"><span class="num">06</span><span class="face" data-expr="smug" style="--s:44px" aria-hidden="true"></span></div>
             <h3>模型配置由你指定</h3>
             <p>OpenAI 兼容与 Anthropic 兼容两种协议，不依赖官方 SDK。主模型、视觉模型、轻量模型可以分开分配，Embedding 可关闭。</p>
           </article>
@@ -365,6 +357,7 @@
     <section class="section">
       <div class="wrap split">
         <div class="split-copy">
+          <span class="face" data-expr="focus" style="--s:64px" aria-hidden="true"></span>
           <p class="eyebrow">流程</p>
           <h2>重复的操作，<br>沉淀成流程。</h2>
           <p class="body">用自然语言描述，AI 边思考边生成可预览的步骤草稿；也可以打开悬浮球，在目标应用里正常操作一遍，AutoP 会记录并转成步骤。之后直接运行，不必每次让模型重新推理。</p>
@@ -388,6 +381,7 @@
           <figcaption>记忆树</figcaption>
         </figure>
         <div class="split-copy">
+          <span class="face" data-expr="smug" style="--s:64px" aria-hidden="true"></span>
           <p class="eyebrow">记忆</p>
           <h2>用得越久，<br>越懂你的手机。</h2>
           <p class="body">记忆按目录组织：用户档案、人物、各 App 的操作手册、任务笔记。提示词里只放索引，正文按需读取；检索用路径匹配、全文和向量混合召回。</p>
@@ -432,14 +426,17 @@
     <section class="section">
       <div class="wrap notes">
         <article class="note">
+          <span class="face" data-expr="angry" style="--s:52px" aria-hidden="true"></span>
           <h3>敏感场景硬阻断</h3>
           <p>支付、转账、密码、授权、删除账号、安装未知应用等场景在执行层拦截，不依赖提示词。命中后暂停任务并通知你手动处理。</p>
         </article>
         <article class="note">
+          <span class="face" data-expr="puzzled" style="--s:52px" aria-hidden="true"></span>
           <h3>数据只去你指定的端点</h3>
           <p>屏幕文本和截图会发给你配置的模型服务。项目不含统计、崩溃上报等第三方 SDK；想要完全本地，可以把端点指向自己部署的模型。</p>
         </article>
         <article class="note">
+          <span class="face" data-expr="calm" style="--s:52px" aria-hidden="true"></span>
           <h3>密钥与操作记录</h3>
           <p>API Key 经 Android Keystore 加密存放，密码框内容不进入观测和日志。所有动作写入操作记录，可事后查看。</p>
         </article>
@@ -449,9 +446,12 @@
     <section class="section">
       <div class="wrap">
         <div class="cta">
-          <div>
-            <h2>自己装一个</h2>
-            <p>不需要 root，Android 11 及以上即可安装。在 GitHub Releases 下载最新的 app-release.apk；Android 13 及以上侧载后，需要先在应用信息里「允许受限设置」，再开启无障碍服务。</p>
+          <div class="cta-main">
+            <span class="face" data-expr="happy" style="--s:72px" aria-hidden="true"></span>
+            <div>
+              <h2>自己装一个</h2>
+              <p>不需要 root，Android 11 及以上即可安装。在 GitHub Releases 下载最新的 app-release.apk；Android 13 及以上侧载后，需要先在应用信息里「允许受限设置」，再开启无障碍服务。</p>
+            </div>
           </div>
           <a class="btn btn-primary" href="https://github.com/W1412X/autop/releases/latest">去 Releases 下载</a>
         </div>
@@ -461,88 +461,170 @@
 
   <footer class="site-footer">
     <div class="wrap footer-inner">
-      <span>AutoP · 仅供开发学习使用</span>
+      <div class="footer-left">
+        <span class="face" data-expr="sleepy" style="--s:30px" aria-hidden="true"></span>
+        <span>AutoP · 仅供开发学习使用</span>
+      </div>
       <span><a href="https://github.com/W1412X/autop">W1412X/autop</a></span>
     </div>
   </footer>
 
   <script>
   (function () {
-    var ball = document.getElementById('heroBall');
-    if (!ball) return;
-    var svg = ball.querySelector('svg');
-    var sat = ball.querySelector('.b-sat');
-    var eyes = ball.querySelector('.b-eyes');
-    var eyeL = ball.querySelector('.b-eye-l');
-    var eyeR = ball.querySelector('.b-eye-r');
-    var EYE_CY = 57.305;
     var reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    var HAPPY_SECS = 1.2;
-    var SPIN_SECS = 0.9;
-    var IDLE_DEG_PER_SEC = 12;     // 一圈 30 秒
-    var SPIN_EXTRA_DEG_PER_SEC = 388; // 点击后约 0.9 秒转完一圈
 
-    var angle = 0, spin = 0, happy = 0, t = 0;
-    var blinkIn = rand(3.5, 6.5), blinkT = -1;
-    var gazeIn = rand(4, 8), tx = 0, ty = 0, gx = 0, gy = 0;
+    // 表情库：眼睛 1024 坐标系，眼中心在 (512 ± 144.3, 579)
+    var EXPR = {
+      calm:    { l: 'open',  r: 'open',  g: [0, 6] },
+      focus:   { l: 'half',  r: 'half',  gap: -7, g: [12, 4] },
+      expect:  { l: 'wide',  r: 'wide',  gap: 8,  g: [20, -12] },
+      happy:   { l: 'happy', r: 'happy', g: [0, 0] },
+      joy:     { l: 'joy',   r: 'joy',   g: [0, -2] },
+      sleepy:  { l: 'half',  r: 'half',  g: [0, 18] },
+      angry:   { l: 'angry', r: 'angry', gap: -8, g: [-12, 14] },
+      dizzy:   { l: 'x',     r: 'x',     g: [0, 4] },
+      smug:    { l: 'happy', r: 'half',  gap: 4,  g: [16, 4] },
+      peek:    { l: 'closed', r: 'open', g: [-34, 4] },
+      puzzled: { l: 'half',  r: 'wide',  gap: 5,  roy: -10, g: [-20, -10] },
+      wink:    { l: 'happy', r: 'open',  g: [0, 6] },
+      pain:    { l: 'pain',  r: 'pain',  g: [0, 14] }
+    };
+    var BLINKABLE = { open: 1, half: 1, wide: 1 };
+
+    function glyph(name, side) {
+      switch (name) {
+        case 'open':   return '<rect x="-52.8" y="-99.6" width="105.6" height="199.2" rx="52.8"/>';
+        case 'half':   return '<rect x="-52.8" y="-50" width="105.6" height="100" rx="50"/>';
+        case 'wide':   return '<rect x="-58" y="-108" width="116" height="216" rx="58"/>';
+        case 'closed': return '<rect x="-48" y="-15" width="96" height="30" rx="15"/>';
+        case 'angry':  return '<rect x="-50" y="-20" width="100" height="40" rx="20" transform="rotate(' + (-side * 16) + ')"/>';
+        case 'happy':  return '<path fill="none" stroke-width="48" d="M-46 34 Q0 -110 46 34"/>';
+        case 'joy':    return '<path fill="none" stroke-width="50" d="M-44 40 Q0 -124 44 40"/>';
+        case 'x':      return '<path fill="none" stroke-width="44" d="M-36 -38 L36 38 M36 -38 L-36 38"/>';
+        case 'pain':
+          return '<path fill="none" stroke-width="44" stroke-linejoin="round" d="' +
+            (side < 0 ? 'M-32 -40 L36 0 L-32 40' : 'M32 -40 L-36 0 L32 40') + '"/>';
+      }
+      return '';
+    }
 
     function rand(a, b) { return a + Math.random() * (b - a); }
 
-    function react() {
-      happy = HAPPY_SECS;
-      spin = SPIN_SECS;
-      if (reduce) {
-        ball.classList.add('happy');
-        setTimeout(function () { ball.classList.remove('happy'); }, HAPPY_SECS * 1000);
+    function Face(el) {
+      this.el = el;
+      this.base = el.getAttribute('data-expr') || 'calm';
+      this.cur = this.base;
+      this.hold = 0;
+      this.gx = 0; this.gy = 0;
+      this.tx = 0; this.ty = 0;
+      this.gazeIn = rand(4, 8);
+      this.blinkIn = rand(3.5, 6.5);
+      this.blinkT = -1;
+      this.spin = 0;
+      this.angle = rand(0, 360);
+      this.forms = ['', ''];
+
+      el.innerHTML =
+        '<svg viewBox="-160 -160 1344 1344" aria-hidden="true">' +
+        '<circle class="disc" cx="512" cy="512" r="512"/>' +
+        '<g class="sat" transform="rotate(0 512 512)"><circle class="satc" cx="891.7" cy="132.3" r="132"/></g>' +
+        '<g class="gaze"><g class="eye eye-l"></g><g class="eye eye-r"></g></g>' +
+        '</svg>';
+      this.sat = el.querySelector('.sat');
+      this.gaze = el.querySelector('.gaze');
+      this.eyeEls = [el.querySelector('.eye-l'), el.querySelector('.eye-r')];
+      this.applyForms();
+      this.render(0);
+    }
+
+    Face.prototype.applyForms = function () {
+      var e = EXPR[this.cur] || EXPR.calm;
+      var names = [e.l, e.r];
+      for (var i = 0; i < 2; i++) {
+        if (this.forms[i] !== names[i]) {
+          this.forms[i] = names[i];
+          this.eyeEls[i].innerHTML = glyph(names[i], i === 0 ? -1 : 1);
+        }
       }
-    }
-    ball.addEventListener('pointerdown', react);
+    };
 
-    function setEye(el, cy, s) {
-      var cx = el === eyeL ? 46.8821 : 61.118;
-      el.setAttribute('transform',
-        'translate(' + cx + ' ' + cy + ') scale(1 ' + s.toFixed(3) + ') translate(' + (-cx) + ' ' + (-cy) + ')');
+    Face.prototype.setExpr = function (name, hold) {
+      this.cur = name;
+      this.hold = hold || 0;
+      this.applyForms();
+      var g = (EXPR[name] || EXPR.calm).g;
+      this.tx = g[0]; this.ty = g[1];
+      this.gazeIn = rand(2, 4);
+    };
+
+    Face.prototype.render = function (dt) {
+      var e = EXPR[this.cur] || EXPR.calm;
+
+      if (this.hold > 0) {
+        this.hold -= dt;
+        if (this.hold <= 0) { this.setExpr(this.base); }
+      }
+
+      this.gazeIn -= dt;
+      if (this.gazeIn <= 0) {
+        var g = e.g;
+        this.tx = g[0] + rand(-12, 12);
+        this.ty = g[1] + rand(-8, 8);
+        this.gazeIn = rand(4, 8);
+      }
+      var k = 1 - Math.exp(-dt * 5);
+      this.gx += (this.tx - this.gx) * k;
+      this.gy += (this.ty - this.gy) * k;
+      this.gaze.setAttribute('transform', 'translate(' + this.gx.toFixed(2) + ' ' + this.gy.toFixed(2) + ')');
+
+      var blinkable = BLINKABLE[this.forms[0]] && BLINKABLE[this.forms[1]];
+      this.blinkIn -= dt;
+      if (blinkable && this.blinkT < 0 && this.blinkIn <= 0) this.blinkT = 0.16;
+      var s = 1;
+      if (this.blinkT >= 0) {
+        this.blinkT -= dt;
+        var p = 1 - Math.max(0, this.blinkT) / 0.16;
+        s = 1 - 0.92 * Math.sin(Math.PI * p);
+        if (this.blinkT <= 0) { this.blinkT = -1; this.blinkIn = rand(3.5, 6.5); }
+      }
+
+      var sides = [-1, 1];
+      for (var i = 0; i < 2; i++) {
+        var cx = 512 + sides[i] * (144.3 + (e.gap || 0));
+        var cy = 579 + (i === 0 ? (e.loy || 0) : (e.roy || 0));
+        this.eyeEls[i].setAttribute('transform',
+          'translate(' + cx.toFixed(2) + ' ' + cy.toFixed(2) + ') scale(1 ' + s.toFixed(3) + ')');
+      }
+
+      this.spin = Math.max(0, this.spin - dt);
+      this.angle = (this.angle + (14 + 388 * (this.spin / 0.9)) * dt) % 360;
+      this.sat.setAttribute('transform', 'rotate(' + this.angle.toFixed(2) + ' 512 512)');
+    };
+
+    var faces = [];
+    document.querySelectorAll('.face[data-expr]').forEach(function (el) {
+      faces.push(new Face(el));
+    });
+
+    // 首页表情球：点一下开心，卫星加速
+    var hero = null;
+    faces.forEach(function (f) { if (f.el.classList.contains('hero-ball')) hero = f; });
+    if (hero) {
+      hero.el.addEventListener('pointerdown', function () {
+        hero.setExpr('joy', 1.2);
+        hero.spin = 0.9;
+      });
     }
 
+    if (reduce) return;
+    var last = performance.now();
     function frame(now) {
       var dt = Math.min(0.05, (now - last) / 1000);
       last = now;
-      t += dt;
-
-      spin = Math.max(0, spin - dt);
-      happy = Math.max(0, happy - dt);
-      var speed = IDLE_DEG_PER_SEC + SPIN_EXTRA_DEG_PER_SEC * (spin / SPIN_SECS);
-      angle = (angle + speed * dt) % 360;
-      sat.setAttribute('transform', 'rotate(' + angle.toFixed(2) + ' 54 54)');
-      ball.classList.toggle('happy', happy > 0);
-
-      gazeIn -= dt;
-      if (gazeIn <= 0) { tx = rand(-2, 2); ty = rand(-1.5, 1.5); gazeIn = rand(4, 8); }
-      var k = 1 - Math.exp(-dt * 6);
-      var wantX = happy > 0 ? 0 : tx, wantY = happy > 0 ? 0 : ty;
-      gx += (wantX - gx) * k;
-      gy += (wantY - gy) * k;
-      eyes.setAttribute('transform', 'translate(' + gx.toFixed(2) + ' ' + gy.toFixed(2) + ')');
-
-      blinkIn -= dt;
-      if (blinkT < 0 && blinkIn <= 0 && happy <= 0) blinkT = 0.16;
-      var s = 1;
-      if (blinkT >= 0) {
-        blinkT -= dt;
-        var p = 1 - Math.max(0, blinkT) / 0.16;
-        s = 1 - 0.9 * Math.sin(Math.PI * p);
-        if (blinkT <= 0) { blinkT = -1; blinkIn = rand(3.5, 6.5); }
-      }
-      setEye(eyeL, EYE_CY, s);
-      setEye(eyeR, EYE_CY, s);
-
-      var breath = 1 + 0.009 * Math.sin(t * Math.PI / 2) + 0.03 * (happy / HAPPY_SECS);
-      svg.style.transform = 'scale(' + breath.toFixed(4) + ')';
+      for (var i = 0; i < faces.length; i++) faces[i].render(dt);
       requestAnimationFrame(frame);
     }
-
-    var last = performance.now();
-    if (!reduce) requestAnimationFrame(frame);
+    requestAnimationFrame(frame);
   })();
   </script>
 </body>
