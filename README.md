@@ -1,11 +1,21 @@
+<div align="center">
+
+<img src="img/logo.svg" width="120" alt="AutoP 图标">
+
 # AutoP
+
+**跑在手机上的通用操作 Agent**
 
 [![release](https://github.com/W1412X/autop/actions/workflows/release.yml/badge.svg)](https://github.com/W1412X/autop/actions/workflows/release.yml)
 ![minSdk](https://img.shields.io/badge/minSdk-30-3DDC84)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2-7F52FF)
 ![Jetpack Compose](https://img.shields.io/badge/UI-Jetpack%20Compose-4285F4)
 
-**跑在手机上的通用操作 Agent。** 你用一句话下达任务，AutoP 自己看屏幕、动手操作，由大模型规划每一步，替你完成点、滑、输入、跨应用的事。屏幕可以从无障碍节点树或端侧视觉模型读取，截图也可以直接交给模型查看；点击和滑动优先走节点动作，也可以通过无线调试配对用 shell 注入，等同真实触摸。不需要 root，Android 11 及以上的手机装上就能用。
+[中文](README.md) · [English](README.en.md) · [项目主页](https://autop.sharesdu.com) · [下载最新 APK](https://github.com/W1412X/autop/releases/latest)
+
+</div>
+
+你用一句话下达任务，AutoP 自己看屏幕、动手操作，由大模型规划每一步，替你完成点、滑、输入、跨应用的事。屏幕可以从无障碍节点树或端侧视觉模型读取，截图也可以直接交给模型查看；点击和滑动优先走节点动作，也可以通过无线调试配对用 shell 注入，等同真实触摸。不需要 root，Android 11 及以上的手机装上就能用。
 
 它不为任何具体 App 写专门的代码路径：应用相关的知识（操作手册、敏感页面规则）都是可编辑的数据，Agent 在使用中不断补充。
 
@@ -13,10 +23,10 @@
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/chat-running.jpg" width="220" alt="对话中的运行时间线"><br><sub>对话：每一步都可展开查看</sub></td>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/running-glow.jpg" width="220" alt="执行期边缘光"><br><sub>执行期：边缘光 + 步数胶囊</sub></td>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flow-ai-create.jpg" width="220" alt="AI 创建流程"><br><sub>AI 创建流程：边思考边生成</sub></td>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/memory.jpg" width="220" alt="记忆树"><br><sub>记忆：按目录组织</sub></td>
+    <td align="center" valign="top"><img src="img/chat-running.jpg" width="220" alt="对话中的运行时间线"><br><sub>对话：每一步都可展开查看</sub></td>
+    <td align="center" valign="top"><img src="img/running-glow.jpg" width="220" alt="执行期边缘光"><br><sub>执行期：边缘光 + 步数胶囊</sub></td>
+    <td align="center" valign="top"><img src="img/flow-ai-create.jpg" width="220" alt="AI 创建流程"><br><sub>AI 创建流程：边思考边生成</sub></td>
+    <td align="center" valign="top"><img src="img/memory.jpg" width="220" alt="记忆树"><br><sub>记忆：按目录组织</sub></td>
   </tr>
 </table>
 
@@ -29,8 +39,10 @@
 - [隐私与安全](#隐私与安全)
 - [项目结构](#项目结构)
 - [开发指南](#开发指南)
+- [第三方依赖与许可](#第三方依赖与许可)
 - [CI 与发布](#ci-与发布)
 - [下载安装包](#下载安装包)
+- [许可](#许可)
 
 ## 能做什么
 
@@ -69,8 +81,8 @@
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/chat-list.jpg" width="220" alt="对话列表"><br><sub>对话列表</sub></td>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/task-new.jpg" width="220" alt="新建任务"><br><sub>新建任务：一句话描述，生成草稿</sub></td>
+    <td align="center" valign="top"><img src="img/chat-list.jpg" width="220" alt="对话列表"><br><sub>对话列表</sub></td>
+    <td align="center" valign="top"><img src="img/task-new.jpg" width="220" alt="新建任务"><br><sub>新建任务：一句话描述，生成草稿</sub></td>
   </tr>
 </table>
 
@@ -86,10 +98,9 @@
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flows-empty.jpg" width="220" alt="流程列表（空）"><br><sub>流程页：点右上角加号创建</sub></td>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flows-list.jpg" width="220" alt="流程列表"><br><sub>我的流程</sub></td>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flow-detail.jpg" width="220" alt="流程详情"><br><sub>详情：运行、调试、统计与参数</sub></td>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/flow-editor.jpg" width="220" alt="流程编辑器"><br><sub>编辑器：简明 / 高级 / JSON</sub></td>
+    <td align="center" valign="top"><img src="img/flows-list.jpg" width="220" alt="流程列表"><br><sub>我的流程</sub></td>
+    <td align="center" valign="top"><img src="img/flow-detail.jpg" width="220" alt="流程详情"><br><sub>详情：运行、调试、统计与参数</sub></td>
+    <td align="center" valign="top"><img src="img/flow-editor.jpg" width="220" alt="流程编辑器"><br><sub>编辑器：简明 / 高级 / JSON</sub></td>
   </tr>
 </table>
 
@@ -97,13 +108,11 @@
 
 按目录组织的记忆树（用户档案、人物、各 App 的操作手册、任务笔记）。提示词里只放索引，正文按需读取；检索是路径匹配、全文（中文二元组分词）和向量的混合召回。Agent 可以直接写入，所有写入带版本，可在「最近变更」里逐条撤销。
 
-
 ### 执行期体验
 
 - 全局悬浮球：空闲、运行、暂停、等待回答、录制各有状态，点开是圆弧菜单与进度面板。
 - **执行期边缘光**：Agent 操作手机时，屏幕四周有随主题色流动、呼吸的柔光，顶部显示步数胶囊。
 - **触摸盾**：执行期间屏蔽用户误触（含状态栏），暂停或停止后立即解除。
-
 
 ### 模型
 
@@ -113,7 +122,7 @@
 
 <table>
   <tr>
-    <td align="center" valign="top"><img src="https://raw.githubusercontent.com/W1412X/autop/main/img/settings.jpg" width="220" alt="我的页面"><br><sub>「我的」：外观、模型、观测方式等设置</sub></td>
+    <td align="center" valign="top"><img src="img/settings.jpg" width="220" alt="我的页面"><br><sub>「我的」：外观、模型、观测方式等设置</sub></td>
   </tr>
 </table>
 
@@ -231,7 +240,7 @@ flowchart TB
 | 分组 | 模块 | 说明 |
 |---|---|---|
 | `core/` | `core-common` `core-config(-impl)` `core-prompt(-impl)` `core-platform` `core-ui` `core-testing` | 基础类型、分层配置、提示词模板、平台适配与密钥、设计系统 |
-| `llm/` | `llm-api` `llm-http` `llm-openai` `llm-anthropic` | 统一消息模型与两种协议适配器、SSE、重试 |
+| `llm/` | `llm-api` `llm-http` `llm-openai` `llm-anthropic` `llm-onnx` | 统一消息模型与两种协议适配器、SSE、重试；端侧 ONNX 嵌入 |
 | `agent/` | `agent-api` `agent-runtime` `agent-store` | 工具 SPI、主循环、压缩、熔断、事件日志存储 |
 | `domain/` | `device-*` `memory-*` `task-*` `flow-*` `policy-*` | 设备感知与执行、记忆、任务与触发、流程、安全策略 |
 | `feature/` | `feature-chat` `-tasks` `-flows` `-memory` `-settings` `-onboarding` `-overlay` | 各页面与悬浮层，互不依赖，由 app 的导航图串起来 |
@@ -262,6 +271,56 @@ flowchart TB
 
 Conventional Commits，scope 用模块领域名，例如 `feat(memory): …`、`fix(device): …`；分支用 `feat/<简述>`、`fix/<简述>`，不直接提交到 `main`。
 
+## 第三方依赖与许可
+
+下表列出项目直接使用的开源库，版本取自 `gradle/libs.versions.toml`。许可证信息来自各项目的公开声明，整理时仅供参考；再分发或商用前请以各项目原始许可证为准。
+
+**运行时依赖（会进入 APK）**
+
+| 库 | 版本 | 许可证 | 用途 |
+|---|---|---|---|
+| [Kotlin](https://github.com/JetBrains/kotlin) / kotlinx.coroutines / kotlinx.serialization | 2.2.10 / 1.11.0 / 1.11.0 | Apache-2.0 | 语言、协程、JSON 序列化 |
+| [Jetpack Compose](https://developer.android.com/jetpack/compose)（BOM 2026.09.00）| 2026.09.00 | Apache-2.0 | 界面：ui、foundation、material3、material-icons-extended |
+| [AndroidX](https://developer.android.com/jetpack/androidx)：core-ktx 1.19.1、activity-compose 1.13.0、lifecycle 2.11.0、navigation 2.10.2、savedstate 1.5.0 | 见左 | Apache-2.0 | 基础组件、生命周期、导航 |
+| AndroidX：room 2.8.5、sqlite 2.6.2、datastore 1.2.1、work 2.12.0 | 见左 | Apache-2.0 | 本地数据库（Room 带 KSP 编译器）、键值配置、后台任务 |
+| [Dagger / Hilt](https://github.com/google/dagger)（hilt-android、hilt-navigation-compose 1.4.0）| 2.60.1 | Apache-2.0 | 依赖注入 |
+| [OkHttp](https://github.com/square/okhttp) 5.5.0 | 5.5.0 | Apache-2.0 | HTTP 与 SSE 连接 |
+| [javax.inject](https://github.com/google/guice) | 1 | Apache-2.0 | 注入注解 |
+| [ONNX Runtime Android](https://github.com/microsoft/onnxruntime) | 1.29.0 | MIT | 端侧视觉模型与嵌入模型推理 |
+| [Bouncy Castle](https://www.bouncycastle.org/)（bcpkix-jdk18on）| 1.80 | Bouncy Castle 许可（MIT 类）| 无线调试配对所需的证书与密钥处理 |
+| [Conscrypt](https://github.com/google/conscrypt) | 2.5.2 | Apache-2.0 | 无线调试的 TLS 实现 |
+| [BoringSSL（NDK 预编译包）](https://github.com/google/boringssl) | 20250114 | OpenSSL / ISC 类许可 | 无线调试 SPAKE2 配对的 native 实现 |
+
+**构建、测试与质量工具（不进入 APK）**
+
+| 库 | 版本 | 许可证 | 用途 |
+|---|---|---|---|
+| [Android Gradle Plugin](https://developer.android.com/build) | 9.4.0 | Apache-2.0 | Android 构建 |
+| [KSP](https://github.com/google/ksp) | 2.2.10-2.0.2 | Apache-2.0 | 注解处理 |
+| [detekt](https://github.com/detekt/detekt) | 1.23.8 | Apache-2.0 | 静态分析 |
+| [ktlint](https://github.com/pinterest/ktlint)（Gradle 插件 ktlint-gradle）| 14.2.0 | MIT | 代码格式检查 |
+| [Kover](https://github.com/Kotlin/kotlinx-kover) | 0.9.11 | Apache-2.0 | 覆盖率统计 |
+| [JUnit 4](https://github.com/junit-team/junit4) | 4.13.2 | EPL-1.0 | 单元测试 |
+| [Robolectric](https://github.com/robolectric/robolectric) | 4.17 | MIT | JVM 上的 Android 测试 |
+| [Truth](https://github.com/google/truth) | 1.4.5 | Apache-2.0 | 断言库 |
+| [Turbine](https://github.com/cashapp/turbine) | 1.2.1 | Apache-2.0 | Flow 测试 |
+| AndroidX Test（core 1.7.0、junit 1.3.0）、Espresso 3.7.0 | 见左 | Apache-2.0 | Android 仪器测试 |
+
+**从其他开源项目搬运的代码**
+
+- **[Shizuku](https://github.com/RikkaApps/Shizuku)**（Apache-2.0，版权归 RikkaApps 所有）：ADB 注入通道搬运了 Shizuku 的 ADB 协议栈（`domain/device-impl/.../impl/adb/`，含 AdbClient、AdbProtocol、AdbMessage、AdbKey、AdbMdns、AdbPairingClient 等），以及无线调试 SPAKE2 配对所用的 native 代码（`libadb.so`，来自 Shizuku 的 `jni/`，依赖 BoringSSL prefab）。搬运文件保留了原有的来源与许可头注释，仅去掉了调试日志。使用上述代码须遵守 Apache License 2.0。
+
+**随 APK 打包的模型权重**
+
+| 文件 | 用途 | 来源 | 许可证 |
+|---|---|---|---|
+| `domain/device-impl/.../assets/vision/gui_detect.onnx` | 控件框检测（YOLO，单类 icon） | 来源待作者确认（POC 记录的权重名为 GPA-GUI-Detector） | 待作者确认 |
+| `ocr_det.onnx` | 文字行检测（PP-OCR DB mobile） | PaddleOCR PP-OCR 系列 | 待作者确认（PaddleOCR 项目为 Apache-2.0） |
+| `ocr_rec_server.onnx`、`ppocr_keys.txt` | 文字识别（PP-OCRv5 server，量化）与字典 | PaddleOCR PP-OCR 系列 | 待作者确认（PaddleOCR 项目为 Apache-2.0） |
+| `icon_cls.onnx` | 图标分类（MobileNetV3-Small，102 类） | 来源待作者确认 | 待作者确认 |
+| `state_cls.onnx` | 开关状态分类（MobileNetV3-Small） | 来源待作者确认 | 待作者确认 |
+| `llm/llm-onnx/.../embedding/bge-small-zh-v1.5-int8/` | 中文文本嵌入（int8 量化） | [BAAI/bge-small-zh-v1.5](https://huggingface.co/BAAI/bge-small-zh-v1.5)，ONNX 版由 onnx-community 转换 | MIT |
+
 ## CI 与发布
 
 push 到 `main`、打 `v*` tag 或手动触发 `.github/workflows/release.yml`：质量门禁（test / detekt / ktlint）→ 构建 release APK → 上传 artifact（**只含最终 APK**）。打 `v*` tag 时，还会把 APK 发布到该 tag 对应的 [GitHub Release](https://github.com/W1412X/autop/releases)。
@@ -271,11 +330,7 @@ push 到 `main`、打 `v*` tag 或手动触发 `.github/workflows/release.yml`�
 ## 下载安装包
 
 统一在 [GitHub Releases](https://github.com/W1412X/autop/releases) 下载最新的 `app-release.apk`。侧载安装时，Android 13 及以上需要先在应用信息里「允许受限设置」，再开启无障碍服务，详见[首次使用](#首次使用)。
-## 第三方代码
 
-- **[Shizuku](https://github.com/RikkaApps/Shizuku)**（Apache License 2.0，版权归 RikkaApps 所有）：ADB 注入通道搬运了 Shizuku 的 ADB 协议栈（`domain/device-impl/.../impl/adb/`，含 AdbClient、AdbProtocol、AdbMessage、AdbKey、AdbMdns、AdbPairingClient 等），以及无线调试 SPAKE2 配对所用的 native 代码（`libadb.so`，来自 Shizuku 的 `jni/`，依赖 BoringSSL prefab）。搬运文件保留了原有的来源与许可头注释，仅去掉了调试日志。
-
-使用上述代码须遵守 Apache License 2.0。
 ## 许可
 
 仅供开发学习使用。仓库目前没有声明许可证；如需使用或二次开发，请先联系作者。
