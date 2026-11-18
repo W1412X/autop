@@ -22,7 +22,7 @@ public data class ConfigMigration(
 )
 
 /** 配置（用户覆盖）文件的当前 schemaVersion。 */
-public const val CURRENT_SCHEMA_VERSION: Int = 12
+public const val CURRENT_SCHEMA_VERSION: Int = 13
 
 /**
  * 内置迁移链：v2 删除屏幕观测 v4 不再使用的配置键（docs/design/
@@ -62,6 +62,8 @@ public fun builtinConfigMigrations(): List<ConfigMigration> =
         ConfigMigration(from = 10, to = 11) { doc -> doc },
         // ADR-0046：ui.overlay 新增 ballSizeDp，仅增键，覆盖文件无需改写。
         ConfigMigration(from = 11, to = 12) { doc -> doc },
+        // ui.ballAmbient 新增段（悬浮球环境动画），仅增键，覆盖文件无需改写。
+        ConfigMigration(from = 12, to = 13) { doc -> doc },
     )
 
 /**

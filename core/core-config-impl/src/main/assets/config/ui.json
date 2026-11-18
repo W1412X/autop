@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 12,
+  "schemaVersion": 13,
   "ui": {
     "appearance": {
       "darkMode": "SYSTEM",
@@ -49,6 +49,22 @@
       "edgeGlow": true,
       "capsule": true,
       "pulseMs": 1800
+    },
+    "ballAmbient": {
+      "nightStartHour": 23,
+      "nightEndHour": 6,
+      "lowBatteryPercent": 20,
+      "morningStartHour": 6,
+      "morningEndHour": 9,
+      "tapMs": 900,
+      "longMs": 1500,
+      "flingMs": 1000,
+      "revealMs": 1000,
+      "wakeMs": 800,
+      "yawnMs": 1500,
+      "greetMs": 1200,
+      "flingPxPerMs": 1.0,
+      "tickSec": 60
     },
     "motion": {
       "expandMs": 200,

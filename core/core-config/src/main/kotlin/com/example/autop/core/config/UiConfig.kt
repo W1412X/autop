@@ -180,6 +180,81 @@ public data class UiIndicatorSection(
 private const val INDICATOR_PULSE_MIN_MS: Long = 300
 private const val INDICATOR_PULSE_MAX_MS: Long = 10000
 
+/**
+ * `ui.ballAmbient`：悬浮球环境动画（睡眠、充电、低电量、手势反应、晨间问候）。
+ * 阈值与时长见设计预览（ambient-animations-preview）。
+ */
+@Serializable
+public data class UiBallAmbientSection(
+    /** 夜间开始的小时（0–23）。夜间时段内球处于睡眠。 */
+    @SerialName("nightStartHour") val nightStartHour: Int = 23,
+    /** 夜间结束的小时（不含）。区间跨午夜时为 [nightStartHour, 24) 与 [0, nightEndHour)。 */
+    @SerialName("nightEndHour") val nightEndHour: Int = 6,
+    /** 低电量阈值（%）：低于它且未充电时球显得疲倦。 */
+    @SerialName("lowBatteryPercent") val lowBatteryPercent: Int = 20,
+    /** 晨间问候时段开始（含，小时）。 */
+    @SerialName("morningStartHour") val morningStartHour: Int = 6,
+    /** 晨间问候时段结束（不含，小时）。时段内每天第一次触摸播放一次哈欠与招手。 */
+    @SerialName("morningEndHour") val morningEndHour: Int = 9,
+    /** 点按反应时长（毫秒）。 */
+    @SerialName("tapMs") val tapMs: Long = 900,
+    /** 长按反应时长（毫秒）。 */
+    @SerialName("longMs") val longMs: Long = 1500,
+    /** 甩到边缘的惊讶时长（毫秒）。 */
+    @SerialName("flingMs") val flingMs: Long = 1000,
+    /** 从细条唤出的招手时长（毫秒）。 */
+    @SerialName("revealMs") val revealMs: Long = 1000,
+    /** 睡眠中被触摸后的唤醒时长（毫秒）：平稳睁眼，不眨眼、不快转。 */
+    @SerialName("wakeMs") val wakeMs: Long = 800,
+    /** 晨间哈欠时长（毫秒）。 */
+    @SerialName("yawnMs") val yawnMs: Long = 1500,
+    /** 晨间招手时长（毫秒）。 */
+    @SerialName("greetMs") val greetMs: Long = 1200,
+    /** 甩出判定速度（px/ms）：松手时拖动的平均速度不低于它即视为甩到边缘。 */
+    @SerialName("flingPxPerMs") val flingPxPerMs: Double = 1.0,
+    /** 环境状态（睡眠、充电、电量、网络）重算间隔（秒）。 */
+    @SerialName("tickSec") val tickSec: Long = 60,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (nightStartHour !in 0..HOUR_MAX) add("nightStartHour must be in 0..$HOUR_MAX, was $nightStartHour")
+            if (nightEndHour !in 0..HOUR_MAX) add("nightEndHour must be in 0..$HOUR_MAX, was $nightEndHour")
+            if (lowBatteryPercent !in 0..PERCENT_MAX) add("lowBatteryPercent must be in 0..$PERCENT_MAX")
+            if (morningStartHour !in 0..HOUR_MAX ||
+                morningEndHour !in 0..HOUR_MAX ||
+                morningStartHour >= morningEndHour
+            ) {
+                add("morning hours must satisfy 0 <= morningStartHour < morningEndHour <= $HOUR_MAX")
+            }
+            listOf(
+                "tapMs" to tapMs,
+                "longMs" to longMs,
+                "flingMs" to flingMs,
+                "revealMs" to revealMs,
+                "wakeMs" to wakeMs,
+                "yawnMs" to yawnMs,
+                "greetMs" to greetMs,
+            ).forEach { (name, value) ->
+                if (value !in
+                    DURATION_MIN_MS..DURATION_MAX_MS
+                ) {
+                    add("$name must be in $DURATION_MIN_MS..$DURATION_MAX_MS ms")
+                }
+            }
+            if (flingPxPerMs !in FLING_MIN..FLING_MAX) add("flingPxPerMs must be in $FLING_MIN..$FLING_MAX")
+            if (tickSec !in TICK_MIN_SEC..TICK_MAX_SEC) add("tickSec must be in $TICK_MIN_SEC..$TICK_MAX_SEC")
+        }
+}
+
+private const val HOUR_MAX: Int = 23
+private const val PERCENT_MAX: Int = 100
+private const val DURATION_MIN_MS: Long = 100
+private const val DURATION_MAX_MS: Long = 10_000
+private const val FLING_MIN: Double = 0.1
+private const val FLING_MAX: Double = 10.0
+private const val TICK_MIN_SEC: Long = 10
+private const val TICK_MAX_SEC: Long = 600
+
 /** `ui.motion`：动效时长。 */
 @Serializable
 public data class UiMotionSection(
@@ -222,6 +297,8 @@ public object UiConfig {
         ConfigKey("ui.overlay", UiOverlaySection.serializer()) { UiOverlaySection() }
     public val INDICATOR: ConfigKey<UiIndicatorSection> =
         ConfigKey("ui.indicator", UiIndicatorSection.serializer()) { UiIndicatorSection() }
+    public val BALL_AMBIENT: ConfigKey<UiBallAmbientSection> =
+        ConfigKey("ui.ballAmbient", UiBallAmbientSection.serializer()) { UiBallAmbientSection() }
     public val MOTION: ConfigKey<UiMotionSection> =
         ConfigKey("ui.motion", UiMotionSection.serializer()) { UiMotionSection() }
     public val DEBUG: ConfigKey<UiDebugSection> =
@@ -230,5 +307,5 @@ public object UiConfig {
         ConfigKey("ui.onboarding", UiOnboardingSection.serializer()) { UiOnboardingSection() }
 
     public val ALL: List<ConfigKey<*>> =
-        listOf(APPEARANCE, NAV, CHAT, BANNER, MEMORY, OVERLAY, INDICATOR, MOTION, DEBUG, ONBOARDING)
+        listOf(APPEARANCE, NAV, CHAT, BANNER, MEMORY, OVERLAY, INDICATOR, BALL_AMBIENT, MOTION, DEBUG, ONBOARDING)
 }
