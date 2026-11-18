@@ -1,6 +1,6 @@
 ---
 id: task.author.spec
-version: 2
+version: 3
 vars: [flows]
 ---
 propose_task 字段口径：
@@ -9,9 +9,12 @@ propose_task 字段口径：
 - triggerType：manual（手动）/ once（到点一次）/ cron（周期）/ condition（条件触发）。
 - at：triggerType=once 时的时间，格式 `yyyy-MM-dd HH:mm` 或 ISO-8601。
 - cron、timezone：triggerType=cron 时的 5 段表达式（分 时 日 月 周）与时区。
-- source、condition：triggerType=condition 时的事件源 id 与判定条件。事件源：trigger.notification（收到通知）/ trigger.app_foreground（应用切前台）/ trigger.charging（充电）/ trigger.network（网络变化）/ trigger.screen_unlock（解锁屏幕）；condition 用自然语言写，如"通知内容包含'快递'"。
+- source：triggerType=condition 时的事件源 id。先用 list_trigger_sources 查看可用事件源、字段与示例值。
+- filter：triggerType=condition 时的字段过滤条件，JSON 文本，结构示例 `{"mode":"ALL","clauses":[{"field":"package","op":"EQUALS","value":"com.tencent.mm"}]}`。能用字段判断的条件（包名、发送人、正文关键词、充电状态）都写在这里；字段取值拿不准时用 sample_events 看真实样例。
+- condition：triggerType=condition 时，filter 表达不了的语义，用自然语言写（如"对方是在问我有没有空"）。能用 filter 写的内容不要放在这里。filter 和 condition 至少给一个。
 {{#if flows}}- executorFlow：绑定流程名（用 list_flows 确认存在）；留空=智能体按 goal 自主执行。
 {{/if}}- needsScreen：需要屏幕与界面交互时 true。
 - hint：补充提示（可选），经验性说明。
 
 给出草稿后用一两句话说明取舍，让用户确认或继续修改。
+

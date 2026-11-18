@@ -11,7 +11,7 @@ class FakePromptRepositoryTest {
     @Test
     fun `loads all builtin templates from the real prompt dir`() {
         val repository = FakePromptRepository()
-        assertThat(repository.all()).hasSize(267)
+        assertThat(repository.all()).hasSize(269)
     }
 
     @Test

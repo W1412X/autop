@@ -45,6 +45,8 @@ private val VERBS: Map<String, String> =
         "tool.create_flow" to "创建流程",
         "tool.edit_flow" to "编辑流程",
         "tool.list_tasks" to "查看任务",
+        "tool.list_trigger_sources" to "查看事件源",
+        "tool.sample_events" to "查看事件样例",
         "tool.create_task" to "创建任务",
         "tool.update_task" to "更新任务",
         "tool.notify_user" to "通知你",

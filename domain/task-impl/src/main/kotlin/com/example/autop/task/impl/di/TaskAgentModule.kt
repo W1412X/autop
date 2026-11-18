@@ -8,6 +8,7 @@ import android.content.Context
 import com.example.autop.agent.Tool
 import com.example.autop.core.common.Clock
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.task.TriggerCatalog
 import com.example.autop.task.UserNotifier
 import com.example.autop.task.impl.db.TasksDb
 import com.example.autop.task.impl.notify.RunAttentionNotifier
@@ -16,7 +17,9 @@ import com.example.autop.task.impl.reminder.LockReminder
 import com.example.autop.task.impl.store.AuditCleaner
 import com.example.autop.task.impl.tools.CreateTaskTool
 import com.example.autop.task.impl.tools.ListTasksTool
+import com.example.autop.task.impl.tools.ListTriggerSourcesTool
 import com.example.autop.task.impl.tools.NotifyUserTool
+import com.example.autop.task.impl.tools.SampleEventsTool
 import com.example.autop.task.impl.tools.UpdateTaskTool
 import dagger.Module
 import dagger.Provides
@@ -78,4 +81,27 @@ public object TaskAgentModule {
     @Provides
     @IntoSet
     public fun provideUpdateTaskTool(tool: UpdateTaskTool): Tool = tool
+
+    @Provides
+    @IntoSet
+    public fun provideListTriggerSourcesTool(tool: ListTriggerSourcesTool): Tool = tool
+
+    @Provides
+    @IntoSet
+    public fun provideSampleEventsTool(tool: SampleEventsTool): Tool = tool
+
+    /** 事件源说明目录（资产缺失或格式错误时启动即失败，不静默降级）。 */
+    @Provides
+    @Singleton
+    public fun provideTriggerCatalog(
+        @ApplicationContext context: Context,
+    ): TriggerCatalog =
+        TriggerCatalog.parse(
+            context.assets
+                .open(TRIGGER_CATALOG_ASSET)
+                .bufferedReader()
+                .use { it.readText() },
+        )
+
+    private const val TRIGGER_CATALOG_ASSET: String = "rules/trigger_sources.json"
 }

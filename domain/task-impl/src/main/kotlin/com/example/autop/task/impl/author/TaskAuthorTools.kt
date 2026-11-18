@@ -77,6 +77,8 @@ internal class TaskAuthorTools(
                 )
                 add(toolSpec("memory_search", "task.author.tools") { string("query", required = true) })
                 if (flows) add(toolSpec("list_flows", "task.author.tools") {})
+                add(toolSpec("list_trigger_sources", "task.author.tools") {})
+                add(toolSpec("sample_events", "task.author.tools") { string("source", required = true) })
                 add(
                     toolSpec("inspect_screen", "task.author.tools") {
                         string("mode", enum = listOf("a11y", "visual", "llm"))
@@ -91,6 +93,7 @@ internal class TaskAuthorTools(
                         string("cron")
                         string("timezone")
                         string("source")
+                        string("filter")
                         string("condition")
                         if (flows) string("executorFlow")
                         boolean("needsScreen")
@@ -126,6 +129,9 @@ internal class TaskAuthorTools(
                 } else {
                     unknownTool(name)
                 }
+            "list_trigger_sources" -> call("list_trigger_sources", buildJsonObject { })
+            "sample_events" ->
+                call("sample_events", buildJsonObject { put("source", args.str("source").orEmpty()) })
             else -> unknownTool(name)
         }
 
@@ -141,6 +147,7 @@ internal class TaskAuthorTools(
             cron = args.str("cron"),
             timezone = args.str("timezone"),
             source = args.str("source"),
+            filter = args.str("filter"),
             condition = args.str("condition"),
             executorFlow = if (configProvider.current().flowsEnabled()) args.str("executorFlow") else null,
             needsScreen = args.str("needsScreen")?.toBooleanStrictOrNull() ?: true,

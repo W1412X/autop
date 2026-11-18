@@ -20,6 +20,7 @@ import com.example.autop.core.common.TaskId
 import com.example.autop.flow.FlowStore
 import com.example.autop.llm.Block
 import com.example.autop.task.FilterGroup
+import com.example.autop.task.FilterJson
 import com.example.autop.task.FlowBinding
 import com.example.autop.task.GroupMode
 import com.example.autop.task.ScheduleSpec
@@ -30,8 +31,10 @@ import com.example.autop.task.TaskRepository
 import com.example.autop.task.Trigger
 import com.example.autop.task.TriggerSource
 import com.example.autop.task.core.Cron
+import com.example.autop.task.core.FilterValidator
 import com.example.autop.task.impl.flowsEnabled
 import kotlinx.coroutines.flow.first
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -181,18 +184,45 @@ public class UpdateTaskTool
             return patch(args, current)
         }
 
+        /**
+         * 修改触发器。只传 source 或 condition 而没有 trigger_type 时，旧实现会静默丢弃并返回成功。
+         * 现在：当前任务是条件触发，就沿用原事件源并生效；否则直接报错。
+         */
+        private fun triggerFor(
+            args: JsonObject,
+            current: Task,
+        ): Outcome<Trigger> {
+            if (args.text("trigger_type") != null) return TaskArgs.trigger(args, sources, base = current.trigger)
+            val touchesCondition = listOf("source", "filter", "condition").any { args.text(it) != null }
+            if (!touchesCondition) return Outcome.Ok(current.trigger)
+            val previous =
+                current.trigger as? Trigger.Condition
+                    ?: return Outcome.Err(
+                        AppError(
+                            code = TaskErrorCodes.INVALID,
+                            message = "当前任务不是条件触发，不能只修改 source、filter 或 condition",
+                            hint = "同时传 trigger_type=condition 才能把任务切换为条件触发",
+                        ),
+                    )
+            val merged =
+                JsonObject(
+                    buildMap<String, JsonElement> {
+                        put("trigger_type", JsonPrimitive("condition"))
+                        put("source", JsonPrimitive(previous.sourceId))
+                        putAll(args)
+                    },
+                )
+            return TaskArgs.trigger(merged, sources, base = previous)
+        }
+
         private suspend fun patch(
             args: JsonObject,
             current: Task,
         ): ToolOutput {
             val trigger =
-                if (args.text("trigger_type") == null) {
-                    current.trigger
-                } else {
-                    when (val built = TaskArgs.trigger(args, sources, base = current.trigger)) {
-                        is Outcome.Ok -> built.value
-                        is Outcome.Err -> return failure(built.error.code, built.error.message, built.error.hint)
-                    }
+                when (val built = triggerFor(args, current)) {
+                    is Outcome.Ok -> built.value
+                    is Outcome.Err -> return failure(built.error.code, built.error.message, built.error.hint)
                 }
             val flow =
                 when (val resolved = TaskArgs.flow(args, parent = current.flow, flows = flows)) {
@@ -283,7 +313,6 @@ private object TaskArgs {
         sources: Set<TriggerSource>,
         base: Trigger? = null,
     ): Outcome<Trigger> {
-        val sourceIds = sources.map { it.id }.toSet()
         val type =
             args
                 .text("trigger_type")
@@ -294,7 +323,7 @@ private object TaskArgs {
             "manual" -> Outcome.Ok(Trigger.Manual)
             "once" -> once(args)
             "cron" -> cron(args)
-            "condition" -> condition(args, sourceIds, base)
+            "condition" -> condition(args, sources, base)
             else -> invalid("未知触发类型：$type（manual/once/cron/condition）")
         }
     }
@@ -321,35 +350,104 @@ private object TaskArgs {
         return Outcome.Ok(Trigger.Schedule(ScheduleSpec.Cron(expr, timezone.ifEmpty { ZoneId.systemDefault().id })))
     }
 
+    /**
+     * 条件触发：字段过滤（filter，JSON）与语义判定（condition，自然语言）至少给一个。
+     * filter 的字段必须属于事件源；同一事件源的更新沿用原过滤与原判定条件（未重新给出时）。
+     */
     private fun condition(
         args: JsonObject,
-        sourceIds: Set<String>,
+        sources: Set<TriggerSource>,
         base: Trigger?,
     ): Outcome<Trigger> {
         val source = args.text("source")?.trim().orEmpty()
-        val condition = args.text("condition")?.trim().orEmpty()
-        if (source.isEmpty() || condition.isEmpty()) {
-            return invalid("trigger_type=condition 需要 source 与 condition")
+        val found = sources.firstOrNull { it.id == source }
+        val previous = (base as? Trigger.Condition)?.takeIf { it.sourceId == source }
+        return when {
+            source.isEmpty() -> invalid("trigger_type=condition 需要 source（先用 list_trigger_sources 查看）")
+            found == null -> unknownSource(source, sources)
+            else -> conditionOf(args, found, previous)
         }
-        if (source !in sourceIds) {
+    }
+
+    private fun unknownSource(
+        source: String,
+        sources: Set<TriggerSource>,
+    ): Outcome<Trigger> =
+        Outcome.Err(
+            AppError(
+                code = TaskErrorCodes.SOURCE_UNKNOWN,
+                message = "未知事件源：$source",
+                hint = "可用：${sources.map { it.id }.sorted().joinToString("、")}",
+            ),
+        )
+
+    /** 事件源已确认存在：解析 filter（未给则沿用原值），再装配判定条件。 */
+    private fun conditionOf(
+        args: JsonObject,
+        source: TriggerSource,
+        previous: Trigger.Condition?,
+    ): Outcome<Trigger> {
+        val filterText = args.text("filter")?.trim().orEmpty()
+        val parsed =
+            if (filterText.isEmpty()) {
+                Outcome.Ok(previous?.filter ?: FilterGroup(GroupMode.ALL, emptyList()))
+            } else {
+                parseFilter(filterText, source.fieldNames)
+            }
+        return when (parsed) {
+            is Outcome.Err -> Outcome.Err(parsed.error)
+            is Outcome.Ok -> withLlmCondition(source.id, parsed.value, args.text("condition"), previous)
+        }
+    }
+
+    private fun withLlmCondition(
+        sourceId: String,
+        filter: FilterGroup,
+        conditionText: String?,
+        previous: Trigger.Condition?,
+    ): Outcome<Trigger> {
+        val llmCondition = conditionText?.trim()?.takeIf { it.isNotEmpty() } ?: previous?.llmCondition
+        return when {
+            llmCondition == null && !FilterValidator.hasRules(filter) ->
+                invalid("trigger_type=condition 需要 filter 或 condition 至少给一个")
+            else ->
+                Outcome.Ok(
+                    Trigger.Condition(
+                        sourceId = sourceId,
+                        filter = filter,
+                        llmCondition = llmCondition,
+                        cooldownMs = previous?.cooldownMs ?: DEFAULT_COOLDOWN_MS,
+                        dailyLimit = previous?.dailyLimit ?: DEFAULT_DAILY_LIMIT,
+                    ),
+                )
+        }
+    }
+
+    /** 解析并校验 filter 文本；失败时错误信息带写法示例与可用字段。 */
+    private fun parseFilter(
+        text: String,
+        fieldNames: List<String>,
+    ): Outcome<FilterGroup> {
+        val group =
+            FilterJson.parse(text)
+                ?: return Outcome.Err(
+                    AppError(
+                        code = TaskErrorCodes.INVALID,
+                        message = "filter 不是合法的过滤条件 JSON",
+                        hint = "写法示例：${FilterJson.EXAMPLE}",
+                    ),
+                )
+        val problems = FilterValidator.problems(group, fieldNames)
+        if (problems.isNotEmpty()) {
             return Outcome.Err(
                 AppError(
-                    code = TaskErrorCodes.SOURCE_UNKNOWN,
-                    message = "未知事件源：$source",
-                    hint = "可用：${sourceIds.sorted().joinToString("、")}",
+                    code = TaskErrorCodes.INVALID,
+                    message = problems.joinToString("；"),
+                    hint = "字段名与操作符以 list_trigger_sources 的结果为准",
                 ),
             )
         }
-        val previous = (base as? Trigger.Condition)?.takeIf { it.sourceId == source }
-        return Outcome.Ok(
-            Trigger.Condition(
-                sourceId = source,
-                filter = previous?.filter ?: FilterGroup(GroupMode.ALL, emptyList()),
-                llmCondition = condition,
-                cooldownMs = previous?.cooldownMs ?: DEFAULT_COOLDOWN_MS,
-                dailyLimit = previous?.dailyLimit ?: DEFAULT_DAILY_LIMIT,
-            ),
-        )
+        return Outcome.Ok(group)
     }
 
     /** `flow` 缺省保持原绑定；空串解绑（改为智能体执行）；非空按名称解析。 */

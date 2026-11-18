@@ -1,0 +1,58 @@
+{
+  "schemaVersion": 1,
+  "operators": {
+    "EQUALS": "字段值与 value 完全相等",
+    "NOT_EQUALS": "字段值与 value 不相等",
+    "CONTAINS": "字段值包含 value",
+    "NOT_CONTAINS": "字段值不包含 value",
+    "STARTS_WITH": "字段值以 value 开头",
+    "REGEX": "字段值匹配正则表达式 value",
+    "IN": "字段值等于 value 中以 | 分隔的任一项",
+    "EXISTS": "字段有非空值（不需要 value）"
+  },
+  "sources": {
+    "trigger.notification": {
+      "kind": "event",
+      "description": "收到新通知时触发，每条通知一次。",
+      "fields": {
+        "package": { "description": "发出通知的应用包名", "example": "com.tencent.mm" },
+        "appLabel": { "description": "发出通知的应用显示名", "example": "微信" },
+        "title": { "description": "通知标题", "example": "张三" },
+        "text": { "description": "通知正文", "example": "明天下午开会吗" },
+        "bigText": { "description": "展开后的完整正文", "example": "" },
+        "conversationTitle": { "description": "会话名或群名（聊天类通知）", "example": "项目群" },
+        "isGroup": { "description": "是否群聊，取值 true 或 false", "example": "true" },
+        "sender": { "description": "发送人（聊天类通知）", "example": "张三" },
+        "category": { "description": "系统标记的通知类别", "example": "msg" },
+        "key": { "description": "通知唯一键，只用于去重，不建议用于过滤", "example": "" }
+      }
+    },
+    "trigger.app_foreground": {
+      "kind": "state",
+      "description": "前台应用切换到另一个应用时触发。",
+      "fields": {
+        "package": { "description": "切换到的前台应用包名", "example": "com.android.settings" }
+      }
+    },
+    "trigger.charging": {
+      "kind": "state",
+      "description": "充电状态变化时触发（插上或拔下充电器）。",
+      "fields": {
+        "charging": { "description": "是否正在充电，取值 true 或 false", "example": "true" },
+        "battery": { "description": "电量百分比", "example": "85" }
+      }
+    },
+    "trigger.network": {
+      "kind": "state",
+      "description": "网络类型变化时触发。",
+      "fields": {
+        "type": { "description": "网络类型：wifi、cellular、none、other", "example": "wifi" }
+      }
+    },
+    "trigger.screen_unlock": {
+      "kind": "event",
+      "description": "用户解锁屏幕时触发。没有可过滤的字段。",
+      "fields": {}
+    }
+  }
+}

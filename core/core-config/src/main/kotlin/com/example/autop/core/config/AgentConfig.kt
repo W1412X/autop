@@ -78,6 +78,8 @@ public data class AgentToolsSection(
                 "tool.create_flow",
                 "tool.edit_flow",
                 "tool.list_tasks",
+                "tool.list_trigger_sources",
+                "tool.sample_events",
                 "tool.create_task",
                 "tool.update_task",
                 "tool.run_shell",

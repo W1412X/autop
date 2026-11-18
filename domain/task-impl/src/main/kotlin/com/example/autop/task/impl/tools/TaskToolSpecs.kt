@@ -22,6 +22,17 @@ public object TaskToolSpecs {
     /** tool.list_tasks：列出任务及状态。 */
     public val listTasks: ToolSpec = toolSpec(name = "list_tasks", descriptionPromptId = "tool.list_tasks") {}
 
+    /** tool.list_trigger_sources：列出事件源、字段说明与示例值，以及过滤操作符。 */
+    public val listTriggerSources: ToolSpec =
+        toolSpec(name = "list_trigger_sources", descriptionPromptId = "tool.list_trigger_sources") {}
+
+    /** tool.sample_events：查看某个事件源最近的真实事件字段。 */
+    public val sampleEvents: ToolSpec =
+        toolSpec(name = "sample_events", descriptionPromptId = "tool.sample_events") {
+            string("source", required = true)
+            string("limit")
+        }
+
     /**
      * tool.create_task：直接创建任务（默认启用）。[flowsEnabled] 为假时不提供 `flow` 参数
      * （流程 Beta 功能关闭，docs/adr/0030-beta-feature-switch.md）。
@@ -35,6 +46,7 @@ public object TaskToolSpecs {
             string("cron")
             string("timezone")
             string("source")
+            string("filter")
             string("condition")
             if (flowsEnabled) string("flow")
             boolean("needs_screen")
@@ -52,6 +64,7 @@ public object TaskToolSpecs {
             string("cron")
             string("timezone")
             string("source")
+            string("filter")
             string("condition")
             if (flowsEnabled) string("flow")
             boolean("needs_screen")

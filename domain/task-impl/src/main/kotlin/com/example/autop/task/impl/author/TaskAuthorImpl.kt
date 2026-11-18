@@ -38,6 +38,7 @@ import com.example.autop.llm.Role
 import com.example.autop.llm.SystemPart
 import com.example.autop.llm.ToolSchema
 import com.example.autop.task.FilterGroup
+import com.example.autop.task.FilterJson
 import com.example.autop.task.FlowBinding
 import com.example.autop.task.GroupMode
 import com.example.autop.task.ScheduleSpec
@@ -52,6 +53,7 @@ import com.example.autop.task.TaskRepository
 import com.example.autop.task.Trigger
 import com.example.autop.task.TriggerSource
 import com.example.autop.task.core.Cron
+import com.example.autop.task.core.FilterValidator
 import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.impl.flowsPromptVars
 import kotlinx.coroutines.CancellationException
@@ -135,6 +137,7 @@ internal class TaskAuthorImpl(
         var timezone: String? = null
         var source: String? = null
         var condition: String? = null
+        var filter: String? = null
         when (val trigger = task.trigger) {
             Trigger.Manual -> Unit
             is Trigger.Schedule ->
@@ -153,6 +156,7 @@ internal class TaskAuthorImpl(
                 triggerType = "condition"
                 source = trigger.sourceId
                 condition = trigger.llmCondition
+                filter = trigger.filter.takeIf { FilterValidator.hasRules(it) }?.let { FilterJson.encode(it) }
             }
         }
         return TaskDraft(
@@ -163,6 +167,7 @@ internal class TaskAuthorImpl(
             cron = cron,
             timezone = timezone,
             source = source,
+            filter = filter,
             condition = condition,
             // 流程关闭时草稿只按智能体展示；保存时既有绑定由 assemble 原样保留。
             executorFlow =
@@ -220,7 +225,7 @@ internal class TaskAuthorSessionImpl(
     private var cancelled = false
     private var activeModelProfileId: String? = null
     private val tools = TaskAuthorTools(d.invokerFactory, d.configProvider, d.prompts, d.ids, d.threads)
-    private val sourceIds: Set<String> = d.sources.map { it.id }.toSet()
+    private val sourceFields: Map<String, List<String>> = d.sources.associate { it.id to it.fieldNames }
 
     override suspend fun send(
         text: String,
@@ -516,18 +521,30 @@ internal class TaskAuthorSessionImpl(
                     val expr = draft.cron?.trim().orEmpty()
                     if (!cronValid(expr)) add("cron 不合法（5 段表达式：分 时 日 月 周）")
                 }
-                "condition" -> {
-                    val source = draft.source?.trim().orEmpty()
-                    if (source.isEmpty()) {
-                        add("condition 需要 source 事件源")
-                    } else if (source !in sourceIds) {
-                        add("未知事件源：$source")
-                    }
-                    if (draft.condition?.trim().isNullOrEmpty()) add("condition 需要判定条件")
-                }
+                "condition" -> addAll(conditionIssues(draft))
                 else -> add("triggerType 未知：${draft.triggerType}")
             }
         }
+
+    /** 条件触发草稿的问题：事件源存在、filter 合法且字段属于该源、filter 与 condition 至少一个。 */
+    private fun conditionIssues(draft: TaskDraft): List<String> {
+        val source = draft.source?.trim().orEmpty()
+        val fields = sourceFields[source]
+        if (source.isEmpty()) return listOf("condition 需要 source 事件源")
+        if (fields == null) return listOf("未知事件源：$source")
+        val issues = mutableListOf<String>()
+        val filterText = draft.filter?.trim().orEmpty()
+        val filter = if (filterText.isEmpty()) null else FilterJson.parse(filterText)
+        when {
+            filterText.isNotEmpty() && filter == null ->
+                issues += "filter 不是合法的过滤条件 JSON，写法示例：${FilterJson.EXAMPLE}"
+            filter != null -> issues += FilterValidator.problems(filter, fields)
+        }
+        val hasFilter = filter != null && FilterValidator.hasRules(filter)
+        val hasCondition = !draft.condition?.trim().isNullOrEmpty()
+        if (!hasFilter && !hasCondition) issues += "condition 与 filter 至少给一个"
+        return issues
+    }
 
     /** 草稿 → 待保存 [Task]（触发器解析 + 流程绑定）；[base] 非空时只覆盖可编辑字段。 */
     private suspend fun assemble(
@@ -636,16 +653,22 @@ internal class TaskAuthorSessionImpl(
         draft: TaskDraft,
         base: Trigger?,
     ): Trigger? {
+        if (conditionIssues(draft).isNotEmpty()) return null
         val source = draft.source?.trim().orEmpty()
-        val condition = draft.condition?.trim().orEmpty()
-        if (source.isEmpty() || condition.isEmpty() || source !in sourceIds) return null
-        val previous = base as? Trigger.Condition
+        val previous = (base as? Trigger.Condition)?.takeIf { it.sourceId == source }
+        val filterText = draft.filter?.trim().orEmpty()
+        val filter =
+            if (filterText.isEmpty()) {
+                previous?.filter ?: FilterGroup(GroupMode.ALL, emptyList())
+            } else {
+                FilterJson.parse(filterText) ?: return null
+            }
         return Trigger.Condition(
             sourceId = source,
-            filter = previous?.takeIf { it.sourceId == source }?.filter ?: FilterGroup(GroupMode.ALL, emptyList()),
-            llmCondition = condition,
-            cooldownMs = previous?.takeIf { it.sourceId == source }?.cooldownMs ?: DEFAULT_COOLDOWN_MS,
-            dailyLimit = previous?.takeIf { it.sourceId == source }?.dailyLimit ?: DEFAULT_DAILY_LIMIT,
+            filter = filter,
+            llmCondition = draft.condition?.trim()?.takeIf { it.isNotEmpty() },
+            cooldownMs = previous?.cooldownMs ?: DEFAULT_COOLDOWN_MS,
+            dailyLimit = previous?.dailyLimit ?: DEFAULT_DAILY_LIMIT,
         )
     }
 

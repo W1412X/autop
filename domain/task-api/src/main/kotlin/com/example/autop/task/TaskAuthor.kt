@@ -28,7 +28,9 @@ public data class TaskDraft(
     val timezone: String? = null,
     /** condition：事件源 id（如 trigger.notification）。 */
     val source: String? = null,
-    /** condition：LLM 判定条件（自然语言）。 */
+    /** condition：字段过滤条件（JSON 文本，结构见 [FilterJson]）；null 表示不额外过滤。 */
+    val filter: String? = null,
+    /** condition：LLM 判定条件（自然语言），表达不了的语义才用。 */
     val condition: String? = null,
     /** 执行器绑定的流程名（null = 智能体按目标执行）。 */
     val executorFlow: String? = null,
