@@ -85,7 +85,8 @@ public fun AutopBallFace(
     spec: BallFaceSpec,
     modifier: Modifier = Modifier,
 ) {
-    val held = rememberHeldFace(spec.mood, spec.scene, spec.seed, LocalBallFaceMinHoldMs.current)
+    val scene = if (spec.mood == BallFaceMood.IDLE) BallFaceScene.IDLE else spec.scene
+    val held = rememberHeldFace(spec.mood, scene, spec.seed, LocalBallFaceMinHoldMs.current)
     HeldBallFace(spec.copy(mood = held.mood, scene = held.scene, seed = held.seed), modifier)
 }
 
@@ -122,7 +123,10 @@ private fun HeldBallFace(
     // 思考段与混合池的轮换序号由同一条逐帧时钟推进（不另起协程）：只在序号变化时重组。
     val rerolls = fixed == null && (scene == BallFaceScene.SAMPLING || scene == BallFaceScene.MIXED)
     val rerollSeconds = if (rerolls) LocalBallRerollMs.current / MILLIS_PER_SECOND else 0f
-    val clock = rememberFaceClock(enabled = motion, rerollSeconds = rerollSeconds)
+    // 空闲态按事件种子给出 5–10 秒的随机间隔（见 BallFaceDirector.idleRerollSeconds）。
+    val idle = fixed == null && scene == BallFaceScene.IDLE
+    val clock =
+        rememberFaceClock(enabled = motion, rerollSeconds = rerollSeconds, jitterSeed = if (idle) spec.seed else null)
     val performed = rememberBallFaceExpression(scene = scene, seed = spec.seed, reroll = clock.rerolls.value)
     val measurer = rememberTextMeasurer()
     val label =
@@ -239,21 +243,34 @@ internal class FaceClock(
 private fun rememberFaceClock(
     enabled: Boolean,
     rerollSeconds: Float,
+    jitterSeed: Long?,
 ): FaceClock {
     val seconds = remember { mutableFloatStateOf(STATIC_TIME_SEC) }
     val rerolls = remember { mutableIntStateOf(0) }
     val latestReroll by rememberUpdatedState(rerollSeconds)
-    LaunchedEffect(enabled) {
+    LaunchedEffect(enabled, jitterSeed) {
         seconds.floatValue = STATIC_TIME_SEC
         rerolls.intValue = 0
         if (enabled) {
             val start = withFrameNanos { it }
+            var jittered = 0
+            var nextBoundary = jitterSeed?.let { BallFaceDirector.idleRerollSeconds(it, 1) } ?: 0f
             while (true) {
                 withFrameNanos { nanos ->
                     val elapsed = (nanos - start) / NANOS_PER_SECOND
                     seconds.floatValue = elapsed
-                    val every = latestReroll
-                    val count = if (every > 0f) (elapsed / every).toInt() else 0
+                    val count =
+                        if (jitterSeed != null) {
+                            // 随机间隔：边界逐个推进，序号相同的间隔由种子决定。
+                            while (elapsed >= nextBoundary) {
+                                jittered++
+                                nextBoundary += BallFaceDirector.idleRerollSeconds(jitterSeed, jittered + 1)
+                            }
+                            jittered
+                        } else {
+                            val every = latestReroll
+                            if (every > 0f) (elapsed / every).toInt() else 0
+                        }
                     if (count != rerolls.intValue) rerolls.intValue = count
                 }
             }

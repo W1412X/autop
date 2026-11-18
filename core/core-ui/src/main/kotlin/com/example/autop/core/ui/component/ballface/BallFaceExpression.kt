@@ -570,7 +570,7 @@ public object BallFaceExpressions {
  */
 public fun fixedBallFaceExpressionOf(mood: BallFaceMood): BallFaceExpression? =
     when (mood) {
-        BallFaceMood.IDLE -> BallFaceExpressions.calm
+        BallFaceMood.IDLE -> null
         BallFaceMood.WAITING -> BallFaceExpressions.waiting
         BallFaceMood.PAUSED -> BallFaceExpressions.paused
         BallFaceMood.BLOCKED -> BallFaceExpressions.blocked

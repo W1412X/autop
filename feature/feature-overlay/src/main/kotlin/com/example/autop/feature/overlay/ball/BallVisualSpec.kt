@@ -9,7 +9,7 @@ import com.example.autop.core.ui.component.ballface.BallFaceMood
 import com.example.autop.core.ui.component.ballface.BallFaceScene
 import com.example.autop.feature.overlay.R
 
-/** 球状态 → 表情状态（固定态一态一张脸；运行中按场景抽取）。 */
+/** 球状态 → 表情状态（状态表情一态一张脸；空闲与运行中按场景抽取）。 */
 internal fun ballFaceMoodOf(mode: BallMode): BallFaceMood =
     when (mode) {
         BallMode.Idle -> BallFaceMood.IDLE

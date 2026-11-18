@@ -72,8 +72,14 @@ class FaceDwellTest {
 
     @Test
     fun `fixed faces ignore scene and seed`() {
-        assertThat(heldFaceOf(BallFaceMood.IDLE, BallFaceScene.SAMPLING, 1L))
-            .isEqualTo(heldFaceOf(BallFaceMood.IDLE, BallFaceScene.GESTURE, 9L))
+        assertThat(heldFaceOf(BallFaceMood.WAITING, BallFaceScene.SAMPLING, 1L))
+            .isEqualTo(heldFaceOf(BallFaceMood.WAITING, BallFaceScene.GESTURE, 9L))
+    }
+
+    @Test
+    fun `idle is performed so scene and seed are part of the key`() {
+        assertThat(heldFaceOf(BallFaceMood.IDLE, BallFaceScene.IDLE, 1L))
+            .isNotEqualTo(heldFaceOf(BallFaceMood.IDLE, BallFaceScene.IDLE, 2L))
     }
 
     private companion object {

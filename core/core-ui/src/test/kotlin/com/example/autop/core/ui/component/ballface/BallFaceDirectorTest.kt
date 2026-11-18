@@ -64,7 +64,7 @@ class BallFaceDirectorTest {
     fun `mixed pool holds every performance face once`() {
         val mixed = BallFaceDirector.poolOf(BallFaceScene.MIXED)
         val performance =
-            BallFaceScene.entries.filter { it != BallFaceScene.MIXED }.flatMap {
+            BallFaceScene.entries.filter { it != BallFaceScene.MIXED && it != BallFaceScene.IDLE }.flatMap {
                 BallFaceDirector.poolOf(
                     it,
                 )

@@ -1,8 +1,9 @@
 /**
  * 悬浮球表情的对外描述（设计稿 `.tmp-icons/ball-face-events.html`）：状态语义、形态、配色与场景。
  *
- * 固定态（[BallFaceMood] 中除 RUNNING_START / RUNNING 外的值）一态一张脸，语义唯一；
- * 表演态（起跑 / 思考 / 工具 / 整理）由 [BallFaceDirector] 在场景池内抽取。
+ * 状态固定态（[BallFaceMood] 中除 IDLE / RUNNING_START / RUNNING 外的值）一态一张脸，语义唯一；
+ * 表演态（空闲 / 起跑 / 思考 / 工具 / 整理）由 [BallFaceDirector] 在场景池内抽取。
+ * 空闲池只放中性表情，不含任何状态语义的表情。
  * 颜色不承载状态：主球与卫星统一用主题色，状态只由眼型与卫星符号表达。
  */
 package com.example.autop.core.ui.component.ballface
@@ -46,6 +47,9 @@ public enum class BallFaceScene {
 
     /** 整理（压缩上下文）：2 个。 */
     COMPACTING,
+
+    /** 空闲：中性表情池（不含任何状态语义的表情），每 5–10 秒随机轮换一次。 */
+    IDLE,
 
     /** 多会话同时运行：从全部表演脸中随机抽取（每 2.5 秒换一次，相邻不重复）。 */
     MIXED,

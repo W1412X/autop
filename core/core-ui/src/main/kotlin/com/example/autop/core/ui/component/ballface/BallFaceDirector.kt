@@ -50,8 +50,19 @@ public object BallFaceDirector {
             BallFaceScene.APP ->
                 listOf(BallFaceExpressions.appLook, BallFaceExpressions.appTilt, BallFaceExpressions.appFar)
             BallFaceScene.COMPACTING -> listOf(BallFaceExpressions.compact, BallFaceExpressions.compactBreath)
+            BallFaceScene.IDLE -> IDLE_POOL
             BallFaceScene.MIXED -> PERFORMANCE_SCENES.flatMap { poolOf(it) }
         }
+
+    /**
+     * 空闲轮换的第 [index] 个间隔（秒，区间 [IDLE_REROLL_MIN_SEC]、[IDLE_REROLL_MAX_SEC]）。
+     * 由事件种子与序号决定，同一种子的序列可复现。
+     */
+    public fun idleRerollSeconds(
+        seed: Long,
+        index: Int,
+    ): Float =
+        IDLE_REROLL_MIN_SEC + Random(seedOf(seed, index)).nextFloat() * (IDLE_REROLL_MAX_SEC - IDLE_REROLL_MIN_SEC)
 
     /**
      * 池内抽取：以 [seed] 初始化随机源（可复现），候选剔除 [previous] 后取一个，保证不与上一张相同。
@@ -96,4 +107,26 @@ public object BallFaceDirector {
 
     private const val SEED_MIX: Long = 31L
     private const val EVENT_MIX: Long = 1_000L
+
+    /** 空闲轮换间隔的区间（秒）。 */
+    public const val IDLE_REROLL_MIN_SEC: Float = 5f
+    public const val IDLE_REROLL_MAX_SEC: Float = 10f
+
+    /** 空闲池：中性表情，不含运行、等待、拦截、出错、暂停等状态语义（设计决定，见方案预览）。 */
+    private val IDLE_POOL: List<BallFaceExpression> =
+        listOf(
+            BallFaceExpressions.calm,
+            BallFaceExpressions.peek,
+            BallFaceExpressions.focus,
+            BallFaceExpressions.startWide,
+            BallFaceExpressions.startTilt,
+            BallFaceExpressions.startOpen,
+            BallFaceExpressions.thinkCurious,
+            BallFaceExpressions.appLook,
+            BallFaceExpressions.appTilt,
+            BallFaceExpressions.appFar,
+            BallFaceExpressions.gestureWatch,
+            BallFaceExpressions.textSide,
+            BallFaceExpressions.visionScan,
+        )
 }

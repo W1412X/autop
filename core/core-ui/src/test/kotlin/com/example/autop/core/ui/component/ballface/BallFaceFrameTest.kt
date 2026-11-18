@@ -21,7 +21,7 @@ class BallFaceFrameTest {
 
     @Test
     fun `fixed moods map to one expression and performance moods to none`() {
-        assertThat(fixedBallFaceExpressionOf(BallFaceMood.IDLE)).isEqualTo(BallFaceExpressions.calm)
+        assertThat(fixedBallFaceExpressionOf(BallFaceMood.IDLE)).isNull()
         assertThat(fixedBallFaceExpressionOf(BallFaceMood.WAITING)).isEqualTo(BallFaceExpressions.waiting)
         assertThat(fixedBallFaceExpressionOf(BallFaceMood.PAUSED)).isEqualTo(BallFaceExpressions.paused)
         assertThat(fixedBallFaceExpressionOf(BallFaceMood.BLOCKED)).isEqualTo(BallFaceExpressions.blocked)
