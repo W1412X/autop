@@ -9,6 +9,7 @@
 package com.example.autop.core.ui.component.ballface
 
 import androidx.compose.runtime.Immutable
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 
 /** 表情状态。RUNNING_START 只用于首步起跑；RUNNING 按 [BallFaceSpec.scene] 抽表演脸。 */
@@ -85,6 +86,50 @@ public enum class BallFacePaint {
     INVERSE,
 }
 
+/** 空闲时的环境状态（只在 [BallFaceMood.IDLE] 下生效，状态表情优先）。 */
+public enum class BallAmbientMode {
+    /** 普通空闲：轮换中性表情池。 */
+    NONE,
+
+    /** 睡眠：眼睛半闭、头微低，卫星慢绕，稳定浮出 z。 */
+    SLEEP,
+
+    /** 充电：卫星绕行变快，眼睛眯成笑眼。 */
+    CHARGING,
+
+    /** 低电量（未充电）：眼睛下垂，卫星慢。不做报警表情。 */
+    TIRED,
+}
+
+/**
+ * 空闲时的手势反应（瞬时，结束后回到环境状态或空闲表情）。卫星一律慢绕，不做快转。
+ */
+public enum class BallReaction {
+    /** 点按：眯眼一下。 */
+    TAP,
+
+    /** 长按：左眼睁大、右眼眯起，视线斜向左上。 */
+    LONG_PRESS,
+
+    /** 拖动中：视线跟随拖动方向（由 [BallFaceSpec.gazeDirection] 给出）。 */
+    DRAG,
+
+    /** 甩到边缘：睁大双眼并轻微抖动。 */
+    FLING,
+
+    /** 从细条唤出：右眼睁开、左眼眯起，轻轻晃头。 */
+    REVEAL,
+
+    /** 睡眠中被触摸：平稳睁眼，不眨眼、不快转。 */
+    WAKE,
+
+    /** 晨间哈欠：眼睛半闭、视线抬起。 */
+    YAWN,
+
+    /** 晨间招手：单眼眯起，轻轻晃头。 */
+    GREET,
+}
+
 /**
  * 表情渲染参数。
  *
@@ -94,6 +139,10 @@ public enum class BallFacePaint {
  * @property count 会话数字（悬浮球）。运行中显示在卫星上；其余状态显示在卫星角标上；null 不显示。
  * @property tint 强制单色（横幅、通知等跟随文字色的位置）。
  * @property motionEnabled 与 `ui.appearance.motionEnabled` 求与；关闭时只画静态落帧。
+ * @property ambient 空闲时的环境状态（睡眠、充电、低电量）；只在 IDLE 下生效。
+ * @property reaction 空闲时的手势反应；只在 IDLE 下生效，优先于环境状态。
+ * @property offline 网络断开：卫星每隔一段时间停住，像在找信号。
+ * @property gazeDirection 拖动时的视线方向，每轴 -1 到 1（相对球半径）；只在 IDLE 且 [reaction] 为 DRAG 时生效。
  */
 @Immutable
 public data class BallFaceSpec(
@@ -105,6 +154,10 @@ public data class BallFaceSpec(
     val tint: Color? = null,
     val motionEnabled: Boolean = true,
     val count: Int? = null,
+    val ambient: BallAmbientMode = BallAmbientMode.NONE,
+    val reaction: BallReaction? = null,
+    val offline: Boolean = false,
+    val gazeDirection: Offset? = null,
 ) {
     public companion object {
         /**

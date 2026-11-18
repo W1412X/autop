@@ -17,6 +17,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.UiConfig
+import com.example.autop.core.ui.component.ballface.BallReaction
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayHost
 import com.example.autop.feature.overlay.ball.BallCallbacks
@@ -118,6 +119,22 @@ public class OverlayBallController
             context.startActivity(
                 Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
             )
+        }
+
+        override fun onTouchGesture(kind: BallReaction) {
+            holder.onTouchGesture(kind)
+        }
+
+        override fun onDragGaze(
+            dxPx: Float,
+            dyPx: Float,
+            ballSizePx: Int,
+        ) {
+            holder.onDragGaze(dxPx, dyPx, ballSizePx)
+        }
+
+        override fun onDragRelease(velocityPxPerMs: Float) {
+            holder.onDragRelease(velocityPxPerMs)
         }
 
         /**

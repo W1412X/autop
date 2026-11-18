@@ -8,6 +8,14 @@ import org.junit.Test
 
 class IdleRotationTest {
     @Test
+    fun `idle pool never spins the satellite faster than thirty seconds`() {
+        BallFaceDirector.poolOf(BallFaceScene.IDLE).forEach { expression ->
+            val orbit = expression.satellite as BallSatelliteMotion.Orbit
+            assertThat(orbit.periodSec).isAtLeast(30f)
+        }
+    }
+
+    @Test
     fun `idle pool holds only neutral expressions without status meaning`() {
         val pool = BallFaceDirector.poolOf(BallFaceScene.IDLE)
         assertThat(pool).hasSize(13)

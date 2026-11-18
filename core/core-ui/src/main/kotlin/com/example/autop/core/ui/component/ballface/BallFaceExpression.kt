@@ -96,6 +96,8 @@ public data class BallFaceExpression(
     val symbol: BallFaceSymbol = BallFaceSymbol.NONE,
     val breathSec: Float = BREATH_DEFAULT_SEC,
     val shake: Float = 0f,
+    /** 稳定浮出 z（睡眠）：每个周期从头顶右侧升起并淡出。 */
+    val floatingZ: Boolean = false,
 )
 
 /** 轨道半径：空闲/固定态。 */

@@ -52,6 +52,9 @@ import com.example.autop.core.ui.theme.LocalBallShape
 import com.example.autop.core.ui.theme.LocalMotionEnabled
 import com.example.autop.core.ui.theme.PetColors
 import kotlinx.coroutines.delay
+import kotlin.math.PI
+import kotlin.math.sin
+import kotlin.random.Random
 
 /** 表情渲染（参数形式）。 */
 @Composable
@@ -118,7 +121,8 @@ private fun HeldBallFace(
     modifier: Modifier,
 ) {
     val motion = spec.motionEnabled && LocalMotionEnabled.current
-    val fixed = fixedBallFaceExpressionOf(spec.mood)
+    // 空闲态的手势反应与环境状态（睡眠、充电、低电量）优先于表演池；状态表情不受影响。
+    val fixed = fixedBallFaceExpressionOf(spec.mood) ?: idleOverrideOf(spec.mood, spec.ambient, spec.reaction)
     val scene = if (spec.mood == BallFaceMood.RUNNING_START) BallFaceScene.STARTING else spec.scene
     // 思考段与混合池的轮换序号由同一条逐帧时钟推进（不另起协程）：只在序号变化时重组。
     val rerolls = fixed == null && (scene == BallFaceScene.SAMPLING || scene == BallFaceScene.MIXED)
@@ -145,9 +149,15 @@ private fun HeldBallFace(
                 palette =
                     facePaletteOf(spec.paint, spec.tint, MaterialTheme.colorScheme, LocalBallFaceColor.current),
                 label = label,
+                measurer = measurer,
             ),
         motion = motion,
         clock = clock,
+        satellitePaused = spec.offline,
+        gazeDirection =
+            spec.gazeDirection.takeIf {
+                spec.mood == BallFaceMood.IDLE && spec.reaction == BallReaction.DRAG
+            },
         modifier = modifier,
     )
 }
@@ -197,6 +207,7 @@ private class FaceStyle(
     val variant: BallFaceVariant,
     val palette: FacePalette,
     val label: FaceLabel?,
+    val measurer: TextMeasurer,
 )
 
 /** 会话数字：[inSatellite] 为真时替代卫星符号，否则画在卫星角标上。 */
@@ -212,6 +223,8 @@ private fun BallFaceCanvas(
     style: FaceStyle,
     motion: Boolean,
     clock: FaceClock,
+    satellitePaused: Boolean,
+    gazeDirection: Offset?,
     modifier: Modifier,
 ) {
     val animator = remember { FaceAnimator() }
@@ -220,7 +233,14 @@ private fun BallFaceCanvas(
     Canvas(modifier) {
         val unit = minOf(size.width, size.height) / CANVAS_UNITS
         val t = if (motion) clock.seconds.value else STATIC_TIME_SEC
-        val frame = animator.frameAt(t, motion)
+        val blinkAt = clock.blinkStart.value
+        val blinking = motion && t >= blinkAt && t - blinkAt < BLINK_SHUT_SEC
+        val base = animator.frameAt(t, motion, blinking, satellitePaused)
+        // 拖动视线：方向 -1..1 映射到设计单位的视线偏移（最大 [DRAG_GAZE_UNITS]）。
+        val frame =
+            gazeDirection?.let {
+                base.copy(gazeX = it.x * DRAG_GAZE_UNITS, gazeY = it.y * DRAG_GAZE_UNITS)
+            } ?: base
         withTransform({
             translate(size.width / 2f, size.height / 2f)
             scale(unit, unit, Offset.Zero)
@@ -237,6 +257,8 @@ private fun BallFaceCanvas(
 internal class FaceClock(
     val seconds: State<Float>,
     val rerolls: State<Int>,
+    /** 最近一次眨眼开始的时刻（秒）；从未眨眼时为 [NO_BLINK]。只在绘制阶段读取。 */
+    val blinkStart: State<Float>,
 )
 
 @Composable
@@ -247,18 +269,26 @@ private fun rememberFaceClock(
 ): FaceClock {
     val seconds = remember { mutableFloatStateOf(STATIC_TIME_SEC) }
     val rerolls = remember { mutableIntStateOf(0) }
+    val blinkStart = remember { mutableFloatStateOf(NO_BLINK) }
     val latestReroll by rememberUpdatedState(rerollSeconds)
     LaunchedEffect(enabled, jitterSeed) {
         seconds.floatValue = STATIC_TIME_SEC
         rerolls.intValue = 0
+        blinkStart.floatValue = NO_BLINK
         if (enabled) {
             val start = withFrameNanos { it }
             var jittered = 0
             var nextBoundary = jitterSeed?.let { BallFaceDirector.idleRerollSeconds(it, 1) } ?: 0f
+            // 眨眼：首次在 2–6 秒后，之后每次闭眼结束再等 2–6 秒。
+            var nextBlink = BallFaceDirector.blinkGapSec(Random.Default)
             while (true) {
                 withFrameNanos { nanos ->
                     val elapsed = (nanos - start) / NANOS_PER_SECOND
                     seconds.floatValue = elapsed
+                    if (elapsed >= nextBlink) {
+                        blinkStart.floatValue = elapsed
+                        nextBlink = elapsed + BLINK_SHUT_SEC + BallFaceDirector.blinkGapSec(Random.Default)
+                    }
                     val count =
                         if (jitterSeed != null) {
                             // 随机间隔：边界逐个推进，序号相同的间隔由种子决定。
@@ -276,7 +306,7 @@ private fun rememberFaceClock(
             }
         }
     }
-    return FaceClock(seconds, rerolls)
+    return FaceClock(seconds, rerolls, blinkStart)
 }
 
 private fun DrawScope.drawFace(
@@ -296,6 +326,22 @@ private fun DrawScope.drawFace(
         drawEye(frame.right, side = 1f, frame = frame, color = eyeColor)
         drawSatellite(frame.satellite, style)
     }
+    frame.zPhase?.let { drawFloatingZ(it, style) }
+}
+
+/** 浮动 z：从头顶右侧升起，正弦淡入淡出；位置在球体外侧，不压在盘面上。 */
+private fun DrawScope.drawFloatingZ(
+    phase: Float,
+    style: FaceStyle,
+) {
+    val alpha = sin(PI * phase).toFloat()
+    drawLabelText(
+        measurer = style.measurer,
+        text = "z",
+        sizeUnits = Z_UNITS,
+        center = Offset(Z_X + Z_DX * phase, Z_Y - Z_DY * phase),
+        color = style.palette.body.withAlpha(alpha),
+    )
 }
 
 /** 球体：实心盘，或线条版的开口环（缺口在右上）。 */
@@ -600,8 +646,21 @@ private fun themePaletteOf(
 
 private fun Color.withAlpha(alpha: Float): Color = copy(alpha = this.alpha * alpha)
 
+/** 拖动时视线的最大偏移（设计单位）。 */
+private const val DRAG_GAZE_UNITS: Float = 60f
+
+/** 浮动 z 的起点与位移、字号（设计单位）。 */
+private const val Z_X: Float = 430f
+private const val Z_Y: Float = -430f
+private const val Z_DX: Float = 60f
+private const val Z_DY: Float = 220f
+private const val Z_UNITS: Float = 150f
+
 /** 静态落帧的时刻（秒）：与设计稿 `MOTION=false` 时的 t 一致。 */
 internal const val STATIC_TIME_SEC: Float = 1.35f
+
+/** 尚未眨眼时的起点：远早于任何时刻，使 `t - start` 始终不在闭眼窗口内。 */
+private const val NO_BLINK: Float = -1_000f
 
 private const val NANOS_PER_SECOND: Float = 1_000_000_000f
 private const val MILLIS_PER_SECOND: Float = 1_000f

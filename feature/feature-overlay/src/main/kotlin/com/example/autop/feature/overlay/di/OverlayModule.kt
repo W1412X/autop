@@ -3,7 +3,9 @@
  */
 package com.example.autop.feature.overlay.di
 
+import com.example.autop.feature.overlay.ball.BallGreetingStore
 import com.example.autop.feature.overlay.ball.BallPositionStore
+import com.example.autop.feature.overlay.ball.SharedPrefsBallGreetingStore
 import com.example.autop.feature.overlay.ball.SharedPrefsBallPositionStore
 import com.example.autop.feature.overlay.record.TargetPickSession
 import com.example.autop.flow.TargetPicker
@@ -21,6 +23,10 @@ public object OverlayModule {
     @Provides
     @Singleton
     public fun provideBallPositionStore(impl: SharedPrefsBallPositionStore): BallPositionStore = impl
+
+    @Provides
+    @Singleton
+    public fun provideBallGreetingStore(impl: SharedPrefsBallGreetingStore): BallGreetingStore = impl
 
     /** 编辑器“在手机上重新选取”的拾取端口。 */
     @Provides

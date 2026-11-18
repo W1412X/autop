@@ -108,9 +108,23 @@ public object BallFaceDirector {
     private const val SEED_MIX: Long = 31L
     private const val EVENT_MIX: Long = 1_000L
 
+    /**
+     * 空闲池卫星绕行周期（秒）：与平静脸一致。池内的表演脸原本绕行 2.6 秒一圈，空闲时改为慢绕，
+     * 运行中的表演池不受影响。
+     */
+    private const val IDLE_ORBIT_SEC: Float = 30f
+
     /** 空闲轮换间隔的区间（秒）。 */
     public const val IDLE_REROLL_MIN_SEC: Float = 5f
     public const val IDLE_REROLL_MAX_SEC: Float = 10f
+
+    /** 眨眼间隔区间（秒）：一次眨眼结束到下一次开始的时间，随机取值。 */
+    public const val BLINK_MIN_GAP_SEC: Float = 2f
+    public const val BLINK_MAX_GAP_SEC: Float = 6f
+
+    /** 下一次眨眼前的间隔（秒），取值在 [BLINK_MIN_GAP_SEC]、[BLINK_MAX_GAP_SEC] 之间。 */
+    public fun blinkGapSec(random: Random): Float =
+        BLINK_MIN_GAP_SEC + random.nextFloat() * (BLINK_MAX_GAP_SEC - BLINK_MIN_GAP_SEC)
 
     /** 空闲池：中性表情，不含运行、等待、拦截、出错、暂停等状态语义（设计决定，见方案预览）。 */
     private val IDLE_POOL: List<BallFaceExpression> =
@@ -128,5 +142,5 @@ public object BallFaceDirector {
             BallFaceExpressions.gestureWatch,
             BallFaceExpressions.textSide,
             BallFaceExpressions.visionScan,
-        )
+        ).map { it.copy(satellite = BallSatelliteMotion.Orbit(IDLE_ORBIT_SEC)) }
 }

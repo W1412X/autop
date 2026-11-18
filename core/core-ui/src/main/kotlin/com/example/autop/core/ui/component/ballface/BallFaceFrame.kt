@@ -12,6 +12,7 @@
 package com.example.autop.core.ui.component.ballface
 
 import kotlin.math.cos
+import kotlin.math.floor
 import kotlin.math.sin
 
 /**
@@ -58,6 +59,8 @@ internal data class BallFaceFrame(
     val tilt: Float,
     val shake: Float,
     val satellite: SatelliteFrame,
+    /** 浮动 z 的周期内相位（0 到 1）；null 表示不画 z。 */
+    val zPhase: Float? = null,
 )
 
 /** 切换表情的过渡时长（秒）：与 [BallFaceDirector.CROSSFADE_MS] 一致。 */
@@ -74,10 +77,14 @@ internal fun ballFaceFrameOf(
     t: Float,
     motion: Boolean,
     digits: String? = null,
+    blinking: Boolean = false,
+    satellitePaused: Boolean = false,
 ): BallFaceFrame {
-    val satDeg = satelliteDegreesOf(e.satellite, t)
+    // 卫星停靠（网络断开）时只让卫星的时间停下，脸的其它动作照常。
+    val satT = if (satellitePaused) pausedTimeOf(t) else t
+    val satDeg = satelliteDegreesOf(e.satellite, satT)
     val gaze = gazeOf(e.gaze, satDeg, t)
-    val blink = motion && (t % BLINK_PERIOD_SEC) > BLINK_SHUT_SEC
+    val blink = motion && blinking
     val drifting = e.satellite == BallSatelliteMotion.Drift
     return BallFaceFrame(
         left = eyeOf(if (blink) blinked(e.left) else e.left, e.leftRotation, e.leftOffsetY),
@@ -88,9 +95,28 @@ internal fun ballFaceFrameOf(
         breath = if (motion) 1f + BREATH_AMPLITUDE * sin(t / e.breathSec * TWO_PI) else 1f,
         tilt = e.tilt + if (drifting) sin(t * TILT_WOBBLE_RATE) * TILT_WOBBLE else 0f,
         shake = if (motion && e.shake != 0f) sin(t * SHAKE_RATE) * e.shake else 0f,
-        satellite = satelliteFrameOf(e, t, satDeg, motion, digits),
+        satellite = satelliteFrameOf(e, satT, satDeg, motion, digits),
+        zPhase = if (motion && e.floatingZ) zPhaseOf(t) else null,
     )
 }
+
+/** 网络断开时卫星停住的周期与停住时长（秒）：每个周期末尾停 [OFFLINE_PAUSE_SEC]。 */
+private const val OFFLINE_CYCLE_SEC: Float = 4f
+private const val OFFLINE_PAUSE_SEC: Float = 1.2f
+
+/** 浮动 z 的周期（秒）。 */
+private const val Z_PERIOD_SEC: Float = 2.4f
+
+/** 卫星停住时的“卫星时间”：只累计未停住的时间，停住期间保持不变，因此卫星不会跳位。 */
+internal fun pausedTimeOf(t: Float): Float {
+    val cycles = floor(t / OFFLINE_CYCLE_SEC)
+    val within = t - cycles * OFFLINE_CYCLE_SEC
+    val pausedNow = (within - (OFFLINE_CYCLE_SEC - OFFLINE_PAUSE_SEC)).coerceIn(0f, OFFLINE_PAUSE_SEC)
+    return t - (cycles * OFFLINE_PAUSE_SEC + pausedNow)
+}
+
+/** z 的周期内相位：0 为刚升起，1 为完全淡出。 */
+internal fun zPhaseOf(t: Float): Float = (t % Z_PERIOD_SEC) / Z_PERIOD_SEC
 
 private fun satelliteFrameOf(
     e: BallFaceExpression,
@@ -132,6 +158,7 @@ internal fun blendFrames(
         tilt = lerp(from.tilt, to.tilt, k),
         shake = lerp(from.shake, to.shake, k),
         satellite = blendSatellite(from.satellite, to.satellite, k),
+        zPhase = to.zPhase,
     )
 
 /** 三次缓入缓出：起止速度为零，过渡两端不突兀。 */
@@ -169,9 +196,11 @@ internal class FaceAnimator {
     fun frameAt(
         t: Float,
         motion: Boolean,
+        blinking: Boolean = false,
+        satellitePaused: Boolean = false,
     ): BallFaceFrame {
         val current = checkNotNull(target) { "setTarget 必须先于 frameAt 调用" }
-        val to = ballFaceFrameOf(current.expression, t, motion, current.digits)
+        val to = ballFaceFrameOf(current.expression, t, motion, current.digits, blinking, satellitePaused)
         if (pending) {
             pending = false
             transitionFrom = shown
@@ -304,8 +333,10 @@ private const val REST_DEGREES: Float = 45f
 private const val ANGLE_OFFSET: Float = 90f
 private const val FULL_TURN: Float = 360f
 private const val TWO_PI: Float = 6.2831855f
-private const val BLINK_PERIOD_SEC: Float = 5.2f
-private const val BLINK_SHUT_SEC: Float = 5.05f
+
+/** 一次眨眼的闭眼时长（秒）。眨眼起点由 [AutopBallFace] 的时钟按 2–6 秒随机给出。 */
+internal const val BLINK_SHUT_SEC: Float = 0.15f
+
 private const val BREATH_AMPLITUDE: Float = 0.009f
 private const val DRIFT_PERIOD_SEC: Float = 4f
 private const val DRIFT_DEGREES: Float = 8f

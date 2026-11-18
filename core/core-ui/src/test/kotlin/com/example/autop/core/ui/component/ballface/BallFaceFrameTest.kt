@@ -70,12 +70,13 @@ class BallFaceFrameTest {
     }
 
     @Test
-    fun `blink closes blinkable eyes only in motion`() {
-        val blinkTime = 5.1f
-        val moving = ballFaceFrameOf(BallFaceExpressions.visionStare, blinkTime, motion = true)
+    fun `blink closes blinkable eyes only in motion and only while blinking`() {
+        val moving = ballFaceFrameOf(BallFaceExpressions.visionStare, 0.5f, motion = true, blinking = true)
         assertThat(moving.left.form).isEqualTo(BallEyeForm.CLOSED)
         assertThat(moving.right.form).isEqualTo(BallEyeForm.CLOSED)
-        val still = ballFaceFrameOf(BallFaceExpressions.visionStare, blinkTime, motion = false)
+        val open = ballFaceFrameOf(BallFaceExpressions.visionStare, 0.5f, motion = true, blinking = false)
+        assertThat(open.left.form).isEqualTo(BallEyeForm.WIDE)
+        val still = ballFaceFrameOf(BallFaceExpressions.visionStare, 0.5f, motion = false, blinking = true)
         assertThat(still.left.form).isEqualTo(BallEyeForm.WIDE)
     }
 

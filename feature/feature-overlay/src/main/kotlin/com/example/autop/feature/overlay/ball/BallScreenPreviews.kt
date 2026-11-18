@@ -7,12 +7,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.example.autop.agent.RunState
+import com.example.autop.core.ui.component.ballface.BallReaction
 import com.example.autop.core.ui.theme.AppearanceSettings
 import com.example.autop.core.ui.theme.AutopTheme
 import com.example.autop.core.ui.theme.DarkMode
 
 private val previewCallbacks =
     object : BallCallbacks {
+        override fun onTouchGesture(kind: BallReaction) = Unit
+
+        override fun onDragGaze(
+            dxPx: Float,
+            dyPx: Float,
+            ballSizePx: Int,
+        ) = Unit
+
+        override fun onDragRelease(velocityPxPerMs: Float) = Unit
+
         override fun onMove(
             x: Int,
             y: Int,

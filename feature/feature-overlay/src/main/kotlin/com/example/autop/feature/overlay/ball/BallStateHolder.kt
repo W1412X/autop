@@ -7,14 +7,19 @@
  */
 package com.example.autop.feature.overlay.ball
 
+import androidx.compose.ui.geometry.Offset
 import com.example.autop.agent.AgentEvent
+import com.example.autop.core.common.Clock
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.exceptionHandler
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.UiBallAmbientSection
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.ui.component.ballface.BallFaceVariant
+import com.example.autop.core.ui.component.ballface.BallReaction
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.DeviceStateProvider
 import com.example.autop.flow.RecordingSession
 import com.example.autop.task.ActiveRunInfo
 import com.example.autop.task.RunService
@@ -29,11 +34,14 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import java.time.Instant
+import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -50,6 +58,9 @@ public class BallStateHolder
         private val positionStore: BallPositionStore,
         private val logger: Logger,
         dispatchers: DispatcherProvider,
+        private val clock: Clock,
+        private val deviceState: DeviceStateProvider,
+        private val greetingStore: BallGreetingStore,
     ) {
         private val scope =
             CoroutineScope(SupervisorJob() + dispatchers.default + logger.exceptionHandler("BallStateHolder"))
@@ -66,8 +77,26 @@ public class BallStateHolder
                 }
             }
 
-        /** 球渲染状态：活跃会话 + 全部未收口会话（数字与拦截/等待）+ 无障碍 + 配置。 */
-        public val uiState: StateFlow<BallUiState> =
+        /** 当前手势反应（null 表示没有）。 */
+        private val reactionState = MutableStateFlow<BallReaction?>(null)
+
+        /** 拖动视线方向（每轴 -1..1），拖动外为 null。 */
+        private val gazeState = MutableStateFlow<Offset?>(null)
+
+        private var reactionJob: Job? = null
+
+        /** 环境快照（睡眠时段、充电、低电量、网络）：按 `ui.ballAmbient.tickSec` 重算。 */
+        private val ambientSnapshot: StateFlow<BallAmbientSnapshot> =
+            flow {
+                while (true) {
+                    emit(Unit)
+                    delay(configProvider.current()[UiConfig.BALL_AMBIENT].tickSec * MILLIS_PER_SECOND)
+                }
+            }.map { snapshotNow() }
+                .stateIn(scope, SharingStarted.Eagerly, snapshotNow())
+
+        /** 基础球状态：活跃会话 + 全部未收口会话（数字与拦截/等待）+ 无障碍 + 配置。 */
+        private val baseUiState: StateFlow<BallUiState> =
             combine(
                 combine(runService.observeActive(), runService.observeOpenRuns()) { active, open -> active to open },
                 accessibility.connected,
@@ -83,6 +112,17 @@ public class BallStateHolder
                     ballSizeDp = bits.ballSizeDp,
                     doubleTapStops = bits.doubleTapStops,
                     opacity = bits.opacity,
+                )
+            }.stateIn(scope, SharingStarted.Eagerly, BallUiState())
+
+        /** 球渲染状态：基础状态叠加环境快照、手势反应与拖动视线。 */
+        public val uiState: StateFlow<BallUiState> =
+            combine(baseUiState, ambientSnapshot, reactionState, gazeState) { base, snapshot, reaction, gaze ->
+                base.copy(
+                    ambient = snapshot.ambient,
+                    offline = snapshot.offline,
+                    reaction = reaction,
+                    gazeDirection = gaze,
                 )
             }.stateIn(scope, SharingStarted.Eagerly, BallUiState())
 
@@ -106,6 +146,81 @@ public class BallStateHolder
 
         /** 当前活跃 Run（圆弧菜单条件项与进度窗共用）。 */
         public fun activeRun(): ActiveRunInfo? = runService.observeActive().value
+
+        /**
+         * 球上的点按、长按或唤出（非拖动）：睡眠中被触摸只播唤醒；晨间每天第一次触摸先哈欠再招手。
+         */
+        public fun onTouchGesture(kind: BallReaction) {
+            val now = clock.nowMillis()
+            val cfg = configProvider.current()[UiConfig.BALL_AMBIENT]
+            val today = epochDayOf(now)
+            val morning = morningGreetDue(hourOf(now), greetingStore.lastGreetDay(), today, cfg)
+            val sequence = touchReactionsOf(kind, ambientSnapshot.value.ambient, morning)
+            if (BallReaction.YAWN in sequence) greetingStore.markGreetDay(today)
+            playSequence(sequence, cfg)
+        }
+
+        /** 拖动中：视线跟随拖动方向（相对球半径归一化）；进入拖动时切到拖动反应。 */
+        public fun onDragGaze(
+            dxPx: Float,
+            dyPx: Float,
+            ballSizePx: Int,
+        ) {
+            val radius = (ballSizePx / 2f).coerceAtLeast(1f)
+            gazeState.value = Offset((dxPx / radius).coerceIn(-1f, 1f), (dyPx / radius).coerceIn(-1f, 1f))
+            if (reactionState.value != BallReaction.DRAG) {
+                reactionJob?.cancel()
+                reactionState.value = BallReaction.DRAG
+            }
+        }
+
+        /** 松手：平均速度达到阈值即为甩到边缘（惊讶）；否则只结束拖动反应与视线。 */
+        public fun onDragRelease(velocityPxPerMs: Float) {
+            gazeState.value = null
+            val cfg = configProvider.current()[UiConfig.BALL_AMBIENT]
+            if (isFling(velocityPxPerMs, cfg)) {
+                playSequence(listOf(BallReaction.FLING), cfg)
+            } else if (reactionState.value == BallReaction.DRAG) {
+                reactionJob?.cancel()
+                reactionState.value = null
+            }
+        }
+
+        /** 依次播放反应：每个反应持续其时长，全部播完后回到空闲（无反应）。 */
+        private fun playSequence(
+            sequence: List<BallReaction>,
+            cfg: UiBallAmbientSection,
+        ) {
+            reactionJob?.cancel()
+            reactionJob =
+                scope.launch {
+                    for (reaction in sequence) {
+                        reactionState.value = reaction
+                        delay(reactionDurationMs(reaction, cfg) ?: 0L)
+                    }
+                    reactionState.value = null
+                }
+        }
+
+        /** 当前环境快照：睡眠时段、充电与电量；网络类型为 none 视为断开。 */
+        private fun snapshotNow(): BallAmbientSnapshot {
+            val cfg = configProvider.current()[UiConfig.BALL_AMBIENT]
+            val now = clock.nowMillis()
+            val device = deviceState.current()
+            return BallAmbientSnapshot(
+                ambient = ambientOf(hourOf(now), device.charging, device.batteryPercent, cfg),
+                offline = device.networkType == NETWORK_NONE,
+            )
+        }
+
+        private fun hourOf(epochMs: Long): Int = Instant.ofEpochMilli(epochMs).atZone(ZoneId.systemDefault()).hour
+
+        private fun epochDayOf(epochMs: Long): Long =
+            Instant
+                .ofEpochMilli(epochMs)
+                .atZone(ZoneId.systemDefault())
+                .toLocalDate()
+                .toEpochDay()
 
         /** 拖动中：更新窗口位置（自由态，不持久化；顺带停掉收拢定时器）。 */
         public fun onMoved(
@@ -256,6 +371,11 @@ public class BallStateHolder
             /** `ui.overlay.displayMode` 取值（edge=松手即收边细条 / always=保持展开）。 */
             private const val DISPLAY_MODE_EDGE: String = "edge"
             private const val DISPLAY_MODE_ALWAYS: String = "always"
+
+            private const val MILLIS_PER_SECOND: Long = 1_000L
+
+            /** `DeviceState.networkType` 无网络时的取值。 */
+            private const val NETWORK_NONE: String = "none"
         }
     }
 

@@ -24,7 +24,12 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.onClick
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.example.autop.core.ui.component.ballface.BallReaction
+import kotlin.math.hypot
 import kotlin.math.roundToInt
+
+/** 拖动尚未产生位移时的时刻占位值。 */
+private const val NO_MOVE_MS: Long = -1L
 
 /** 松手磁吸判定距离（球心距边缘，dp）。 */
 private val MAGNET_SIZE = 28.dp
@@ -76,8 +81,14 @@ internal fun BallScreen(
     val tap: () -> Unit = {
         when {
             state.mode is BallMode.AccessibilityLost -> callbacks.onAccessibilityTap()
-            current.position.dock != BallDock.NONE -> callbacks.onReveal(current.screenWidthPx, current.ballSizePx)
-            else -> callbacks.onTap(current.screenWidthPx)
+            current.position.dock != BallDock.NONE -> {
+                callbacks.onReveal(current.screenWidthPx, current.ballSizePx)
+                callbacks.onTouchGesture(BallReaction.REVEAL)
+            }
+            else -> {
+                callbacks.onTap(current.screenWidthPx)
+                callbacks.onTouchGesture(BallReaction.TAP)
+            }
         }
     }
     val description = stringResource(ballDescriptionOf(uiState.mode))
@@ -120,6 +131,7 @@ private fun Modifier.ballGestures(
         .pointerInput(Unit) {
             detectTapGestures(
                 onTap = { onTap() },
+                onLongPress = { callbacks.onTouchGesture(BallReaction.LONG_PRESS) },
                 onDoubleTap = {
                     if (state.position.dock == BallDock.NONE) callbacks.onDoubleTap()
                 },
@@ -127,13 +139,20 @@ private fun Modifier.ballGestures(
         }.pointerInput(Unit) {
             var dragOrigin = Offset.Zero
             var dragTotal = Offset.Zero
+            // 拖动速度（甩出判定）：首次位移的时刻到最后一次位移的时刻之间的平均速度。
+            var moveStartMs = NO_MOVE_MS
+            var moveLastMs = NO_MOVE_MS
             detectDragGestures(
                 onDragStart = {
                     dragOrigin = Offset(state.position.x.toFloat(), state.position.y.toFloat())
                     dragTotal = Offset.Zero
+                    moveStartMs = NO_MOVE_MS
+                    moveLastMs = NO_MOVE_MS
                 },
                 onDrag = { change, amount ->
                     change.consume()
+                    if (moveStartMs == NO_MOVE_MS) moveStartMs = change.uptimeMillis
+                    moveLastMs = change.uptimeMillis
                     dragTotal += amount
                     val visible = (state.ballSizePx * DOCK_VISIBLE_RATIO).roundToInt()
                     val x =
@@ -145,8 +164,13 @@ private fun Modifier.ballGestures(
                             .roundToInt()
                             .coerceIn(0, state.screenHeightPx - state.ballSizePx)
                     callbacks.onMove(x, y)
+                    callbacks.onDragGaze(dragTotal.x, dragTotal.y, state.ballSizePx)
                 },
                 onDragEnd = {
+                    val elapsedMs = (moveLastMs - moveStartMs).coerceAtLeast(1L)
+                    val distancePx = hypot(dragTotal.x.toDouble(), dragTotal.y.toDouble())
+                    val velocity = if (moveStartMs == NO_MOVE_MS) 0f else (distancePx / elapsedMs).toFloat()
+                    callbacks.onDragRelease(velocity)
                     callbacks.onDragEnd(
                         state.ballSizePx,
                         state.screenWidthPx,

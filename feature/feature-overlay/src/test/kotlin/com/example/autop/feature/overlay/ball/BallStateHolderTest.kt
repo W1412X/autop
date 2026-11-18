@@ -1,8 +1,13 @@
 package com.example.autop.feature.overlay.ball
 
+import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.TestDispatcherProvider
+import com.example.autop.device.DeviceState
+import com.example.autop.device.DeviceStateProvider
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import org.junit.Test
 
@@ -144,7 +149,34 @@ class BallStateHolderTest {
             positionStore = store,
             logger = NoopLogger,
             dispatchers = TestDispatcherProvider(UnconfinedTestDispatcher()),
+            clock = FakeClock(0L),
+            deviceState = FakeDeviceState(),
+            greetingStore = FakeGreetingStore(),
         )
+
+    private class FakeDeviceState : DeviceStateProvider {
+        override fun current(): DeviceState =
+            DeviceState(
+                batteryPercent = 80,
+                charging = false,
+                networkType = "wifi",
+                screenOn = true,
+                keyguardLocked = false,
+                foregroundPackage = null,
+            )
+
+        override val changes: Flow<DeviceState> = emptyFlow()
+    }
+
+    private class FakeGreetingStore : BallGreetingStore {
+        var day: Long? = null
+
+        override fun lastGreetDay(): Long? = day
+
+        override fun markGreetDay(day: Long) {
+            this.day = day
+        }
+    }
 
     private class FakePositionStore : BallPositionStore {
         var saved: BallPosition? = null

@@ -3,6 +3,8 @@
  */
 package com.example.autop.feature.overlay.ball
 
+import com.example.autop.core.ui.component.ballface.BallReaction
+
 /** 悬浮球手势回调（由 OverlayBallController 实现）。 */
 public interface BallCallbacks {
     /** 拖动中：移动球窗口到绝对位置（px）。 */
@@ -41,4 +43,17 @@ public interface BallCallbacks {
 
     /** 无障碍断开态单击：跳系统无障碍设置。 */
     public fun onAccessibilityTap()
+
+    /** 球上的点按、长按或唤出（非拖动）：播放对应的手势反应（睡眠中则为唤醒）。 */
+    public fun onTouchGesture(kind: BallReaction)
+
+    /** 拖动中：视线跟随拖动方向（[dxPx]、[dyPx] 为相对拖动起点的位移，单位 px）。 */
+    public fun onDragGaze(
+        dxPx: Float,
+        dyPx: Float,
+        ballSizePx: Int,
+    )
+
+    /** 松手：[velocityPxPerMs] 为拖动平均速度，达到阈值即为甩到边缘。 */
+    public fun onDragRelease(velocityPxPerMs: Float)
 }
