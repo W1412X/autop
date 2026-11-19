@@ -12,6 +12,12 @@ public object TaskErrorCodes {
     public const val CRON_INVALID: String = "task.cron_invalid"
     public const val SOURCE_UNKNOWN: String = "task.source_unknown"
     public const val PERMISSION_MISSING: String = "task.permission_missing"
+
+    /** 完全模式任务开始时 Shell 执行总闸未开启（设置里关闭）。 */
+    public const val PERMISSION_SHELL_SWITCH: String = "task.permission_shell_switch"
+
+    /** 完全模式任务开始时 shell 注入通道未连接（无线调试未开启或未配对）。 */
+    public const val PERMISSION_SHELL_CHANNEL: String = "task.permission_shell_channel"
     public const val DAILY_LIMIT: String = "task.daily_limit"
     public const val COOLDOWN: String = "task.cooldown"
     public const val SCREEN_BUSY: String = "task.screen_busy"

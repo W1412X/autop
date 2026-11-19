@@ -7,6 +7,7 @@ package com.example.autop.task
 
 import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.TaskId
 import com.example.autop.flow.AuthorLive
 import com.example.autop.flow.AuthorMessage
@@ -36,6 +37,8 @@ public data class TaskDraft(
     val executorFlow: String? = null,
     /** 是否需要屏幕可用（默认 true）。 */
     val needsScreen: Boolean = true,
+    /** 运行模式：标准或完全（完全需要 Shell 执行总闸开启且无线注入已连接）。 */
+    val runMode: RunMode = RunMode.STANDARD,
     /** 补充提示（经验性说明，随 goal 一起交付）。 */
     val hint: String = "",
 )
@@ -52,6 +55,10 @@ public data class TaskAuthorState(
     val errorCode: String? = null,
     /** 正在修改已有任务（保存时更新该任务而不是新建）。 */
     val editing: Boolean = false,
+    /** 当前草稿的问题（不通过则不能保存），与保存时的校验同一套规则。 */
+    val issues: List<String> = emptyList(),
+    /** 当前草稿的权限提示（不阻断保存，运行时会因此失败或等待）。 */
+    val warnings: List<String> = emptyList(),
 )
 
 /** 一个任务创作会话。 */

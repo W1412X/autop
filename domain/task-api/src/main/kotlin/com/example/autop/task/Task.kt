@@ -143,7 +143,8 @@ public enum class GroupMode {
 public data class FilterClause(
     val field: String,
     val op: FilterOp,
-    val value: String,
+    /** EXISTS 不需要 value，缺省为空串（其余操作符由 FilterValidator 校验非空）。 */
+    val value: String = "",
     val ignoreCase: Boolean = true,
 )
 
