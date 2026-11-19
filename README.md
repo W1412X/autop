@@ -314,11 +314,15 @@ Conventional Commits，scope 用模块领域名，例如 `feat(memory): …`、`
 
 | 文件 | 用途 | 来源 | 许可证 |
 |---|---|---|---|
-| `domain/device-impl/.../assets/vision/gui_detect.onnx` | 控件框检测（YOLO，单类 icon） | 来源待作者确认（POC 记录的权重名为 GPA-GUI-Detector） | 待作者确认 |
-| `ocr_det.onnx` | 文字行检测（PP-OCR DB mobile） | PaddleOCR PP-OCR 系列 | 待作者确认（PaddleOCR 项目为 Apache-2.0） |
-| `ocr_rec_server.onnx`、`ppocr_keys.txt` | 文字识别（PP-OCRv5 server，量化）与字典 | PaddleOCR PP-OCR 系列 | 待作者确认（PaddleOCR 项目为 Apache-2.0） |
-| `icon_cls.onnx` | 图标分类（MobileNetV3-Small，102 类） | 来源待作者确认 | 待作者确认 |
-| `state_cls.onnx` | 开关状态分类（MobileNetV3-Small） | 来源待作者确认 | 待作者确认 |
+| `gui_detect.onnx` | 控件框检测（YOLO，单类 icon） | Ultralytics YOLO11s（COCO 预训练）起步，在 MobileViews 等数据经 VH 自动转换得到的 YOLO 标注（`yolo_v2`，`tools/vh2yolo_v2.py`）上微调，训练目录 `poc/visual-parsing/runs/vp8_B2`，导出脚本 `tools/export_vp8_assets.py`。ONNX 元数据写明 "Ultralytics YOLO11s" | AGPL-3.0（Ultralytics）。Ultralytics 官方回复：不购买企业许可时，以 AGPL-3.0 使用该权重须开源整个方案，包括权重 |
+| `ocr_det.onnx` | 文字行检测（PP-OCRv5 mobile，DB） | PaddleOCR PP-OCRv5 mobile 检测模型，paddle2onnx 转换（`poc/visual-parsing/out/v5`） | Apache-2.0（PaddleOCR） |
+| `ocr_rec_server.onnx` | 文字识别（PP-OCRv5 server 识别模型，量化） | PaddleOCR PP-OCRv5 server 识别模型（`poc/visual-parsing/weights/PP-OCRv5_server_rec_infer.tar`） | Apache-2.0（PaddleOCR） |
+| `ppocr_keys.txt` | 文字识别字典 | 取自 PP-OCRv5 识别模型 `inference.yml` 的 `character_dict` | Apache-2.0（PaddleOCR） |
+| `ocr_lexicon.txt` | OCR 词典（CTC 词典重打分用的 UI 词表） | 项目自拟的中文 UI 词汇，见 `docs/design/ocr-accuracy-uplift.md` | 随本仓库（项目自有内容） |
+| `icon_cls.onnx` | 图标分类（MobileNetV3-Small，102 类） | torchvision MobileNetV3-Small（ImageNet 预训练）换 102 类头，在 icon-dataset（boostvolt/icon-dataset，100 类）加 text_crop、image_crop 两个拒识类上训练，`poc/visual-parsing/tools/train_icon_cls.py` | 代码与预训练权重：BSD-3-Clause（torchvision）。icon-dataset 未声明许可证（README 与文件列表中均无） |
+| `state_cls.onnx` | 开关状态分类（MobileNetV3-Small，checkbox / radio / switch 共用） | torchvision MobileNetV3-Small（ImageNet 预训练），在 MobileViews 衍生的控件裁剪上训练，标签来自 VH 的 `checked`，`tools/build_state_crops.py`、`tools/train_state_cls.py` | 代码与预训练权重：BSD-3-Clause（torchvision）。训练数据见下 |
+
+MobileViews（mllmTeam，Hugging Face 数据集）是 `yolo_v2` 与 `state_cls` 的数据来源。设计稿（`docs/design/visual-screen-parsing.md`）记录其为 copyright:none；数据集页的许可证字段本次未能核实。
 | `llm/llm-onnx/.../embedding/bge-small-zh-v1.5-int8/` | 中文文本嵌入（int8 量化） | [BAAI/bge-small-zh-v1.5](https://huggingface.co/BAAI/bge-small-zh-v1.5)，ONNX 版由 onnx-community 转换 | MIT |
 
 ## CI 与发布
