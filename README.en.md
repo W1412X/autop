@@ -310,21 +310,6 @@ The tables below list the open-source libraries the project uses directly. Versi
 
 - **[Shizuku](https://github.com/RikkaApps/Shizuku)** (Apache-2.0, copyright RikkaApps): the ADB injection channel adapts Shizuku's ADB protocol stack (`domain/device-impl/.../impl/adb/`, including AdbClient, AdbProtocol, AdbMessage, AdbKey, AdbMdns, and AdbPairingClient), and the native code for SPAKE2 wireless debugging pairing (`libadb.so` from Shizuku's `jni/`, which depends on the BoringSSL prefab). The adapted files keep their original source and license header comments. Only debug logging was removed. Using this code requires compliance with the Apache License 2.0.
 
-**Model weights bundled in the APK**
-
-| File | Purpose | Source | License |
-|---|---|---|---|
-| `gui_detect.onnx` | Control box detection (YOLO, single class: icon) | Starts from Ultralytics YOLO11s (COCO pretrained), fine-tuned on YOLO labels that MobileViews-derived data was converted into from view hierarchies (`yolo_v2`, `tools/vh2yolo_v2.py`). Training run `poc/visual-parsing/runs/vp8_B2`, exported by `tools/export_vp8_assets.py`. The ONNX metadata names "Ultralytics YOLO11s" | AGPL-3.0 (Ultralytics). Ultralytics' official answer: without an Enterprise License, using these weights under AGPL-3.0 requires open-sourcing the entire solution, including the weights |
-| `ocr_det.onnx` | Text line detection (PP-OCRv5 mobile, DB) | PaddleOCR PP-OCRv5 mobile detection model, converted with paddle2onnx (`poc/visual-parsing/out/v5`) | Apache-2.0 (PaddleOCR) |
-| `ocr_rec_server.onnx` | Text recognition (PP-OCRv5 server recognition model, quantized) | PaddleOCR PP-OCRv5 server recognition model (`poc/visual-parsing/weights/PP-OCRv5_server_rec_infer.tar`) | Apache-2.0 (PaddleOCR) |
-| `ppocr_keys.txt` | Text recognition character dictionary | Exported from the `character_dict` in the PP-OCRv5 recognition model's `inference.yml` | Apache-2.0 (PaddleOCR) |
-| `ocr_lexicon.txt` | OCR lexicon (UI vocabulary for CTC lexicon rescoring) | Chinese UI vocabulary compiled by the project, see `docs/design/ocr-accuracy-uplift.md` | Part of this repository (project-owned content) |
-| `icon_cls.onnx` | Icon classification (MobileNetV3-Small, 102 classes) | torchvision MobileNetV3-Small (ImageNet pretrained) with a 102-class head, trained on icon-dataset (boostvolt/icon-dataset, 100 classes) plus two rejection classes (text_crop, image_crop), `poc/visual-parsing/tools/train_icon_cls.py` | Code and pretrained weights: BSD-3-Clause (torchvision). icon-dataset declares no license (none in its README or file list) |
-| `state_cls.onnx` | Toggle state classification (MobileNetV3-Small, shared by checkbox / radio / switch) | torchvision MobileNetV3-Small (ImageNet pretrained), trained on control crops derived from MobileViews, with labels from the VH `checked` attribute, `tools/build_state_crops.py`, `tools/train_state_cls.py` | Code and pretrained weights: BSD-3-Clause (torchvision). Training data see below |
-
-MobileViews (mllmTeam, a Hugging Face dataset) is the data source for `yolo_v2` and `state_cls`. The design document (`docs/design/visual-screen-parsing.md`) records it as copyright:none. Its license field on the dataset page could not be verified.
-| `llm/llm-onnx/.../embedding/bge-small-zh-v1.5-int8/` | Chinese text embedding (int8 quantized) | [BAAI/bge-small-zh-v1.5](https://huggingface.co/BAAI/bge-small-zh-v1.5), ONNX version converted by onnx-community | MIT |
-
 ## CI and release
 
 Pushes to `main`, `v*` tags, or manual runs of `.github/workflows/release.yml` run the quality gates (test, detekt, ktlint), build the release APK, and upload it as an artifact (**the final APK only**). When a `v*` tag is pushed, the APK is also published to the matching [GitHub Release](https://github.com/W1412X/autop/releases).
