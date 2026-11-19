@@ -24,7 +24,10 @@ keystore.properties
 # ── 不入库：训练 PoC（体积数十 G）、开发过程文档、分发产物 ──
 /poc/
 /autop/
-/docs/
+/docs/*
+!/docs/index.html
+!/docs/favicon.svg
+!/docs/.nojekyll
 /apk-dist/
 /*.log
 /*.txt
