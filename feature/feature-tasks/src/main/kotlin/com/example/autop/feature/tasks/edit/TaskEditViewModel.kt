@@ -9,9 +9,15 @@ import androidx.lifecycle.viewModelScope
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.PermissionChecks
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.FeaturesConfig
+import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.ShellInput
+import com.example.autop.device.ShellState
 import com.example.autop.feature.tasks.NEW_TASK_ID
 import com.example.autop.feature.tasks.TASK_ID_ARG
 import com.example.autop.feature.tasks.TasksNavigator
@@ -21,15 +27,20 @@ import com.example.autop.flow.FlowStore
 import com.example.autop.flow.FlowValidationService
 import com.example.autop.task.ConditionResult
 import com.example.autop.task.FilterOp
+import com.example.autop.task.RunEnvironment
 import com.example.autop.task.RunService
 import com.example.autop.task.Task
 import com.example.autop.task.TaskRepository
+import com.example.autop.task.TaskRequirements
 import com.example.autop.task.TriggerEvent
 import com.example.autop.task.TriggerSimulator
 import com.example.autop.task.TriggerSource
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonPrimitive
@@ -51,6 +62,9 @@ public class TaskEditViewModel
         private val flowStore: FlowStore,
         private val flowValidation: FlowValidationService,
         private val configProvider: ConfigProvider,
+        private val accessibilityStatus: AccessibilityStatus,
+        private val shellInput: ShellInput,
+        private val permissions: PermissionChecks,
     ) : ViewModel() {
         private val taskId: String? =
             savedStateHandle.get<String>(TASK_ID_ARG)?.takeIf { it != NEW_TASK_ID }
@@ -66,9 +80,68 @@ public class TaskEditViewModel
 
         public val uiState: StateFlow<TaskEditUiState> = _uiState
 
+        /** 当前运行环境（无障碍、shell 总闸与通道、通知使用权），变化时刷新权限提示。 */
+        private val envState = MutableStateFlow(currentEnvironment())
+
+        private fun currentEnvironment(): RunEnvironment =
+            currentEnvironment(accessibilityStatus.connected.value, shellInput.state.value, configProvider.current())
+
+        private fun currentEnvironment(
+            accessible: Boolean,
+            shell: ShellState,
+            snapshot: ConfigSnapshot,
+        ): RunEnvironment =
+            RunEnvironment(
+                accessibilityConnected = accessible,
+                shellSwitchOn = snapshot[FeaturesConfig.FEATURES].shellExec,
+                shellConnected = shell == ShellState.Connected,
+                notificationListenerGranted = permissions.canReadNotifications(),
+            )
+
+        /** 决定缺失项的表单字段：执行方式为流程时不适用；条件源只在条件触发时参与。 */
+        private fun requirementInputOf(state: TaskEditUiState): RequirementInput =
+            RequirementInput(
+                flow = state.executorFlow,
+                needsScreen = state.needsScreen,
+                runMode = state.runMode,
+                sourcePermission =
+                    if (state.triggerKind == EditTriggerKind.CONDITION) {
+                        state.sourceOptions.firstOrNull { it.id == state.sourceId }?.requiresPermission
+                    } else {
+                        null
+                    },
+            )
+
+        private data class RequirementInput(
+            val flow: Boolean,
+            val needsScreen: Boolean,
+            val runMode: RunMode,
+            val sourcePermission: String?,
+        )
+
         private var simEvents: List<TriggerEvent> = emptyList()
 
         init {
+            // 运行环境变化（无障碍、shell 通道、总闸）时刷新快照。
+            viewModelScope.launch {
+                combine(
+                    accessibilityStatus.connected,
+                    shellInput.state,
+                    configProvider.observe(),
+                ) { accessible, shell, snapshot ->
+                    currentEnvironment(accessible, shell, snapshot)
+                }.collect { env -> envState.value = env }
+            }
+            // 表单字段或环境变化时重新算缺失项；只在结果变化时写回，避免循环刷新。
+            viewModelScope.launch {
+                combine(_uiState.map { requirementInputOf(it) }.distinctUntilChanged(), envState) { input, env ->
+                    if (input.flow) {
+                        emptyList()
+                    } else {
+                        TaskRequirements.missing(input.needsScreen, input.runMode, input.sourcePermission, env)
+                    }
+                }.distinctUntilChanged().collect { missing -> _uiState.update { it.copy(missing = missing) } }
+            }
             viewModelScope.launch {
                 configProvider.observe().collect { snapshot ->
                     _uiState.update { it.copy(flowsEnabled = snapshot.flowsEnabled()) }

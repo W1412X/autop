@@ -39,6 +39,7 @@ import com.example.autop.core.ui.component.SwitchRow
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
 import com.example.autop.feature.tasks.R
+import com.example.autop.task.TaskRequirement
 
 /** 任务编辑页。 */
 @Composable
@@ -113,8 +114,39 @@ private fun BasicSection(
             onCheckedChange = { onAction(TaskEditAction.SetNeedsScreen(it)) },
         )
         RunModeRow(state = state, onAction = onAction)
+        PermissionWarnings(missing = state.missing)
     }
 }
+
+/** 运行所需权限的缺失提示：不阻断保存，说明运行时会因此失败或等待。 */
+@Composable
+private fun PermissionWarnings(missing: List<TaskRequirement>) {
+    if (missing.isEmpty()) return
+    val spacing = LocalSpacing.current
+    Column(modifier = Modifier.fillMaxWidth().padding(spacing.screenEdge)) {
+        Text(
+            text = stringResource(R.string.task_edit_perm_header),
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.error,
+        )
+        missing.forEach { requirement ->
+            Text(
+                text = stringResource(permissionTextRes(requirement)),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+@StringRes
+private fun permissionTextRes(requirement: TaskRequirement): Int =
+    when (requirement) {
+        TaskRequirement.ACCESSIBILITY -> R.string.task_edit_perm_accessibility
+        TaskRequirement.SHELL_SWITCH -> R.string.task_edit_perm_shell_switch
+        TaskRequirement.SHELL_CHANNEL -> R.string.task_edit_perm_shell_channel
+        TaskRequirement.NOTIFICATION_LISTENER -> R.string.task_edit_perm_notification_listener
+    }
 
 /** 执行方式：智能体 / 流程；选流程后按其参数声明填写参数。 */
 @Composable

@@ -14,6 +14,7 @@ import com.example.autop.task.LockedBehavior
 import com.example.autop.task.ScheduleSpec
 import com.example.autop.task.Task
 import com.example.autop.task.TaskExecutor
+import com.example.autop.task.TaskRequirement
 import com.example.autop.task.Trigger
 import java.time.Instant
 import java.time.LocalDate
@@ -32,6 +33,8 @@ public data class TaskEditUiState(
     val runMode: RunMode = RunMode.STANDARD,
     /** Shell 执行总闸是否开启；关闭时不能选择完全模式。 */
     val shellExecEnabled: Boolean = false,
+    /** 按当前表单与运行环境算出的缺失权限（提示用，不阻断保存；运行时缺失会失败或等待）。 */
+    val missing: List<TaskRequirement> = emptyList(),
     // 触发
     val triggerKind: EditTriggerKind = EditTriggerKind.MANUAL,
     val scheduleMode: EditScheduleMode = EditScheduleMode.DAILY,

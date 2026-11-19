@@ -39,6 +39,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.thread.ui.AttachImageButton
 import com.example.autop.core.thread.ui.PendingImageStrip
 import com.example.autop.core.thread.ui.SentImageRow
@@ -150,7 +151,16 @@ public fun TaskAuthorScreen(
                 MessageItem(message = message, pending = author.pendingQuestion, onAction = onAction)
             }
             // 草稿是此前轮次的产物，排在正在流式输出的这一轮之前，跟随底部时看到的始终是最新内容。
-            author.draft?.let { draft -> item { DraftCard(draft = draft, flowsEnabled = state.flowsEnabled) } }
+            author.draft?.let { draft ->
+                item {
+                    DraftCard(
+                        draft = draft,
+                        flowsEnabled = state.flowsEnabled,
+                        issues = author.issues,
+                        warnings = author.warnings,
+                    )
+                }
+            }
             author.live?.let { live -> item { LiveTurn(live = live) } }
             if (author.busy && author.live == null && author.pendingQuestion == null) {
                 item {
@@ -307,6 +317,8 @@ private fun activityText(name: String): String =
         "inspect_screen" -> stringResource(R.string.task_author_activity_inspect_screen)
         "memory_search" -> stringResource(R.string.task_author_activity_memory_search)
         "list_flows" -> stringResource(R.string.task_author_activity_list_flows)
+        "list_trigger_sources" -> stringResource(R.string.task_author_activity_list_trigger_sources)
+        "sample_events" -> stringResource(R.string.task_author_activity_sample_events)
         "propose_task" -> stringResource(R.string.task_author_activity_propose_task)
         else -> name
     }
@@ -426,6 +438,8 @@ private fun ThinkingBlock(
 private fun DraftCard(
     draft: TaskDraft,
     flowsEnabled: Boolean,
+    issues: List<String>,
+    warnings: List<String>,
 ) {
     val spacing = LocalSpacing.current
     Column(
@@ -461,6 +475,14 @@ private fun DraftCard(
                 },
             style = MaterialTheme.typography.bodySmall,
         )
+        Text(
+            text =
+                stringResource(
+                    R.string.task_author_run_mode,
+                    stringResource(runModeLabelRes(draft.runMode)),
+                ),
+            style = MaterialTheme.typography.bodySmall,
+        )
         if (draft.hint.isNotBlank()) {
             Text(
                 text = stringResource(R.string.task_author_hint, draft.hint),
@@ -468,8 +490,22 @@ private fun DraftCard(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
+        issues.forEach { issue ->
+            Text(text = issue, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
+        }
+        warnings.forEach { warning ->
+            Text(
+                text = warning,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
     }
 }
+
+/** 运行模式的名称资源（与任务编辑页一致）。 */
+private fun runModeLabelRes(mode: RunMode): Int =
+    if (mode == RunMode.FULL) R.string.task_edit_run_mode_full else R.string.task_edit_run_mode_standard
 
 /** 触发行：方式 + 时间/表达式/条件。 */
 @Composable

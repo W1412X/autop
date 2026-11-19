@@ -214,6 +214,14 @@
     <string name="task_author_activity_inspect_screen">正在查看当前屏幕…</string>
     <string name="task_author_activity_memory_search">正在检索记忆…</string>
     <string name="task_author_activity_list_flows">正在查看已有流程…</string>
+    <string name="task_author_activity_list_trigger_sources">正在查看事件源…</string>
+    <string name="task_author_activity_sample_events">正在查看事件样例…</string>
+    <string name="task_author_run_mode">运行模式：%1$s</string>
+    <string name="task_edit_perm_header">以下权限未满足，运行时任务会失败或无法触发：</string>
+    <string name="task_edit_perm_accessibility">无障碍服务未连接：需要屏幕的任务会一直等待，请先到系统设置开启无障碍。</string>
+    <string name="task_edit_perm_shell_switch">Shell 执行总闸未开启：完全模式任务开始时会直接失败，请在设置中开启。</string>
+    <string name="task_edit_perm_shell_channel">shell 注入通道未连接：完全模式任务开始时会直接失败，请开启无线调试并完成配对。</string>
+    <string name="task_edit_perm_notification_listener">通知使用权未授予：通知条件任务不会被触发，请到系统设置授予通知使用权。</string>
     <string name="task_author_activity_propose_task">正在整理任务草稿…</string>
     <string name="run_entry_menu_title">操作</string>
     <string name="run_entry_menu_fork">从这里分叉</string>
