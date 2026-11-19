@@ -39,6 +39,7 @@ import com.example.autop.task.impl.PendingRuns
 import com.example.autop.task.impl.RunControl
 import com.example.autop.task.impl.RunControlImpl
 import com.example.autop.task.impl.RunCoordinator
+import com.example.autop.task.impl.RunEnvironmentProvider
 import com.example.autop.task.impl.RunExecutor
 import com.example.autop.task.impl.RunObserver
 import com.example.autop.task.impl.RunRunner
@@ -192,6 +193,7 @@ public object TaskModule {
         lockReminder: LockReminder,
         notifier: UserNotifierImpl,
         configProvider: ConfigProvider,
+        environment: RunEnvironmentProvider,
         threadStore: ThreadStore,
         prompts: PromptRepository,
         clock: Clock,
@@ -210,6 +212,7 @@ public object TaskModule {
             lockReminder = lockReminder,
             notifier = notifier,
             configProvider = configProvider,
+            environment = environment,
             threadStore = threadStore,
             prompts = prompts,
             clock = clock,

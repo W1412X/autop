@@ -4,6 +4,7 @@
  */
 package com.example.autop.task.impl.di
 
+import com.example.autop.agent.RuntimeStateSource
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolInvokerFactory
 import com.example.autop.core.common.AuthorImageStore
@@ -12,7 +13,9 @@ import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Logger
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.prompt.PromptRepository
+import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.NotificationFeed
+import com.example.autop.device.ScreenLease
 import com.example.autop.flow.FlowStore
 import com.example.autop.llm.LlmGateway
 import com.example.autop.task.ConditionEvaluator
@@ -22,6 +25,7 @@ import com.example.autop.task.TaskRepository
 import com.example.autop.task.TriggerSimulator
 import com.example.autop.task.TriggerSource
 import com.example.autop.task.impl.RunCoordinator
+import com.example.autop.task.impl.RunEnvironmentProvider
 import com.example.autop.task.impl.author.TaskAuthorDeps
 import com.example.autop.task.impl.author.TaskAuthorImpl
 import com.example.autop.task.impl.draft.LlmConditionEvaluator
@@ -98,6 +102,10 @@ public object TaskDraftModule {
         ids: IdGenerator,
         invokerFactory: Provider<ToolInvokerFactory>,
         authorImages: AuthorImageStore,
+        stateSources: Set<@JvmSuppressWildcards RuntimeStateSource>,
+        environment: RunEnvironmentProvider,
+        screenLease: ScreenLease,
+        deviceState: DeviceStateProvider,
     ): TaskAuthor =
         TaskAuthorImpl(
             TaskAuthorDeps(
@@ -112,6 +120,10 @@ public object TaskDraftModule {
                 ids = ids,
                 invokerFactory = { invokerFactory.get() },
                 images = authorImages,
+                stateSources = stateSources,
+                environment = environment,
+                screenLease = screenLease,
+                deviceState = deviceState,
             ),
         )
 

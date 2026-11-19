@@ -1,4 +1,4 @@
-/**
+﻿/**
  * [RunScheduler] 单测（docs/tech/07 §9）：排队顺序、租约占用时等待释放后继续、
  * 锁屏提醒/跳过、最近触摸延后、needsScreen=false 不取租约。
  */
@@ -40,6 +40,7 @@ import com.example.autop.task.impl.testing.FakeTaskRepository
 import com.example.autop.task.impl.testing.FakeThreadStore
 import com.example.autop.task.impl.testing.FakeTouchShield
 import com.example.autop.task.impl.testing.FakeUserActivity
+import com.example.autop.task.impl.testing.fakeRunEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestScope
@@ -291,6 +292,7 @@ private class Fixture(
         )
     val scheduler =
         RunScheduler(
+            environment = fakeRunEnvironment(config),
             runStore = runStore,
             queue = queue,
             pending = pending,

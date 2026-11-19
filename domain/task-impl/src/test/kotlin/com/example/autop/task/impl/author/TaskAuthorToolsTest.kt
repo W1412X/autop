@@ -36,7 +36,8 @@ class TaskAuthorToolsTest {
         runTest {
             val f = fixture()
             val out = f.tools.run("memory_search", buildJsonObject { put("query", "张三") }) {}
-            assertThat(out).doesNotContain("error")
+            assertThat(out.text).doesNotContain("error")
+            assertThat(out.isError).isFalse()
             val (name, args) = f.invoker.calls.single()
             assertThat(name).isEqualTo("memory_search")
             assertThat(args["query"].toString()).contains("张三")
@@ -61,12 +62,55 @@ class TaskAuthorToolsTest {
         }
 
     @Test
+    fun `list_trigger_sources invokes the real tool by visible name`() =
+        runTest {
+            val f = fixture()
+            f.tools.run("list_trigger_sources", buildJsonObject { }) {}
+            assertThat(f.invoker.calls.map { it.first }).containsExactly("list_trigger_sources")
+        }
+
+    @Test
+    fun `sample_events passes the source by visible name`() =
+        runTest {
+            val f = fixture()
+            f.tools.run("sample_events", buildJsonObject { put("source", "notification") }) {}
+            val (name, args) = f.invoker.calls.single()
+            assertThat(name).isEqualTo("sample_events")
+            assertThat(args["source"].toString()).contains("notification")
+        }
+
+    @Test
+    fun `failed tool call is reported as error result`() =
+        runTest {
+            val f = fixture()
+            f.invoker.ok = false
+            val out = f.tools.run("sample_events", buildJsonObject { put("source", "x") }) {}
+            assertThat(out.isError).isTrue()
+            assertThat(out.text).contains("error")
+        }
+
+    @Test
+    fun `unknown tool name is reported as error result`() =
+        runTest {
+            val f = fixture()
+            val out = f.tools.run("no_such_tool", buildJsonObject { }) {}
+            assertThat(out.isError).isTrue()
+            assertThat(f.invoker.calls).isEmpty()
+        }
+
+    @Test
     fun `invoker tool filter keeps read-only tool ids`() =
         runTest {
             val f = fixture()
             f.tools.run("list_flows", buildJsonObject { }) {}
             assertThat(f.factory.filter)
-                .containsExactly("tool.observe", "tool.memory_search", "tool.list_flows")
+                .containsExactly(
+                    "tool.observe",
+                    "tool.memory_search",
+                    "tool.list_flows",
+                    "tool.list_trigger_sources",
+                    "tool.sample_events",
+                )
         }
 
     @Test
@@ -119,6 +163,7 @@ class TaskAuthorToolsTest {
 
     private class RecordingInvoker : ToolInvoker {
         val calls: MutableList<Pair<String, JsonObject>> = mutableListOf()
+        var ok: Boolean = true
 
         override suspend fun invoke(
             toolName: String,
@@ -126,7 +171,7 @@ class TaskAuthorToolsTest {
             ctx: ToolContext,
         ): ToolOutput {
             calls += toolName to args
-            return ToolOutput(ok = true, content = listOf(Block.Text("ok")))
+            return ToolOutput(ok = ok, content = listOf(Block.Text(if (ok) "ok" else "boom")))
         }
     }
 

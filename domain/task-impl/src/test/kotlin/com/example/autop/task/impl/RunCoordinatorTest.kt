@@ -1,4 +1,4 @@
-/**
+﻿/**
  * [RunCoordinator] steer 单测（agent-harness-overhaul WP8.5）：排队中（未启动）的 Run
  * 直接落盘 STEER 用户消息；已结束的 Run 返回 `task.invalid`，不写任何事件。
  */
@@ -43,6 +43,7 @@ import com.example.autop.task.impl.testing.FakeTaskRepository
 import com.example.autop.task.impl.testing.FakeThreadStore
 import com.example.autop.task.impl.testing.FakeTouchShield
 import com.example.autop.task.impl.testing.FakeUserActivity
+import com.example.autop.task.impl.testing.fakeRunEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -104,6 +105,7 @@ private class CoordinatorFixture(
     private val pending = PendingRuns()
     private val scheduler =
         RunScheduler(
+            environment = fakeRunEnvironment(config),
             runStore = runStore,
             queue = RunQueue(TaskQueueSection.DEFAULT_ORIGIN_WEIGHTS),
             pending = pending,

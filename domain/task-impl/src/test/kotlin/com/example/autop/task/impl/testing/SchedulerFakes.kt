@@ -20,21 +20,26 @@ import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ThreadSummary
 import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.PermissionChecks
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.common.ThreadId
+import com.example.autop.core.config.ConfigProvider
 import com.example.autop.device.AccessibilityStatus
 import com.example.autop.device.AppInfo
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceState
 import com.example.autop.device.DeviceStateProvider
 import com.example.autop.device.ScreenLease
+import com.example.autop.device.ShellInput
+import com.example.autop.device.ShellState
 import com.example.autop.device.TouchShield
 import com.example.autop.device.UserActivityMonitor
 import com.example.autop.task.RunRecord
 import com.example.autop.task.Task
 import com.example.autop.task.TaskRepository
+import com.example.autop.task.impl.RunEnvironmentProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -370,3 +375,58 @@ public class FakeTaskRepository(
         limit: Int,
     ): Flow<List<RunRecord>> = MutableStateFlow(emptyList())
 }
+
+/** fake shell 注入通道：默认未连接，调用的注入方法均返回失败（调度测试不走注入）。 */
+public class FakeShellInput(
+    connected: Boolean = false,
+) : ShellInput {
+    override val state: StateFlow<ShellState> =
+        MutableStateFlow(if (connected) ShellState.Connected else ShellState.Disconnected).asStateFlow()
+    override val paired: StateFlow<Boolean> = MutableStateFlow(false).asStateFlow()
+
+    override suspend fun pair(
+        pairingPort: Int,
+        pairCode: String,
+    ): Outcome<Unit> = error("FakeShellInput.pair 未在测试中使用")
+
+    override suspend fun connect(): Boolean = false
+
+    override suspend fun probe(): Boolean = false
+
+    override suspend fun tap(
+        x: Int,
+        y: Int,
+        durationMs: Long,
+    ): Boolean = false
+
+    override suspend fun swipe(
+        fromX: Int,
+        fromY: Int,
+        toX: Int,
+        toY: Int,
+        durationMs: Long,
+    ): Boolean = false
+
+    override suspend fun keyEvent(code: Int): Boolean = false
+
+    override suspend fun keyCombination(vararg codes: Int): Boolean = false
+}
+
+/** fake 权限查询：全部已授予。 */
+public object FakePermissionChecks : PermissionChecks {
+    override fun canDrawOverlay(): Boolean = true
+
+    override fun canPostNotifications(): Boolean = true
+
+    override fun canReadNotifications(): Boolean = true
+
+    override fun canUseFullScreenIntent(): Boolean = true
+
+    override fun isIgnoringBatteryOptimizations(): Boolean = true
+
+    override fun canScheduleExactAlarms(): Boolean = true
+}
+
+/** 测试用运行环境：Shell 总闸关闭、通道未连接（只影响完全模式任务，标准模式任务不受影响）。 */
+public fun fakeRunEnvironment(configProvider: ConfigProvider): RunEnvironmentProvider =
+    RunEnvironmentProvider(configProvider, FakeShellInput(), FakeAccessibilityStatus(), FakePermissionChecks)

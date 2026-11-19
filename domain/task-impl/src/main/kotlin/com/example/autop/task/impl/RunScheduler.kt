@@ -23,6 +23,8 @@ import com.example.autop.task.RunRecord
 import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
 import com.example.autop.task.TaskErrorCodes
+import com.example.autop.task.TaskRequirement
+import com.example.autop.task.TaskRequirements
 import com.example.autop.task.core.RunQueue
 import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.impl.notify.UserNotifierImpl
@@ -48,6 +50,7 @@ public class RunScheduler(
     private val lockReminder: LockReminder,
     private val notifier: UserNotifierImpl,
     private val configProvider: ConfigProvider,
+    private val environment: RunEnvironmentProvider,
     private val threadStore: ThreadStore,
     private val prompts: PromptRepository,
     private val clock: Clock,
@@ -81,20 +84,12 @@ public class RunScheduler(
                     return@withLock
                 }
                 val task = pending.taskOf(record.id)
+                if (startBlockedByPermission(record, task)) {
+                    trySchedule()
+                    return@withLock
+                }
                 val needsScreen = pending.flowNeedsScreen(record.id) ?: task?.needsScreen ?: true
-                if (needsScreen && !accessibilityStatus.connected.value) {
-                    notifier.notifyAccessibilityNeeded(ACCESSIBILITY_HINT)
-                    markWaiting(record, RunStatus.WAITING_SCREEN)
-                    return@withLock
-                }
-                if (needsScreen && deviceState.current().keyguardLocked) {
-                    gateLocked(record, task)
-                    return@withLock
-                }
-                if (needsScreen && screenLease.holder.value != null) {
-                    markWaiting(record, RunStatus.WAITING_SCREEN)
-                    return@withLock
-                }
+                if (waitingForScreen(record, task, needsScreen)) return@withLock
                 val idle = idleDelayMs(record, needsScreen)
                 if (idle > 0) {
                     scope.launch {
@@ -241,6 +236,62 @@ public class RunScheduler(
     private suspend fun failFlowDisabled(record: RunRecord) {
         closeWaitingRun(record.id, RunStatus.FAILED, TaskErrorCodes.FLOW_DISABLED)
         runStore.get(record.id)?.takeIf { it.origin != RunOrigin.CHAT }?.let { notifier.notifyResult(it) }
+    }
+
+    /**
+     * 需要屏幕时的门：无障碍未连接、锁屏、屏幕被占用。返回 true 表示本次不启动（已等待、已提醒或已收口）。
+     */
+    private suspend fun waitingForScreen(
+        record: RunRecord,
+        task: Task?,
+        needsScreen: Boolean,
+    ): Boolean {
+        if (!needsScreen) return false
+        if (!accessibilityStatus.connected.value) {
+            notifier.notifyAccessibilityNeeded(ACCESSIBILITY_HINT)
+            markWaiting(record, RunStatus.WAITING_SCREEN)
+            return true
+        }
+        if (deviceState.current().keyguardLocked) {
+            gateLocked(record, task)
+            return true
+        }
+        if (screenLease.holder.value != null) {
+            markWaiting(record, RunStatus.WAITING_SCREEN)
+            return true
+        }
+        return false
+    }
+
+    /**
+     * 开始前的权限门（完全模式缺 shell）：缺失则以对应错误码收口并通知，返回 true。流程运行不适用。
+     */
+    private suspend fun startBlockedByPermission(
+        record: RunRecord,
+        task: Task?,
+    ): Boolean {
+        if (task == null || pending.isFlowRun(record.id)) return false
+        val blocking = TaskRequirements.blockingAtStart(task.runMode, environment.current()) ?: return false
+        failPermission(record, blocking)
+        return true
+    }
+
+    /**
+     * 完全模式所需的 shell 权限缺失（设置开关或无线注入通道）：开始前以对应错误码失败收口并通知，
+     * 与流程功能关闭的处理一致；不降级为标准模式运行，避免与用户选择的档位不一致。
+     */
+    private suspend fun failPermission(
+        record: RunRecord,
+        requirement: TaskRequirement,
+    ) {
+        val code =
+            when (requirement) {
+                TaskRequirement.SHELL_CHANNEL -> TaskErrorCodes.PERMISSION_SHELL_CHANNEL
+                else -> TaskErrorCodes.PERMISSION_SHELL_SWITCH
+            }
+        closeWaitingRun(record.id, RunStatus.FAILED, code)
+        runStore.get(record.id)?.takeIf { it.origin != RunOrigin.CHAT }?.let { notifier.notifyResult(it) }
+        logger.w(TAG, "start_blocked_permission", "runId" to record.id.value, "code" to code)
     }
 
     /** 锁屏门：SKIP → CANCELLED；REMIND → 提醒并等待（docs/tech/07 §4.3/§4.4）。 */

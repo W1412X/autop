@@ -1,4 +1,4 @@
-/**
+﻿/**
  * [InterruptedRunRecovery] 单测（docs/tech/04 §3.11，07 §1.3，WP8.4）：启动收口全部
  * 未结束 Run（已启动 → INTERRUPTED，未启动 → CANCELLED/LOST_ON_RESTART）并补写带
  * liveNote 的 RunFinished；“继续”在同一 Thread 新起 RESUME Run（input 为
@@ -41,6 +41,7 @@ import com.example.autop.task.impl.testing.FakeTaskRepository
 import com.example.autop.task.impl.testing.FakeThreadStore
 import com.example.autop.task.impl.testing.FakeTouchShield
 import com.example.autop.task.impl.testing.FakeUserActivity
+import com.example.autop.task.impl.testing.fakeRunEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -175,6 +176,7 @@ private class RecoveryFixture(
     private val screenLease = FakeScreenLease()
     private val scheduler =
         RunScheduler(
+            environment = fakeRunEnvironment(config),
             runStore = runStore,
             queue = RunQueue(TaskQueueSection.DEFAULT_ORIGIN_WEIGHTS),
             pending = pending,

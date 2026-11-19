@@ -2,6 +2,8 @@
 
 package com.example.autop.task.impl.author
 
+import com.example.autop.agent.RuntimeStateSource
+import com.example.autop.agent.StateRequest
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolInvokerFactory
 import com.example.autop.agent.protocol.FallbackMode
@@ -17,13 +19,21 @@ import com.example.autop.core.common.FlowId
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.TaskId
+import com.example.autop.core.common.ThreadId
+import com.example.autop.core.common.getOrNull
+import com.example.autop.core.common.runCatchingCancellable
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.ConfigSnapshot
+import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.FlowConfig
 import com.example.autop.core.config.UiConfig
 import com.example.autop.core.prompt.PromptRepository
+import com.example.autop.device.DeviceStateProvider
+import com.example.autop.device.ScreenLease
 import com.example.autop.flow.AuthorLive
 import com.example.autop.flow.AuthorMessage
 import com.example.autop.flow.FlowStore
@@ -50,10 +60,15 @@ import com.example.autop.task.TaskDraft
 import com.example.autop.task.TaskErrorCodes
 import com.example.autop.task.TaskExecutor
 import com.example.autop.task.TaskRepository
+import com.example.autop.task.TaskRequirement
+import com.example.autop.task.TaskRequirements
 import com.example.autop.task.Trigger
 import com.example.autop.task.TriggerSource
 import com.example.autop.task.core.Cron
 import com.example.autop.task.core.FilterValidator
+import com.example.autop.task.impl.RUN_MODE_VAR
+import com.example.autop.task.impl.RunEnvironmentProvider
+import com.example.autop.task.impl.RunScreenGate
 import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.impl.flowsPromptVars
 import kotlinx.coroutines.CancellationException
@@ -97,6 +112,11 @@ internal class TaskAuthorDeps(
     val ids: IdGenerator,
     val invokerFactory: () -> ToolInvokerFactory,
     val images: AuthorImageStore,
+    /** 运行状态来源（与对话 agent 同一批）：创作时给模型当前时间、电量、前台应用、权限与 shell 状态。 */
+    val stateSources: Set<RuntimeStateSource>,
+    val environment: RunEnvironmentProvider,
+    val screenLease: ScreenLease,
+    val deviceState: DeviceStateProvider,
 )
 
 /** AI 创建任务的会话工厂：同一任务（或新建草稿）只保留一个会话；离开时仍在运行的会话留在这里，回到同一草稿时接上。 */
@@ -182,6 +202,7 @@ internal class TaskAuthorImpl(
                     null
                 },
             needsScreen = task.needsScreen,
+            runMode = task.runMode,
         )
     }
 
@@ -224,8 +245,18 @@ internal class TaskAuthorSessionImpl(
     private var answerGate: CompletableDeferred<String>? = null
     private var cancelled = false
     private var activeModelProfileId: String? = null
-    private val tools = TaskAuthorTools(d.invokerFactory, d.configProvider, d.prompts, d.ids, d.threads)
+
+    /** 本会话的屏幕门：与智能体 Run 同一规则，读屏时占用屏幕（与运行中的任务互斥），每轮结束释放。 */
+    private val screenGate =
+        RunScreenGate(
+            owner = "task-author-$imageOwner",
+            lease = d.screenLease,
+            deviceState = d.deviceState,
+            acquireTimeoutMs = d.configProvider.current()[DeviceConfig.SCREEN_LEASE].acquireTimeoutMs,
+        )
+    private val tools = TaskAuthorTools(d.invokerFactory, d.configProvider, d.prompts, d.ids, d.threads, screenGate)
     private val sourceFields: Map<String, List<String>> = d.sources.associate { it.id to it.fieldNames }
+    private val sourcePermissions: Map<String, String?> = d.sources.associate { it.id to it.requiresPermission }
 
     override suspend fun send(
         text: String,
@@ -267,6 +298,8 @@ internal class TaskAuthorSessionImpl(
                 // 取消路径上也必须完成收尾：补齐历史、结束忙碌态（挂起调用需要不可取消的上下文）。
                 withContext(NonCancellable) {
                     conversation.repairDanglingToolCalls(cancelledToolText())
+                    // 读屏占用的屏幕只在本轮内持有，轮结束即归还，不挡住之后的任务运行。
+                    screenGate.release()
                     _state.update { it.copy(busy = false, pendingQuestion = null) }
                 }
             }
@@ -286,6 +319,12 @@ internal class TaskAuthorSessionImpl(
         val draft =
             state.value.draft
                 ?: return Outcome.Err(AppError(code = TaskErrorCodes.INVALID, message = "no draft to save"))
+        // 与草稿提示同一套校验：有问题的草稿不保存，问题写回状态，草稿卡上直接展示。
+        val issues = draftIssues(draft)
+        if (issues.isNotEmpty()) {
+            _state.update { it.copy(issues = issues) }
+            return Outcome.Err(AppError(code = TaskErrorCodes.INVALID, message = issues.joinToString("；")))
+        }
         val task =
             when (val built = assemble(draft, base)) {
                 is Outcome.Ok -> built.value
@@ -307,7 +346,7 @@ internal class TaskAuthorSessionImpl(
             _state.update { it.copy(errorCode = ERROR_LLM_UNAVAILABLE) }
             return
         }
-        val runtime = pipeline(provider, config)
+        val runtime = pipeline(provider, config, stateText())
         var turn = 0
         repeat(config[FlowConfig.AUTHOR].maxTurns) {
             if (cancelled) return
@@ -322,6 +361,7 @@ internal class TaskAuthorSessionImpl(
     private fun pipeline(
         provider: LlmProvider,
         config: ConfigSnapshot,
+        state: String,
     ): TaskPipeline {
         // 工具能力为 false 时走 JSON 文本回退（ADR-0024），否则原生 tools。
         val nativeTools = provider.profile.capabilities.tools
@@ -345,6 +385,7 @@ internal class TaskAuthorSessionImpl(
                 add(SystemPart(render(SYSTEM, flowsPromptVars(config.flowsEnabled()))))
                 add(SystemPart(render(OUTPUT, mapOf("lang" to languageLabel()))))
                 add(SystemPart(render(SPEC, flowsPromptVars(config.flowsEnabled()))))
+                add(SystemPart(render(STATE, mapOf("state" to state))))
                 base?.let { task ->
                     val taskJson = json.encodeToString(Task.serializer(), task)
                     add(SystemPart(render(EDIT_CONTEXT, mapOf("task" to taskJson))))
@@ -376,7 +417,8 @@ internal class TaskAuthorSessionImpl(
                 val results =
                     resolved.calls.map { call ->
                         if (call.name !in SELF_REPORTING) activity(call.name)
-                        Block.ToolResult(call.id, listOf(Block.Text(runTool(call))), isError = false)
+                        val result = runTool(call)
+                        Block.ToolResult(call.id, listOf(Block.Text(result.text)), isError = result.isError)
                     }
                 conversation += Msg(Role.TOOL, results)
                 false
@@ -458,12 +500,13 @@ internal class TaskAuthorSessionImpl(
             .joinToString("\n") { it.text }
             .trim()
 
-    private suspend fun runTool(call: Block.ToolCall): String {
+    private suspend fun runTool(call: Block.ToolCall): AuthorToolResult {
         val args =
             runCatching { json.parseToJsonElement(call.argsJson) as? JsonObject }.getOrNull() ?: JsonObject(emptyMap())
         return when (call.name) {
-            "ask_user" -> askUser(args)
-            "propose_task" -> propose(args)
+            // 提问的回答与草稿校验反馈都是正常结果；校验不通过由模型根据 issues 自行修正，不算工具失败。
+            "ask_user" -> AuthorToolResult(askUser(args))
+            "propose_task" -> AuthorToolResult(propose(args))
             else -> tools.run(call.name, args) { activity(it) }
         }
     }
@@ -485,11 +528,15 @@ internal class TaskAuthorSessionImpl(
         return answer
     }
 
-    /** 组装草稿并把字段问题反馈给模型（草稿总是写入状态，用户可见）。 */
-    private fun propose(args: JsonObject): String {
-        val draft = tools.propose(args)
+    /**
+     * 合并草稿并把问题与权限提示反馈给模型。草稿总是写入状态（用户可见）；问题不为空时不能保存。
+     * 权限提示不阻断保存，告诉模型需要先让用户开启什么。
+     */
+    private suspend fun propose(args: JsonObject): String {
+        val draft = tools.propose(args, previous = _state.value.draft)
         val issues = draftIssues(draft)
-        _state.update { it.copy(draft = draft) }
+        val warnings = warningsOf(draft)
+        _state.update { it.copy(draft = draft, issues = issues, warnings = warnings) }
         return buildJsonObject {
             put("ok", issues.isEmpty())
             put(
@@ -498,16 +545,69 @@ internal class TaskAuthorSessionImpl(
                     issues.forEach { add(JsonPrimitive(it)) }
                 },
             )
+            put(
+                "warnings",
+                buildJsonArray {
+                    warnings.forEach { add(JsonPrimitive(it)) }
+                },
+            )
         }.toString()
     }
+
+    /** 当前运行状态（与对话 agent 同一批来源）：每轮创作前采集，让模型知道现在的时间、权限与 shell 状态。 */
+    private suspend fun stateText(): String {
+        val req =
+            StateRequest(
+                runId = RunId(d.ids.newId()),
+                threadId = ThreadId(d.ids.newId()),
+                config = d.configProvider.current(),
+                // 创作时不知道任务会以哪种档位运行，按完全模式采集，shell 状态两种情况都能看到。
+                vars = mapOf(RUN_MODE_VAR to RunMode.FULL.id),
+            )
+        return d.stateSources
+            .flatMap { source ->
+                runCatchingCancellable("task.author.state") { source.entries(req) }.getOrNull().orEmpty()
+            }.map { it.text }
+            .filter { it.isNotBlank() }
+            .joinToString("\n")
+    }
+
+    /** 草稿的权限提示：按草稿的需要屏幕、运行模式与条件源权限，对照当前环境列出缺失项。 */
+    private fun warningsOf(draft: TaskDraft): List<String> {
+        val sourcePermission =
+            if (draft.triggerType.trim() == "condition") sourcePermissions[draft.source?.trim().orEmpty()] else null
+        val missing =
+            TaskRequirements.missing(draft.needsScreen, draft.runMode, sourcePermission, d.environment.current())
+        if (missing.isEmpty()) return emptyList()
+        val vars =
+            mapOf(
+                "accessibility" to flag(TaskRequirement.ACCESSIBILITY in missing),
+                "shellSwitch" to flag(TaskRequirement.SHELL_SWITCH in missing),
+                "shellChannel" to flag(TaskRequirement.SHELL_CHANNEL in missing),
+                "notificationListener" to flag(TaskRequirement.NOTIFICATION_LISTENER in missing),
+            )
+        return render(WARNINGS, vars)
+            .lines()
+            .map { it.trim() }
+            .filter { it.startsWith(BULLET) }
+            .map { it.removePrefix(BULLET) }
+    }
+
+    private fun flag(on: Boolean): String = if (on) "1" else ""
 
     // ---- 草稿装配 -----------------------------------------------------------------------------
 
     /** 校验 [TaskDraft] 字段（propose_task 的即时反馈；装配期还会再走 TaskRepository 校验）。 */
-    private fun draftIssues(draft: TaskDraft): List<String> =
+    private suspend fun draftIssues(draft: TaskDraft): List<String> =
         buildList {
             if (draft.name.isBlank()) add("name 为空")
             if (draft.goal.isBlank()) add("goal 为空")
+            // 流程绑定与保存时的装配规则一致：流程功能开启且指定了流程名，必须能解析到。
+            val flowName = draft.executorFlow?.trim().orEmpty()
+            val flowsOn = d.configProvider.current().flowsEnabled()
+            if (flowName.isNotEmpty() && flowsOn && d.flows.resolve(flowName) == null) {
+                add("找不到流程：$flowName（先用 list_flows 确认流程名）")
+            }
             when (draft.triggerType.trim()) {
                 "manual" -> Unit
                 "once" -> {
@@ -569,6 +669,7 @@ internal class TaskAuthorSessionImpl(
                 goal = goalOf(draft),
                 trigger = trigger,
                 needsScreen = draft.needsScreen,
+                runMode = draft.runMode,
                 executor = binding.executor,
                 flow = binding.flow,
                 updatedAt = now,
@@ -580,6 +681,7 @@ internal class TaskAuthorSessionImpl(
                 goal = goalOf(draft),
                 trigger = trigger,
                 needsScreen = draft.needsScreen,
+                runMode = draft.runMode,
                 executor = binding.executor,
                 flow = binding.flow,
                 createdAt = now,
@@ -732,6 +834,9 @@ internal class TaskAuthorSessionImpl(
         const val SPEC = "task.author.spec"
         const val EDIT_CONTEXT = "task.author.edit_context"
         const val OUTPUT = "agent.system.output"
+        const val STATE = "task.author.state"
+        const val WARNINGS = "task.author.warnings"
+        const val BULLET = "- "
         const val MAX_OUTPUT = 8192
         const val ERROR_TOO_LONG = "task.author_too_long"
         const val ERROR_LLM_UNAVAILABLE = "task.author_llm_unavailable"

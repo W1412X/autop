@@ -7,6 +7,7 @@ package com.example.autop.task.impl.author
 
 import com.example.autop.agent.RunRequest
 import com.example.autop.agent.RunScopedValues
+import com.example.autop.agent.ScreenAccessGate
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolInvoker
@@ -18,6 +19,7 @@ import com.example.autop.core.common.AppError
 import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
+import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.ConfigSnapshot
@@ -27,10 +29,20 @@ import com.example.autop.llm.ToolSchema
 import com.example.autop.task.TaskDraft
 import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.impl.flowsPromptVars
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
+
+/**
+ * 一次创作工具调用的结果。[text] 回给模型；[isError] 对应 `Block.ToolResult.isError`，
+ * 工具执行失败或名称未知时为 true。
+ */
+internal data class AuthorToolResult(
+    val text: String,
+    val isError: Boolean = false,
+)
 
 /** 任务创作工具箱（[ToolInvoker] 委托真实工具，[propose] 维护草稿）。 */
 internal class TaskAuthorTools(
@@ -39,6 +51,8 @@ internal class TaskAuthorTools(
     private val prompts: PromptRepository,
     private val ids: IdGenerator,
     private val threadStore: ThreadStore,
+    /** 屏幕门（与智能体 Run 同一规则）：读屏前取得屏幕，与正在运行的任务互斥。null 时不占用。 */
+    private val screenGate: ScreenAccessGate? = null,
 ) {
     private val runId = RunId(ids.newId())
     private val threadId = ThreadId(ids.newId())
@@ -56,6 +70,7 @@ internal class TaskAuthorTools(
             vars = emptyMap(),
             config = configProvider.current(),
             toolFilter = TOOL_FILTER,
+            screenGate = screenGate,
         )
 
     /** 工具声明：说明取自模板 `task.author.tools`（每行 `名称|说明`）；流程关闭时不含流程相关工具与参数。 */
@@ -97,6 +112,7 @@ internal class TaskAuthorTools(
                         string("condition")
                         if (flows) string("executorFlow")
                         boolean("needsScreen")
+                        string("runMode", enum = listOf("standard", "full"))
                         string("hint")
                     },
                 )
@@ -108,7 +124,7 @@ internal class TaskAuthorTools(
         name: String,
         args: JsonObject,
         activity: (String) -> Unit,
-    ): String =
+    ): AuthorToolResult =
         when (name) {
             "inspect_screen" -> {
                 activity("inspect_screen")
@@ -135,32 +151,76 @@ internal class TaskAuthorTools(
             else -> unknownTool(name)
         }
 
-    private fun unknownTool(name: String): String = """{"error":"unknown tool $name"}"""
+    private fun unknownTool(name: String): AuthorToolResult =
+        AuthorToolResult("""{"error":"unknown tool $name"}""", isError = true)
 
-    /** 组装草稿（字段口径见 `task.author.spec`）；流程关闭时模型给的 executorFlow 不采纳，草稿按智能体执行。 */
-    fun propose(args: JsonObject): TaskDraft =
-        TaskDraft(
-            name = args.str("name").orEmpty(),
-            goal = args.str("goal").orEmpty(),
-            triggerType = args.str("triggerType") ?: "manual",
-            at = args.str("at"),
-            cron = args.str("cron"),
-            timezone = args.str("timezone"),
-            source = args.str("source"),
-            filter = args.str("filter"),
-            condition = args.str("condition"),
-            executorFlow = if (configProvider.current().flowsEnabled()) args.str("executorFlow") else null,
-            needsScreen = args.str("needsScreen")?.toBooleanStrictOrNull() ?: true,
-            hint = args.str("hint").orEmpty(),
+    /**
+     * 组装草稿（字段口径见 `task.author.spec`）。
+     *
+     * [previous] 为当前草稿：模型只传需要修改的字段，没传的字段保持草稿原值；没有草稿时未传字段取默认值。
+     * 可选字段传空串表示清空。`filter` 既可以是 JSON 文本，也可以直接是 JSON 对象（两种写法等价）。
+     * 流程关闭时模型给的 executorFlow 不采纳，草稿按智能体执行。
+     */
+    fun propose(
+        args: JsonObject,
+        previous: TaskDraft? = null,
+    ): TaskDraft {
+        val base = previous ?: TaskDraft(name = "", goal = "")
+        return TaskDraft(
+            name = args.requiredOr("name", base.name).trim(),
+            goal = args.requiredOr("goal", base.goal),
+            triggerType = args.requiredOr("triggerType", base.triggerType).trim().ifEmpty { "manual" },
+            at = args.optionalOr("at", base.at),
+            cron = args.optionalOr("cron", base.cron),
+            timezone = args.optionalOr("timezone", base.timezone),
+            source = args.optionalOr("source", base.source),
+            filter = args.optionalOr("filter", base.filter),
+            condition = args.optionalOr("condition", base.condition),
+            executorFlow =
+                if (configProvider.current().flowsEnabled()) {
+                    args.optionalOr("executorFlow", base.executorFlow)
+                } else {
+                    null
+                },
+            needsScreen = args.textOf("needsScreen")?.toBooleanStrictOrNull() ?: base.needsScreen,
+            runMode = args.textOf("runMode")?.let { RunMode.fromId(it) } ?: base.runMode,
+            hint = args.requiredOr("hint", base.hint),
         )
+    }
+
+    /** 模型给了这个参数（非 null）时取其文本，否则保持 [old]。 */
+    private fun JsonObject.requiredOr(
+        key: String,
+        old: String,
+    ): String = if (hasValue(key)) textOf(key).orEmpty() else old
+
+    /** 可选字段：给了则取文本（空白视为清空），没给保持 [old]。 */
+    private fun JsonObject.optionalOr(
+        key: String,
+        old: String?,
+    ): String? = if (hasValue(key)) textOf(key)?.takeIf { it.isNotBlank() } else old
+
+    private fun JsonObject.hasValue(key: String): Boolean = this[key]?.let { it !is JsonNull } ?: false
+
+    /** 参数文本：字符串/数字/布尔取其内容；对象或数组按 JSON 文本接受。 */
+    private fun JsonObject.textOf(key: String): String? =
+        when (val value = this[key]) {
+            null, JsonNull -> null
+            is JsonPrimitive -> value.content
+            else -> value.toString()
+        }
 
     private suspend fun call(
         tool: String,
         args: JsonObject,
-    ): String {
+    ): AuthorToolResult {
         val out = invoker.invoke(tool, args, context)
         val text = out.content.filterIsInstance<Block.Text>().joinToString("\n") { it.text }
-        return if (out.ok) text else """{"error":${JsonPrimitive(out.error?.message ?: text)}}"""
+        return if (out.ok) {
+            AuthorToolResult(text)
+        } else {
+            AuthorToolResult("""{"error":${JsonPrimitive(out.error?.message ?: text)}}""", isError = true)
+        }
     }
 
     private fun JsonObject.str(key: String): String? = (this[key] as? JsonPrimitive)?.content
@@ -172,7 +232,14 @@ internal class TaskAuthorTools(
          * 只放行只读工具：创作会话不执行任何写屏/写记忆动作。
          * 这里是**工具 id**（路由器按 id 过滤；invoke 用模型可见名）。
          */
-        val TOOL_FILTER: Set<String> = setOf("tool.observe", "tool.memory_search", "tool.list_flows")
+        val TOOL_FILTER: Set<String> =
+            setOf(
+                "tool.observe",
+                "tool.memory_search",
+                "tool.list_flows",
+                "tool.list_trigger_sources",
+                "tool.sample_events",
+            )
     }
 }
 

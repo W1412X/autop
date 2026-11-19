@@ -1,4 +1,4 @@
-/**
+﻿/**
  * [RunExecutor] 入队落盘单测（agent-harness-overhaul WP8.1）：用户输入入队即写入
  * 事件日志（chat=INPUT、resume=INJECTED），任务 Run 不写输入（目标只由 GoalContributor 注入）。
  */
@@ -43,6 +43,7 @@ import com.example.autop.task.impl.testing.FakeTaskRepository
 import com.example.autop.task.impl.testing.FakeThreadStore
 import com.example.autop.task.impl.testing.FakeTouchShield
 import com.example.autop.task.impl.testing.FakeUserActivity
+import com.example.autop.task.impl.testing.fakeRunEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
@@ -152,6 +153,7 @@ private class ExecutorFixture(
     val session = FakeAgentSession()
     private val scheduler =
         RunScheduler(
+            environment = fakeRunEnvironment(config),
             runStore = runStore,
             queue = RunQueue(TaskQueueSection.DEFAULT_ORIGIN_WEIGHTS),
             pending = pending,
