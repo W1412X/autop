@@ -182,7 +182,7 @@ class ScreenObserverAutoTest {
                 context = context,
             )
         val modes = ObserveModeResolver(holder, visual, prompts)
-        val preparer = ScreenPreparer(reader, capturer, contentAreas, visual, serializer)
+        val preparer = ScreenPreparer(reader, capturer, visual, serializer)
         return ScreenObserver(preparer, serializer, modes)
     }
 
@@ -403,6 +403,13 @@ class ScreenObserverAutoTest {
         override suspend fun setRunMode(
             threadId: ThreadId,
             mode: RunMode,
+        ): Unit = Unit
+
+        override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = false
+
+        override suspend fun setBackgroundScreen(
+            threadId: ThreadId,
+            enabled: Boolean,
         ): Unit = Unit
 
         override suspend fun modelProfileOf(threadId: ThreadId): String? = null

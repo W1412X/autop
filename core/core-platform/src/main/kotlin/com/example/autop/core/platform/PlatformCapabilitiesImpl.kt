@@ -24,6 +24,7 @@ public class PlatformCapabilitiesImpl(
             Capability.NOTIFICATION_AUTH_REQUIRED_ACTION -> sdkInt >= SDK_S
             Capability.RESTRICTED_SETTINGS -> sdkInt >= SDK_T
             Capability.ACCESSIBILITY_DATA_SENSITIVE -> sdkInt >= SDK_U
+            Capability.BACKGROUND_VIRTUAL_DISPLAY -> sdkInt >= SDK_U
             Capability.DYNAMIC_COLOR -> sdkInt >= SDK_S
             Capability.MUTABLE_PENDING_INTENT_FOR_REMOTE_INPUT -> sdkInt >= SDK_S
         }

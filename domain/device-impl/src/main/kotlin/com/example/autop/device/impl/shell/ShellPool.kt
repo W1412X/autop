@@ -57,6 +57,7 @@ public class ShellPool
         private val mutex = Mutex()
         private val hosts = HashMap<RunId, HostEntry>()
         private val creating = HashMap<RunId, CompletableDeferred<Outcome<HostEntry>>>()
+        private val released = HashSet<RunId>()
         private val hostPermits = Semaphore(limits.hostPoolSize)
         private val scope = CoroutineScope(SupervisorJob() + dispatchers.io)
         private var reaper: Job? = null
@@ -84,13 +85,17 @@ public class ShellPool
         }
 
         override suspend fun releaseRun(owner: RunId) {
-            mutex.withLock { hosts.remove(owner)?.let { dropLocked(it) } }
+            mutex.withLock {
+                released.add(owner)
+                hosts.remove(owner)?.let { dropLocked(it) }
+            }
         }
 
         override suspend fun closeAll() {
             mutex.withLock {
                 hosts.values.forEach { dropLocked(it) }
                 hosts.clear()
+                released.addAll(creating.keys)
             }
         }
 
@@ -181,6 +186,11 @@ public class ShellPool
                 mutex.withLock {
                     hosts[owner]?.takeIf { it.client.isAlive }?.let { return Outcome.Ok(it) }
                     hosts.remove(owner)?.let { dropLocked(it) }
+                    creating[owner]?.takeIf { owner in released }?.let {
+                        it.complete(Outcome.Err(AppError(ShellExecErrorCodes.UNAVAILABLE, "run released")))
+                        return Outcome.Err(AppError(ShellExecErrorCodes.UNAVAILABLE, "run released"))
+                    }
+                    released.remove(owner)
                     creating[owner] ?: CompletableDeferred<Outcome<HostEntry>>().also { deferred ->
                         creating[owner] = deferred
                         scope.launch { create(owner, deferred) }
@@ -196,6 +206,13 @@ public class ShellPool
             val outcome = openHost(owner)
             mutex.withLock {
                 creating.remove(owner)
+                if (owner in released) {
+                    (outcome as? Outcome.Ok)?.value?.let { dropLocked(it) }
+                    result.complete(
+                        Outcome.Err(AppError(ShellExecErrorCodes.UNAVAILABLE, "run released during host creation")),
+                    )
+                    return
+                }
                 (outcome as? Outcome.Ok)?.let { hosts[owner] = it.value }
             }
             ensureReaper()

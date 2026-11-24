@@ -66,8 +66,9 @@ public class RunCoordinator(
         images: List<ImageAttachment>,
         modelProfileId: String?,
         runMode: RunMode,
+        backgroundScreen: Boolean,
     ): Outcome<RunRecord> {
-        val result = executor.launchChat(threadId, text, images, modelProfileId, runMode)
+        val result = executor.launchChat(threadId, text, images, modelProfileId, runMode, backgroundScreen)
         host.ensureRunning()
         return result
     }
@@ -191,9 +192,8 @@ public class RunCoordinator(
     }
 
     override fun cancel(runId: RunId) {
-        // N191（安全关键）：先强制解除触摸屏蔽再取消——中止按钮点下就必须能操作手机，
-        // 即使 Run 卡死未收口（新 Run 开始时 reset 恢复正常驱动）。
-        shield.forceRelease()
+        // N191（安全关键）：已确认真实屏目标先强制解除再取消；后台或未知目标不得误放共享盾。
+        RunDisplayTargetRegistry.forceRelease(runId, shield)
         val handle = observer.handleOf(runId)
         if (handle != null) {
             handle.cancel()

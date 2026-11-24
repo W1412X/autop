@@ -58,6 +58,7 @@ internal class ShellHostClient(
     private val io: CoroutineDispatcher,
     private val ackTimeoutMs: Long,
     private val logger: Logger,
+    private val maxLineBytes: Int = 1_048_576,
 ) {
     private val pending = ConcurrentHashMap<Int, CompletableDeferred<JSONObject>>()
     private val nextId = AtomicInteger(1)
@@ -145,6 +146,10 @@ internal class ShellHostClient(
                 lineBuffer.reset()
                 if (line.isNotBlank() && !handleLine(line)) return
             } else {
+                if (lineBuffer.size() >= maxLineBytes) {
+                    failAll(ShellHostTransportException("shell host reply exceeds line limit"))
+                    return
+                }
                 lineBuffer.write(b.toInt())
             }
         }

@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 13,
+  "schemaVersion": 14,
   "device": {
     "screenLease": {
       "acquireTimeoutMs": 3000
@@ -146,6 +146,15 @@
         "killGraceMs": 2000,
         "waitChunkMs": 5000
       }
+    },
+    "background": {
+      "width": 720,
+      "height": 1600,
+      "dpi": 320,
+      "launchTimeoutMs": 4000,
+      "requestTimeoutMs": 30000,
+      "jpegQuality": 85,
+      "maxPayloadBytes": 12582912
     },
     "apps": {
       "listLimit": 50

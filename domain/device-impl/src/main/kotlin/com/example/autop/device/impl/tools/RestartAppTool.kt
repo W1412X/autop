@@ -20,11 +20,13 @@ import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.example.autop.device.core.PackageNames
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
@@ -100,6 +102,9 @@ public class RestartAppTool
             action: PreparedAction,
             ctx: ToolContext,
         ): ToolOutput {
+            if (currentDisplayTarget() is DisplayTarget.Background) {
+                return toolError(DeviceErrorCodes.BG_ACTION_UNSUPPORTED, "后台屏不支持跨显示 force-stop")
+            }
             val payload = action.payload as RestartAction
             val pkg = payload.pkg
             val pre = epilogue.preSample(ctx)

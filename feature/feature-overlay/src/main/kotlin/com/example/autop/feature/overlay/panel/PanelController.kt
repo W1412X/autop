@@ -12,9 +12,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import com.example.autop.core.common.BackgroundRunBlock
+import com.example.autop.core.common.Capability
+import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.core.ui.component.OptionItem
 import com.example.autop.core.ui.overlay.OverlayLifecycleOwner
 import com.example.autop.device.OverlayHost
+import com.example.autop.device.ShellInput
+import com.example.autop.device.ShellState
 import com.example.autop.feature.overlay.OverlayWindowIds
 import com.example.autop.feature.overlay.ball.BallStateHolder
 import com.example.autop.feature.overlay.composeOverlayView
@@ -35,6 +40,8 @@ public class PanelController
         private val host: OverlayHost,
         private val holder: BallStateHolder,
         private val actions: PanelRunActions,
+        private val shellInput: ShellInput,
+        private val platformCapabilities: PlatformCapabilities,
     ) {
         private val shownState = MutableStateFlow(false)
 
@@ -70,16 +77,24 @@ public class PanelController
         @Composable
         private fun PanelContent() {
             val uiState by holder.uiState.collectAsState()
+            val shellState by shellInput.state.collectAsState()
+            val backgroundRunBlock =
+                BackgroundRunBlock.of(
+                    supported = platformCapabilities.has(Capability.BACKGROUND_VIRTUAL_DISPLAY),
+                    channelConnected = shellState == ShellState.Connected,
+                    running = false,
+                    enabled = false,
+                )
             val modelOptions by remember(this) {
                 modelProfiles.profiles.map { list -> list.map { OptionItem(id = it.id, label = it.displayName) } }
             }.collectAsState(emptyList())
             val callbacks =
                 remember(this) {
                     PanelCallbacks(
-                        onSend = { text, modelProfileId ->
+                        onSend = { text, modelProfileId, backgroundScreen ->
                             // 发送后只收起面板；执行中的进度由顶部控制条与运行详情面板呈现（ADR-0014 / N218），
                             // 不再拉起旧进度窗（ProgressController 窗口保留，供悬浮球菜单手动打开）。
-                            actions.send(text, modelProfileId) { dismiss() }
+                            actions.send(text, modelProfileId, backgroundScreen) { dismiss() }
                         },
                         onDismiss = ::dismiss,
                     )
@@ -87,6 +102,7 @@ public class PanelController
             PanelScreen(
                 callbacks = callbacks,
                 modelOptions = modelOptions,
+                backgroundRunBlock = backgroundRunBlock,
             )
         }
     }

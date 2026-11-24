@@ -36,6 +36,11 @@ public sealed interface ChatThreadAction {
         val mode: RunMode,
     ) : ChatThreadAction
 
+    /** 切换本会话的后台虚拟屏模式；运行中不可切换。 */
+    public data class SetBackgroundScreen(
+        val enabled: Boolean,
+    ) : ChatThreadAction
+
     /** 关闭「无法切换到完全模式」的提示（ADR-0040 §2.4）。 */
 
     public data object DismissShellBlock : ChatThreadAction

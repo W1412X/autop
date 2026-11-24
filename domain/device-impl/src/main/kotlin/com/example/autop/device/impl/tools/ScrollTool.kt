@@ -107,7 +107,7 @@ public class ScrollTool
         ): Outcome<PreparedAction> {
             val x = args.int("x") ?: CENTER
             val y = args.int("y") ?: CENTER
-            val base = contentAreas.base()
+            val base = snap.contentArea ?: contentAreas.base()
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
             val center = mapper.toScreen(x, y) ?: return coordOutOfRange(coords)
             val tree = receipts.treeOf(ctx, snap)
@@ -179,7 +179,7 @@ public class ScrollTool
             scroll: ScrollAction,
             snap: ScreenSnapshot,
         ): StepResult {
-            val base = contentAreas.base()
+            val base = snap.contentArea ?: contentAreas.base()
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
             val anchor = mapper.toScreen(scroll.anchor.x, scroll.anchor.y)
             if (anchor == null) {

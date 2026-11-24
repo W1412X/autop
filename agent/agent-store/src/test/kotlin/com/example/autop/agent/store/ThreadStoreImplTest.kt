@@ -111,6 +111,19 @@ public class ThreadStoreImplTest {
         }
 
     @Test
+    public fun `background screen mode is stored per thread and defaults off`(): Unit =
+        runBlocking {
+            val thread = store.createThread("t", null)
+            assertThat(store.backgroundScreenOf(thread)).isFalse()
+
+            store.setBackgroundScreen(thread, true)
+
+            assertThat(store.backgroundScreenOf(thread)).isTrue()
+            assertThat(db.threadDao().byId(thread.value)!!.backgroundScreen).isTrue()
+            assertThat(store.backgroundScreenOf(ThreadId("missing"))).isFalse()
+        }
+
+    @Test
     public fun `forkable is set on tool results without unpaired calls only`(): Unit =
         runBlocking {
             val thread = store.createThread("t", null)

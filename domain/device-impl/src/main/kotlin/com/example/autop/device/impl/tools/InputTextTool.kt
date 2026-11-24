@@ -20,6 +20,7 @@ import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.GestureController
 import com.example.autop.device.NodeFlags
 import com.example.autop.device.NodeSnapshot
@@ -31,6 +32,7 @@ import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.example.autop.device.core.PixelSize
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.CoordSpaceResolver
 import com.example.autop.device.impl.DirectResolvedNode
@@ -123,7 +125,7 @@ public class InputTextTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> {
-            val base = contentAreas.base()
+            val base = snap.contentArea ?: contentAreas.base()
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
             val area = base ?: Rect(0, 0, snap.screenWidth, snap.screenHeight)
             val tree = receipts.treeOf(ctx, snap)
@@ -280,6 +282,14 @@ public class InputTextTool
          * replace 空串（清空）只发全选删除，不写剪贴板、不粘贴。
          */
         private suspend fun shellWrite(input: InputAction): Outcome<WriteOutcome> {
+            if (currentDisplayTarget() is DisplayTarget.Background) {
+                return Outcome.Err(
+                    AppError(
+                        code = DeviceErrorCodes.ACTION_FAILED,
+                        message = "后台输入框拒绝 SET_TEXT，未写入真实屏剪贴板",
+                    ),
+                )
+            }
             if (shell.state.value != ShellState.Connected) {
                 return Outcome.Err(
                     AppError(
@@ -356,7 +366,8 @@ public class InputTextTool
                 traces += trace.executionLine(ExecMethod.NODE_ACTION, "ACTION_IME_ENTER")
                 return SUBMIT_OK
             }
-            if (shell.state.value == ShellState.Connected && gestures.shellKeyEvent(KEYCODE_ENTER)) {
+            val background = currentDisplayTarget() is DisplayTarget.Background
+            if ((shell.state.value == ShellState.Connected || background) && gestures.shellKeyEvent(KEYCODE_ENTER)) {
                 traces += trace.executionLine(ExecMethod.SHELL_KEY, "Enter")
                 return SUBMIT_OK
             }

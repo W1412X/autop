@@ -26,6 +26,8 @@ public data class PendingEntry(
     val task: Task?,
     /** 独立运行的流程；任务绑定的流程在执行时按 Task.flow 解析。 */
     val flow: FlowLaunch? = null,
+    /** 发送时固定的显示模式；排队期间不随会话设置变化。 */
+    val backgroundScreen: Boolean = false,
 )
 
 /** 待启动 Run 暂存（入队写、执行读）。 */
@@ -64,6 +66,9 @@ public class PendingRuns {
 
     /** 查询（调度门条件用）。 */
     public fun taskOf(runId: RunId): Task? = entries[runId]?.task
+
+    /** 查询（调度门条件用）：本次发送是否固定走后台虚拟屏。 */
+    public fun backgroundScreenOf(runId: RunId): Boolean = entries[runId]?.backgroundScreen ?: false
 
     /** 是否为流程运行：独立流程，或任务绑定了流程（流程功能关闭时据此拦截，ADR-0030）。 */
     public fun isFlowRun(runId: RunId): Boolean {

@@ -21,12 +21,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.res.stringResource
+import com.example.autop.core.common.BackgroundRunBlock
 import com.example.autop.core.common.RunMode
 import com.example.autop.core.thread.ui.AttachImageButton
 import com.example.autop.core.thread.ui.PendingImageStrip
 import com.example.autop.core.ui.component.AutopComposer
 import com.example.autop.core.ui.component.AutopFlatChip
 import com.example.autop.core.ui.component.AutopModelSelector
+import com.example.autop.core.ui.component.BackgroundRunRow
 import com.example.autop.core.ui.component.ComposerTrailing
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.OptionIcon
@@ -37,6 +39,7 @@ import com.example.autop.core.ui.component.rememberVoiceStarter
 import com.example.autop.core.ui.component.vector
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.feature.chat.R
+import com.example.autop.core.ui.R as CoreUiR
 
 /**
  * 对话输入区。
@@ -65,6 +68,7 @@ internal fun InputArea(
                 .padding(horizontal = LocalSpacing.current.screenEdge),
     ) {
         PendingImageStrip(images = state.images, onRemove = { onAction(ChatThreadAction.RemoveImage(it)) })
+        BackgroundRunToggle(state, onAction)
         VoiceErrorToast(code = state.voiceError)
         AutopComposer(
             value = state.input,
@@ -109,6 +113,19 @@ internal fun InputArea(
             focusRequester = focusRequester,
         )
     }
+}
+
+@Composable
+private fun BackgroundRunToggle(
+    state: ChatThreadUiState,
+    onAction: (ChatThreadAction) -> Unit,
+) {
+    BackgroundRunRow(
+        checked = state.backgroundScreen,
+        onCheckedChange = { onAction(ChatThreadAction.SetBackgroundScreen(it)) },
+        enabled = state.backgroundRunBlock == null,
+        unavailableReason = state.backgroundRunBlock?.let { stringResource(it.messageRes()) },
+    )
 }
 
 /** 尾部按钮：听写中为语音（停止态）；运行中无输入为停止；无输入且可语音为语音；其余为发送。 */
@@ -185,6 +202,13 @@ private fun runModeDescRes(mode: RunMode): Int =
         RunMode.CHAT_ONLY -> R.string.thread_run_mode_chat_only_desc
         RunMode.STANDARD -> R.string.thread_run_mode_standard_desc
         RunMode.FULL -> R.string.thread_run_mode_full_desc
+    }
+
+private fun BackgroundRunBlock.messageRes(): Int =
+    when (this) {
+        BackgroundRunBlock.RUNNING -> CoreUiR.string.core_ui_background_run_locked
+        BackgroundRunBlock.UNSUPPORTED -> CoreUiR.string.core_ui_background_run_unsupported
+        BackgroundRunBlock.CHANNEL_DISCONNECTED -> CoreUiR.string.core_ui_background_run_disconnected
     }
 
 private const val ARROW = "▾"

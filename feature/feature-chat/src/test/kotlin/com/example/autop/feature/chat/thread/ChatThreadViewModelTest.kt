@@ -12,9 +12,12 @@ import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ThreadSummary
 import com.example.autop.core.common.AppError
+import com.example.autop.core.common.BackgroundRunBlock
+import com.example.autop.core.common.Capability
 import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.LogFiles
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
@@ -32,6 +35,7 @@ import com.example.autop.task.RunService
 import com.example.autop.task.RunStatus
 import com.example.autop.task.Task
 import com.google.common.truth.Truth.assertThat
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -47,6 +51,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runCurrent
 import kotlinx.coroutines.test.runTest
 import kotlinx.coroutines.test.setMain
 import org.junit.After
@@ -169,6 +174,144 @@ public class ChatThreadViewModelTest {
             assertThat(threads.runModeOf(ThreadId("t2"))).isEqualTo(RunMode.CHAT_ONLY)
         }
 
+    @Test
+    public fun `background mode persists and is captured for each send`() =
+        runTest(testDispatcher) {
+            val threads = FakeChatThreadStore()
+            val runService = FakeChatRunService()
+            val viewModel = createViewModel(threads, runService, shellConnected = true)
+            viewModel.bindThread("t1")
+
+            viewModel.onAction(ChatThreadAction.SetBackgroundScreen(true))
+            viewModel.onAction(ChatThreadAction.SetInput("后台执行"))
+            viewModel.onAction(ChatThreadAction.Send)
+
+            assertThat(threads.backgroundScreenOf(ThreadId("t1"))).isTrue()
+            assertThat(runService.chatBackgroundModes).containsExactly(true)
+
+            val reopened = createViewModel(threads, runService, shellConnected = true)
+            reopened.bindThread("t1")
+            assertThat(reopened.uiState.value.backgroundScreen).isTrue()
+
+            reopened.onAction(ChatThreadAction.SetBackgroundScreen(false))
+            reopened.onAction(ChatThreadAction.SetInput("真实屏执行"))
+            reopened.onAction(ChatThreadAction.Send)
+            assertThat(runService.chatBackgroundModes).containsExactly(true, false).inOrder()
+        }
+
+    @Test
+    public fun `background mode stays locked until the sent run is visible`() =
+        runTest(testDispatcher) {
+            val threads = FakeChatThreadStore()
+            val runService = FakeChatRunService()
+            val startGate = CompletableDeferred<Unit>()
+            runService.startGate = startGate
+            val viewModel = createViewModel(threads, runService, shellConnected = true)
+            viewModel.bindThread("t1")
+            viewModel.onAction(ChatThreadAction.SetBackgroundScreen(true))
+            viewModel.onAction(ChatThreadAction.SetInput("后台执行"))
+            viewModel.onAction(ChatThreadAction.Send)
+            runCurrent()
+
+            viewModel.onAction(ChatThreadAction.SetBackgroundScreen(false))
+            assertThat(viewModel.uiState.value.backgroundScreen).isTrue()
+            assertThat(viewModel.uiState.value.backgroundRunBlock).isEqualTo(BackgroundRunBlock.RUNNING)
+
+            startGate.complete(Unit)
+            runCurrent()
+            assertThat(runService.chatBackgroundModes).containsExactly(true)
+            assertThat(viewModel.uiState.value.backgroundRunBlock).isEqualTo(BackgroundRunBlock.RUNNING)
+
+            runService.openRuns.getOrPut("t1") { MutableStateFlow(null) }.value = record("r-new", ThreadId("t1"))
+            runCurrent()
+            runService.openRuns.getValue("t1").value = null
+            runCurrent()
+            assertThat(viewModel.uiState.value.backgroundRunBlock).isNull()
+            assertThat(threads.backgroundScreenOf(ThreadId("t1"))).isTrue()
+        }
+
+    @Test
+    public fun `background mode cannot change while this thread is running`() =
+        runTest(testDispatcher) {
+            val threads = FakeChatThreadStore()
+            val runService = FakeChatRunService()
+            val viewModel = createViewModel(threads, runService, shellConnected = true)
+            viewModel.bindThread("t1")
+            viewModel.onAction(ChatThreadAction.SetBackgroundScreen(true))
+            runService.openRuns.getOrPut("t1") { MutableStateFlow(null) }.value = record("r1", ThreadId("t1"))
+            runCurrent()
+
+            viewModel.onAction(ChatThreadAction.SetBackgroundScreen(false))
+
+            assertThat(viewModel.uiState.value.backgroundScreen).isTrue()
+            assertThat(viewModel.uiState.value.backgroundRunBlock).isEqualTo(BackgroundRunBlock.RUNNING)
+            assertThat(threads.backgroundScreenOf(ThreadId("t1"))).isTrue()
+        }
+
+    @Test
+    public fun `background mode reports sdk and channel blockers`() =
+        runTest(testDispatcher) {
+            val disconnected = createViewModel(FakeChatThreadStore(), FakeChatRunService())
+            disconnected.bindThread("t1")
+            runCurrent()
+            disconnected.onAction(ChatThreadAction.SetBackgroundScreen(true))
+            runCurrent()
+            assertThat(disconnected.uiState.value.backgroundRunBlock)
+                .isEqualTo(BackgroundRunBlock.CHANNEL_DISCONNECTED)
+            assertThat(disconnected.uiState.value.backgroundScreen).isFalse()
+
+            val unsupported =
+                createViewModel(
+                    FakeChatThreadStore(),
+                    FakeChatRunService(),
+                    shellConnected = true,
+                    backgroundSupported = false,
+                )
+            unsupported.bindThread("t1")
+            runCurrent()
+            unsupported.onAction(ChatThreadAction.SetBackgroundScreen(true))
+            runCurrent()
+            assertThat(unsupported.uiState.value.backgroundRunBlock).isEqualTo(BackgroundRunBlock.UNSUPPORTED)
+        }
+
+    @Test
+    public fun `background mode can be turned off after channel disconnects`() =
+        runTest(testDispatcher) {
+            val threads = FakeChatThreadStore()
+            val shellInput = FakeChatShellInput(connected = true)
+            val viewModel =
+                createViewModel(
+                    threads,
+                    FakeChatRunService(),
+                    shellInput = shellInput,
+                )
+            viewModel.bindThread("t1")
+            runCurrent()
+            viewModel.onAction(ChatThreadAction.SetBackgroundScreen(true))
+            runCurrent()
+            shellInput.state.value = ShellState.Disconnected
+            runCurrent()
+
+            assertThat(viewModel.uiState.value.backgroundRunBlock).isNull()
+            viewModel.onAction(ChatThreadAction.SetBackgroundScreen(false))
+            assertThat(viewModel.uiState.value.backgroundScreen).isFalse()
+            assertThat(viewModel.uiState.value.backgroundRunBlock).isEqualTo(BackgroundRunBlock.CHANNEL_DISCONNECTED)
+            assertThat(threads.backgroundScreenOf(ThreadId("t1"))).isFalse()
+        }
+
+    @Test
+    public fun `fork inherits background mode`() =
+        runTest(testDispatcher) {
+            val threads = FakeChatThreadStore()
+            val viewModel = createViewModel(threads, FakeChatRunService(), FakeForkSession(), shellConnected = true)
+            viewModel.bindThread("t1")
+            viewModel.onAction(ChatThreadAction.SetBackgroundScreen(true))
+
+            viewModel.onAction(ChatThreadAction.ForkFrom(1))
+
+            assertThat(threads.backgroundScreenOf(ThreadId("t2"))).isTrue()
+        }
+
     private fun hasUserText(
         viewModel: ChatThreadViewModel,
         text: String,
@@ -180,6 +323,9 @@ public class ChatThreadViewModelTest {
         threads: ThreadStore,
         runService: RunService,
         session: AgentSession = FakeForkSession(),
+        shellConnected: Boolean = false,
+        backgroundSupported: Boolean = true,
+        shellInput: ShellInput = FakeChatShellInput(shellConnected),
     ): ChatThreadViewModel =
         ChatThreadViewModel(
             threadStore = threads,
@@ -195,14 +341,18 @@ public class ChatThreadViewModelTest {
                     TestDispatcherProvider(testDispatcher),
                 ),
             speech = FakeSpeechInput(),
-            shellInput = FakeChatShellInput(),
+            shellInput = shellInput,
+            platformCapabilities = FakeChatCapabilities(backgroundSupported),
             dispatchers = TestDispatcherProvider(testDispatcher),
         )
 }
 
 /** 只读 shell 通道状态（默认未连接，发送 FULL 模式时走阻断分支）。 */
-private class FakeChatShellInput : ShellInput {
-    override val state: StateFlow<ShellState> = MutableStateFlow(ShellState.Disconnected)
+private class FakeChatShellInput(
+    connected: Boolean = false,
+) : ShellInput {
+    override val state: MutableStateFlow<ShellState> =
+        MutableStateFlow(if (connected) ShellState.Connected else ShellState.Disconnected)
     override val paired: StateFlow<Boolean> = MutableStateFlow(false)
 
     override suspend fun pair(
@@ -231,6 +381,12 @@ private class FakeChatShellInput : ShellInput {
     override suspend fun keyEvent(code: Int): Boolean = error("unused")
 
     override suspend fun keyCombination(vararg codes: Int): Boolean = error("unused")
+}
+
+private class FakeChatCapabilities(
+    private val backgroundSupported: Boolean,
+) : PlatformCapabilities {
+    override fun has(c: Capability): Boolean = c != Capability.BACKGROUND_VIRTUAL_DISPLAY || backgroundSupported
 }
 
 /** 一条用户输入消息载荷。 */
@@ -349,6 +505,17 @@ private class FakeChatThreadStore : ThreadStore {
         runModes[threadId.value] = mode
     }
 
+    private val backgroundScreens = mutableMapOf<String, Boolean>()
+
+    override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = backgroundScreens[threadId.value] ?: false
+
+    override suspend fun setBackgroundScreen(
+        threadId: ThreadId,
+        enabled: Boolean,
+    ) {
+        backgroundScreens[threadId.value] = enabled
+    }
+
     override suspend fun titleOf(threadId: ThreadId): String? = null
 
     override suspend fun delete(threadId: ThreadId): Unit = Unit
@@ -361,9 +528,12 @@ private class FakeChatRunService : RunService {
     val openRuns = mutableMapOf<String, MutableStateFlow<RunRecord?>>()
     val active = MutableStateFlow<ActiveRunInfo?>(null)
     val cancelled = mutableListOf<RunId>()
+    val chatBackgroundModes = mutableListOf<Boolean>()
 
     /** steer 返回结果（默认成功）。 */
     var steerResult: Outcome<Unit> = Outcome.Ok(Unit)
+
+    var startGate: CompletableDeferred<Unit>? = null
 
     override fun observeOpenRun(threadId: ThreadId): Flow<RunRecord?> =
         openRuns.getOrPut(threadId.value) { MutableStateFlow(null) }
@@ -405,7 +575,12 @@ private class FakeChatRunService : RunService {
         images: List<ImageAttachment>,
         modelProfileId: String?,
         runMode: com.example.autop.core.common.RunMode,
-    ): Outcome<RunRecord> = Outcome.Ok(record("r-new", threadId ?: ThreadId("thread-new")))
+        backgroundScreen: Boolean,
+    ): Outcome<RunRecord> {
+        chatBackgroundModes += backgroundScreen
+        startGate?.await()
+        return Outcome.Ok(record("r-new", threadId ?: ThreadId("thread-new")))
+    }
 
     override suspend fun forkAndRun(
         threadId: ThreadId,

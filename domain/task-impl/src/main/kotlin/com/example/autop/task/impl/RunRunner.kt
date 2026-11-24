@@ -17,10 +17,13 @@ import com.example.autop.agent.TASK_RUN_VAR
 import com.example.autop.agent.ThreadEvent
 import com.example.autop.agent.ThreadStore
 import com.example.autop.agent.ToolResultEvent
+import com.example.autop.core.common.AppError
 import com.example.autop.core.common.AutopJson
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Logger
+import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.RunId
 import com.example.autop.core.common.RunMode
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.ConfigSnapshot
@@ -30,7 +33,9 @@ import com.example.autop.core.config.FlowConfig
 import com.example.autop.core.config.TaskConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppLauncher
+import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.DeviceStateProvider
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.ScreenLease
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.FlowProgressFeed
@@ -52,8 +57,10 @@ import com.example.autop.task.impl.flowsEnabled
 import com.example.autop.task.impl.notify.UserNotifierImpl
 import com.example.autop.task.impl.store.RunStore
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -93,38 +100,147 @@ public class RunRunner(
     ) {
         val startedAt = clock.nowMillis()
         if (!launchRecord(record, startedAt)) return
-        val entry = pending.take(record.id)
-        val flowLaunch = flowLaunchOf(entry, task)
-        // 兜底（调度门已先拦截）：流程功能关闭时在取屏幕租约与调用流程会话之前收口（ADR-0030）。
-        if (flowLaunch != null && !configProvider.current().flowsEnabled()) {
-            failFlowDisabled(record)
-            return
+        var terminalWritten = false
+        try {
+            // 启动后立即登记未知态，覆盖 pending/flow 解析与 open 挂起时的取消窗口。
+            RunDisplayTargetRegistry.bindOpening(record.id)
+            val entry = pending.take(record.id)
+            val flowLaunch = flowLaunchOf(entry, task)
+            // 兜底（调度门已先拦截）：流程功能关闭时在取屏幕租约与调用流程会话之前收口（ADR-0030）。
+            if (flowLaunch != null && !configProvider.current().flowsEnabled()) {
+                failFlowDisabled(record)
+                return
+            }
+            val needsScreen = flowLaunch?.needsScreen ?: task?.needsScreen ?: true
+            val execution = startAndRun(record, task, flowLaunch, entry, needsScreen)
+            if (execution == null) return
+            withContext(NonCancellable) {
+                observer.finish(record.id, execution.finished)
+                observer.clear(record.id)
+                terminalWritten = true
+            }
+            val final = runStore.get(record.id) ?: return
+            settle(
+                record,
+                task,
+                flowLaunch,
+                execution.finished,
+                final,
+                execution.gate?.originPackage ?: execution.originPackage,
+            )
+        } catch (e: CancellationException) {
+            // 覆盖 pending/flow 解析、显示打开与执行窗口；终态已写后不覆盖成功/失败结果。
+            if (!terminalWritten) finishCancelled(record)
+            throw e
+        } finally {
+            withContext(NonCancellable) {
+                try {
+                    touchShieldWatcher.releaseDisplay(record.id)
+                } catch (e: Exception) {
+                    logger.w(TAG, "display_release_failed", "runId" to record.id.value, error = e)
+                } finally {
+                    RunDisplayTargetRegistry.clear(record.id)
+                }
+            }
         }
-        val needsScreen = flowLaunch?.needsScreen ?: task?.needsScreen ?: true
-        val request = if (flowLaunch == null && !isFlowTask(task)) buildRequest(record, task, entry) else null
-        // ADR-0035：智能体 Run 按需占用屏幕（首次屏幕工具调用时取得），不在开始时整段取租约。
-        val gate = screenGateFor(record, request)
-        // 流程与任务的流程运行仍在开始时持有租约（屏幕需求在定义里已知）。
-        val originPkg = if (gate == null && needsScreen) deviceState.current().foregroundPackage else null
-        val finished = runAndCatch(record, task, flowLaunch, entry, request, gate, needsScreen)
-        observer.finish(record.id, finished)
-        observer.clear(record.id)
-        val final = runStore.get(record.id) ?: return
-        settle(record, task, flowLaunch, finished, final, gate?.originPackage ?: originPkg)
     }
 
-    /** 智能体 Run 的屏幕门（ADR-0035）；非智能体 Run 为 null。 */
+    /** 打开显示并执行会话；显示失败已显式收口并返回 null，绝不回落真实屏。 */
+    private suspend fun startAndRun(
+        record: RunRecord,
+        task: Task?,
+        flowLaunch: FlowLaunch?,
+        entry: PendingEntry?,
+        needsScreen: Boolean,
+    ): RunExecution? {
+        val target =
+            when (val opened = openDisplay(record.id, entry?.backgroundScreen == true)) {
+                is Outcome.Ok -> opened.value
+                is Outcome.Err -> {
+                    failDisplay(record, opened.error)
+                    return null
+                }
+            }
+        // open 成功后立即登记，堵住取消入口在 Agent 句柄登记前误放真实屏触摸盾的窗口。
+        RunDisplayTargetRegistry.bind(record.id, target)
+        val displayScope =
+            when (val scoped = displayScopeFor(target)) {
+                is Outcome.Ok -> scoped.value
+                is Outcome.Err -> {
+                    failDisplay(record, scoped.error)
+                    return null
+                }
+            }
+        val request = if (flowLaunch == null && !isFlowTask(task)) buildRequest(record, task, entry) else null
+        // ADR-0035：真实屏智能体 Run 按需占用屏幕；后台屏与流程运行不取真实屏租约。
+        val gate = screenGateFor(record, request, target)
+        val originPackage =
+            if (target is DisplayTarget.Main && gate == null && needsScreen) {
+                deviceState.current().foregroundPackage
+            } else {
+                null
+            }
+        val finished = runAndCatch(record, task, flowLaunch, entry, request, gate, needsScreen, target, displayScope)
+        return RunExecution(finished, gate, originPackage)
+    }
+
+    /** 启动/执行窗口取消仍由既有 Observer 收口，不新建 Run 状态权威。 */
+    private suspend fun finishCancelled(record: RunRecord) {
+        withContext(NonCancellable) {
+            observer.finish(
+                record.id,
+                RunFinished(status = RunOutcome.CANCELLED, summary = null, errorCode = null),
+            )
+            observer.clear(record.id)
+        }
+    }
+
+    /** 显示打开异常按未知内部错误收口；取消继续上抛，由 finally 释放资源。 */
+    @Suppress("TooGenericExceptionCaught") // 控制器契约外异常的兜底，避免 Run 停留在 RUNNING
+    private suspend fun openDisplay(
+        owner: RunId,
+        backgroundScreen: Boolean,
+    ): Outcome<DisplayTarget> =
+        try {
+            touchShieldWatcher.openDisplay(owner, backgroundScreen)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            logger.e(TAG, "display_open_failed", "runId" to owner.value, error = e)
+            Outcome.Err(AppError(CommonErrorCodes.UNKNOWN, "display open failed", cause = e))
+        }
+
+    /** 子 Agent/Flow 必须继承同一显示元素；冲突时显式失败，绝不覆盖为真实屏。 */
+    private fun displayScopeFor(target: DisplayTarget): Outcome<CoroutineScope> {
+        val inherited = scope.coroutineContext[DisplayTarget]
+        if (inherited != null && inherited != target) {
+            return Outcome.Err(AppError(DeviceErrorCodes.BG_RELEASED, "conflicting run display context"))
+        }
+        val scoped = CoroutineScope(scope.coroutineContext + target)
+        return if (scoped.coroutineContext[DisplayTarget] == target) {
+            Outcome.Ok(scoped)
+        } else {
+            Outcome.Err(AppError(DeviceErrorCodes.BG_RELEASED, "run display context not inherited"))
+        }
+    }
+
+    /** 智能体 Run 的屏幕门（ADR-0035）；后台屏与非智能体 Run 为 null。 */
     private fun screenGateFor(
         record: RunRecord,
         request: RunRequest?,
+        target: DisplayTarget,
     ): RunScreenGate? =
-        request?.let {
-            RunScreenGate(
-                owner = record.id.value,
-                lease = screenLease,
-                deviceState = deviceState,
-                acquireTimeoutMs = configProvider.current()[DeviceConfig.SCREEN_LEASE].acquireTimeoutMs,
-            )
+        if (target is DisplayTarget.Main) {
+            request?.let {
+                RunScreenGate(
+                    owner = record.id.value,
+                    lease = screenLease,
+                    deviceState = deviceState,
+                    acquireTimeoutMs = configProvider.current()[DeviceConfig.SCREEN_LEASE].acquireTimeoutMs,
+                )
+            }
+        } else {
+            null
         }
 
     /** 执行 Run 并把异常统一收口为 [RunFinished]；取消照常上抛（收口后）。 */
@@ -137,21 +253,20 @@ public class RunRunner(
         request: RunRequest?,
         gate: RunScreenGate?,
         needsScreen: Boolean,
+        target: DisplayTarget,
+        displayScope: CoroutineScope,
     ): RunFinished =
         try {
             val run = request?.copy(screenGate = gate)
-            if (gate == null && needsScreen) {
-                screenLease.withLease(record.id.value) { runBlock(record, run, flowLaunch, task, entry) }
+            if (target is DisplayTarget.Main && gate == null && needsScreen) {
+                screenLease.withLease(record.id.value) {
+                    runBlock(record, run, flowLaunch, task, entry, target, displayScope)
+                }
             } else {
-                runBlock(record, run, flowLaunch, task, entry)
+                runBlock(record, run, flowLaunch, task, entry, target, displayScope)
             }
         } catch (e: CancellationException) {
-            // 取消也要收口：不 finish/clear 会让进度页永远停在「运行中」。
-            observer.finish(
-                record.id,
-                RunFinished(status = RunOutcome.CANCELLED, summary = null, errorCode = null),
-            )
-            observer.clear(record.id)
+            // 由 execute 的统一启动窗口收口；此处只释放屏幕门并继续上抛。
             throw e
         } catch (e: Exception) {
             logger.e(TAG, "run_crashed", "runId" to record.id.value, error = e)
@@ -227,6 +342,25 @@ public class RunRunner(
         runStore.get(record.id)?.let { notifyIfBackground(it) }
     }
 
+    /** 显示目标打开/继承失败：保留控制器错误码并显式收口，不调用 Agent，也不回落真实屏。 */
+    private suspend fun failDisplay(
+        record: RunRecord,
+        error: AppError,
+    ) {
+        val finished =
+            RunFinished(
+                status = RunOutcome.FAILED,
+                summary = null,
+                errorCode = error.code,
+                liveNote = prompts.runEndedNote(RunOutcome.FAILED),
+            )
+        ensureRunFinished(record, finished)
+        observer.finish(record.id, finished)
+        observer.clear(record.id)
+        runStore.get(record.id)?.let { notifyIfBackground(it) }
+        logger.w(TAG, "display_open_failed", "runId" to record.id.value, "code" to error.code)
+    }
+
     private fun isFlowRun(
         launch: FlowLaunch?,
         task: Task?,
@@ -249,18 +383,21 @@ public class RunRunner(
         flowLaunch: FlowLaunch?,
         task: Task?,
         entry: PendingEntry?,
+        target: DisplayTarget,
+        displayScope: CoroutineScope,
     ): RunFinished {
-        // N217：新 Run 的盾抑制清除在启动前同步落地（见 [TouchShieldWatcher.beginRun]）。
-        touchShieldWatcher.beginRun()
+        // N217：仅真实屏新 Run 在启动前同步清除盾抑制；后台屏不调用触摸盾启动/watch。
+        if (target is DisplayTarget.Main) touchShieldWatcher.beginRun(record.id, target)
         val handle =
             when {
-                flowLaunch != null -> flowSession.start(flowRequest(record, task, entry, flowLaunch), scope)
-                request != null -> agentSession.start(request, scope)
-                else -> return RunFinished(
-                    status = RunOutcome.FAILED,
-                    summary = null,
-                    errorCode = FlowErrorCodes.NOT_FOUND,
-                )
+                flowLaunch != null -> flowSession.start(flowRequest(record, task, entry, flowLaunch), displayScope)
+                request != null -> agentSession.start(request, displayScope)
+                else ->
+                    return RunFinished(
+                        status = RunOutcome.FAILED,
+                        summary = null,
+                        errorCode = FlowErrorCodes.NOT_FOUND,
+                    )
             }
         observer.begin(record, handle)
         // 取消意图补投（取消幂等收口）：句柄登记前窗口落下的取消在此兑现。
@@ -273,12 +410,17 @@ public class RunRunner(
             flowFeed.register(record.id, flowLaunch.definition.name, handle)
         }
         val watcher = scope.launch { observer.watch(record.id, handle) }
-        val shieldWatcher = scope.launch { touchShieldWatcher.watch(handle, record.id.value, screenLease.holder) }
+        val shieldWatcher =
+            if (target is DisplayTarget.Main) {
+                scope.launch { touchShieldWatcher.watch(handle, record.id.value, screenLease.holder) }
+            } else {
+                null
+            }
         try {
             return handle.await()
         } finally {
             watcher.cancelAndJoin()
-            shieldWatcher.cancelAndJoin()
+            shieldWatcher?.cancelAndJoin()
         }
     }
 
@@ -501,6 +643,12 @@ public class RunRunner(
         runCatching { appLauncher.launch(originPkg) }
             .onFailure { logger.w(TAG, "return_to_origin_failed", "error" to (it.message ?: "unknown")) }
     }
+
+    private data class RunExecution(
+        val finished: RunFinished,
+        val gate: RunScreenGate?,
+        val originPackage: String?,
+    )
 
     private companion object {
         const val TAG = "RunRunner"

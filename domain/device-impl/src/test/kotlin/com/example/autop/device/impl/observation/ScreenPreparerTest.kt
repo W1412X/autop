@@ -219,7 +219,7 @@ class ScreenPreparerTest {
                 prompts = prompts,
                 context = context,
             )
-        return ScreenPreparer(reader, capturer, contentAreas, visual, serializer)
+        return ScreenPreparer(reader, capturer, visual, serializer)
     }
 
     private fun service(): AutopAccessibilityService =
@@ -332,6 +332,13 @@ class ScreenPreparerTest {
         override suspend fun setRunMode(
             threadId: ThreadId,
             mode: RunMode,
+        ): Unit = Unit
+
+        override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = false
+
+        override suspend fun setBackgroundScreen(
+            threadId: ThreadId,
+            enabled: Boolean,
         ): Unit = Unit
 
         override suspend fun modelProfileOf(threadId: ThreadId): String? = null

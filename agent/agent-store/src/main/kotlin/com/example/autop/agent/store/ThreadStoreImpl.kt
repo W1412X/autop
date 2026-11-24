@@ -263,6 +263,17 @@ public class ThreadStoreImpl(
         changesFlow.tryEmit(Unit)
     }
 
+    override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean =
+        db.threadDao().byId(threadId.value)?.backgroundScreen ?: false
+
+    override suspend fun setBackgroundScreen(
+        threadId: ThreadId,
+        enabled: Boolean,
+    ) {
+        db.threadDao().setBackgroundScreen(threadId.value, enabled)
+        changesFlow.tryEmit(Unit)
+    }
+
     override suspend fun titleOf(threadId: ThreadId): String? = db.threadDao().byId(threadId.value)?.title
 
     /**

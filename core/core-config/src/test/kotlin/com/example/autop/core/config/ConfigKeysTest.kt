@@ -54,6 +54,18 @@ class ConfigKeysTest {
     }
 
     @Test
+    fun `background display section validates viewport timing and transport limits`() {
+        assertThat(DeviceBackgroundSection().validate()).isEmpty()
+        assertThat(
+            DeviceBackgroundSection(width = 4097, height = 1600, dpi = 0, launchTimeoutMs = 0, jpegQuality = 101)
+                .validate(),
+        ).hasSize(4)
+        assertThat(DeviceBackgroundSection(width = 4096, height = 2048).validate()).isEmpty()
+        assertThat(DeviceBackgroundSection(maxPayloadBytes = 1024).validate()).hasSize(1)
+        assertThat(DeviceBackgroundSection(maxPayloadBytes = 33_554_432).validate()).isEmpty()
+    }
+
+    @Test
     fun `vision parallel section validates thread ranges`() {
         assertThat(DeviceVisionParallelSection().validate()).isEmpty()
         assertThat(DeviceVisionParallelSection(maxThreads = 1, cropOrtThreads = 0).validate()).isEmpty()

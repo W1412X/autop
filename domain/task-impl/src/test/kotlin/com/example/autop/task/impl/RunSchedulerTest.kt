@@ -10,6 +10,7 @@ import androidx.room.Room
 import androidx.test.core.app.ApplicationProvider
 import com.example.autop.agent.RunFinished
 import com.example.autop.agent.RunOutcome
+import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.common.TaskId
 import com.example.autop.core.common.ThreadId
@@ -18,6 +19,7 @@ import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.DeviceState
+import com.example.autop.device.DisplayTarget
 import com.example.autop.task.LockedBehavior
 import com.example.autop.task.RunOrigin
 import com.example.autop.task.RunRecord
@@ -35,6 +37,7 @@ import com.example.autop.task.impl.testing.FakeAgentSession
 import com.example.autop.task.impl.testing.FakeAppLauncher
 import com.example.autop.task.impl.testing.FakeDeviceStateProvider
 import com.example.autop.task.impl.testing.FakeLogger
+import com.example.autop.task.impl.testing.FakeRunDisplayController
 import com.example.autop.task.impl.testing.FakeScreenLease
 import com.example.autop.task.impl.testing.FakeTaskRepository
 import com.example.autop.task.impl.testing.FakeThreadStore
@@ -107,6 +110,43 @@ public class RunSchedulerTest {
             fixture.screenLease.setHolder(null)
             pump(fixture)
             assertEquals(listOf(record.id), fixture.session.requests.map { it.runId })
+        }
+
+    @Test
+    public fun `background display ignores accessibility lease and recent touch`() =
+        runTest {
+            val fixture = Fixture(backgroundScope, backgroundDisplay = true)
+            fixture.accessibility.setConnected(false)
+            fixture.screenLease.setHolder("real-run")
+            fixture.activity.lastTouchAt = START_MS - TOUCH_AGO_MS
+            val record = fixture.enqueueRun("run-bg", RunOrigin.SCHEDULE, taskOf("t1"), backgroundScreen = true)
+
+            fixture.scheduler.trySchedule()
+            pump(fixture)
+
+            assertEquals(listOf(record.id), fixture.session.requests.map { it.runId })
+            assertEquals(0, fixture.screenLease.leaseCalls)
+            assertEquals("real-run", fixture.screenLease.holder.value)
+            assertEquals(0, fixture.shield.resetCount)
+            assertEquals(listOf(record.id), fixture.displays.released)
+        }
+
+    @Test
+    public fun `background display retains lock screen gate`() =
+        runTest {
+            val fixture = Fixture(backgroundScope, backgroundDisplay = true)
+            fixture.accessibility.setConnected(false)
+            fixture.screenLease.setHolder("real-run")
+            fixture.devices.state = unlockedState().copy(keyguardLocked = true)
+            val record = fixture.enqueueRun("run-bg", RunOrigin.SCHEDULE, taskOf("t1"), backgroundScreen = true)
+
+            fixture.scheduler.trySchedule()
+            pump(fixture)
+
+            assertTrue(fixture.session.requests.isEmpty())
+            assertEquals(RunStatus.WAITING_USER, fixture.runStore.get(record.id)?.status)
+            assertEquals(1, fixture.queue.size)
+            assertTrue(fixture.displays.opened.isEmpty())
         }
 
     @Test
@@ -244,10 +284,11 @@ public class RunSchedulerTest {
 /** 测试装配：真实 RunStore/RunRunner/LockReminder + fake 设备端口（docs/tech/07 §9）。 */
 private class Fixture(
     scope: CoroutineScope,
+    val config: FakeConfigProvider = FakeConfigProvider(),
+    private val backgroundDisplay: Boolean = false,
 ) {
     val context: Context = ApplicationProvider.getApplicationContext()
     val clock = FakeClock(start = START_MS)
-    val config = FakeConfigProvider()
     val db: TasksDb =
         Room
             .inMemoryDatabaseBuilder(context, TasksDb::class.java)
@@ -261,6 +302,17 @@ private class Fixture(
     val threads = FakeThreadStore()
     val queue = RunQueue(TaskQueueSection.DEFAULT_ORIGIN_WEIGHTS)
     val screenLease = FakeScreenLease()
+    val displays =
+        FakeRunDisplayController { owner ->
+            if (backgroundDisplay) {
+                Outcome.Ok(
+                    DisplayTarget.Background(owner = owner, displayId = 7, width = 1080, height = 1920, dpi = 320),
+                )
+            } else {
+                Outcome.Ok(DisplayTarget.Main)
+            }
+        }
+    val shield = FakeTouchShield()
     val accessibility = FakeAccessibilityStatus()
     val devices = FakeDeviceStateProvider(unlockedState())
     val activity = FakeUserActivity()
@@ -277,7 +329,7 @@ private class Fixture(
             runStore = runStore,
             pending = pending,
             observer = RunObserver(runStore, config, clock, FakeFlowProgressFeed),
-            touchShieldWatcher = TouchShieldWatcher(FakeTouchShield()),
+            touchShieldWatcher = TouchShieldWatcher(shield, displays),
             screenLease = screenLease,
             deviceState = devices,
             appLauncher = launcher,
@@ -315,6 +367,7 @@ private class Fixture(
         id: String,
         origin: RunOrigin,
         task: Task,
+        backgroundScreen: Boolean = false,
     ): RunRecord {
         val record =
             RunRecord(
@@ -333,7 +386,7 @@ private class Fixture(
                 waitingQuestion = null,
             )
         runStore.save(record)
-        pending.put(record.id, PendingEntry(vars = emptyMap(), task = task))
+        pending.put(record.id, PendingEntry(vars = emptyMap(), task = task, backgroundScreen = backgroundScreen))
         scheduler.enqueue(record)
         return record
     }

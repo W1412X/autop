@@ -102,7 +102,7 @@ public class ReplayTargetResolverImpl
         }
 
         private fun mapperOf(snap: ScreenSnapshot): CoordMapper =
-            coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), contentAreas.base() ?: snap.contentArea)
+            coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), snap.contentArea ?: contentAreas.base())
 
         private fun replace(
             args: JsonObject,

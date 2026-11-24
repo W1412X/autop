@@ -99,6 +99,12 @@ public interface ThreadDao {
         mode: String,
     )
 
+    @Query("UPDATE threads SET backgroundScreen = :enabled WHERE id = :id")
+    public suspend fun setBackgroundScreen(
+        id: String,
+        enabled: Boolean,
+    )
+
     @Query("DELETE FROM threads WHERE id = :id")
     public suspend fun delete(id: String)
 }

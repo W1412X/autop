@@ -143,6 +143,7 @@ internal class InMemoryThreadStore(
     }
 
     private val runModes = mutableMapOf<String, RunMode>()
+    private val backgroundScreens = mutableMapOf<String, Boolean>()
 
     override suspend fun runModeOf(threadId: ThreadId): RunMode = runModes[threadId.value] ?: RunMode.STANDARD
 
@@ -151,6 +152,15 @@ internal class InMemoryThreadStore(
         mode: RunMode,
     ) {
         runModes[threadId.value] = mode
+    }
+
+    override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = backgroundScreens[threadId.value] ?: false
+
+    override suspend fun setBackgroundScreen(
+        threadId: ThreadId,
+        enabled: Boolean,
+    ) {
+        backgroundScreens[threadId.value] = enabled
     }
 
     override suspend fun modelProfileOf(threadId: ThreadId): String? = modelOverrides[threadId.value]

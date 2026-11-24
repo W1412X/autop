@@ -69,10 +69,14 @@ public class PanelRunActions
         public fun send(
             text: String,
             modelProfileId: String? = null,
+            backgroundScreen: Boolean = false,
             onStarted: (RunRecord) -> Unit = {},
         ) {
             scope.launch {
-                runService.startChat(null, text, modelProfileId = modelProfileId).getOrNull()?.let(onStarted)
+                runService
+                    .startChat(null, text, modelProfileId = modelProfileId, backgroundScreen = backgroundScreen)
+                    .getOrNull()
+                    ?.let(onStarted)
             }
         }
 
@@ -104,12 +108,11 @@ public class PanelRunActions
         }
 
         /**
-         * 停止（N191/N217，安全关键）：先强制解除触摸屏蔽再取消——终止按钮点下就必须能
-         * 立刻操作手机，即使取消链路异常或 Run 卡死未收口。
+         * 停止（N191/N217，安全关键）：由 RunCoordinator 按显示目标强制解除真实屏触摸盾后再取消，
+         * 后台屏停止不得误放其他真实 Run 的盾。
          */
         public fun stop() {
             if (ignoreWhileInjecting(ACTION_STOP)) return
-            shield.forceRelease()
             val id = activeId() ?: return
             publish(ControlIntentKind.STOP, id)
             runService.cancel(id)
@@ -123,10 +126,9 @@ public class PanelRunActions
             runService.resume(id, RESUME_NOTE)
         }
 
-        /** 拦截面板「结束」（同 [stop]：先强制解除屏蔽）。 */
+        /** 拦截面板「结束」（同 [stop]：由 RunCoordinator 按显示目标解除屏蔽）。 */
         public fun finishBlocked() {
             if (ignoreWhileInjecting(ACTION_FINISH_BLOCKED)) return
-            shield.forceRelease()
             val id = activeId() ?: return
             publish(ControlIntentKind.STOP, id)
             runService.cancel(id)

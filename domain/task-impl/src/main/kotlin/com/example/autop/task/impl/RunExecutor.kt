@@ -61,6 +61,7 @@ public class RunExecutor(
         images: List<ImageAttachment>,
         modelProfileId: String? = null,
         runMode: RunMode = RunMode.STANDARD,
+        backgroundScreen: Boolean = false,
     ): Outcome<RunRecord> {
         val placeholder = if (threadId == null) placeholderTitle(text) else null
         val thread = threadId ?: threadStore.createThread(title = placeholder, parent = null)
@@ -68,6 +69,7 @@ public class RunExecutor(
         threadStore.setModelProfile(thread, modelProfileId)
         // 发送即持久化本次的运行模式（ADR-0043）：之后切换页面、重新打开会话都沿用它。
         threadStore.setRunMode(thread, runMode)
+        threadStore.setBackgroundScreen(thread, backgroundScreen)
         if (modelProfileId != null) {
             logger.i(TAG, "chat_model_selected", "threadId" to thread.value, "profileId" to modelProfileId)
         }
@@ -83,6 +85,7 @@ public class RunExecutor(
                 UserMessageKind.INPUT,
                 if (runMode == RunMode.STANDARD) emptyMap() else mapOf(RUN_MODE_VAR to runMode.id),
                 null,
+                backgroundScreen = backgroundScreen,
             )
         if (placeholder != null && enqueued is Outcome.Ok) {
             refineTitle(thread = thread, message = text, placeholder = placeholder)
@@ -143,6 +146,7 @@ public class RunExecutor(
             UserMessageKind.INJECTED,
             mapOf(RESUMED_FROM_KEY to source.id.value),
             null,
+            backgroundScreen = threadStore.backgroundScreenOf(source.threadId),
         )
 
     /**
@@ -172,6 +176,7 @@ public class RunExecutor(
         vars: Map<String, String>,
         task: Task?,
         flow: FlowLaunch? = null,
+        backgroundScreen: Boolean = false,
     ): Outcome<RunRecord> {
         val now = clock.nowMillis()
         val record =
@@ -190,12 +195,13 @@ public class RunExecutor(
                 pauseReason = null,
                 waitingQuestion = null,
             )
+        RunDisplayTargetRegistry.bindOpening(record.id)
         runStore.save(record)
         // 输入入队即落盘（WP8.1）：先写事件日志再暂存入队，进程被杀也不丢用户原话。
         if (input.isNotEmpty() && inputKind != null) {
             threadStore.append(threadId, record.id, UserMessage(blocks = input, kind = inputKind))
         }
-        pending.put(record.id, PendingEntry(vars = vars, task = task, flow = flow))
+        pending.put(record.id, PendingEntry(vars = vars, task = task, flow = flow, backgroundScreen = backgroundScreen))
         scheduler.enqueue(record)
         scheduler.trySchedule()
         return Outcome.Ok(record)

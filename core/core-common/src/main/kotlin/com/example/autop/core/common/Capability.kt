@@ -31,6 +31,9 @@ public enum class Capability {
     /** SDK ≥ 34：`accessibilityDataSensitive` 视图（真机验证项 Q5）。 */
     ACCESSIBILITY_DATA_SENSITIVE,
 
+    /** SDK ≥ 34：带独立焦点的后台虚拟屏。 */
+    BACKGROUND_VIRTUAL_DISPLAY,
+
     /** SDK ≥ 31：动态取色（Monet，docs/tech/08 §1.1）。 */
     DYNAMIC_COLOR,
 

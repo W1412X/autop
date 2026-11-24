@@ -6,6 +6,6 @@ package com.example.autop.feature.overlay.panel
 
 /** 输入面板动作回调聚合。 */
 internal class PanelCallbacks(
-    val onSend: (text: String, modelProfileId: String?) -> Unit,
+    val onSend: (text: String, modelProfileId: String?, backgroundScreen: Boolean) -> Unit,
     val onDismiss: () -> Unit,
 )

@@ -129,6 +129,15 @@ public interface ThreadStore {
         mode: RunMode,
     )
 
+    /** 会话是否在后台虚拟屏运行；线程不存在时为 false。 */
+    public suspend fun backgroundScreenOf(threadId: ThreadId): Boolean
+
+    /** 记录会话后台运行模式；发送、切换、分叉时写入。 */
+    public suspend fun setBackgroundScreen(
+        threadId: ThreadId,
+        enabled: Boolean,
+    )
+
     /** 单个线程的标题（线程不存在给 null）；顶栏与标题精炼的覆盖判定用。 */
     public suspend fun titleOf(threadId: ThreadId): String?
 

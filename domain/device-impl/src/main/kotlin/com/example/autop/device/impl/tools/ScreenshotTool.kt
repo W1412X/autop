@@ -5,6 +5,7 @@
  */
 package com.example.autop.device.impl.tools
 
+import android.graphics.BitmapFactory
 import com.example.autop.agent.Tool
 import com.example.autop.agent.ToolAccess
 import com.example.autop.agent.ToolContext
@@ -16,13 +17,15 @@ import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.Rect
+import com.example.autop.device.ScreenReader
 import com.example.autop.device.Screenshot
 import com.example.autop.device.core.PixelSize
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.device.impl.ContentAreaProvider
 import com.example.autop.device.impl.ProcessedShot
 import com.example.autop.device.impl.ScreenshotProcessor
-import com.example.autop.device.impl.ScreenshotTaker
 import com.example.autop.device.impl.deviceHistory
 import com.example.autop.device.impl.markPointOf
 import com.example.autop.device.impl.pixelCropOf
@@ -38,7 +41,7 @@ import javax.inject.Singleton
 public class ScreenshotTool
     @Inject
     constructor(
-        private val taker: ScreenshotTaker,
+        private val reader: ScreenReader,
         private val processor: ScreenshotProcessor,
         private val contentAreas: ContentAreaProvider,
         private val prompts: PromptRepository,
@@ -69,7 +72,7 @@ public class ScreenshotTool
                     is MarkArg.Value -> parsed
                     is MarkArg.None -> null
                 }
-            return when (val got = taker.take()) {
+            return when (val got = reader.screenshot()) {
                 is Outcome.Err -> errorOutput(got.error)
                 is Outcome.Ok -> render(got.value, region, mark, ctx)
             }
@@ -81,12 +84,18 @@ public class ScreenshotTool
             mark: MarkArg.Value?,
             ctx: ToolContext,
         ): ToolOutput {
-            val bitmap = shot.handle as? android.graphics.Bitmap
+            val bitmap =
+                shot.handle as? android.graphics.Bitmap
+                    ?: shot.jpegBytes?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }
             return if (bitmap == null) {
                 toolError(DeviceErrorCodes.SCREENSHOT_FAILED, "截图数据不可用")
             } else {
                 val screen = PixelSize(bitmap.width, bitmap.height)
-                val base = contentAreas.base()
+                val base =
+                    when (val target = currentDisplayTarget()) {
+                        is DisplayTarget.Background -> Rect(0, 0, target.width, target.height)
+                        else -> contentAreas.base()
+                    }
                 val point = mark?.let { markPointOf(screen, it.x, it.y, base) }
                 val processed =
                     try {

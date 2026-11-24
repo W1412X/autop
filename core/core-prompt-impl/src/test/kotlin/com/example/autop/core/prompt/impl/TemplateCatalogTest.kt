@@ -261,6 +261,7 @@ class TemplateCatalogTest {
                 "device.stabilize.not_settled",
                 "device.visual.ocr_disabled",
                 "device.trace.channel.accessibility",
+                "device.trace.channel.background",
                 "device.trace.channel.none",
                 "device.trace.channel.shell",
                 "device.trace.gesture",

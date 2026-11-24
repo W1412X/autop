@@ -8,7 +8,10 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import com.example.autop.core.common.PermissionChecks
+import com.example.autop.core.common.RunId
 import com.example.autop.core.testing.FakeClock
+import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.NotificationFeed
 import com.example.autop.device.NotificationInfo
 import com.example.autop.device.NotificationMessage
@@ -17,7 +20,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -58,6 +63,35 @@ class ReadNotificationsToolTest {
 
             assertThat(out.ok).isTrue()
             assertThat(out.content.toString()).contains("<untrusted source=\"clipboard\">密码123</untrusted>")
+        }
+
+    @Test
+    fun `background clipboard access is rejected without reading or overwriting real clipboard`() =
+        runTest {
+            val env = ToolTestEnv()
+            val clipboard = context.getSystemService(ClipboardManager::class.java)
+            clipboard.setPrimaryClip(ClipData.newPlainText("real", "保留"))
+            val owner = RunId("background-run")
+            val target = DisplayTarget.Background(owner, 9, 720, 1600, 320)
+
+            val get = withContext(target) { ClipboardGetTool(context).invoke(JsonObject(emptyMap()), env.ctx()) }
+            val set =
+                withContext(target) {
+                    ClipboardSetTool(context).invoke(
+                        JsonObject(mapOf("text" to JsonPrimitive("覆盖"))),
+                        env.ctx(),
+                    )
+                }
+
+            assertThat(get.ok).isFalse()
+            assertThat(set.ok).isFalse()
+            assertThat(get.error?.code).isEqualTo(DeviceErrorCodes.BG_ACTION_UNSUPPORTED)
+            assertThat(
+                clipboard.primaryClip
+                    ?.getItemAt(0)
+                    ?.text
+                    .toString(),
+            ).isEqualTo("保留")
         }
 
     private fun note(): NotificationInfo =

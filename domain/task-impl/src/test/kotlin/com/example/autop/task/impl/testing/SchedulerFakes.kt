@@ -31,6 +31,8 @@ import com.example.autop.device.AppInfo
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceState
 import com.example.autop.device.DeviceStateProvider
+import com.example.autop.device.DisplayTarget
+import com.example.autop.device.RunDisplayController
 import com.example.autop.device.ScreenLease
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
@@ -121,6 +123,30 @@ public class FakeScreenLease(
     }
 }
 
+/** fake Run 显示会话：默认真实屏，可注入后台目标或打开错误并记录释放。 */
+public class FakeRunDisplayController(
+    private val openResult: suspend (RunId) -> Outcome<DisplayTarget> = { Outcome.Ok(DisplayTarget.Main) },
+) : RunDisplayController {
+    public val opened: MutableList<RunId> = mutableListOf()
+    public val backgroundRequests: MutableList<Boolean> = mutableListOf()
+    public val released: MutableList<RunId> = mutableListOf()
+
+    override suspend fun open(
+        owner: RunId,
+        backgroundScreen: Boolean,
+    ): Outcome<DisplayTarget> {
+        opened += owner
+        backgroundRequests += backgroundScreen
+        return openResult(owner)
+    }
+
+    override suspend fun release(owner: RunId) {
+        released += owner
+    }
+
+    override suspend fun closeAll(): Unit = Unit
+}
+
 /** fake 无障碍状态。 */
 public class FakeAccessibilityStatus(
     initial: Boolean = true,
@@ -144,9 +170,16 @@ public class FakeDeviceStateProvider(
     /** 当前状态快照（测试直接改写）。 */
     public var state: DeviceState = initial
 
+    /** [current] 调用次数（验证后台屏不读真实屏前台应用）。 */
+    public var currentCalls: Int = 0
+        private set
+
     override val changes: Flow<DeviceState> = changesFlow
 
-    override fun current(): DeviceState = state
+    override fun current(): DeviceState {
+        currentCalls += 1
+        return state
+    }
 
     /** 发出一次状态变化（触发 RunScheduler 的重试收集器）。 */
     public suspend fun emit(next: DeviceState) {
@@ -318,6 +351,7 @@ public class FakeThreadStore(
     ): Unit = Unit
 
     private val runModes = mutableMapOf<String, RunMode>()
+    private val backgroundScreens = mutableMapOf<String, Boolean>()
 
     override suspend fun runModeOf(threadId: ThreadId): RunMode = runModes[threadId.value] ?: RunMode.STANDARD
 
@@ -326,6 +360,15 @@ public class FakeThreadStore(
         mode: RunMode,
     ) {
         runModes[threadId.value] = mode
+    }
+
+    override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = backgroundScreens[threadId.value] ?: false
+
+    override suspend fun setBackgroundScreen(
+        threadId: ThreadId,
+        enabled: Boolean,
+    ) {
+        backgroundScreens[threadId.value] = enabled
     }
 
     override suspend fun modelProfileOf(threadId: ThreadId): String? = null

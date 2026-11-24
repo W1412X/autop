@@ -13,7 +13,9 @@ import com.example.autop.agent.ToolContext
 import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.core.UntrustedText
+import com.example.autop.device.currentDisplayTarget
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.serialization.json.JsonObject
 import javax.inject.Inject
@@ -36,6 +38,9 @@ public class ClipboardGetTool
             args: JsonObject,
             ctx: ToolContext,
         ): ToolOutput {
+            if (currentDisplayTarget() is DisplayTarget.Background) {
+                return toolError(DeviceErrorCodes.BG_ACTION_UNSUPPORTED, "后台虚拟屏不支持访问真实屏剪贴板")
+            }
             // 空剪贴板与“被系统拒绝”要分开：混报会让模型盲目重试（N172）。
             val clip =
                 try {
@@ -73,6 +78,9 @@ public class ClipboardSetTool
             args: JsonObject,
             ctx: ToolContext,
         ): ToolOutput {
+            if (currentDisplayTarget() is DisplayTarget.Background) {
+                return toolError(DeviceErrorCodes.BG_ACTION_UNSUPPORTED, "后台虚拟屏不支持访问真实屏剪贴板")
+            }
             // 与 input_text 同口径：空串视为未提供，不写空剪贴板。
             val text = args.str("text") ?: return toolError(CommonErrorCodes.INVALID_ARGUMENT, "必须提供 text")
             clipboardManager(context).setPrimaryClip(ClipData.newPlainText("autop", text))

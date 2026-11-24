@@ -11,6 +11,8 @@ import com.example.autop.agent.RunHandle
 import com.example.autop.agent.RunOutcome
 import com.example.autop.agent.RunState
 import com.example.autop.core.common.RunId
+import com.example.autop.device.DisplayTarget
+import com.example.autop.task.impl.testing.FakeRunDisplayController
 import com.example.autop.task.impl.testing.FakeTouchShield
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
@@ -45,7 +47,8 @@ public class TouchShieldWatcherTest {
             val shield = FakeTouchShield()
             val handle = MutableStateHandle(RunState.STARTING)
             val holder = MutableStateFlow<String?>("test-run")
-            val job = launch { TouchShieldWatcher(shield).watch(handle, "test-run", holder) }
+            val job =
+                launch { TouchShieldWatcher(shield, FakeRunDisplayController()).watch(handle, "test-run", holder) }
             runCurrent()
             assertTrue(shield.lastActive)
 
@@ -69,7 +72,8 @@ public class TouchShieldWatcherTest {
             val shield = FakeTouchShield()
             val handle = MutableStateHandle(RunState.EXECUTING_TOOLS)
             val holder = MutableStateFlow<String?>("other-run")
-            val job = launch { TouchShieldWatcher(shield).watch(handle, "test-run", holder) }
+            val job =
+                launch { TouchShieldWatcher(shield, FakeRunDisplayController()).watch(handle, "test-run", holder) }
             runCurrent()
             assertFalse(shield.lastActive)
 
@@ -86,8 +90,8 @@ public class TouchShieldWatcherTest {
             // reset 在 agent 启动前同步落地，不会晚于用户「停止」的 forceRelease 把盾拉起。
             val shield = FakeTouchShield()
             shield.forceRelease()
-            val watcher = TouchShieldWatcher(shield)
-            watcher.beginRun()
+            val watcher = TouchShieldWatcher(shield, FakeRunDisplayController())
+            watcher.beginRun(RunId("test-run"), DisplayTarget.Main)
             assertFalse(shield.forceReleased)
             val handle = MutableStateHandle(RunState.EXECUTING_TOOLS)
             val holder = MutableStateFlow<String?>("test-run")
@@ -95,7 +99,61 @@ public class TouchShieldWatcherTest {
             runCurrent()
             assertTrue(shield.lastActive)
             job.cancelAndJoin()
+            RunDisplayTargetRegistry.clear(RunId("test-run"))
         }
+
+    @Test
+    public fun `background cancel does not force release real shield`() {
+        val shield = FakeTouchShield()
+        val owner = RunId("background-run")
+        RunDisplayTargetRegistry.bind(
+            owner,
+            DisplayTarget.Background(owner = owner, displayId = 9, width = 1080, height = 1920, dpi = 320),
+        )
+        try {
+            RunDisplayTargetRegistry.forceRelease(owner, shield)
+            assertFalse(shield.forceReleased)
+        } finally {
+            RunDisplayTargetRegistry.clear(owner)
+        }
+    }
+
+    @Test
+    public fun `opening run does not release shared shield before target is confirmed`() {
+        val shield = FakeTouchShield()
+        val owner = RunId("opening-run")
+        RunDisplayTargetRegistry.bindOpening(owner)
+        try {
+            RunDisplayTargetRegistry.forceRelease(owner, shield)
+            assertFalse(shield.forceReleased)
+
+            RunDisplayTargetRegistry.bind(
+                owner,
+                DisplayTarget.Background(owner = owner, displayId = 9, width = 1080, height = 1920, dpi = 320),
+            )
+            RunDisplayTargetRegistry.forceRelease(owner, shield)
+            assertFalse(shield.forceReleased)
+        } finally {
+            RunDisplayTargetRegistry.clear(owner)
+        }
+    }
+
+    @Test
+    public fun `real cancel releases shield but unknown target leaves shared shield intact`() {
+        val shield = FakeTouchShield()
+        val owner = RunId("real-run")
+        RunDisplayTargetRegistry.bind(owner, DisplayTarget.Main)
+        try {
+            RunDisplayTargetRegistry.forceRelease(owner, shield)
+            assertTrue(shield.forceReleased)
+        } finally {
+            RunDisplayTargetRegistry.clear(owner)
+        }
+
+        val unknownShield = FakeTouchShield()
+        RunDisplayTargetRegistry.forceRelease(RunId("not-started"), unknownShield)
+        assertFalse(unknownShield.forceReleased)
+    }
 }
 
 /** fake 运行句柄：state 可变（驱动测试用），await 不返回。 */

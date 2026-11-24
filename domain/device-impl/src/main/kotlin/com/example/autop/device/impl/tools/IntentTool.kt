@@ -21,6 +21,7 @@ import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppInfo
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.NavigationApp
 import com.example.autop.device.NavigationApps
 import com.example.autop.device.ScreenReader
@@ -38,6 +39,7 @@ import com.example.autop.device.core.SettingsPage
 import com.example.autop.device.core.kind
 import com.example.autop.device.core.navigation.NavigationRules
 import com.example.autop.device.core.navigation.NavigationUriBuilder
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.device.impl.AppIdentity
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.intent.ActivityStarter
@@ -93,6 +95,7 @@ public class IntentTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> {
+            if (currentDisplayTarget() is DisplayTarget.Background) return backgroundUnsupported()
             val rules = rulesLoader.get()
             val parsed =
                 IntentSpecParser.parse(
@@ -129,6 +132,7 @@ public class IntentTool
             action: PreparedAction,
             ctx: ToolContext,
         ): ToolOutput {
+            if (currentDisplayTarget() is DisplayTarget.Background) return errorOutput(backgroundUnsupported().error)
             val payload = action.payload as IntentAction
             val pre = epilogue.preSample(ctx)
             return when (val intent = payload.spec) {
@@ -431,6 +435,9 @@ public class IntentTool
                 NavReason.AUTO -> "auto"
                 NavReason.ONLY_ONE -> "onlyOne"
             }
+
+        private fun backgroundUnsupported(): Outcome.Err =
+            Outcome.Err(AppError(DeviceErrorCodes.BG_ACTION_UNSUPPORTED, "后台屏不支持系统 intent"))
 
         private fun invalid(error: IntentInvalid): Outcome.Err {
             val vars =

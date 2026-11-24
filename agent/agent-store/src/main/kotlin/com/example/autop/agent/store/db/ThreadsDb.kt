@@ -1,6 +1,6 @@
 /**
  * `threads.db` 数据库（docs/tech/04 §4）：`exportSchema = true`，schema 导出到 `schemas/` 并入库。
- * 当前为全新安装的单一 schema（ADR-0021），不保留旧版本的迁移。
+ * schema 导出到 `schemas/` 并入库；结构升级使用显式迁移，不清空用户会话。
  */
 package com.example.autop.agent.store.db
 
@@ -29,4 +29,4 @@ public abstract class ThreadsDb : RoomDatabase() {
 }
 
 /** threads.db（线程） 结构版本（ADR-0032）：结构变化时升高，启动检查据此提示备份或清除。 */
-public const val THREADS_DB_VERSION: Int = 3
+public const val THREADS_DB_VERSION: Int = 4

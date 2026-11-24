@@ -28,6 +28,18 @@ public sealed interface ShellChannelAction {
     /** 知情同意：确认开启 Shell 执行。 */
     public data object ConfirmShellExecConsent : ShellChannelAction
 
+    /** 编辑后台虚拟屏参数；null 表示沿用已保存值。 */
+    public data class UpdateBackgroundConfig(
+        val width: String? = null,
+        val height: String? = null,
+        val dpi: String? = null,
+        val launchTimeoutMs: String? = null,
+        val requestTimeoutMs: String? = null,
+    ) : ShellChannelAction
+
+    /** 保存后台虚拟屏高级参数；下次创建显示会话时生效。 */
+    public data object SaveBackgroundConfig : ShellChannelAction
+
     /** 知情同意：取消，保持关闭。 */
     public data object DismissShellExecConsent : ShellChannelAction
 }

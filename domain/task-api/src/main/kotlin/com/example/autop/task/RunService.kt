@@ -32,6 +32,8 @@ public interface RunService {
         modelProfileId: String? = null,
         /** 运行模式（ADR-0040）：决定本轮可见的工具，仅影响这一次发送。 */
         runMode: RunMode = RunMode.STANDARD,
+        /** 本次发送是否在独立后台虚拟屏运行；发送即持久化到该会话。 */
+        backgroundScreen: Boolean = false,
     ): Outcome<RunRecord>
 
     /** 从 [atSeq] 处分叉源线程并发起对话（[text] 为 null 时沿用源消息继续）。 */

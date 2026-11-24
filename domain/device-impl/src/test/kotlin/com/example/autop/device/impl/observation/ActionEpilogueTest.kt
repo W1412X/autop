@@ -230,7 +230,7 @@ class ActionEpilogueTest {
                 context = context,
             )
         val modes = ObserveModeResolver(holder, visual, prompts)
-        val preparer = ScreenPreparer(reader, capturer, contentAreas, visual, serializer)
+        val preparer = ScreenPreparer(reader, capturer, visual, serializer)
         val observer = ScreenObserver(preparer, serializer, modes)
         val epilogue = ActionEpilogue(FakeStabilizer, probe, frameMotion(), prompts, FakeClock(0L), RecordingMonitor())
         return Pair(observer, epilogue)
@@ -454,6 +454,13 @@ class ActionEpilogueTest {
         override suspend fun setRunMode(
             threadId: ThreadId,
             mode: RunMode,
+        ): Unit = Unit
+
+        override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = false
+
+        override suspend fun setBackgroundScreen(
+            threadId: ThreadId,
+            enabled: Boolean,
         ): Unit = Unit
 
         override suspend fun modelProfileOf(threadId: ThreadId): String? = null

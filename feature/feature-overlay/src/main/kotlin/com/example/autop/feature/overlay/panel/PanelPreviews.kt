@@ -29,6 +29,6 @@ internal fun InputPanelDarkPreview() =
 
 private val PreviewCallbacks =
     PanelCallbacks(
-        onSend = { _, _ -> },
+        onSend = { _, _, _ -> },
         onDismiss = {},
     )

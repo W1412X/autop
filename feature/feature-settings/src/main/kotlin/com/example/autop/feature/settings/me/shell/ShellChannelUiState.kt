@@ -4,6 +4,7 @@
  */
 package com.example.autop.feature.settings.me.shell
 
+import com.example.autop.core.config.DeviceBackgroundSection
 import com.example.autop.device.ShellState
 
 /** 配对提示（文案在 feature-settings 的 strings，ViewModel 不接触资源）。 */
@@ -15,6 +16,12 @@ public sealed interface ShellNotice {
     public data class PairFailed(
         val message: String,
     ) : ShellNotice
+
+    /** 后台参数格式或范围不合法。 */
+    public data object BackgroundInvalid : ShellNotice
+
+    /** 后台参数已保存。 */
+    public data object BackgroundSaved : ShellNotice
 }
 
 /** 注入通道子页状态。 */
@@ -33,6 +40,13 @@ public data class ShellChannelUiState(
     val notice: ShellNotice? = null,
     /** Shell 执行总闸是否开启（features.shellExec）。 */
     val shellExecEnabled: Boolean = false,
+    /** 后台虚拟屏高级参数（随保存生效，不改变会话后台模式）。 */
+    val backgroundConfig: DeviceBackgroundSection = DeviceBackgroundSection(),
+    val backgroundWidthText: String = "720",
+    val backgroundHeightText: String = "1600",
+    val backgroundDpiText: String = "320",
+    val backgroundLaunchTimeoutText: String = "4000",
+    val backgroundRequestTimeoutText: String = "30000",
     /** 首次开启需要知情同意：弹窗显示中。 */
     val shellExecConsentPending: Boolean = false,
 )

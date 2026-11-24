@@ -15,6 +15,7 @@ import com.example.autop.device.GestureController
 import com.example.autop.device.NavigationApps
 import com.example.autop.device.ObserveModeAvailability
 import com.example.autop.device.PairingDiscovery
+import com.example.autop.device.RunDisplayController
 import com.example.autop.device.ScreenLease
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ShellInput
@@ -24,13 +25,14 @@ import com.example.autop.device.TouchShield
 import com.example.autop.device.UiStabilizer
 import com.example.autop.device.UpdateChecker
 import com.example.autop.device.VisualScreenParser
-import com.example.autop.device.impl.AppLauncherImpl
 import com.example.autop.device.impl.DeviceStateProviderImpl
-import com.example.autop.device.impl.GestureControllerImpl
 import com.example.autop.device.impl.ObserveModeResolver
 import com.example.autop.device.impl.ScreenLeaseImpl
-import com.example.autop.device.impl.ScreenReaderImpl
-import com.example.autop.device.impl.UiStabilizerImpl
+import com.example.autop.device.impl.bgdisplay.BackgroundDisplayManagerImpl
+import com.example.autop.device.impl.bgdisplay.route.RoutedAppLauncher
+import com.example.autop.device.impl.bgdisplay.route.RoutedGestureController
+import com.example.autop.device.impl.bgdisplay.route.RoutedScreenReader
+import com.example.autop.device.impl.bgdisplay.route.RoutedUiStabilizer
 import com.example.autop.device.impl.intent.NavigationAppsImpl
 import com.example.autop.device.impl.observation.ReplayStateProbeImpl
 import com.example.autop.device.impl.observation.ReplayTargetResolverImpl
@@ -57,7 +59,7 @@ import javax.inject.Singleton
 public object DevicePortsModule {
     @Provides
     @Singleton
-    public fun provideScreenReader(impl: ScreenReaderImpl): ScreenReader = impl
+    public fun provideScreenReader(impl: RoutedScreenReader): ScreenReader = impl
 
     @Provides
     @Singleton
@@ -65,15 +67,19 @@ public object DevicePortsModule {
 
     @Provides
     @Singleton
-    public fun provideGestureController(impl: GestureControllerImpl): GestureController = impl
+    public fun provideGestureController(impl: RoutedGestureController): GestureController = impl
 
     @Provides
     @Singleton
-    public fun provideUiStabilizer(impl: UiStabilizerImpl): UiStabilizer = impl
+    public fun provideUiStabilizer(impl: RoutedUiStabilizer): UiStabilizer = impl
 
     @Provides
     @Singleton
-    public fun provideAppLauncher(impl: AppLauncherImpl): AppLauncher = impl
+    public fun provideAppLauncher(impl: RoutedAppLauncher): AppLauncher = impl
+
+    @Provides
+    @Singleton
+    public fun provideRunDisplayController(impl: BackgroundDisplayManagerImpl): RunDisplayController = impl
 
     @Provides
     @Singleton

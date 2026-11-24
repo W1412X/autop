@@ -38,6 +38,8 @@ public data class ThreadEntity(
     val origin: String = "CHAT",
     /** 会话运行模式（RunMode 的持久化 id）；默认标准（ADR-0040、ADR-0043）。 */
     val runMode: String = "standard",
+    /** 会话后台虚拟屏模式；默认使用真实屏。 */
+    val backgroundScreen: Boolean = false,
 )
 
 /**

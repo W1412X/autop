@@ -65,6 +65,7 @@ public fun ShellChannelScreen(
             ShellStatusCard(state = state, onAction = onAction)
             SectionTitle(text = stringResource(R.string.me_shell_exec_section))
             ShellExecCard(state = state, onAction = onAction)
+            BackgroundScreenCard(state = state, onAction = onAction)
             PairingGuideSection()
             SectionTitle(text = stringResource(R.string.me_shell_section_pair))
             PairingCard(state = state, onAction = onAction)
@@ -195,6 +196,8 @@ private fun noticeTextOf(notice: ShellNotice): String =
     when (notice) {
         ShellNotice.InputMissing -> stringResource(R.string.me_shell_input_missing)
         is ShellNotice.PairFailed -> stringResource(R.string.me_shell_pair_failed, notice.message)
+        ShellNotice.BackgroundInvalid -> stringResource(R.string.me_shell_background_invalid)
+        ShellNotice.BackgroundSaved -> stringResource(R.string.me_shell_background_saved)
     }
 
 /** Shell 执行总闸（shell-exec 设计 §2.5）：开关 + 说明；通道未连接时仍可开启，提示连接后可用。 */
@@ -219,6 +222,81 @@ private fun ShellExecCard(
         StepText(textRes = R.string.me_shell_exec_desc)
         if (!connected) StepText(textRes = R.string.me_shell_exec_offline)
     }
+}
+
+/** 后台虚拟屏高级参数：仅影响下次创建的显示会话，不切换会话模式。 */
+@Composable
+private fun BackgroundScreenCard(
+    state: ShellChannelUiState,
+    onAction: (ShellChannelAction) -> Unit,
+) {
+    StatusCard(
+        icon = AutopIcons.Screenshot,
+        tint = MaterialTheme.colorScheme.primary,
+        title = stringResource(R.string.me_shell_background_title),
+        subtitle = stringResource(R.string.me_shell_background_desc),
+    ) {
+        BackgroundConfigField(
+            value = state.backgroundWidthText,
+            label = stringResource(R.string.me_shell_background_width),
+            onValueChange = { onAction(ShellChannelAction.UpdateBackgroundConfig(width = it)) },
+        )
+        BackgroundConfigField(
+            value = state.backgroundHeightText,
+            label = stringResource(R.string.me_shell_background_height),
+            onValueChange = { onAction(ShellChannelAction.UpdateBackgroundConfig(height = it)) },
+        )
+        BackgroundConfigField(
+            value = state.backgroundDpiText,
+            label = stringResource(R.string.me_shell_background_dpi),
+            onValueChange = { onAction(ShellChannelAction.UpdateBackgroundConfig(dpi = it)) },
+        )
+        BackgroundConfigField(
+            value = state.backgroundLaunchTimeoutText,
+            label = stringResource(R.string.me_shell_background_launch_timeout),
+            onValueChange = { onAction(ShellChannelAction.UpdateBackgroundConfig(launchTimeoutMs = it)) },
+        )
+        BackgroundConfigField(
+            value = state.backgroundRequestTimeoutText,
+            label = stringResource(R.string.me_shell_background_request_timeout),
+            onValueChange = { onAction(ShellChannelAction.UpdateBackgroundConfig(requestTimeoutMs = it)) },
+        )
+        val notice = state.notice
+        if (notice == ShellNotice.BackgroundInvalid || notice == ShellNotice.BackgroundSaved) {
+            Text(
+                text = noticeTextOf(notice),
+                style = MaterialTheme.typography.bodySmall,
+                color =
+                    if (notice == ShellNotice.BackgroundInvalid) {
+                        MaterialTheme.colorScheme.error
+                    } else {
+                        MaterialTheme.colorScheme.primary
+                    },
+                modifier = Modifier.padding(top = LocalSpacing.current.sm),
+            )
+        }
+        AutopButton(
+            text = stringResource(R.string.me_shell_background_save),
+            onClick = { onAction(ShellChannelAction.SaveBackgroundConfig) },
+            modifier = Modifier.fillMaxWidth().padding(top = LocalSpacing.current.md),
+        )
+    }
+}
+
+@Composable
+private fun BackgroundConfigField(
+    value: String,
+    label: String,
+    onValueChange: (String) -> Unit,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onValueChange,
+        label = { Text(label) },
+        singleLine = true,
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        modifier = Modifier.fillMaxWidth().padding(top = LocalSpacing.current.xs),
+    )
 }
 
 /** 首次开启的知情同意弹窗（shell-exec 设计 §8）。 */

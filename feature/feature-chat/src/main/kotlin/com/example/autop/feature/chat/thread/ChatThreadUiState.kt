@@ -4,6 +4,7 @@
  */
 package com.example.autop.feature.chat.thread
 
+import com.example.autop.core.common.BackgroundRunBlock
 import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.RunMode
 import com.example.autop.core.config.UiChatSection
@@ -71,6 +72,10 @@ public data class ChatThreadUiState(
     val defaultModelId: String? = null,
     /** 运行模式三档（ADR-0040）：本页发送时使用的档位。 */
     val runMode: RunMode = RunMode.STANDARD,
+    /** 会话级后台虚拟屏模式；默认使用真实屏。 */
+    val backgroundScreen: Boolean = false,
+    /** 后台运行开关不可用的原因。 */
+    val backgroundRunBlock: BackgroundRunBlock? = null,
     /** 完全模式前置条件不满足时的阻断提示（非 null 时显示弹窗）。 */
     val shellBlock: ShellBlock? = null,
     /** 系统语音识别是否可用（不可用时不显示麦克风）。 */

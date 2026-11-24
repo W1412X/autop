@@ -38,15 +38,17 @@ import com.example.autop.task.impl.testing.FakeAgentSession
 import com.example.autop.task.impl.testing.FakeAppLauncher
 import com.example.autop.task.impl.testing.FakeDeviceStateProvider
 import com.example.autop.task.impl.testing.FakeLogger
+import com.example.autop.task.impl.testing.FakeRunDisplayController
 import com.example.autop.task.impl.testing.FakeScreenLease
 import com.example.autop.task.impl.testing.FakeTaskRepository
 import com.example.autop.task.impl.testing.FakeThreadStore
 import com.example.autop.task.impl.testing.FakeTouchShield
 import com.example.autop.task.impl.testing.FakeUserActivity
 import com.example.autop.task.impl.testing.fakeRunEnvironment
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.runTest
+import kotlinx.serialization.json.JsonObject
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -94,6 +96,31 @@ public class RunExecutorTest {
         }
 
     @Test
+    public fun `queued background run registers intent before execution`() =
+        runTest {
+            val fixture = ExecutorFixture(backgroundScope)
+
+            val result =
+                fixture.executor.launchChat(
+                    null,
+                    "后台任务",
+                    images = emptyList(),
+                    backgroundScreen = true,
+                )
+
+            val record = (result as Outcome.Ok).value
+            assertTrue(fixture.threads.backgroundScreenOf(record.threadId))
+            assertTrue(fixture.pending.backgroundScreenOf(record.id))
+            val shield = FakeTouchShield()
+            try {
+                RunDisplayTargetRegistry.forceRelease(record.id, shield)
+                assertFalse(shield.forceReleased)
+            } finally {
+                RunDisplayTargetRegistry.clear(record.id)
+            }
+        }
+
+    @Test
     public fun `task run writes no input message`() =
         runTest {
             val fixture = ExecutorFixture(backgroundScope)
@@ -104,7 +131,7 @@ public class RunExecutorTest {
         }
 
     @Test
-    public fun `resume input is injected kind`() =
+    public fun `resume preserves background mode and injects input`() =
         runTest {
             val fixture = ExecutorFixture(backgroundScope)
             val source =
@@ -124,7 +151,12 @@ public class RunExecutorTest {
                     waitingQuestion = null,
                 )
 
-            fixture.executor.launchResume(source, "继续做完")
+            fixture.threads.setBackgroundScreen(ThreadId("thread-src"), true)
+            val result = fixture.executor.launchResume(source, "继续做完")
+
+            val resumed = (result as Outcome.Ok).value
+            assertTrue(fixture.pending.backgroundScreenOf(resumed.id))
+            assertTrue(fixture.threads.backgroundScreenOf(resumed.threadId))
 
             val message =
                 fixture.threads
@@ -140,16 +172,17 @@ private fun FakeThreadStore.payloads(): List<EventPayload> = appended.map { it.p
 
 /** 测试装配：真实 RunStore/RunScheduler + fake 端口；无障碍未连接挡住执行，专注入队行为。 */
 private class ExecutorFixture(
-    scope: CoroutineScope,
+    scope: kotlinx.coroutines.CoroutineScope,
+    overrides: JsonObject = JsonObject(emptyMap()),
 ) {
     private val context: Context = ApplicationProvider.getApplicationContext()
     private val clock = FakeClock(start = EXEC_START_MS)
-    private val config = FakeConfigProvider()
+    private val config = FakeConfigProvider(overrides)
     private val db: TasksDb =
         Room.inMemoryDatabaseBuilder(context, TasksDb::class.java).allowMainThreadQueries().build()
     private val runStore = RunStore(db)
     val threads = FakeThreadStore()
-    private val pending = PendingRuns()
+    val pending = PendingRuns()
     val session = FakeAgentSession()
     private val scheduler =
         RunScheduler(
@@ -166,7 +199,7 @@ private class ExecutorFixture(
                     runStore = runStore,
                     pending = pending,
                     observer = RunObserver(runStore, config, clock, FakeFlowProgressFeed),
-                    touchShieldWatcher = TouchShieldWatcher(FakeTouchShield()),
+                    touchShieldWatcher = TouchShieldWatcher(FakeTouchShield(), FakeRunDisplayController()),
                     screenLease = FakeScreenLease(),
                     deviceState = FakeDeviceStateProvider(execUnlockedState()),
                     appLauncher = FakeAppLauncher(),

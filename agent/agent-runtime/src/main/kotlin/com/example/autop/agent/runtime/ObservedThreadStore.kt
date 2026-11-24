@@ -95,6 +95,13 @@ internal class ObservedThreadStore(
         mode: RunMode,
     ) = delegate.setRunMode(threadId, mode)
 
+    override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = delegate.backgroundScreenOf(threadId)
+
+    override suspend fun setBackgroundScreen(
+        threadId: ThreadId,
+        enabled: Boolean,
+    ) = delegate.setBackgroundScreen(threadId, enabled)
+
     override suspend fun titleOf(threadId: ThreadId): String? = delegate.titleOf(threadId)
 
     override suspend fun delete(threadId: ThreadId) = delegate.delete(threadId)

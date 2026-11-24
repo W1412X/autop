@@ -78,6 +78,7 @@ public class ExecutionTraceRenderer
             when (channel) {
                 InjectionChannel.SHELL -> prompts.text(PROMPT_CHANNEL_SHELL)
                 InjectionChannel.ACCESSIBILITY -> prompts.text(PROMPT_CHANNEL_ACCESSIBILITY)
+                InjectionChannel.BACKGROUND -> prompts.text(PROMPT_CHANNEL_BACKGROUND)
                 InjectionChannel.NONE -> prompts.text(PROMPT_CHANNEL_NONE)
             }
 
@@ -88,6 +89,7 @@ public class ExecutionTraceRenderer
             const val PROMPT_SHELL_KEY = "device.trace.shell_key"
             const val PROMPT_CHANNEL_SHELL = "device.trace.channel.shell"
             const val PROMPT_CHANNEL_ACCESSIBILITY = "device.trace.channel.accessibility"
+            const val PROMPT_CHANNEL_BACKGROUND = "device.trace.channel.background"
             const val PROMPT_CHANNEL_NONE = "device.trace.channel.none"
             const val PROMPT_SHELL_SKIP_PREFIX = "device.trace.shell_skip."
 

@@ -12,6 +12,8 @@ dependencies {
     implementation(project(":core:core-config"))
     implementation(project(":llm:llm-api"))
     testImplementation(project(":core:core-testing"))
+    testImplementation(libs.androidx.room.testing)
+    testImplementation(libs.androidx.sqlite.framework)
 }
 // 单测用 FakeConfigProvider 读取真实配置默认值（docs/tech/02 §5 的 autop.configDir 机制）。
 tasks.withType<Test>().configureEach {

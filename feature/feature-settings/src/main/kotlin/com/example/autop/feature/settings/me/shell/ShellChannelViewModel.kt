@@ -12,6 +12,8 @@ import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.ConfigEditor
 import com.example.autop.core.config.ConfigProvider
+import com.example.autop.core.config.DeviceBackgroundSection
+import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.device.PairingDiscovery
 import com.example.autop.device.ShellExec
@@ -27,7 +29,9 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.encodeToJsonElement
 import javax.inject.Inject
 
 /** 注入通道子页 ViewModel。 */
@@ -47,6 +51,11 @@ public class ShellChannelViewModel
         private val busy = MutableStateFlow(false)
         private val notice = MutableStateFlow<ShellNotice?>(null)
         private val consentPending = MutableStateFlow(false)
+        private val backgroundWidth = MutableStateFlow<String?>(null)
+        private val backgroundHeight = MutableStateFlow<String?>(null)
+        private val backgroundDpi = MutableStateFlow<String?>(null)
+        private val backgroundLaunchTimeout = MutableStateFlow<String?>(null)
+        private val backgroundRequestTimeout = MutableStateFlow<String?>(null)
 
         init {
             // 自动发现端口回填：端口为空且非忙碌时填入（用户手输优先，不覆盖）。
@@ -65,6 +74,13 @@ public class ShellChannelViewModel
                 .map { it[FeaturesConfig.FEATURES].shellExec }
                 .distinctUntilChanged()
                 .stateIn(viewModelScope, SharingStarted.Eagerly, false)
+
+        private val backgroundConfig: StateFlow<DeviceBackgroundSection> =
+            configProvider
+                .observe()
+                .map { it[DeviceConfig.BACKGROUND] }
+                .distinctUntilChanged()
+                .stateIn(viewModelScope, SharingStarted.Eagerly, DeviceBackgroundSection())
 
         private val channelFlow: StateFlow<ChannelSnapshot> =
             combine(
@@ -85,8 +101,35 @@ public class ShellChannelViewModel
                 FormSnapshot(port, code, running, hint, consent)
             }.stateIn(viewModelScope, SharingStarted.Eagerly, FormSnapshot("", "", false, null, false))
 
+        private val backgroundDrafts: StateFlow<BackgroundDrafts> =
+            combine(
+                backgroundWidth,
+                backgroundHeight,
+                backgroundDpi,
+                backgroundLaunchTimeout,
+                backgroundRequestTimeout,
+            ) { width, height, dpi, launch, request ->
+                BackgroundDrafts(width, height, dpi, launch, request)
+            }.stateIn(viewModelScope, SharingStarted.Eagerly, BackgroundDrafts(null, null, null, null, null))
+
+        private val backgroundFormFlow: StateFlow<BackgroundFormSnapshot> =
+            combine(backgroundConfig, backgroundDrafts) { config, drafts ->
+                BackgroundFormSnapshot(
+                    config = config,
+                    width = drafts.width ?: config.width.toString(),
+                    height = drafts.height ?: config.height.toString(),
+                    dpi = drafts.dpi ?: config.dpi.toString(),
+                    launchTimeout = drafts.launchTimeout ?: config.launchTimeoutMs.toString(),
+                    requestTimeout = drafts.requestTimeout ?: config.requestTimeoutMs.toString(),
+                )
+            }.stateIn(
+                viewModelScope,
+                SharingStarted.Eagerly,
+                BackgroundFormSnapshot(DeviceBackgroundSection(), "720", "1600", "320", "4000", "30000"),
+            )
+
         public val uiState: StateFlow<ShellChannelUiState> =
-            combine(channelFlow, formFlow) { channel, form ->
+            combine(channelFlow, formFlow, backgroundFormFlow) { channel, form, background ->
                 ShellChannelUiState(
                     shellState = channel.state,
                     portText = form.port,
@@ -95,6 +138,12 @@ public class ShellChannelViewModel
                     discovering = !channel.paired && channel.port == null,
                     notice = form.notice,
                     shellExecEnabled = channel.shellExecEnabled,
+                    backgroundConfig = background.config,
+                    backgroundWidthText = background.width,
+                    backgroundHeightText = background.height,
+                    backgroundDpiText = background.dpi,
+                    backgroundLaunchTimeoutText = background.launchTimeout,
+                    backgroundRequestTimeoutText = background.requestTimeout,
                     shellExecConsentPending = form.consent,
                 )
             }.stateIn(
@@ -110,6 +159,8 @@ public class ShellChannelViewModel
                 ShellChannelAction.Pair -> pair()
                 ShellChannelAction.Connect -> connect()
                 is ShellChannelAction.SetShellExec -> setShellExec(action.enabled)
+                is ShellChannelAction.UpdateBackgroundConfig -> updateBackgroundConfig(action)
+                ShellChannelAction.SaveBackgroundConfig -> saveBackgroundConfig()
                 ShellChannelAction.ConfirmShellExecConsent -> confirmConsent()
                 ShellChannelAction.DismissShellExecConsent -> consentPending.value = false
             }
@@ -123,6 +174,50 @@ public class ShellChannelViewModel
                 writeShellExec(false)
                 viewModelScope.launch(dispatchers.io) { shellExec.closeAll() }
             }
+        }
+
+        private fun updateBackgroundConfig(action: ShellChannelAction.UpdateBackgroundConfig) {
+            action.width?.let { backgroundWidth.value = it }
+            action.height?.let { backgroundHeight.value = it }
+            action.dpi?.let { backgroundDpi.value = it }
+            action.launchTimeoutMs?.let { backgroundLaunchTimeout.value = it }
+            action.requestTimeoutMs?.let { backgroundRequestTimeout.value = it }
+        }
+
+        private fun saveBackgroundConfig() {
+            val current = backgroundConfig.value
+            val form = backgroundFormFlow.value
+            val width = form.width.trim().toIntOrNull()
+            val height = form.height.trim().toIntOrNull()
+            val dpi = form.dpi.trim().toIntOrNull()
+            val launchTimeoutMs = form.launchTimeout.trim().toLongOrNull()
+            val requestTimeoutMs = form.requestTimeout.trim().toLongOrNull()
+            if (width == null || height == null || dpi == null) return invalidBackground()
+            if (launchTimeoutMs == null || requestTimeoutMs == null) return invalidBackground()
+            val updated =
+                current.copy(
+                    width = width,
+                    height = height,
+                    dpi = dpi,
+                    launchTimeoutMs = launchTimeoutMs,
+                    requestTimeoutMs = requestTimeoutMs,
+                )
+            if (updated.validate().isNotEmpty()) return invalidBackground()
+            viewModelScope.launch(dispatchers.io) {
+                val result = configEditor.setOverride(DeviceConfig.BACKGROUND.path, Json.encodeToJsonElement(updated))
+                notice.value = if (result is Outcome.Ok) ShellNotice.BackgroundSaved else ShellNotice.BackgroundInvalid
+                if (result is Outcome.Ok) {
+                    backgroundWidth.value = null
+                    backgroundHeight.value = null
+                    backgroundDpi.value = null
+                    backgroundLaunchTimeout.value = null
+                    backgroundRequestTimeout.value = null
+                }
+            }
+        }
+
+        private fun invalidBackground() {
+            notice.value = ShellNotice.BackgroundInvalid
         }
 
         private fun confirmConsent() {
@@ -173,6 +268,23 @@ public class ShellChannelViewModel
             val busy: Boolean,
             val notice: ShellNotice?,
             val consent: Boolean,
+        )
+
+        private data class BackgroundDrafts(
+            val width: String?,
+            val height: String?,
+            val dpi: String?,
+            val launchTimeout: String?,
+            val requestTimeout: String?,
+        )
+
+        private data class BackgroundFormSnapshot(
+            val config: DeviceBackgroundSection,
+            val width: String,
+            val height: String,
+            val dpi: String,
+            val launchTimeout: String,
+            val requestTimeout: String,
         )
 
         private data class ChannelSnapshot(

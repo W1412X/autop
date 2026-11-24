@@ -555,6 +555,50 @@ public data class DeviceShellExecSection(
     }
 }
 
+/** `device.background`：Run 级后台虚拟屏。 */
+@Serializable
+public data class DeviceBackgroundSection(
+    @SerialName("width") val width: Int = 720,
+    @SerialName("height") val height: Int = 1600,
+    @SerialName("dpi") val dpi: Int = 320,
+    @SerialName("launchTimeoutMs") val launchTimeoutMs: Long = 4000,
+    @SerialName("requestTimeoutMs") val requestTimeoutMs: Long = 30_000,
+    @SerialName("jpegQuality") val jpegQuality: Int = 85,
+    @SerialName("maxPayloadBytes") val maxPayloadBytes: Int = 12_582_912,
+) : ConfigSection {
+    override fun validate(): List<String> =
+        buildList {
+            if (width !in 1..MAX_DISPLAY_DIMENSION ||
+                height !in 1..MAX_DISPLAY_DIMENSION ||
+                width.toLong() * height > MAX_DISPLAY_PIXELS
+            ) {
+                add("background viewport must be positive and within 8MP")
+            }
+            if (dpi !in 1..MAX_DPI) add("background dpi must be within 1..640")
+            if (launchTimeoutMs !in 1..MAX_LAUNCH_TIMEOUT_MS) add("background launchTimeoutMs must be within 1..30000")
+            if (requestTimeoutMs !in
+                1..MAX_REQUEST_TIMEOUT_MS
+            ) {
+                add("background requestTimeoutMs must be within 1..120000")
+            }
+            if (jpegQuality !in 1..MAX_JPEG_QUALITY) add("background jpegQuality must be within 1..100")
+            if (maxPayloadBytes !in MIN_PAYLOAD_BYTES..MAX_PAYLOAD_BYTES) {
+                add("background maxPayloadBytes must be within 256KB..32MB")
+            }
+        }
+
+    public companion object {
+        public const val MAX_DISPLAY_DIMENSION: Int = 4096
+        public const val MAX_DISPLAY_PIXELS: Long = 8_388_608L
+        public const val MAX_DPI: Int = 640
+        public const val MAX_LAUNCH_TIMEOUT_MS: Long = 30_000L
+        public const val MAX_REQUEST_TIMEOUT_MS: Long = 120_000L
+        public const val MAX_JPEG_QUALITY: Int = 100
+        public const val MIN_PAYLOAD_BYTES: Int = 262_144
+        public const val MAX_PAYLOAD_BYTES: Int = 33_554_432
+    }
+}
+
 /** `device.apps`：应用列表（tool_optimize 02 §12）。 */
 @Serializable
 public data class DeviceAppsSection(
@@ -621,6 +665,8 @@ public object DeviceConfig {
         ConfigKey("device.shell", DeviceShellSection.serializer()) { DeviceShellSection() }
     public val APPS: ConfigKey<DeviceAppsSection> =
         ConfigKey("device.apps", DeviceAppsSection.serializer()) { DeviceAppsSection() }
+    public val BACKGROUND: ConfigKey<DeviceBackgroundSection> =
+        ConfigKey("device.background", DeviceBackgroundSection.serializer()) { DeviceBackgroundSection() }
 
     public val ALL: List<ConfigKey<*>> =
         listOf(
@@ -647,5 +693,6 @@ public object DeviceConfig {
             INPUT,
             SHELL,
             APPS,
+            BACKGROUND,
         )
 }

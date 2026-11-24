@@ -11,6 +11,7 @@ import com.example.autop.core.common.Outcome
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.Rect
 import com.example.autop.device.ScreenReader
@@ -24,7 +25,7 @@ import com.example.autop.device.WindowType
 import com.example.autop.device.core.NodeIdAssigner
 import com.example.autop.device.core.NodeIds
 import com.example.autop.device.core.SerializedScreen
-import com.example.autop.device.impl.ContentAreaProvider
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.device.impl.SnapshotCapturer
 import com.example.autop.device.impl.SnapshotSerializer
 import com.example.autop.device.impl.deviceHistory
@@ -51,7 +52,6 @@ public class ScreenPreparer
     constructor(
         private val screenReader: ScreenReader,
         private val capturer: SnapshotCapturer,
-        private val contentAreas: ContentAreaProvider,
         private val visualParser: VisualScreenParser,
         private val serializer: SnapshotSerializer,
     ) {
@@ -134,7 +134,15 @@ public class ScreenPreparer
             config: ConfigSnapshot,
             effective: List<ObserveMode>,
         ): Outcome<Prepared> {
-            val base = capturer.buildSnapshot()
+            val base =
+                if (currentDisplayTarget() is DisplayTarget.Background) {
+                    when (val got = screenReader.snapshotOrDegraded()) {
+                        is Outcome.Err -> return got
+                        is Outcome.Ok -> got.value
+                    }
+                } else {
+                    capturer.buildSnapshot()
+                }
             val shot =
                 when (val got = screenReader.screenshot()) {
                     is Outcome.Err -> return got
@@ -192,7 +200,7 @@ public class ScreenPreparer
                 height = shot.height,
                 rotation = base.rotation,
                 capturedAt = base.capturedAt,
-                contentArea = contentAreas.base(),
+                contentArea = base.contentArea ?: Rect(0, 0, base.screenWidth, base.screenHeight),
             )
 
         private fun signatureOf(shot: Screenshot): FrameSignature? {

@@ -117,6 +117,13 @@ internal class DebugThreadStore(
         mode: RunMode,
     ) = Unit
 
+    override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = false
+
+    override suspend fun setBackgroundScreen(
+        threadId: ThreadId,
+        enabled: Boolean,
+    ) = Unit
+
     override suspend fun titleOf(threadId: ThreadId): String? = if (threadId.value == DEBUG_THREAD_ID) "debug" else null
 
     override suspend fun delete(threadId: ThreadId) {

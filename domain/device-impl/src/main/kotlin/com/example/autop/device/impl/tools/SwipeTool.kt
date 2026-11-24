@@ -88,7 +88,7 @@ public class SwipeTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> {
-            val base = contentAreas.base()
+            val base = snap.contentArea ?: contentAreas.base()
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
             val from = mapper.toScreen(start.x, start.y)
             val to = mapper.toScreen(end.x, end.y)

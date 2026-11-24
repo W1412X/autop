@@ -90,6 +90,24 @@ public object DeviceErrorCodes {
     /** 等待条件超时。 */
     public const val TIMEOUT: String = "device.timeout"
 
+    /** 后台虚拟屏不支持当前系统。 */
+    public const val BG_UNSUPPORTED_SDK: String = "device.bg_unsupported_sdk"
+
+    /** 后台虚拟屏通道不可用。 */
+    public const val BG_CHANNEL_UNAVAILABLE: String = "device.bg_channel_unavailable"
+
+    /** 后台虚拟屏创建失败。 */
+    public const val BG_DISPLAY_CREATE_FAILED: String = "device.bg_display_create_failed"
+
+    /** 后台显示会话已释放或宿主失活。 */
+    public const val BG_RELEASED: String = "device.bg_released"
+
+    /** 后台屏不支持该动作。 */
+    public const val BG_ACTION_UNSUPPORTED: String = "device.bg_action_unsupported"
+
+    /** 后台屏输入被系统拒绝。 */
+    public const val BG_INPUT_REJECTED: String = "device.bg_input_rejected"
+
     /** 更新检测失败（网络不可达、GitHub 限流或响应异常）。 */
     public const val UPDATE_CHECK_FAILED: String = "device.update_check_failed"
 

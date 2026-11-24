@@ -24,10 +24,13 @@ import com.example.autop.agent.UserMessage
 import com.example.autop.agent.UserMessageKind
 import com.example.autop.agent.nextAwaitingModel
 import com.example.autop.core.common.AutopJson
+import com.example.autop.core.common.BackgroundRunBlock
+import com.example.autop.core.common.Capability
 import com.example.autop.core.common.DispatcherProvider
 import com.example.autop.core.common.ImageAttachment
 import com.example.autop.core.common.LogFiles
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.PlatformCapabilities
 import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.common.getOrNull
@@ -65,6 +68,7 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
@@ -141,6 +145,10 @@ private data class ChatMeta(
     val modelProfileId: String? = null,
     /** 运行模式（ADR-0040）：下一次发送时生效；随线程持久化在 threads.db（ADR-0043），页面重建后沿用。 */
     val runMode: RunMode = RunMode.STANDARD,
+    /** 会话级后台虚拟屏模式；默认使用真实屏。 */
+    val backgroundScreen: Boolean = false,
+    /** 发送已受理但开放 Run 尚未反映到页面，期间禁止切换屏幕模式。 */
+    val starting: Boolean = false,
     /** 完全模式无法切换时的阻断原因（非 null 时弹窗）。 */
     val shellBlock: ShellBlock? = null,
     val sheet: ChatThreadSheet = ChatThreadSheet(),
@@ -170,6 +178,7 @@ public class ChatThreadViewModel
         private val imageReader: ChatImageReader,
         private val speech: SpeechInput,
         private val shellInput: ShellInput,
+        private val platformCapabilities: PlatformCapabilities,
         private val dispatchers: DispatcherProvider,
     ) : ViewModel() {
         /** 系统语音识别是否可用（设备没有识别服务时不显示麦克风）。 */
@@ -231,6 +240,16 @@ public class ChatThreadViewModel
                 accessibility.connected,
             ) { input, active, metaState, open, connected ->
                 buildState(input, active, open, metaState, connected)
+            }.combine(shellInput.state) { state, shellState ->
+                state.copy(
+                    backgroundRunBlock =
+                        BackgroundRunBlock.of(
+                            supported = platformCapabilities.has(Capability.BACKGROUND_VIRTUAL_DISPLAY),
+                            channelConnected = shellState == ShellState.Connected,
+                            running = state.running,
+                            enabled = state.backgroundScreen,
+                        ),
+                )
             }.stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.Eagerly,
@@ -354,6 +373,7 @@ public class ChatThreadViewModel
         private fun updateChatOption(action: ChatThreadAction) {
             when (action) {
                 is ChatThreadAction.SetRunMode -> setRunMode(action.mode)
+                is ChatThreadAction.SetBackgroundScreen -> setBackgroundScreen(action.enabled)
                 ChatThreadAction.DismissShellBlock -> meta.update { it.copy(shellBlock = null) }
                 else -> Unit
             }
@@ -370,6 +390,32 @@ public class ChatThreadViewModel
                 viewModelScope.launch { threadStore.setRunMode(ThreadId(threadId), mode) }
             }
         }
+
+        private fun setBackgroundScreen(enabled: Boolean) {
+            if (
+                backgroundRunBlockNow(
+                    openRun.value != null || meta.value.starting,
+                    meta.value.backgroundScreen,
+                ) != null
+            ) {
+                return
+            }
+            meta.update { it.copy(backgroundScreen = enabled) }
+            if (threadId != NEW_THREAD) {
+                viewModelScope.launch { threadStore.setBackgroundScreen(ThreadId(threadId), enabled) }
+            }
+        }
+
+        private fun backgroundRunBlockNow(
+            running: Boolean,
+            enabled: Boolean,
+        ): BackgroundRunBlock? =
+            BackgroundRunBlock.of(
+                supported = platformCapabilities.has(Capability.BACKGROUND_VIRTUAL_DISPLAY),
+                channelConnected = shellInput.state.value == ShellState.Connected,
+                running = running,
+                enabled = enabled,
+            )
 
         /** 完全模式的前置条件：总闸开启，且无线注入已连接。 */
         private fun shellBlockNow(): ShellBlock? =
@@ -448,8 +494,10 @@ public class ChatThreadViewModel
         }
 
         private fun send() {
+            if (meta.value.starting) return
             val text = meta.value.input.trim()
             val images = meta.value.images
+            val snapshot = meta.value
             val open = openRun.value
             // 运行中只能补充文字指令（图片随新一轮对话发送）。
             if (text.isEmpty() && (open != null || images.isEmpty())) return
@@ -466,39 +514,52 @@ public class ChatThreadViewModel
                 }
                 return
             }
-            meta.update { it.copy(input = "", images = emptyList()) }
+            meta.update { it.copy(input = "", images = emptyList(), starting = true) }
             // 乐观显示：不等入库与运行创建，发出的消息立即出现在时间线末尾。
             timeline.update { it.copy(outgoing = text.takeIf { t -> t.isNotBlank() }) }
-            viewModelScope.launch {
-                val fresh = threadId == NEW_THREAD
-                val outcome =
-                    runService.startChat(
-                        threadId = if (fresh) null else ThreadId(threadId),
-                        text = text,
-                        images = images,
-                        modelProfileId = meta.value.modelProfileId,
-                        runMode = meta.value.runMode,
+            viewModelScope.launch { startChat(snapshot, text, images, background) }
+        }
+
+        private suspend fun startChat(
+            snapshot: ChatMeta,
+            text: String,
+            images: List<ImageAttachment>,
+            background: Boolean,
+        ) {
+            val fresh = threadId == NEW_THREAD
+            val outcome =
+                runService.startChat(
+                    threadId = if (fresh) null else ThreadId(threadId),
+                    text = text,
+                    images = images,
+                    modelProfileId = snapshot.modelProfileId,
+                    runMode = snapshot.runMode,
+                    backgroundScreen = snapshot.backgroundScreen,
+                )
+            if (outcome is Outcome.Err) {
+                // 发送失败：撤销乐观消息，把原文和图片放回输入框（不丢用户内容）。
+                timeline.update { it.copy(outgoing = null) }
+                meta.update {
+                    it.copy(
+                        input = it.input.ifEmpty { text },
+                        images = it.images.ifEmpty { images },
+                        notice = ThreadNotice.SEND_FAILED,
+                        starting = false,
                     )
-                if (outcome is Outcome.Err) {
-                    // 发送失败：撤销乐观消息，把原文和图片放回输入框（不丢用户内容）。
-                    timeline.update { it.copy(outgoing = null) }
-                    meta.update {
-                        it.copy(
-                            input = it.input.ifEmpty { text },
-                            images = it.images.ifEmpty { images },
-                            notice = ThreadNotice.SEND_FAILED,
-                        )
-                    }
                 }
-                outcome.getOrNull()?.let { record ->
-                    if (fresh) {
-                        threadId = record.threadId.value
-                        startCollecting(record.threadId.value)
-                        navChannel.send(ChatNavEvent.ReplaceThread(record.threadId.value))
-                    }
-                    if (background) navChannel.send(ChatNavEvent.Background)
-                }
+                return
             }
+            val record = (outcome as Outcome.Ok).value
+            if (fresh) {
+                threadId = record.threadId.value
+                startCollecting(record.threadId.value)
+                navChannel.send(ChatNavEvent.ReplaceThread(record.threadId.value))
+            }
+            if (background) navChannel.send(ChatNavEvent.Background)
+            combine(runService.observeRun(record.id), openRun) { latest, open ->
+                open?.id == record.id || latest.status !in RunStatus.OPEN
+            }.first { visible -> visible }
+            meta.update { it.copy(starting = false) }
         }
 
         /** 语音输入：识别中的临时结果实时写进输入框（接在开始时的文字后面）；确定结果并入输入框。 */
@@ -563,11 +624,13 @@ public class ChatThreadViewModel
         }
 
         private fun forkFrom(seq: Long) {
+            val snapshot = meta.value
             meta.update { it.copy(sheet = it.sheet.copy(menuSeq = null)) }
             viewModelScope.launch {
                 agentSession.fork(ThreadId(threadId), seq, title = null).getOrNull()?.let { forked ->
                     // 分叉线程沿用当前模式，并持久化（ADR-0043）。
-                    threadStore.setRunMode(forked, meta.value.runMode)
+                    threadStore.setRunMode(forked, snapshot.runMode)
+                    threadStore.setBackgroundScreen(forked, snapshot.backgroundScreen)
                     threadId = forked.value
                     startCollecting(forked.value)
                     navChannel.send(ChatNavEvent.ReplaceThread(forked.value))
@@ -593,7 +656,11 @@ public class ChatThreadViewModel
                 viewModelScope.launch {
                     threadTitle.value = threadStore.titleOf(id)
                     meta.update {
-                        it.copy(modelProfileId = threadStore.modelProfileOf(id), runMode = threadStore.runModeOf(id))
+                        it.copy(
+                            modelProfileId = threadStore.modelProfileOf(id),
+                            runMode = threadStore.runModeOf(id),
+                            backgroundScreen = threadStore.backgroundScreenOf(id),
+                        )
                     }
                     timeline.update { TimelineInput(outgoing = it.outgoing) }
                     // observeFrom 先回放已有事件再转实时（WP8.3）：新对话的用户输入事件
@@ -631,12 +698,13 @@ public class ChatThreadViewModel
                 threadId = threadId,
                 title = input.title,
                 entries = entries,
-                running = open != null,
+                running = open != null || metaState.starting,
                 awaitingReply = awaitingReplyOf(entries, open, input.awaitingModel),
                 accessibilityConnected = connected,
                 input = metaState.input,
                 modelProfileId = metaState.modelProfileId,
                 runMode = metaState.runMode,
+                backgroundScreen = metaState.backgroundScreen,
                 shellBlock = metaState.shellBlock,
                 voiceError = metaState.voiceError,
                 images = metaState.images,

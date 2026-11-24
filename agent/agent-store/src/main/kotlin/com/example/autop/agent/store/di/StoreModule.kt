@@ -6,6 +6,8 @@ package com.example.autop.agent.store.di
 
 import android.content.Context
 import androidx.room.Room
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import com.example.autop.agent.ThreadEventIndexer
 import com.example.autop.agent.ThreadIndexMaintenance
 import com.example.autop.agent.ThreadRecallRetriever
@@ -49,7 +51,18 @@ public object StoreModule {
     @Singleton
     public fun provideThreadsDb(
         @ApplicationContext context: Context,
-    ): ThreadsDb = Room.databaseBuilder(context, ThreadsDb::class.java, "threads.db").build()
+    ): ThreadsDb =
+        Room
+            .databaseBuilder(context, ThreadsDb::class.java, "threads.db")
+            .addMigrations(migration3To4)
+            .build()
+
+    public val migration3To4: Migration =
+        object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE threads ADD COLUMN backgroundScreen INTEGER NOT NULL DEFAULT 0")
+            }
+        }
 
     @Provides
     @Singleton

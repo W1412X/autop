@@ -89,8 +89,9 @@ public class RunScheduler(
                     return@withLock
                 }
                 val needsScreen = pending.flowNeedsScreen(record.id) ?: task?.needsScreen ?: true
-                if (waitingForScreen(record, task, needsScreen)) return@withLock
-                val idle = idleDelayMs(record, needsScreen)
+                val backgroundDisplay = pending.backgroundScreenOf(record.id)
+                if (waitingForScreen(record, task, needsScreen, backgroundDisplay)) return@withLock
+                val idle = idleDelayMs(record, needsScreen, backgroundDisplay)
                 if (idle > 0) {
                     scope.launch {
                         delay(idle)
@@ -189,11 +190,16 @@ public class RunScheduler(
                 it
             }
         }
-        val record = runStore.get(runId) ?: return
+        val record =
+            runStore.get(runId) ?: run {
+                RunDisplayTargetRegistry.clear(runId)
+                return
+            }
         if (!closed) {
             markCancelIntentIfRunning(runId, record.status)
             return
         }
+        RunDisplayTargetRegistry.clear(runId)
         pending.remove(runId)
         pending.consumeCancelled(runId)
         val outcome =
@@ -239,15 +245,17 @@ public class RunScheduler(
     }
 
     /**
-     * 需要屏幕时的门：无障碍未连接、锁屏、屏幕被占用。返回 true 表示本次不启动（已等待、已提醒或已收口）。
+     * 需要屏幕时的门：真实屏检查无障碍与租约；后台屏只保留锁屏门，Host 能力由 RunRunner fail-closed 校验。
+     * 返回 true 表示本次不启动（已等待、已提醒或已收口）。
      */
     private suspend fun waitingForScreen(
         record: RunRecord,
         task: Task?,
         needsScreen: Boolean,
+        backgroundDisplay: Boolean,
     ): Boolean {
         if (!needsScreen) return false
-        if (!accessibilityStatus.connected.value) {
+        if (!backgroundDisplay && !accessibilityStatus.connected.value) {
             notifier.notifyAccessibilityNeeded(ACCESSIBILITY_HINT)
             markWaiting(record, RunStatus.WAITING_SCREEN)
             return true
@@ -256,7 +264,7 @@ public class RunScheduler(
             gateLocked(record, task)
             return true
         }
-        if (screenLease.holder.value != null) {
+        if (!backgroundDisplay && screenLease.holder.value != null) {
             markWaiting(record, RunStatus.WAITING_SCREEN)
             return true
         }
@@ -307,18 +315,16 @@ public class RunScheduler(
         }
     }
 
-    /** 用户最近触摸后的静默期（只对非对话且需要屏幕的 Run 生效）。 */
+    /** 用户最近触摸后的静默期（只对真实屏、非对话且需要屏幕的 Run 生效）。 */
     private fun idleDelayMs(
         record: RunRecord,
         needsScreen: Boolean,
+        backgroundDisplay: Boolean,
     ): Long {
-        val lastTouch = userActivity.lastUserTouchAt()
-        return if (!needsScreen || record.origin == RunOrigin.CHAT || lastTouch == null) {
-            0
-        } else {
-            val idleMs = configProvider.current()[TaskConfig.TASK].idleBeforeStartMs
-            (lastTouch + idleMs - clock.nowMillis()).coerceAtLeast(0)
-        }
+        if (!needsScreen || backgroundDisplay || record.origin == RunOrigin.CHAT) return 0
+        val lastTouch = userActivity.lastUserTouchAt() ?: return 0
+        val idleMs = configProvider.current()[TaskConfig.TASK].idleBeforeStartMs
+        return (lastTouch + idleMs - clock.nowMillis()).coerceAtLeast(0)
     }
 
     private suspend fun markWaiting(

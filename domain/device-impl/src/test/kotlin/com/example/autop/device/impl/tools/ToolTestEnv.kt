@@ -108,7 +108,7 @@ internal class ToolTestEnv {
             prompts = prompts,
             context = context,
         )
-    private val preparer = ScreenPreparer(reader, capturer, contentAreas, FakeVisual(), serializer)
+    private val preparer = ScreenPreparer(reader, capturer, FakeVisual(), serializer)
     private val modes = ObserveModeResolver(holder, FakeVisual(), prompts)
     val observer = ScreenObserver(preparer, serializer, modes)
     private val frameMotion = FrameMotion(reader, provider)
@@ -566,6 +566,13 @@ private object UnusedThreadStore : ThreadStore {
     override suspend fun setRunMode(
         threadId: ThreadId,
         mode: RunMode,
+    ): Unit = Unit
+
+    override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = false
+
+    override suspend fun setBackgroundScreen(
+        threadId: ThreadId,
+        enabled: Boolean,
     ): Unit = Unit
 
     override suspend fun modelProfileOf(threadId: ThreadId): String? = null

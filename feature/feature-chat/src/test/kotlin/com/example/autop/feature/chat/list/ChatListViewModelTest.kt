@@ -305,6 +305,13 @@ private class FakeThreadStore(
         mode: RunMode,
     ): Unit = Unit
 
+    override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = false
+
+    override suspend fun setBackgroundScreen(
+        threadId: ThreadId,
+        enabled: Boolean,
+    ): Unit = Unit
+
     override suspend fun modelProfileOf(threadId: ThreadId): String? = null
 
     override suspend fun setModelProfile(
@@ -339,6 +346,7 @@ private class FakeRunService : RunService {
         images: List<com.example.autop.core.common.ImageAttachment>,
         modelProfileId: String?,
         runMode: com.example.autop.core.common.RunMode,
+        backgroundScreen: Boolean,
     ): com.example.autop.core.common.Outcome<RunRecord> = error("unused")
 
     override suspend fun forkAndRun(

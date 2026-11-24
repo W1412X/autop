@@ -167,6 +167,13 @@ internal class PatchFlowNodeToolTest {
                 mode: RunMode,
             ): Unit = Unit
 
+            override suspend fun backgroundScreenOf(threadId: ThreadId): Boolean = false
+
+            override suspend fun setBackgroundScreen(
+                threadId: ThreadId,
+                enabled: Boolean,
+            ): Unit = Unit
+
             override suspend fun modelProfileOf(threadId: ThreadId): String? = null
 
             override suspend fun setModelProfile(

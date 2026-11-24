@@ -85,7 +85,7 @@ public class TapTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> {
-            val area = contentAreas.base()
+            val area = snap.contentArea ?: contentAreas.base()
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), area)
             val target = mapper.toScreen(x, y) ?: return coordOutOfRange(coords)
             val modelPoint = Point(x, y)

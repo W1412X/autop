@@ -80,6 +80,9 @@ public enum class InjectionChannel {
 
     /** 无障碍服务注入（dispatchGesture / performGlobalAction）：部分应用会识别并丢弃。 */
     ACCESSIBILITY,
+
+    /** UID 2000 Host 向指定虚拟屏注入。 */
+    BACKGROUND,
 }
 
 /** shell 通道未被使用的原因。 */

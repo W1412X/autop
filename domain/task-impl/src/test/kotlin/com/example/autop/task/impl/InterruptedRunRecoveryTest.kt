@@ -36,6 +36,7 @@ import com.example.autop.task.impl.testing.FakeAgentSession
 import com.example.autop.task.impl.testing.FakeAppLauncher
 import com.example.autop.task.impl.testing.FakeDeviceStateProvider
 import com.example.autop.task.impl.testing.FakeLogger
+import com.example.autop.task.impl.testing.FakeRunDisplayController
 import com.example.autop.task.impl.testing.FakeScreenLease
 import com.example.autop.task.impl.testing.FakeTaskRepository
 import com.example.autop.task.impl.testing.FakeThreadStore
@@ -189,7 +190,7 @@ private class RecoveryFixture(
                     runStore = runStore,
                     pending = pending,
                     observer = RunObserver(runStore, config, clock, FakeFlowProgressFeed),
-                    touchShieldWatcher = TouchShieldWatcher(FakeTouchShield()),
+                    touchShieldWatcher = TouchShieldWatcher(FakeTouchShield(), FakeRunDisplayController()),
                     screenLease = screenLease,
                     deviceState = FakeDeviceStateProvider(recoveryUnlockedState()),
                     appLauncher = FakeAppLauncher(),

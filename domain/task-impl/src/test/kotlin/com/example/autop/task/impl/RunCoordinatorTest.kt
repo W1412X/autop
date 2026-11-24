@@ -19,6 +19,7 @@ import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.DeviceState
+import com.example.autop.device.DisplayTarget
 import com.example.autop.flow.FlowDefinition
 import com.example.autop.flow.FlowIssue
 import com.example.autop.flow.FlowValidationService
@@ -38,6 +39,7 @@ import com.example.autop.task.impl.testing.FakeAgentSession
 import com.example.autop.task.impl.testing.FakeAppLauncher
 import com.example.autop.task.impl.testing.FakeDeviceStateProvider
 import com.example.autop.task.impl.testing.FakeLogger
+import com.example.autop.task.impl.testing.FakeRunDisplayController
 import com.example.autop.task.impl.testing.FakeScreenLease
 import com.example.autop.task.impl.testing.FakeTaskRepository
 import com.example.autop.task.impl.testing.FakeThreadStore
@@ -47,6 +49,7 @@ import com.example.autop.task.impl.testing.fakeRunEnvironment
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.test.runTest
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -89,6 +92,35 @@ public class RunCoordinatorTest {
             assertEquals(TaskErrorCodes.INVALID, (result as Outcome.Err).error.code)
             assertTrue(fixture.threads.appended.isEmpty())
         }
+
+    @Test
+    public fun `cancel force releases only real screen runs`() =
+        runTest {
+            val backgroundFixture = CoordinatorFixture(backgroundScope)
+            val backgroundId = RunId("run-bg")
+            backgroundFixture.saveRun(backgroundId.value, RunStatus.RUNNING)
+            RunDisplayTargetRegistry.bind(
+                backgroundId,
+                DisplayTarget.Background(backgroundId, displayId = 3, width = 1080, height = 1920, dpi = 320),
+            )
+            try {
+                backgroundFixture.coordinator.cancel(backgroundId)
+                assertFalse(backgroundFixture.shield.forceReleased)
+            } finally {
+                RunDisplayTargetRegistry.clear(backgroundId)
+            }
+
+            val realFixture = CoordinatorFixture(backgroundScope)
+            val realId = RunId("run-real")
+            realFixture.saveRun(realId.value, RunStatus.RUNNING)
+            RunDisplayTargetRegistry.bind(realId, DisplayTarget.Main)
+            try {
+                realFixture.coordinator.cancel(realId)
+                assertTrue(realFixture.shield.forceReleased)
+            } finally {
+                RunDisplayTargetRegistry.clear(realId)
+            }
+        }
 }
 
 /** 测试装配：真实 RunStore/RunExecutor 链 + fake 端口（docs/tech/07 §9 同款）。 */
@@ -102,6 +134,7 @@ private class CoordinatorFixture(
         Room.inMemoryDatabaseBuilder(context, TasksDb::class.java).allowMainThreadQueries().build()
     val runStore = RunStore(db)
     val threads = FakeThreadStore()
+    val shield = FakeTouchShield()
     private val pending = PendingRuns()
     private val scheduler =
         RunScheduler(
@@ -118,7 +151,7 @@ private class CoordinatorFixture(
                     runStore = runStore,
                     pending = pending,
                     observer = RunObserver(runStore, config, clock, FakeFlowProgressFeed),
-                    touchShieldWatcher = TouchShieldWatcher(FakeTouchShield()),
+                    touchShieldWatcher = TouchShieldWatcher(FakeTouchShield(), FakeRunDisplayController()),
                     screenLease = FakeScreenLease(),
                     deviceState = FakeDeviceStateProvider(steerUnlockedState()),
                     appLauncher = FakeAppLauncher(),
@@ -175,7 +208,7 @@ private class CoordinatorFixture(
                     clock = clock,
                     logger = FakeLogger,
                 ),
-            shield = FakeTouchShield(),
+            shield = shield,
             logger = FakeLogger,
             flowStore = FakeFlowStore,
             flowValidation = NoopFlowValidation,
