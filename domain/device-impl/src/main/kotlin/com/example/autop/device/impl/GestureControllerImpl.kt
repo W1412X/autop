@@ -10,6 +10,8 @@ import android.graphics.Path
 import android.view.accessibility.AccessibilityNodeInfo
 import com.example.autop.core.common.Clock
 import com.example.autop.core.common.Logger
+import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.map
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.device.GestureController
@@ -98,7 +100,7 @@ public class GestureControllerImpl
             target: ResolvedNode,
             actionId: Int,
             args: Map<String, Any?>,
-        ): Boolean = selfAction { target.performAction(actionId, args) }
+        ): Outcome<Boolean> = target.performAction(actionId, args).map { selfAction { it } }
 
         /** 点击（或长按）坐标点。N199：shell 通道优先（应用可丢弃无障碍注入事件），失败回落无障碍手势。 */
         override suspend fun tap(
@@ -138,11 +140,11 @@ public class GestureControllerImpl
         }
 
         /** 当前焦点输入框；没有返回 null（§5.3）。 */
-        override suspend fun focusedInput(): ResolvedNode? {
-            val service = holder.current() ?: return null
-            val node = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return null
+        override suspend fun focusedInput(): Outcome<ResolvedNode?> {
+            val service = holder.current() ?: return Outcome.Ok(null)
+            val node = service.findFocus(AccessibilityNodeInfo.FOCUS_INPUT) ?: return Outcome.Ok(null)
             val snapshot = NodeSnapshotReader.read(node, idx = 0, parent = null, childIndex = 0)
-            return DirectResolvedNode(snapshot, node.windowId, node)
+            return Outcome.Ok(DirectResolvedNode(snapshot, node.windowId, node))
         }
 
         /** 按路径定位快照里选中的节点并执行无障碍动作；动作不走输入管道，无需放行触摸盾。 */
@@ -151,10 +153,16 @@ public class GestureControllerImpl
             path: List<Int>,
             expectedBounds: Rect,
             actionId: Int,
-        ): NodeActionOutcome {
-            val node = locate(windowId, path, expectedBounds) ?: return NodeActionOutcome.STALE
+        ): Outcome<NodeActionOutcome> {
+            val node = locate(windowId, path, expectedBounds) ?: return Outcome.Ok(NodeActionOutcome.STALE)
             return try {
-                if (selfAction { node.performAction(actionId) }) NodeActionOutcome.DONE else NodeActionOutcome.REJECTED
+                Outcome.Ok(
+                    if (selfAction { node.performAction(actionId) }) {
+                        NodeActionOutcome.DONE
+                    } else {
+                        NodeActionOutcome.REJECTED
+                    },
+                )
             } finally {
                 release(node)
             }
@@ -305,15 +313,17 @@ public class GestureControllerImpl
         }
 
         /** shell 注入按键（input_text 的粘贴/回车等）：统一走盾放行＋自身动作标记。 */
-        override suspend fun shellKeyEvent(code: Int): Boolean =
-            shellAction(InjectionFootprint.Focus) { shellInput.keyEvent(code) } is ShellAttempt.Done
+        override suspend fun shellKeyEvent(code: Int): Outcome<Boolean> =
+            Outcome.Ok(shellAction(InjectionFootprint.Focus) { shellInput.keyEvent(code) } is ShellAttempt.Done)
 
         /** shell 注入组合键（如 Ctrl+A）。 */
         @Suppress("SpreadOperator") // 组合键只有 2 键，一次性小数组拷贝可忽略；vararg 端口只能展开传入
-        override suspend fun shellKeyCombination(codes: List<Int>): Boolean =
-            shellAction(InjectionFootprint.Focus) {
-                shellInput.keyCombination(*codes.toIntArray())
-            } is ShellAttempt.Done
+        override suspend fun shellKeyCombination(codes: List<Int>): Outcome<Boolean> =
+            Outcome.Ok(
+                shellAction(InjectionFootprint.Focus) {
+                    shellInput.keyCombination(*codes.toIntArray())
+                } is ShellAttempt.Done,
+            )
 
         /** GlobalAction 映射到 KeyEvent KEYCODE_*。 */
         private fun keyCodeOf(action: GlobalAction): Int? =

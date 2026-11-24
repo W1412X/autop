@@ -11,8 +11,10 @@ import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
+import com.example.autop.device.currentDisplayTarget
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -29,14 +31,15 @@ public class InputStateSource
 
         override suspend fun entries(req: StateRequest): List<StateEntry> {
             val entries = mutableListOf<StateEntry>()
-            val connected = accessibility.connected.value
+            val background = currentDisplayTarget() is DisplayTarget.Background
+            val connected = background || accessibility.connected.value
             entries +=
                 StateEntry(
                     KEY_ACCESSIBILITY,
                     render(PROMPT_ACCESSIBILITY, mapOf(VAR_ON to flag(connected), VAR_OFF to flag(!connected))),
                 )
             entries += StateEntry(KEY_SHELL, render(PROMPT_SHELL, shellVars()))
-            val shieldOn = req.config[DeviceConfig.TOUCH].shieldEnabled
+            val shieldOn = !background && req.config[DeviceConfig.TOUCH].shieldEnabled
             entries +=
                 StateEntry(
                     KEY_SHIELD,

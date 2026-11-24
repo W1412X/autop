@@ -128,7 +128,7 @@ public class ScrollNodeTool
             val stepTraces = mutableListOf<String>()
             for (i in 1..scroll.steps) {
                 if (i > 1) epilogue.pause(ctx, ctx.config[DeviceConfig.SCROLL].stepDelayMs)
-                val outcome =
+                val result =
                     gestures.performAtPath(
                         scroll.target.target.windowId,
                         scroll.target.target.path,
@@ -136,22 +136,26 @@ public class ScrollNodeTool
                         actionId,
                     )
                 val error =
-                    when (outcome) {
-                        NodeActionOutcome.STALE ->
-                            AppError(
-                                code = DeviceErrorCodes.NODE_STALE,
-                                message = "node #${scroll.id} is stale in the live tree",
-                                retryable = true,
-                                hint = prompts.text(PROMPT_STALE),
-                            )
-                        NodeActionOutcome.REJECTED ->
-                            AppError(
-                                code = DeviceErrorCodes.NODE_REJECTED,
-                                message = "app rejected $label on node #${scroll.id}",
-                                retryable = false,
-                                hint = rejectedHint(scroll, label),
-                            )
-                        NodeActionOutcome.DONE -> null
+                    when (result) {
+                        is Outcome.Err -> result.error
+                        is Outcome.Ok ->
+                            when (result.value) {
+                                NodeActionOutcome.STALE ->
+                                    AppError(
+                                        code = DeviceErrorCodes.NODE_STALE,
+                                        message = "node #${scroll.id} is stale in the live tree",
+                                        retryable = true,
+                                        hint = prompts.text(PROMPT_STALE),
+                                    )
+                                NodeActionOutcome.REJECTED ->
+                                    AppError(
+                                        code = DeviceErrorCodes.NODE_REJECTED,
+                                        message = "app rejected $label on node #${scroll.id}",
+                                        retryable = false,
+                                        hint = rejectedHint(scroll, label),
+                                    )
+                                NodeActionOutcome.DONE -> null
+                            }
                     }
                 if (error != null) {
                     if (i > 1) {

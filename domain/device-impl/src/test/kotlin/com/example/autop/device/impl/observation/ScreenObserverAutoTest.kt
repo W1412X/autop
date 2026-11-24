@@ -17,10 +17,12 @@ import com.example.autop.core.common.RunId
 import com.example.autop.core.common.RunMode
 import com.example.autop.core.common.ThreadId
 import com.example.autop.core.config.ConfigSnapshot
+import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.NodeFlags
 import com.example.autop.device.NodeSnapshot
 import com.example.autop.device.ObservationMode
@@ -50,6 +52,7 @@ import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import org.junit.Test
@@ -142,6 +145,21 @@ class ScreenObserverAutoTest {
             assertThat(second.observation.mode).isEqualTo(ObservationMode.FULL)
             assertThat(third.observation.mode).isEqualTo(ObservationMode.FULL)
             assertThat(third.screen.model.mode).isEqualTo(ObserveMode.VISUAL)
+        }
+
+    @Test
+    fun `background run uses host accessibility when physical service is off`() =
+        runTest {
+            val modes = ObserveModeResolver(ServiceHolder(), FakeVisual(), FakePromptRepository())
+            val config = provider().current()[DeviceConfig.OBSERVE]
+            val display = DisplayTarget.Background(RunId("background-run"), 9, 720, 1600, 320)
+
+            assertThat(modes.effective(config)).doesNotContain(ObserveMode.A11Y)
+            val runtimeModes = withContext(display) { modes.runtimeEffective(config) }
+            val reason = withContext(display) { modes.unavailableReason(ObserveMode.A11Y, config) }
+
+            assertThat(runtimeModes).contains(ObserveMode.A11Y)
+            assertThat(reason).isNull()
         }
 
     private suspend fun observe(observer: ScreenObserver): ObservationResult =

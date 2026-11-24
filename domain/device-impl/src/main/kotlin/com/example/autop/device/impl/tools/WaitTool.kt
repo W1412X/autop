@@ -184,13 +184,20 @@ internal suspend fun conditionSatisfied(
     val pkgMissing = pkg != null && pkgSnap == null
     val textMissing = textNeeded && textSnap == null
     if (pkgMissing || textMissing) return false
-    val checks = mutableListOf<Boolean>()
-    pkgSnap?.let { checks += it.foregroundPackage == pkg }
-    textSnap?.let { snap ->
-        appear?.let { checks += hasText(snap, it) }
-        disappear?.let { checks += !hasText(snap, it) }
-    }
-    return checks.isNotEmpty() && checks.all { it }
+    val packageOk = pkg == null || pkgSnap?.foregroundPackage == pkg
+    val textOk = !textNeeded || textConditionSatisfied(appear, disappear, textSnap)
+    return packageOk && textOk
+}
+
+private fun textConditionSatisfied(
+    appear: String?,
+    disappear: String?,
+    snapshot: ScreenSnapshot?,
+): Boolean {
+    if (snapshot == null || snapshot.nodes.isEmpty()) return false
+    if (appear != null && !hasText(snapshot, appear)) return false
+    if (disappear != null && hasText(snapshot, disappear)) return false
+    return true
 }
 
 private fun hasText(

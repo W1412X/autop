@@ -51,7 +51,7 @@ public class ScreenObserver
             selection: ObserveSelection,
         ): Outcome<ObservationResult> {
             val cfg = ctx.config[DeviceConfig.OBSERVE]
-            val effective = modes.effective(cfg)
+            val effective = modes.runtimeEffective(cfg)
             return when (selection) {
                 is ObserveSelection.Explicit ->
                     explicit(ctx, selection, effective, cfg)

@@ -7,9 +7,11 @@ package com.example.autop.device.impl
 
 import com.example.autop.core.config.DeviceObserveSection
 import com.example.autop.core.prompt.PromptRepository
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.ObserveModeAvailability
 import com.example.autop.device.VisualScreenParser
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.device.impl.tools.text
 import com.example.autop.device.impl.vision.VisualAvailability
 import com.example.autop.device.impl.vision.VisualUnavailable
@@ -25,18 +27,24 @@ public class ObserveModeResolver
         private val visual: VisualScreenParser,
         private val prompts: PromptRepository,
     ) : ObserveModeAvailability {
-        /** 当前生效的模式列表（按配置优先级排序）。 */
+        /** 工具声明展示物理屏能力；运行期模式选择使用 [runtimeEffective]。 */
         public fun effective(config: DeviceObserveSection): List<ObserveMode> =
+            config.priority
+                .mapNotNull { ObserveMode.parse(it) }
+                .filter { enabled(it, config) && physicalCapabilityReason(it) == null }
+
+        /** 当前 Run 实际生效的模式列表（按配置优先级排序）。 */
+        public suspend fun runtimeEffective(config: DeviceObserveSection): List<ObserveMode> =
             config.priority
                 .mapNotNull { ObserveMode.parse(it) }
                 .filter { enabled(it, config) && capabilityReason(it) == null }
 
         /** 参与 observe 不传 mode 时自动选择的生效方式（按优先级排序）。 */
-        public fun autoCandidates(config: DeviceObserveSection): List<ObserveMode> =
-            effective(config).filter { config.modes.of(it.id).auto }
+        public suspend fun autoCandidates(config: DeviceObserveSection): List<ObserveMode> =
+            runtimeEffective(config).filter { config.modes.of(it.id).auto }
 
         /** 显式选择 [mode] 时的不可用原因；可用返回 null。 */
-        public fun unavailableReason(
+        public suspend fun unavailableReason(
             mode: ObserveMode,
             config: DeviceObserveSection,
         ): String? =
@@ -46,20 +54,28 @@ public class ObserveModeResolver
                 capabilityReason(mode)
             }
 
-        /** 能力可用性（不看用户开关）：设置页展示用。 */
-        override fun unavailableReason(mode: ObserveMode): String? = capabilityReason(mode)
+        /** 能力可用性（不看用户开关）：设置页展示物理屏能力。 */
+        override fun unavailableReason(mode: ObserveMode): String? = physicalCapabilityReason(mode)
 
         private fun enabled(
             mode: ObserveMode,
             config: DeviceObserveSection,
         ): Boolean = config.modes.of(mode.id).enabled
 
-        private fun capabilityReason(mode: ObserveMode): String? =
+        private suspend fun capabilityReason(mode: ObserveMode): String? =
             when (mode) {
                 ObserveMode.A11Y ->
-                    if (holder.current() == null) "无障碍服务未连接" else null
+                    if (currentDisplayTarget() is DisplayTarget.Background) null else physicalA11yReason()
                 ObserveMode.VISUAL -> visualReason()
             }
+
+        private fun physicalCapabilityReason(mode: ObserveMode): String? =
+            when (mode) {
+                ObserveMode.A11Y -> physicalA11yReason()
+                ObserveMode.VISUAL -> visualReason()
+            }
+
+        private fun physicalA11yReason(): String? = if (holder.current() == null) "无障碍服务未连接" else null
 
         /**
          * 视觉不可用原因（WP7.6）：OCR 停用单独说明原因，模型未就绪用统一文案；

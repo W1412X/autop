@@ -21,11 +21,14 @@ import com.example.autop.core.common.RunMode
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.config.FeaturesConfig
 import com.example.autop.core.prompt.PromptRepository
+import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.ShellExec
 import com.example.autop.device.ShellExecErrorCodes
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.example.autop.device.core.UntrustedText
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.device.impl.R
 import com.example.autop.device.impl.shell.ShellCommandRules
 import com.example.autop.device.impl.shell.ShellDangerRulesLoader
@@ -106,6 +109,7 @@ public class RunShellTool
             args: JsonObject,
             ctx: ToolContext,
         ): ToolOutput? {
+            rejectBackgroundScreen(args)?.let { return it }
             val command = args.shellStr(ARG_COMMAND) ?: return null
             val match = dangerRules.get().match(command, context.packageName) ?: return null
             val allow = context.getString(R.string.run_shell_option_allow)
@@ -144,6 +148,7 @@ public class RunShellTool
                 return output(RunShellResults.ofNotDispatched(ShellExecErrorCodes.INVALID_ARGUMENT), problem)
             }
             val screen = args.shellBool(ARG_SCREEN) == true
+            rejectBackgroundScreen(args)?.let { return it }
             return when (val outcome = shellExec.exec(ctx.runId, command, timeoutOf(args))) {
                 is Outcome.Err -> output(RunShellResults.ofNotDispatched(outcome.error.code), outcome.error.message)
                 is Outcome.Ok -> output(RunShellResults.ofResult(outcome.value, screen))
@@ -176,6 +181,16 @@ public class RunShellTool
                 effectMayHaveHappened = view.effectMayHaveHappened,
             )
         }
+
+        private suspend fun rejectBackgroundScreen(args: JsonObject): ToolOutput? =
+            if (args.shellBool(ARG_SCREEN) == true && currentDisplayTarget() is DisplayTarget.Background) {
+                toolError(
+                    DeviceErrorCodes.BG_ACTION_UNSUPPORTED,
+                    "后台 Run 不支持 screen=true 的 shell 命令；请使用后台屏幕工具",
+                )
+            } else {
+                null
+            }
 
         private fun timeoutOf(args: JsonObject): Long = args.shellLong(ARG_TIMEOUT) ?: limits.defaultTimeoutMs
 

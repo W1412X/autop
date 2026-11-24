@@ -4,8 +4,13 @@ import com.example.autop.core.common.Logger
 import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.RunId
 import com.example.autop.core.config.DeviceBackgroundSection
+import com.example.autop.core.testing.FakeConfigProvider
+import com.example.autop.core.testing.TestDispatcherProvider
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
+import com.example.autop.device.impl.shell.AdbConnectPorts
 import com.example.autop.device.impl.shell.ShellHostClient
+import com.example.autop.device.impl.shell.ShellHostConnector
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.cancelAndJoin
@@ -16,6 +21,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
+import org.robolectric.RuntimeEnvironment
 import org.robolectric.annotation.Config
 import org.robolectric.annotation.ConscryptMode
 
@@ -60,6 +66,31 @@ class BackgroundDisplayManagerTest {
             job.cancelAndJoin()
 
             assertThat(client.isAlive).isTrue()
+        }
+
+    @Test
+    fun `repeated main runs do not retain release tombstones`() =
+        runTest {
+            val context = RuntimeEnvironment.getApplication()
+            val config = FakeConfigProvider()
+            val dispatchers = TestDispatcherProvider(StandardTestDispatcher(testScheduler))
+            val manager =
+                BackgroundDisplayManagerImpl(
+                    configProvider = config,
+                    connector = ShellHostConnector(context, AdbConnectPorts(context, config), dispatchers, NoopLogger),
+                    dispatchers = dispatchers,
+                    logger = NoopLogger,
+                )
+
+            repeat(10) { index ->
+                val owner = RunId("main-run-$index")
+                val opened = manager.open(owner, backgroundScreen = false)
+                assertThat((opened as Outcome.Ok).value).isEqualTo(DisplayTarget.Main)
+                manager.release(owner)
+            }
+
+            assertThat(manager.releasedOwners).isEmpty()
+            manager.closeAll()
         }
 
     private object NoopLogger : Logger {

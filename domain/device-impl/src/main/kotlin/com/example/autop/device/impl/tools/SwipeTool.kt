@@ -81,14 +81,14 @@ public class SwipeTool
             }
         }
 
-        private fun prepared(
+        private suspend fun prepared(
             snap: ScreenSnapshot,
             start: Point,
             end: Point,
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> {
-            val base = snap.contentArea ?: contentAreas.base()
+            val base = contentAreas.forSnapshot(snap)
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
             val from = mapper.toScreen(start.x, start.y)
             val to = mapper.toScreen(end.x, end.y)
@@ -185,7 +185,7 @@ public class SwipeTool
                     swipe.durationMs,
                     swipe.trajectoryJitterPx,
                 )
-            if (!result.ok) return errorOutput(injectFailed("滑动"))
+            if (!result.ok) return errorOutput(result.error ?: injectFailed("滑动"))
             val gesture =
                 gestureJson(swipe.from.x, swipe.from.y, swipe.to.x, swipe.to.y, swipe.durationMs)
             val traceLine =

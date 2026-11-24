@@ -10,6 +10,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.view.accessibility.AccessibilityNodeInfo
 import com.example.autop.agent.PreparedAction
+import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
 import com.example.autop.device.DeviceErrorCodes
@@ -155,6 +156,64 @@ class InputTextToolTest {
             assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.ACTION_FAILED)
             assertThat(out.trace.joinToString("\n")).contains("SET_TEXT 被应用拒绝")
             assertThat(out.content.toString()).contains("无线调试")
+        }
+
+    @Test
+    fun `focus lookup error is preserved without fallback`() =
+        runTest {
+            val env = ToolTestEnv()
+            env.gestures.focusedError = AppError(DeviceErrorCodes.BG_RELEASED, "后台显示会话已释放")
+            env.queue(a11yScreenOf(emptyList()))
+            val tool = env.inputTextTool(FakeShell())
+            val ctx = env.ctx()
+            val prepared = okOf(tool.prepare(args("""{"text":"你好"}"""), ctx))
+
+            val out = tool.perform(prepared, ctx)
+
+            assertThat(out.ok).isFalse()
+            assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.BG_RELEASED)
+            assertThat(env.gestures.nodeActions).isEmpty()
+            assertThat(env.gestures.shellKeys).isEmpty()
+        }
+
+    @Test
+    fun `set text chain error is preserved without clipboard fallback`() =
+        runTest {
+            val env = ToolTestEnv()
+            env.gestures.focused = FakeResolvedNode(editableNode(1))
+            env.gestures.nodeActionError = AppError(DeviceErrorCodes.BG_INPUT_REJECTED, "后台输入被拒绝")
+            env.queue(a11yScreenOf(emptyList()))
+            val tool = env.inputTextTool(FakeShell())
+            val ctx = env.ctx()
+            val prepared = okOf(tool.prepare(args("""{"text":"你好"}"""), ctx))
+
+            val out = tool.perform(prepared, ctx)
+
+            assertThat(out.ok).isFalse()
+            assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.BG_INPUT_REJECTED)
+            assertThat(env.gestures.shellKeys).isEmpty()
+        }
+
+    @Test
+    fun `shell key error is preserved after clipboard restore`() =
+        runTest {
+            val env = ToolTestEnv()
+            val shell = FakeShell()
+            env.gestures.focused = FakeResolvedNode(editableNode(1))
+            env.gestures.nodeActionOk = false
+            env.gestures.shellKeyError = AppError(DeviceErrorCodes.BG_RELEASED, "后台按键通道已释放")
+            clipboard().setPrimaryClip(ClipData.newPlainText("old", "旧内容"))
+            env.queue(a11yScreenOf(emptyList()))
+            val tool = env.inputTextTool(shell)
+            val ctx = env.ctx()
+            val prepared = okOf(tool.prepare(args("""{"text":"你好"}"""), ctx))
+
+            val out = tool.perform(prepared, ctx)
+
+            assertThat(out.ok).isFalse()
+            assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.BG_RELEASED)
+            assertThat(out.error?.message).contains("剪贴板")
+            assertThat(clipboardText()).isEqualTo("旧内容")
         }
 
     @Test

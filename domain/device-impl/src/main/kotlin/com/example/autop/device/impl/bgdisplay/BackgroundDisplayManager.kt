@@ -86,7 +86,9 @@ internal class BackgroundDisplaySession(
                 when (code) {
                     BackgroundDisplayWire.ERR_INJECTION_FAILED,
                     BackgroundDisplayWire.ERR_INPUT_NOT_FOUND,
+                    BackgroundDisplayWire.ERR_SET_TEXT_FAILED,
                     -> DeviceErrorCodes.BG_INPUT_REJECTED
+                    BackgroundDisplayWire.ERR_STALE_NODE -> DeviceErrorCodes.NODE_STALE
                     BackgroundDisplayWire.ERR_DISPLAY_UNAVAILABLE,
                     BackgroundDisplayWire.ERR_AUTOMATION_UNAVAILABLE,
                     -> DeviceErrorCodes.BG_RELEASED
@@ -98,6 +100,7 @@ internal class BackgroundDisplaySession(
                     else -> DeviceErrorCodes.ACTION_FAILED
                 },
             message = code,
+            retryable = code == BackgroundDisplayWire.ERR_STALE_NODE || code == BackgroundDisplayWire.ERR_TIMEOUT,
         )
 }
 
@@ -116,6 +119,8 @@ public class BackgroundDisplayManagerImpl
         private val sessions = HashMap<RunId, BackgroundDisplaySession>()
         private val creating = HashMap<RunId, CompletableDeferred<Outcome<BackgroundDisplaySession>>>()
         private val released = HashSet<RunId>()
+        internal val releasedOwners: Set<RunId>
+            get() = released
         private var hostClient: ShellHostClient? = null
         private var hostConnecting: CompletableDeferred<ShellHostClient>? = null
         private var hostGeneration = 0L
@@ -169,7 +174,7 @@ public class BackgroundDisplayManagerImpl
         override suspend fun release(owner: RunId) {
             val session =
                 mutex.withLock {
-                    released.add(owner)
+                    if (owner in creating) released.add(owner) else released.remove(owner)
                     sessions.remove(owner)
                 }
             session?.release()
@@ -203,18 +208,21 @@ public class BackgroundDisplayManagerImpl
             result: CompletableDeferred<Outcome<BackgroundDisplaySession>>,
         ) {
             val outcome = openHost(owner, config)
-            val lateSession =
+            val (cancelled, lateSession) =
                 mutex.withLock {
                     creating.remove(owner)
-                    if (owner in released) {
-                        (outcome as? Outcome.Ok)?.value
-                    } else {
-                        (outcome as? Outcome.Ok)?.let { sessions[owner] = it.value }
-                        null
-                    }
+                    val cancelled = released.remove(owner)
+                    val lateSession =
+                        if (cancelled) {
+                            (outcome as? Outcome.Ok)?.value
+                        } else {
+                            (outcome as? Outcome.Ok)?.let { sessions[owner] = it.value }
+                            null
+                        }
+                    cancelled to lateSession
                 }
             lateSession?.release()
-            if (lateSession != null) {
+            if (cancelled) {
                 result.complete(
                     Outcome.Err(AppError(DeviceErrorCodes.BG_RELEASED, "run released during display creation")),
                 )

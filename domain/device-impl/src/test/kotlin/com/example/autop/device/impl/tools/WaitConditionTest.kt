@@ -84,6 +84,22 @@ class WaitConditionTest {
         }
 
     @Test
+    fun `text_disappears cannot be confirmed from an empty tree`() =
+        runTest {
+            val satisfied =
+                conditionSatisfied(
+                    until = untilOf("""{"text_disappears":"加载中"}"""),
+                    snapshot =
+                        snaps(
+                            full = Outcome.Ok(screenOf(foreground = "com.tencent.mm")),
+                            degraded = Outcome.Ok(screenOf(foreground = "com.tencent.mm")),
+                        ),
+                )
+
+            assertThat(satisfied).isFalse()
+        }
+
+    @Test
     fun `mixed conditions all must hold`() =
         runTest {
             val satisfied =

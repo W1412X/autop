@@ -6,6 +6,7 @@ package com.example.autop.device.impl.tools
 
 import com.example.autop.agent.PreparedAction
 import com.example.autop.agent.ToolContext
+import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NodeActionOutcome
@@ -114,6 +115,23 @@ class TapNodeToolTest {
             assertThat(out.ok).isFalse()
             assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.NODE_REJECTED)
             assertThat(out.content.first().toString()).contains("at=")
+            assertThat(env.gestures.taps).isEmpty()
+        }
+
+    @Test
+    fun `node action chain error is not reported as stale or rejected`() =
+        runTest {
+            val env = ToolTestEnv()
+            recordA11y(env)
+            env.queue(a11yScreenOf(listOf(clickableNode(1, "确定", LIVE_BOUNDS))))
+            env.gestures.pathError = AppError(DeviceErrorCodes.BG_RELEASED, "后台显示会话已释放")
+            val ctx = env.ctx()
+            val prepared = okOf(prepare(env, ctx, id = 1))
+
+            val out = env.tapNodeTool().perform(prepared, ctx)
+
+            assertThat(out.ok).isFalse()
+            assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.BG_RELEASED)
             assertThat(env.gestures.taps).isEmpty()
         }
 

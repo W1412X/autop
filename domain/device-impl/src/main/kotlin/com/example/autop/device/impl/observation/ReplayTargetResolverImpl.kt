@@ -91,7 +91,7 @@ public class ReplayTargetResolverImpl
         }
 
         /** 旧记录 `_locator`：按现有定位器匹配当前快照，取节点中心换算为 0–1000。 */
-        private fun resolveLocator(
+        private suspend fun resolveLocator(
             element: JsonElement,
             snap: ScreenSnapshot,
         ): Point? {
@@ -101,8 +101,8 @@ public class ReplayTargetResolverImpl
             return mapper.toNormalized(node.bounds.centerX, node.bounds.centerY)
         }
 
-        private fun mapperOf(snap: ScreenSnapshot): CoordMapper =
-            coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), snap.contentArea ?: contentAreas.base())
+        private suspend fun mapperOf(snap: ScreenSnapshot): CoordMapper =
+            coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), contentAreas.forSnapshot(snap))
 
         private fun replace(
             args: JsonObject,

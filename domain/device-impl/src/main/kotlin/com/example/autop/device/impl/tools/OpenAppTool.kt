@@ -11,14 +11,18 @@ import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppInfo
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
+import com.example.autop.device.Rect
 import com.example.autop.device.ScreenReader
 import com.example.autop.device.ScreenSnapshot
 import com.example.autop.device.core.AppMatcher
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.device.impl.PolicySubjectBuilder
 import com.example.autop.device.impl.observation.ActionEpilogue
 import com.example.autop.device.impl.observation.ReplayInput
@@ -56,11 +60,33 @@ public class OpenAppTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> =
-            // N193 空树降级：应用匹配不依赖节点树；空树应用上的恢复路径（open_app）不能被卡死。
-            when (val got = screenReader.snapshotOrDegraded()) {
-                is Outcome.Err -> got
-                is Outcome.Ok -> prepareWith(got.value, args, ctx.config)
+            when (val display = currentDisplayTarget()) {
+                is DisplayTarget.Background ->
+                    prepareWith(
+                        screenReader.snapshotOrDegraded().getOrNull() ?: emptyScreen(display),
+                        args,
+                        ctx.config,
+                    )
+                else ->
+                    when (val got = screenReader.snapshotOrDegraded()) {
+                        is Outcome.Err -> got
+                        is Outcome.Ok -> prepareWith(got.value, args, ctx.config)
+                    }
             }
+
+        private fun emptyScreen(display: DisplayTarget.Background): ScreenSnapshot =
+            ScreenSnapshot(
+                capturedAt = System.currentTimeMillis(),
+                windows = emptyList(),
+                nodes = emptyList(),
+                foregroundPackage = null,
+                screenWidth = display.width,
+                screenHeight = display.height,
+                rotation = 0,
+                keyguardLocked = false,
+                contentArea = Rect(0, 0, display.width, display.height),
+                truncated = false,
+            )
 
         private suspend fun prepareWith(
             snap: ScreenSnapshot,

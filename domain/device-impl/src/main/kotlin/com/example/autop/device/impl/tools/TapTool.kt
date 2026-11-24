@@ -78,14 +78,14 @@ public class TapTool
             }
         }
 
-        private fun prepareWith(
+        private suspend fun prepareWith(
             snap: ScreenSnapshot,
             x: Int,
             y: Int,
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> {
-            val area = snap.contentArea ?: contentAreas.base()
+            val area = contentAreas.forSnapshot(snap)
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), area)
             val target = mapper.toScreen(x, y) ?: return coordOutOfRange(coords)
             val modelPoint = Point(x, y)
@@ -123,7 +123,9 @@ public class TapTool
         ): ToolOutput {
             val tap = action.payload as TapAction
             val pre = epilogue.preSample(ctx)
-            val gesture = tapGesture(tap) ?: return errorOutput(injectFailed("点击"))
+            val result = gestures.tap(tap.point.x, tap.point.y, tap.durationMs)
+            if (!result.ok) return errorOutput(result.error ?: injectFailed("点击"))
+            val gesture = GestureShot(result, gestureJson(tap.point.x, tap.point.y, tap.durationMs))
             val trace =
                 buildList {
                     add(executionText(gesture.result))
@@ -149,12 +151,6 @@ public class TapTool
                 channel = gesture.channel,
                 shellSkip = gesture.shellSkip,
             )
-
-        private suspend fun tapGesture(tap: TapAction): GestureShot? {
-            val result = gestures.tap(tap.point.x, tap.point.y, tap.durationMs)
-            if (!result.ok) return null
-            return GestureShot(result, gestureJson(tap.point.x, tap.point.y, tap.durationMs))
-        }
 
         private fun resultTextOf(
             x: Int,

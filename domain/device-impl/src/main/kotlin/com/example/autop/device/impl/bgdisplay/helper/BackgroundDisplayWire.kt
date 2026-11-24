@@ -34,7 +34,6 @@ internal object BackgroundDisplayWire {
     const val ERR_TREE_UNAVAILABLE: String = "tree_unavailable"
     const val ERR_CAPTURE_FAILED: String = "capture_failed"
     const val ERR_LAUNCH_FAILED: String = "launch_failed"
-    const val ERR_NO_FOREGROUND: String = "no_foreground"
     const val ERR_FOREGROUND_UNAVAILABLE: String = "foreground_unavailable"
     const val ERR_INJECTION_FAILED: String = "injection_failed"
     const val ERR_INPUT_NOT_FOUND: String = "input_not_found"

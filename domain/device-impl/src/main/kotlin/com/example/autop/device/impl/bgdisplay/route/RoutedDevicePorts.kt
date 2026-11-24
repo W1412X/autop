@@ -137,12 +137,11 @@ public class RoutedGestureController
             target: ResolvedNode,
             actionId: Int,
             args: Map<String, Any?>,
-        ): Boolean {
-            if (actionId != AccessibilityNodeInfo.ACTION_SET_TEXT) return false
-            return when (val display = currentDisplayTarget()) {
+        ): Outcome<Boolean> =
+            when (val display = currentDisplayTarget()) {
                 is DisplayTarget.Background ->
-                    when (
-                        val result =
+                    when (actionId) {
+                        AccessibilityNodeInfo.ACTION_SET_TEXT ->
                             withSession(display) { session ->
                                 val text =
                                     args[AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE]
@@ -155,41 +154,41 @@ public class RoutedGestureController
                                             .put("windowId", target.windowId)
                                             .put("nodeJson", nodeJson(target.snapshot))
                                             .put("text", text),
-                                    ).ok()
+                                    ).map { true }
                             }
-                    ) {
-                        is Outcome.Ok -> result.value
-                        is Outcome.Err -> false
+                        else -> Outcome.Err(unsupported("节点动作 $actionId"))
                     }
                 else -> main.performNodeAction(target, actionId, args)
             }
-        }
 
         override suspend fun performAtPath(
             windowId: Int,
             path: List<Int>,
             expectedBounds: Rect,
             actionId: Int,
-        ): NodeActionOutcome =
+        ): Outcome<NodeActionOutcome> =
             when (val display = currentDisplayTarget()) {
                 is DisplayTarget.Background ->
-                    when (
-                        val found =
-                            withSession(display) { session ->
-                                session
-                                    .request(
-                                        JSONObject()
-                                            .put("op", BackgroundDisplayWire.OP_NODE_ACTION)
-                                            .put("windowId", windowId)
-                                            .put("path", org.json.JSONArray(path))
-                                            .put("expectedBounds", rectJson(expectedBounds))
-                                            .put("actionId", actionId),
-                                    ).errorOrNull()
-                            }
-                    ) {
-                        is Outcome.Ok ->
-                            if (found.value == null) NodeActionOutcome.DONE else NodeActionOutcome.REJECTED
-                        is Outcome.Err -> NodeActionOutcome.STALE
+                    withSession(display) { session ->
+                        when (
+                            val result =
+                                session.request(
+                                    JSONObject()
+                                        .put("op", BackgroundDisplayWire.OP_NODE_ACTION)
+                                        .put("windowId", windowId)
+                                        .put("path", org.json.JSONArray(path))
+                                        .put("expectedBounds", rectJson(expectedBounds))
+                                        .put("actionId", actionId),
+                                )
+                        ) {
+                            is Outcome.Ok -> Outcome.Ok(NodeActionOutcome.DONE)
+                            is Outcome.Err ->
+                                if (result.error.code == DeviceErrorCodes.NODE_STALE) {
+                                    Outcome.Ok(NodeActionOutcome.STALE)
+                                } else {
+                                    result
+                                }
+                        }
                     }
                 else -> main.performAtPath(windowId, path, expectedBounds, actionId)
             }
@@ -223,24 +222,17 @@ public class RoutedGestureController
                     .put("durationMs", durationMs)
             }
 
-        override suspend fun focusedInput(): ResolvedNode? =
+        override suspend fun focusedInput(): Outcome<ResolvedNode?> =
             when (val display = currentDisplayTarget()) {
                 is DisplayTarget.Background ->
-                    when (
-                        val result =
-                            withSession(display) { session ->
-                                session
-                                    .request(
-                                        JSONObject()
-                                            .put("op", BackgroundDisplayWire.OP_FOCUSED_INPUT),
-                                    ).okValue()
-                                    ?.let { reply ->
-                                        if (reply.optBoolean("found")) HostFocused(reply, session) else null
-                                    }
+                    withSession(display) { session ->
+                        session
+                            .request(
+                                JSONObject()
+                                    .put("op", BackgroundDisplayWire.OP_FOCUSED_INPUT),
+                            ).map { reply ->
+                                if (reply.optBoolean("found")) HostFocused(reply, session).resolved() else null
                             }
-                    ) {
-                        is Outcome.Ok -> result.value?.resolved()
-                        is Outcome.Err -> null
                     }
                 else -> main.focusedInput()
             }
@@ -248,38 +240,36 @@ public class RoutedGestureController
         override suspend fun globalAction(action: GlobalAction): InjectionResult =
             when (currentDisplayTarget()) {
                 is DisplayTarget.Background ->
-                    if (action == GlobalAction.BACK) shellKeyEvent(KeyEvent.KEYCODE_BACK).injection() else failed()
+                    if (action == GlobalAction.BACK) {
+                        when (val result = shellKeyEvent(KeyEvent.KEYCODE_BACK)) {
+                            is Outcome.Ok -> InjectionResult(result.value, InjectionChannel.BACKGROUND)
+                            is Outcome.Err -> InjectionResult.failed(result.error)
+                        }
+                    } else {
+                        InjectionResult.failed(unsupported("全局动作 ${action.name}"))
+                    }
                 else -> main.globalAction(action)
             }
 
-        override suspend fun shellKeyEvent(code: Int): Boolean =
+        override suspend fun shellKeyEvent(code: Int): Outcome<Boolean> =
             when (val display = currentDisplayTarget()) {
                 is DisplayTarget.Background ->
-                    when (val result = withSession(display) { it.request(keyRequest(code)).ok() }) {
-                        is Outcome.Ok -> result.value
-                        is Outcome.Err -> false
-                    }
+                    withSession(display) { it.request(keyRequest(code)).map { _ -> true } }
                 else -> main.shellKeyEvent(code)
             }
 
-        override suspend fun shellKeyCombination(codes: List<Int>): Boolean =
+        override suspend fun shellKeyCombination(codes: List<Int>): Outcome<Boolean> =
             when (val display = currentDisplayTarget()) {
                 is DisplayTarget.Background ->
-                    when (
-                        val result =
-                            withSession(display) {
-                                it
-                                    .request(
-                                        JSONObject()
-                                            .put(
-                                                "op",
-                                                BackgroundDisplayWire.OP_KEY_COMBO,
-                                            ).put("codes", org.json.JSONArray(codes)),
-                                    ).ok()
-                            }
-                    ) {
-                        is Outcome.Ok -> result.value
-                        is Outcome.Err -> false
+                    withSession(display) {
+                        it
+                            .request(
+                                JSONObject()
+                                    .put(
+                                        "op",
+                                        BackgroundDisplayWire.OP_KEY_COMBO,
+                                    ).put("codes", org.json.JSONArray(codes)),
+                            ).map { _ -> true }
                     }
                 else -> main.shellKeyCombination(codes)
             }
@@ -291,20 +281,20 @@ public class RoutedGestureController
         ): InjectionResult =
             when (display) {
                 is DisplayTarget.Background ->
-                    when (val result = withSession(display) { it.request(request()).ok() }) {
-                        is Outcome.Ok -> result.value.injection()
-                        is Outcome.Err -> failed()
+                    when (val result = withSession<Boolean>(display) { it.request(request()).map { _ -> true } }) {
+                        is Outcome.Ok -> InjectionResult(result.value, InjectionChannel.BACKGROUND)
+                        is Outcome.Err -> InjectionResult.failed(result.error)
                     }
                 else -> mainCall()
             }
 
         private suspend fun <T> withSession(
             display: DisplayTarget.Background,
-            block: suspend (BackgroundDisplaySession) -> T,
+            block: suspend (BackgroundDisplaySession) -> Outcome<T>,
         ): Outcome<T> =
             when (val result = manager.session(display)) {
                 is Outcome.Err -> result
-                is Outcome.Ok -> Outcome.Ok(block(result.value))
+                is Outcome.Ok -> block(result.value)
             }
     }
 
@@ -329,22 +319,25 @@ private class HostResolvedNode(
     override fun performAction(
         actionId: Int,
         args: Map<String, Any?>,
-    ): Boolean =
+    ): Outcome<Boolean> =
         kotlinx.coroutines.runBlocking {
-            if (actionId != AccessibilityNodeInfo.ACTION_SET_TEXT) return@runBlocking false
-            session
-                .request(
-                    JSONObject()
-                        .put("op", BackgroundDisplayWire.OP_SET_TEXT)
-                        .put("windowId", windowId)
-                        .put("nodeJson", nodeJson(snapshot))
-                        .put(
-                            "text",
-                            args[AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE]
-                                ?.toString()
-                                .orEmpty(),
-                        ),
-                ).ok()
+            when (actionId) {
+                AccessibilityNodeInfo.ACTION_SET_TEXT ->
+                    session
+                        .request(
+                            JSONObject()
+                                .put("op", BackgroundDisplayWire.OP_SET_TEXT)
+                                .put("windowId", windowId)
+                                .put("nodeJson", nodeJson(snapshot))
+                                .put(
+                                    "text",
+                                    args[AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE]
+                                        ?.toString()
+                                        .orEmpty(),
+                                ),
+                        ).map { true }
+                else -> Outcome.Err(unsupported("节点动作 $actionId"))
+            }
         }
 }
 
@@ -463,16 +456,10 @@ private fun nodeJson(node: NodeSnapshot): String = AutopJson.default.encodeToStr
 private fun decodeNode(value: JSONObject): NodeSnapshot =
     AutopJson.default.decodeFromString(NodeSnapshot.serializer(), value.toString())
 
-private fun Outcome<*>.ok(): Boolean = this is Outcome.Ok
-
-private fun <T> Outcome<T>.okValue(): T? = (this as? Outcome.Ok)?.value
-
 private fun <T> Outcome<T>.errorOrNull(): AppError? = (this as? Outcome.Err)?.error
 
-private fun Boolean.injection(): InjectionResult =
-    InjectionResult(
-        this,
-        if (this) InjectionChannel.BACKGROUND else InjectionChannel.NONE,
+private fun unsupported(action: String): AppError =
+    AppError(
+        code = DeviceErrorCodes.BG_ACTION_UNSUPPORTED,
+        message = "后台显示不支持 $action",
     )
-
-private fun failed(): InjectionResult = InjectionResult.FAILED

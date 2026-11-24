@@ -6,7 +6,10 @@ package com.example.autop.device.impl
 
 import com.example.autop.core.config.ConfigProvider
 import com.example.autop.core.config.DeviceConfig
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.Rect
+import com.example.autop.device.ScreenSnapshot
+import com.example.autop.device.currentDisplayTarget
 import java.util.concurrent.atomic.AtomicReference
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -36,4 +39,8 @@ public class ContentAreaProvider
             val hide = configProvider.current()[DeviceConfig.SERIALIZER].hideSystemDecoration
             return if (hide) latest.get() else null
         }
+
+        /** 真实屏遵循装饰区配置；后台屏始终使用本次虚拟屏快照的完整内容区。 */
+        public suspend fun forSnapshot(snapshot: ScreenSnapshot): Rect? =
+            if (currentDisplayTarget() is DisplayTarget.Background) snapshot.contentArea else base()
     }

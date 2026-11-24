@@ -6,6 +6,7 @@ package com.example.autop.device.impl.tools
 
 import com.example.autop.agent.PreparedAction
 import com.example.autop.agent.ToolContext
+import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
 import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.NodeActionOutcome
@@ -64,6 +65,22 @@ class ScrollNodeToolTest {
 
             assertThat(out.ok).isFalse()
             assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.NODE_REJECTED)
+            assertThat(env.gestures.swipes).isEmpty()
+        }
+
+    @Test
+    fun `node action chain error is not reported as stale or rejected`() =
+        runTest {
+            val env = ToolTestEnv()
+            recordA11y(env)
+            env.gestures.pathError = AppError(DeviceErrorCodes.BG_RELEASED, "后台显示会话已释放")
+            val ctx = env.ctx()
+            val prepared = okOf(prepare(env, ctx, steps = 1))
+
+            val out = env.scrollNodeTool().perform(prepared, ctx)
+
+            assertThat(out.ok).isFalse()
+            assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.BG_RELEASED)
             assertThat(env.gestures.swipes).isEmpty()
         }
 

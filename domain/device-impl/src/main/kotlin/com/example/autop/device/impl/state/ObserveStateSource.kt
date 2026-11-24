@@ -27,7 +27,7 @@ public class ObserveStateSource
 
         override suspend fun entries(req: StateRequest): List<StateEntry> {
             val cfg = req.config[DeviceConfig.OBSERVE]
-            val effective = modes.effective(cfg)
+            val effective = modes.runtimeEffective(cfg)
             val auto = modes.autoCandidates(cfg)
             val entries = mutableListOf<StateEntry>()
             entries +=

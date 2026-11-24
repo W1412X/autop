@@ -7,6 +7,7 @@ package com.example.autop.device.impl
 import android.os.Build
 import android.os.Bundle
 import android.view.accessibility.AccessibilityNodeInfo
+import com.example.autop.core.common.Outcome
 import com.example.autop.device.NodeSnapshot
 import com.example.autop.device.ResolvedNode
 
@@ -20,7 +21,7 @@ internal class DirectResolvedNode(
     override fun performAction(
         actionId: Int,
         args: Map<String, Any?>,
-    ): Boolean {
+    ): Outcome<Boolean> {
         val bundle =
             Bundle().apply {
                 args.forEach { (key, value) ->
@@ -33,7 +34,7 @@ internal class DirectResolvedNode(
                     }
                 }
             }
-        return node.refresh() && node.performAction(actionId, bundle)
+        return Outcome.Ok(node.refresh() && node.performAction(actionId, bundle))
     }
 
     override fun currentText(): String? = if (node.refresh()) node.text?.toString() else null

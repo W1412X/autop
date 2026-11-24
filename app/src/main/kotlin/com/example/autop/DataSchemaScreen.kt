@@ -19,6 +19,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +37,7 @@ import java.util.Locale
 @Composable
 internal fun DataSchemaScreen(onResolved: () -> Unit) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     val scope = rememberCoroutineScope()
     val gate = remember { dataSchemaGate(context) }
     val names = remember { gate.mismatches().map { it.fileName } }
@@ -60,7 +62,7 @@ internal fun DataSchemaScreen(onResolved: () -> Unit) {
                         (context.applicationContext as AutopApplication).resumeAfterDataReset()
                         onResolved()
                     }
-                }.onFailure { error = context.getString(R.string.data_schema_failed, it.message.orEmpty()) }
+                }.onFailure { error = resources.getString(R.string.data_schema_failed, it.message.orEmpty()) }
             busy = false
         }
     }

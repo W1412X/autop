@@ -118,14 +118,14 @@ public class InputTextTool
             }
         }
 
-        private fun prepared(
+        private suspend fun prepared(
             snap: ScreenSnapshot,
             text: String,
             click: ClickArg,
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> {
-            val base = snap.contentArea ?: contentAreas.base()
+            val base = contentAreas.forSnapshot(snap)
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
             val area = base ?: Rect(0, 0, snap.screenWidth, snap.screenHeight)
             val tree = receipts.treeOf(ctx, snap)
@@ -195,7 +195,11 @@ public class InputTextTool
             input: InputAction,
             steps: MutableList<String>,
         ): Outcome<WriteOutcome> {
-            val focused = gestures.focusedInput()
+            val focused =
+                when (val result = gestures.focusedInput()) {
+                    is Outcome.Err -> return result
+                    is Outcome.Ok -> result.value
+                }
             return try {
                 when {
                     focused == null ->
@@ -229,25 +233,29 @@ public class InputTextTool
                                     ),
                             ),
                         )
-                    else -> {
-                        val value =
-                            if (input.append) {
-                                val current = focused.currentText() ?: return Outcome.Err(refreshFailed())
-                                current + input.text
-                            } else {
-                                input.text
-                            }
-                        val done = focusedWrite(focused, input, value)
-                        if (done != null) {
-                            Outcome.Ok(done)
-                        } else {
-                            steps += TRACE_SET_TEXT_REJECTED
-                            shellWrite(input)
-                        }
-                    }
+                    else -> writeFocused(focused, input, steps)
                 }
             } finally {
                 (focused as? DirectResolvedNode)?.close()
+            }
+        }
+
+        private suspend fun writeFocused(
+            focused: ResolvedNode,
+            input: InputAction,
+            steps: MutableList<String>,
+        ): Outcome<WriteOutcome> {
+            val value =
+                if (input.append) {
+                    val current = focused.currentText() ?: return Outcome.Err(refreshFailed())
+                    current + input.text
+                } else {
+                    input.text
+                }
+            val done = focusedWrite(focused, input, value, steps)
+            return when (done) {
+                is Outcome.Err -> done
+                is Outcome.Ok -> done.value?.let { Outcome.Ok(it) } ?: shellWrite(input)
             }
         }
 
@@ -256,17 +264,30 @@ public class InputTextTool
             node: ResolvedNode,
             input: InputAction,
             value: String,
-        ): WriteOutcome? {
-            val ok =
+            steps: MutableList<String>,
+        ): Outcome<WriteOutcome?> {
+            val performed =
                 gestures.performNodeAction(
                     node,
                     ACTION_SET_TEXT,
                     mapOf(ACTION_ARGUMENT_SET_TEXT to value),
                 )
-            if (!ok) return null
+            val ok =
+                when (performed) {
+                    is Outcome.Err -> return performed
+                    is Outcome.Ok -> performed.value
+                }
+            if (!ok) {
+                steps += TRACE_SET_TEXT_REJECTED
+                return Outcome.Ok(null)
+            }
             val traces = mutableListOf(trace.executionLine(ExecMethod.NODE_ACTION, "ACTION_SET_TEXT"))
-            val submit = submitOf(node, input, traces)
-            return WriteOutcome(resultText(input, submit), traces)
+            val submit =
+                when (val result = submitOf(node, input, traces)) {
+                    is Outcome.Err -> return result
+                    is Outcome.Ok -> result.value
+                }
+            return Outcome.Ok(WriteOutcome(resultText(input, submit), traces))
         }
 
         /** 输入框当前内容刷新失败（WP7.11）：不拿旧文本做 append，改用 mode=replace 重新输入。 */
@@ -285,7 +306,7 @@ public class InputTextTool
             if (currentDisplayTarget() is DisplayTarget.Background) {
                 return Outcome.Err(
                     AppError(
-                        code = DeviceErrorCodes.ACTION_FAILED,
+                        code = DeviceErrorCodes.BG_ACTION_UNSUPPORTED,
                         message = "后台输入框拒绝 SET_TEXT，未写入真实屏剪贴板",
                     ),
                 )
@@ -314,25 +335,26 @@ public class InputTextTool
                     )
                 }
             }
-            val ok = sendKeys(input, clearing)
+            val keys = sendKeys(input, clearing)
             val restoreNote =
                 if (clearing) {
                     CLIPBOARD_UNTOUCHED
                 } else {
                     restoreClipboard(saved, input.clipboardRestoreDelayMs)
                 }
-            if (!ok) {
+            if (keys is Outcome.Err) {
                 return Outcome.Err(
-                    AppError(
-                        code = DeviceErrorCodes.ACTION_FAILED,
-                        message = "通过 shell 输入文字失败；$restoreNote",
-                    ),
+                    keys.error.copy(message = "通过 shell 输入文字失败；$restoreNote"),
                 )
             }
             val traces = mutableListOf<String>()
             traces += trace.executionLine(ExecMethod.SHELL_KEY, if (clearing) TRACE_CLEAR_LABEL else CLIPBOARD_PASTE)
             traces += restoreNote
-            val submit = shellSubmitOf(input, traces)
+            val submit =
+                when (val result = shellSubmitOf(input, traces)) {
+                    is Outcome.Err -> return result
+                    is Outcome.Ok -> result.value
+                }
             return Outcome.Ok(WriteOutcome(resultText(input, submit), traces))
         }
 
@@ -340,51 +362,97 @@ public class InputTextTool
         private suspend fun sendKeys(
             input: InputAction,
             clearing: Boolean,
-        ): Boolean =
+        ): Outcome<Unit> =
             when {
                 clearing ->
-                    gestures.shellKeyEvent(KEYCODE_MOVE_END) &&
-                        gestures.shellKeyCombination(listOf(KEYCODE_CTRL_LEFT, KEYCODE_A)) &&
-                        gestures.shellKeyEvent(KEYCODE_DEL)
-                input.append -> gestures.shellKeyEvent(KEYCODE_MOVE_END) && gestures.shellKeyEvent(KEYCODE_PASTE)
+                    shellKeys(
+                        listOf(KEYCODE_MOVE_END),
+                        listOf(KEYCODE_CTRL_LEFT, KEYCODE_A),
+                        listOf(KEYCODE_DEL),
+                    )
+                input.append -> shellKeys(listOf(KEYCODE_MOVE_END), listOf(KEYCODE_PASTE))
                 else ->
-                    gestures.shellKeyEvent(KEYCODE_MOVE_END) &&
-                        gestures.shellKeyCombination(listOf(KEYCODE_CTRL_LEFT, KEYCODE_A)) &&
-                        gestures.shellKeyEvent(KEYCODE_DEL) &&
-                        gestures.shellKeyEvent(KEYCODE_PASTE)
+                    shellKeys(
+                        listOf(KEYCODE_MOVE_END),
+                        listOf(KEYCODE_CTRL_LEFT, KEYCODE_A),
+                        listOf(KEYCODE_DEL),
+                        listOf(KEYCODE_PASTE),
+                    )
             }
+
+        private suspend fun shellKeys(vararg keys: List<Int>): Outcome<Unit> {
+            for (codes in keys) {
+                val result =
+                    if (codes.size == 1) {
+                        gestures.shellKeyEvent(codes.single())
+                    } else {
+                        gestures.shellKeyCombination(codes)
+                    }
+                when (result) {
+                    is Outcome.Err -> return result
+                    is Outcome.Ok ->
+                        if (!result.value) {
+                            return Outcome.Err(
+                                AppError(
+                                    code = DeviceErrorCodes.ACTION_FAILED,
+                                    message = "通过 shell 输入文字失败",
+                                ),
+                            )
+                        }
+                }
+            }
+            return Outcome.Ok(Unit)
+        }
 
         /** 提交：优先 IME_ENTER 节点动作，失败或没有该动作时补一次 shell Enter；结果写进 [traces]。 */
         private suspend fun submitOf(
             node: ResolvedNode,
             input: InputAction,
             traces: MutableList<String>,
-        ): String {
-            if (!input.submit) return ""
-            val hasImeEnter = node.snapshot.actions.contains(ACTION_IME_ENTER)
-            if (hasImeEnter && gestures.performNodeAction(node, ACTION_IME_ENTER)) {
-                traces += trace.executionLine(ExecMethod.NODE_ACTION, "ACTION_IME_ENTER")
-                return SUBMIT_OK
-            }
+        ): Outcome<String> {
+            if (!input.submit) return Outcome.Ok("")
             val background = currentDisplayTarget() is DisplayTarget.Background
-            if ((shell.state.value == ShellState.Connected || background) && gestures.shellKeyEvent(KEYCODE_ENTER)) {
-                traces += trace.executionLine(ExecMethod.SHELL_KEY, "Enter")
-                return SUBMIT_OK
+            if (node.snapshot.actions.contains(ACTION_IME_ENTER)) {
+                when (val result = gestures.performNodeAction(node, ACTION_IME_ENTER)) {
+                    is Outcome.Err ->
+                        if (!background || result.error.code != DeviceErrorCodes.BG_ACTION_UNSUPPORTED) {
+                            return result
+                        }
+                    is Outcome.Ok ->
+                        if (result.value) {
+                            traces += trace.executionLine(ExecMethod.NODE_ACTION, "ACTION_IME_ENTER")
+                            return Outcome.Ok(SUBMIT_OK)
+                        }
+                }
             }
-            return SUBMIT_FAILED
+            if (shell.state.value != ShellState.Connected && !background) return Outcome.Ok(SUBMIT_FAILED)
+            return when (val result = gestures.shellKeyEvent(KEYCODE_ENTER)) {
+                is Outcome.Err -> result
+                is Outcome.Ok ->
+                    if (result.value) {
+                        traces += trace.executionLine(ExecMethod.SHELL_KEY, "Enter")
+                        Outcome.Ok(SUBMIT_OK)
+                    } else {
+                        Outcome.Ok(SUBMIT_FAILED)
+                    }
+            }
         }
 
         /** shell 路径的提交：直接 shell Enter，结果与通道写进 [traces]。 */
         private suspend fun shellSubmitOf(
             input: InputAction,
             traces: MutableList<String>,
-        ): String {
-            if (!input.submit) return ""
-            return if (gestures.shellKeyEvent(KEYCODE_ENTER)) {
-                traces += trace.executionLine(ExecMethod.SHELL_KEY, "Enter")
-                SUBMIT_OK
-            } else {
-                SUBMIT_FAILED
+        ): Outcome<String> {
+            if (!input.submit) return Outcome.Ok("")
+            return when (val result = gestures.shellKeyEvent(KEYCODE_ENTER)) {
+                is Outcome.Err -> result
+                is Outcome.Ok ->
+                    if (result.value) {
+                        traces += trace.executionLine(ExecMethod.SHELL_KEY, "Enter")
+                        Outcome.Ok(SUBMIT_OK)
+                    } else {
+                        Outcome.Ok(SUBMIT_FAILED)
+                    }
             }
         }
 
@@ -439,7 +507,9 @@ public class InputTextTool
             val gesture =
                 input.clickPoint?.let {
                     val result = gestures.tap(it.x, it.y, input.clickDurationMs)
-                    if (!result.ok) return errorOutput(injectFailed("点击输入框")).copy(trace = steps)
+                    if (!result.ok) {
+                        return errorOutput(result.error ?: injectFailed("点击输入框")).copy(trace = steps)
+                    }
                     steps +=
                         prompts.text(
                             PROMPT_CLICKED,

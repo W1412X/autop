@@ -89,10 +89,13 @@ public class GlobalActionTool
             val pre = epilogue.preSample(ctx)
             val result = gestures.globalAction(payload.action)
             if (!result.ok) {
-                return toolError(
-                    DeviceErrorCodes.ACTION_FAILED,
-                    "全局动作 ${payload.action.name} 执行失败",
-                    prompts.text(PROMPT_FAILED_HINT),
+                return errorOutput(
+                    result.error
+                        ?: AppError(
+                            code = DeviceErrorCodes.ACTION_FAILED,
+                            message = "全局动作 ${payload.action.name} 执行失败",
+                            hint = prompts.text(PROMPT_FAILED_HINT),
+                        ),
                 )
             }
             val traceLine =

@@ -99,7 +99,7 @@ public class ScrollTool
             }
         }
 
-        private fun prepared(
+        private suspend fun prepared(
             snap: ScreenSnapshot,
             direction: ScrollDirection,
             args: JsonObject,
@@ -107,7 +107,7 @@ public class ScrollTool
         ): Outcome<PreparedAction> {
             val x = args.int("x") ?: CENTER
             val y = args.int("y") ?: CENTER
-            val base = snap.contentArea ?: contentAreas.base()
+            val base = contentAreas.forSnapshot(snap)
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
             val center = mapper.toScreen(x, y) ?: return coordOutOfRange(coords)
             val tree = receipts.treeOf(ctx, snap)
@@ -179,7 +179,7 @@ public class ScrollTool
             scroll: ScrollAction,
             snap: ScreenSnapshot,
         ): StepResult {
-            val base = snap.contentArea ?: contentAreas.base()
+            val base = contentAreas.forSnapshot(snap)
             val mapper = coords.mapper(PixelSize(snap.screenWidth, snap.screenHeight), base)
             val anchor = mapper.toScreen(scroll.anchor.x, scroll.anchor.y)
             if (anchor == null) {
@@ -192,12 +192,15 @@ public class ScrollTool
             val area = base ?: Rect(0, 0, snap.screenWidth, snap.screenHeight)
             val container = scrollContainer(snap, anchor)?.let { ScrollGeometry.intersectOrSelf(it, area) } ?: area
             val shot =
-                swipe(ctx, container, anchor, scroll.direction)
-                    ?: return StepResult(
-                        gesture = null,
-                        trace = "",
-                        error = injectFailed("滚动手势"),
-                    )
+                when (val result = swipe(ctx, container, anchor, scroll.direction)) {
+                    is Outcome.Err ->
+                        return StepResult(
+                            gesture = null,
+                            trace = "",
+                            error = result.error,
+                        )
+                    is Outcome.Ok -> result.value
+                }
             val line =
                 trace.executionLine(
                     ExecMethod.GESTURE,
@@ -216,13 +219,13 @@ public class ScrollTool
             return target?.node?.bounds
         }
 
-        /** 执行容器内的单步手势；返回实际通道与回放参数，注入未送达返回 null。 */
+        /** 执行容器内的单步手势；返回实际通道与回放参数，注入未送达返回错误。 */
         private suspend fun swipe(
             ctx: ToolContext,
             container: Rect,
             anchor: Point,
             direction: ScrollDirection,
-        ): GestureShot? {
+        ): Outcome<GestureShot> {
             val cfg = ctx.config[DeviceConfig.SCROLL]
             val step = ScrollGeometry.step(container, anchor, direction, paramsOf(cfg))
             val (from, to) =
@@ -230,8 +233,8 @@ public class ScrollTool
                     ThreadLocalRandom.current().nextDouble()
                 }
             val result = gestures.swipe(from.x, from.y, to.x, to.y, step.durationMs, cfg.trajectoryJitterPx)
-            if (!result.ok) return null
-            return GestureShot(result, gestureJson(from.x, from.y, to.x, to.y, step.durationMs))
+            if (!result.ok) return Outcome.Err(result.error ?: injectFailed("滚动手势"))
+            return Outcome.Ok(GestureShot(result, gestureJson(from.x, from.y, to.x, to.y, step.durationMs)))
         }
 
         private fun paramsOf(cfg: DeviceScrollSection): ScrollGeometryParams =

@@ -5,11 +5,15 @@
 package com.example.autop.device.impl.tools
 
 import com.example.autop.agent.PreparedAction
+import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
+import com.example.autop.core.common.RunId
 import com.example.autop.device.AppInfo
 import com.example.autop.device.DeviceErrorCodes
+import com.example.autop.device.DisplayTarget
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -67,6 +71,60 @@ class OpenAppToolTest {
             assertThat(out.ok).isTrue()
             assertThat(launcher.launched).containsExactly("com.autonavi.minimap")
             assertThat(out.content.toString()).contains("已请求打开 高德地图（com.autonavi.minimap）")
+        }
+
+    @Test
+    fun `background empty display launches when snapshot is unavailable`() =
+        runTest {
+            val env = ToolTestEnv()
+            val launcher = FakeAppLauncher(apps = listOf(AppInfo("com.autonavi.minimap", "高德地图")))
+            env.reader.snapshots += Outcome.Err(AppError("no_foreground", "empty display"))
+            val tool = env.openAppTool(launcher)
+            val display = DisplayTarget.Background(RunId("background-run"), 9, 720, 1600, 320)
+
+            val out =
+                withContext(display) {
+                    val prepared = okOf(tool.prepare(args("""{"name":"高德地图"}"""), env.ctx()))
+                    tool.perform(prepared, env.ctx())
+                }
+
+            assertThat(out.ok).isTrue()
+            assertThat(launcher.launched).containsExactly("com.autonavi.minimap")
+            assertThat(env.reader.snapshots).isEmpty()
+        }
+
+    @Test
+    fun `background explicit package launches when snapshot is unavailable`() =
+        runTest {
+            val env = ToolTestEnv()
+            val launcher = FakeAppLauncher()
+            env.reader.snapshots += Outcome.Err(AppError("no_foreground", "empty display"))
+            val tool = env.openAppTool(launcher)
+            val display = DisplayTarget.Background(RunId("background-run"), 9, 720, 1600, 320)
+
+            val out =
+                withContext(display) {
+                    val prepared =
+                        okOf(tool.prepare(args("""{"package":"com.autonavi.minimap"}"""), env.ctx()))
+                    tool.perform(prepared, env.ctx())
+                }
+
+            assertThat(out.ok).isTrue()
+            assertThat(launcher.launched).containsExactly("com.autonavi.minimap")
+        }
+
+    @Test
+    fun `main display keeps snapshot failure and launches nothing`() =
+        runTest {
+            val env = ToolTestEnv()
+            val launcher = FakeAppLauncher(apps = listOf(AppInfo("com.autonavi.minimap", "高德地图")))
+            env.reader.snapshots += Outcome.Err(AppError("tree_unavailable", "screen unavailable"))
+            val tool = env.openAppTool(launcher)
+
+            val prepared = tool.prepare(args("""{"name":"高德地图"}"""), env.ctx())
+
+            assertThat((prepared as Outcome.Err).error.code).isEqualTo("tree_unavailable")
+            assertThat(launcher.launched).isEmpty()
         }
 
     private fun args(json: String): JsonObject = Json.parseToJsonElement(json).jsonObject

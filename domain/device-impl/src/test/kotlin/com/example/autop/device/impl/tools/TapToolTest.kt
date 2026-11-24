@@ -5,13 +5,17 @@
 package com.example.autop.device.impl.tools
 
 import com.example.autop.agent.PreparedAction
+import com.example.autop.core.common.AppError
 import com.example.autop.core.common.Outcome
+import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.device.Rect
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.put
 import org.junit.Test
 import org.junit.runner.RunWith
 import org.robolectric.RobolectricTestRunner
@@ -59,6 +63,59 @@ class TapToolTest {
             assertThat(out.ok).isFalse()
             assertThat(env.gestures.taps).hasSize(1)
             assertThat(env.gestures.nodeActions).isEmpty()
+        }
+
+    @Test
+    fun `injection chain error is preserved`() =
+        runTest {
+            val env = ToolTestEnv()
+            env.gestures.tapError = AppError(DeviceErrorCodes.BG_RELEASED, "后台显示会话已释放")
+            val screen = a11yScreenOf(emptyList())
+            env.queue(screen)
+            env.queue(screen)
+            val tool = env.tapTool()
+            val ctx = env.ctx()
+            val prepared = okOf(tool.prepare(args(), ctx))
+
+            val out = tool.perform(prepared, ctx)
+
+            assertThat(out.ok).isFalse()
+            assertThat(out.error?.code).isEqualTo(DeviceErrorCodes.BG_RELEASED)
+            assertThat(out.error?.message).contains("会话已释放")
+        }
+
+    @Test
+    fun `full screen mode maps tap against full screen instead of snapshot content area`() =
+        runTest {
+            val env = ToolTestEnv()
+            env.provider.setOverrides(
+                buildJsonObject {
+                    put(
+                        "device",
+                        buildJsonObject {
+                            put("serializer", buildJsonObject { put("hideSystemDecoration", false) })
+                            put(
+                                "tap",
+                                buildJsonObject {
+                                    put("jitterMaxPx", 0)
+                                    put("jitterRatio", 0)
+                                },
+                            )
+                        },
+                    )
+                },
+            )
+            val screen = a11yScreenOf(emptyList()).copy(contentArea = Rect(0, 100, 1080, 1820))
+            env.queue(screen)
+            env.queue(screen)
+            val tool = env.tapTool()
+            val ctx = env.ctx()
+            val prepared = okOf(tool.prepare(args(), ctx))
+
+            val out = tool.perform(prepared, ctx)
+
+            assertThat(out.ok).isTrue()
+            assertThat(env.gestures.taps).containsExactly(540 to 480)
         }
 
     private fun args(): JsonObject =

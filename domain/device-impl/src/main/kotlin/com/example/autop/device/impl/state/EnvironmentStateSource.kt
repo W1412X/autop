@@ -8,11 +8,15 @@ import com.example.autop.agent.RuntimeStateSource
 import com.example.autop.agent.StateEntry
 import com.example.autop.agent.StateRequest
 import com.example.autop.core.common.Clock
+import com.example.autop.core.common.Outcome
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppLauncher
 import com.example.autop.device.DeviceState
 import com.example.autop.device.DeviceStateProvider
+import com.example.autop.device.DisplayTarget
+import com.example.autop.device.ScreenReader
+import com.example.autop.device.currentDisplayTarget
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -29,12 +33,13 @@ public class EnvironmentStateSource
         private val deviceStates: DeviceStateProvider,
         private val clock: Clock,
         private val apps: AppLauncher,
+        private val screenReader: ScreenReader,
         private val prompts: PromptRepository,
     ) : RuntimeStateSource {
         override val id: String = ID
 
         override suspend fun entries(req: StateRequest): List<StateEntry> {
-            val state = deviceStates.current()
+            val state = stateForDisplay()
             return listOf(
                 StateEntry(KEY_TIME, render(PROMPT_TIME, timeVars()), volatile = true),
                 StateEntry(KEY_BATTERY, render(PROMPT_BATTERY, batteryVars(state)), volatile = true),
@@ -42,6 +47,20 @@ public class EnvironmentStateSource
                 StateEntry(KEY_FOREGROUND, render(PROMPT_FOREGROUND, foregroundVars(state))),
                 StateEntry(KEY_SCREEN, render(PROMPT_SCREEN, screenVars(state))),
             )
+        }
+
+        private suspend fun stateForDisplay(): DeviceState {
+            val physical = deviceStates.current()
+            return if (currentDisplayTarget() is DisplayTarget.Background) {
+                val foreground = (screenReader.snapshotOrDegraded() as? Outcome.Ok)?.value?.foregroundPackage
+                physical.copy(
+                    foregroundPackage = foreground,
+                    screenOn = true,
+                    keyguardLocked = false,
+                )
+            } else {
+                physical
+            }
         }
 
         private fun timeVars(): Map<String, String> {

@@ -151,7 +151,7 @@ public class ScreenPreparer
             val timeoutMs = config[DeviceConfig.VISION].timeoutMs
             val tree =
                 try {
-                    withTimeout(timeoutMs) { visualParser.synthesize(frameOf(shot, base)) }
+                    withTimeout(timeoutMs) { visualParser.synthesize(frameOf(shot, base, config)) }
                 } catch (e: TimeoutCancellationException) {
                     return Outcome.Err(visualParseFailed("visual parse timeout (${timeoutMs}ms)", e))
                 } catch (e: CancellationException) {
@@ -193,6 +193,7 @@ public class ScreenPreparer
         private fun frameOf(
             shot: Screenshot,
             base: ScreenSnapshot,
+            config: ConfigSnapshot,
         ): VisualFrame =
             VisualFrame(
                 imageBytes = shot.jpegBytes ?: ByteArray(0),
@@ -200,7 +201,12 @@ public class ScreenPreparer
                 height = shot.height,
                 rotation = base.rotation,
                 capturedAt = base.capturedAt,
-                contentArea = base.contentArea ?: Rect(0, 0, base.screenWidth, base.screenHeight),
+                contentArea =
+                    if (config[DeviceConfig.SERIALIZER].hideSystemDecoration) {
+                        base.contentArea ?: Rect(0, 0, base.screenWidth, base.screenHeight)
+                    } else {
+                        Rect(0, 0, base.screenWidth, base.screenHeight)
+                    },
             )
 
         private fun signatureOf(shot: Screenshot): FrameSignature? {

@@ -119,33 +119,37 @@ public class TapNodeTool
             val pre = epilogue.preSample(ctx)
             val label = if (tap.long) ACTION_LONG_CLICK else ACTION_CLICK
             val actionId = if (tap.long) NodeActionIds.LONG_CLICK else NodeActionIds.CLICK
-            val outcome =
+            val result =
                 gestures.performAtPath(
                     tap.target.target.windowId,
                     tap.target.target.path,
                     tap.target.live.bounds,
                     actionId,
                 )
-            when (outcome) {
-                NodeActionOutcome.STALE ->
-                    return errorOutput(
-                        AppError(
-                            code = DeviceErrorCodes.NODE_STALE,
-                            message = "node #${tap.id} is stale in the live tree",
-                            retryable = true,
-                            hint = prompts.text(PROMPT_STALE),
-                        ),
-                    )
-                NodeActionOutcome.REJECTED ->
-                    return errorOutput(
-                        AppError(
-                            code = DeviceErrorCodes.NODE_REJECTED,
-                            message = "app rejected $label on node #${tap.id}",
-                            retryable = false,
-                            hint = rejectedHint(tap, label),
-                        ),
-                    )
-                NodeActionOutcome.DONE -> Unit
+            when (result) {
+                is Outcome.Err -> return errorOutput(result.error)
+                is Outcome.Ok ->
+                    when (result.value) {
+                        NodeActionOutcome.STALE ->
+                            return errorOutput(
+                                AppError(
+                                    code = DeviceErrorCodes.NODE_STALE,
+                                    message = "node #${tap.id} is stale in the live tree",
+                                    retryable = true,
+                                    hint = prompts.text(PROMPT_STALE),
+                                ),
+                            )
+                        NodeActionOutcome.REJECTED ->
+                            return errorOutput(
+                                AppError(
+                                    code = DeviceErrorCodes.NODE_REJECTED,
+                                    message = "app rejected $label on node #${tap.id}",
+                                    retryable = false,
+                                    hint = rejectedHint(tap, label),
+                                ),
+                            )
+                        NodeActionOutcome.DONE -> Unit
+                    }
             }
             return epilogue.finish(
                 ctx,

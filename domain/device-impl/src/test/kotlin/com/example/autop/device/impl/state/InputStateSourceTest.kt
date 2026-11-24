@@ -11,12 +11,14 @@ import com.example.autop.core.common.ThreadId
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
 import com.example.autop.device.AccessibilityStatus
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.ShellInput
 import com.example.autop.device.ShellState
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import org.junit.Test
 
 class InputStateSourceTest {
@@ -40,10 +42,63 @@ class InputStateSourceTest {
             assertThat(shellTexts(paired)).contains("shell 未连接，已配对过")
         }
 
+    @Test
+    fun `background run reports touch shield off`() =
+        runTest {
+            val source = source()
+            val display = DisplayTarget.Background(RunId("background-run"), 9, 720, 1600, 320)
+
+            val text =
+                withContext(display) {
+                    source.entries(request()).single { it.key == InputStateSource.KEY_SHIELD }.text
+                }
+
+            assertThat(text).contains("已关闭，执行期间不拦截用户触摸")
+            assertThat(text).doesNotContain("拦截用户触摸；")
+        }
+
+    @Test
+    fun `main run keeps configured touch shield on`() =
+        runTest {
+            val text = source().entries(request()).single { it.key == InputStateSource.KEY_SHIELD }.text
+
+            assertThat(text).contains("执行期间拦截用户触摸")
+        }
+
+    @Test
+    fun `background run uses host accessibility when physical service is off`() =
+        runTest {
+            val source = source(accessibilityConnected = false)
+            val display = DisplayTarget.Background(RunId("background-run"), 9, 720, 1600, 320)
+
+            val text =
+                withContext(display) {
+                    source.entries(request()).single { it.key == InputStateSource.KEY_ACCESSIBILITY }.text
+                }
+
+            assertThat(text).contains("已连接")
+            assertThat(text).doesNotContain("未连接")
+        }
+
+    private fun source(accessibilityConnected: Boolean = true): InputStateSource =
+        InputStateSource(
+            accessibility = FakeAccessibility(accessibilityConnected),
+            shell = FakeShell(state = ShellState.Connected, paired = true),
+            prompts = FakePromptRepository(),
+        )
+
+    private fun request(): StateRequest =
+        StateRequest(
+            runId = RunId("run-1"),
+            threadId = ThreadId("thread-1"),
+            config = FakeConfigProvider().current(),
+            vars = emptyMap(),
+        )
+
     private suspend fun shellTexts(shell: FakeShell): String {
         val source =
             InputStateSource(
-                accessibility = FakeAccessibility,
+                accessibility = FakeAccessibility(),
                 shell = shell,
                 prompts = FakePromptRepository(),
             )
@@ -57,8 +112,10 @@ class InputStateSourceTest {
         return source.entries(req).single { it.key == InputStateSource.KEY_SHELL }.text
     }
 
-    private object FakeAccessibility : AccessibilityStatus {
-        override val connected: StateFlow<Boolean> = MutableStateFlow(true)
+    private class FakeAccessibility(
+        connected: Boolean = true,
+    ) : AccessibilityStatus {
+        override val connected: StateFlow<Boolean> = MutableStateFlow(connected)
     }
 
     private class FakeShell(

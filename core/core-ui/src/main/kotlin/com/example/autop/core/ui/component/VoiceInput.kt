@@ -14,6 +14,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.core.content.ContextCompat
 import com.example.autop.core.ui.R
 
@@ -62,10 +63,11 @@ public fun joinVoiceText(
 @Composable
 public fun VoiceErrorToast(code: String?) {
     val context = LocalContext.current
+    val resources = LocalResources.current
     LaunchedEffect(code) {
         if (code == null) return@LaunchedEffect
         val (res, arg) = voiceErrorText(code)
-        Toast.makeText(context, context.getString(res, arg), Toast.LENGTH_LONG).show()
+        Toast.makeText(context, resources.getString(res, arg), Toast.LENGTH_LONG).show()
     }
 }
 

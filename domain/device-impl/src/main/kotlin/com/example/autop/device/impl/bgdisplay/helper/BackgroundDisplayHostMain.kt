@@ -3,6 +3,8 @@
 package com.example.autop.device.impl.bgdisplay.helper
 
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.annotation.SuppressLint
+import android.annotation.TargetApi
 import android.app.ActivityOptions
 import android.app.KeyguardManager
 import android.app.PendingIntent
@@ -11,6 +13,7 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.hardware.input.InputManager
@@ -55,7 +58,6 @@ import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_FOREGROUND_UNAVAILABLE
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_INJECTION_FAILED
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_LAUNCH_FAILED
-import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_NO_FOREGROUND
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_SET_TEXT_FAILED
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_STALE_NODE
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_TIMEOUT
@@ -210,6 +212,7 @@ private data class DisplaySession(
     val jpegQuality: Int,
 )
 
+@TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 internal class BackgroundDisplayServer(
     private val context: Context,
 ) {
@@ -566,7 +569,7 @@ internal class BackgroundDisplayServer(
                     else -> hostFailure(ERR_TREE_UNAVAILABLE, error)
                 }
             }
-            hostFailure(ERR_TREE_UNAVAILABLE)
+            emptyList()
         }
 
     private fun capture(request: JSONObject): JSONObject {
@@ -577,6 +580,9 @@ internal class BackgroundDisplayServer(
             repeat(CAPTURE_RETRY_COUNT) {
                 if (image == null) image = reader.acquireLatestImage()
                 if (image == null) SystemClock.sleep(CAPTURE_RETRY_MS)
+            }
+            if (image == null && foregroundPackage(session.display.displayId) == null) {
+                return blankCapture(session.width, session.height, session.jpegQuality)
             }
             val captured = image ?: hostFailure(ERR_CAPTURE_FAILED)
             val bytes = encodeJpeg(captured, session.jpegQuality)
@@ -591,6 +597,30 @@ internal class BackgroundDisplayServer(
             }
         } finally {
             runCatching { image?.close() }
+        }
+    }
+
+    private fun blankCapture(
+        width: Int,
+        height: Int,
+        quality: Int,
+    ): JSONObject {
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        return try {
+            bitmap.eraseColor(Color.BLACK)
+            val bytes =
+                ByteArrayOutputStream().use { output ->
+                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)) {
+                        hostFailure(ERR_CAPTURE_FAILED)
+                    }
+                    output.toByteArray()
+                }
+            JSONObject()
+                .put("jpeg", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                .put("width", width)
+                .put("height", height)
+        } finally {
+            bitmap.recycle()
         }
     }
 
@@ -936,8 +966,8 @@ internal class BackgroundDisplayServer(
     }
 
     private fun foreground(request: JSONObject): JSONObject {
-        val packageName = foregroundPackage(requireSession(request).display.displayId) ?: hostFailure(ERR_NO_FOREGROUND)
-        return JSONObject().put("packageName", packageName)
+        val packageName = foregroundPackage(requireSession(request).display.displayId)
+        return JSONObject().put("packageName", packageName.orEmpty())
     }
 
     private fun foregroundPackage(displayId: Int): String? {
@@ -997,9 +1027,8 @@ internal class BackgroundDisplayServer(
         require(x in 0 until session.width && y in 0 until session.height) { "coordinates" }
     }
 
-    private fun inputManager(): InputManager =
-        context.getSystemService(InputManager::class.java) ?: hostFailure(ERR_INJECTION_FAILED)
-
+    // UID 2000 Host uses the platform's per-display setter; failure must abort instead of using the real display.
+    @SuppressLint("BlockedPrivateApi")
     private fun setDisplayId(
         event: InputEvent,
         displayId: Int,
@@ -1010,6 +1039,9 @@ internal class BackgroundDisplayServer(
                 .invoke(event, displayId)
         }.onFailure { hostFailure(ERR_INJECTION_FAILED, it) }
     }
+
+    private fun inputManager(): InputManager =
+        context.getSystemService(InputManager::class.java) ?: hostFailure(ERR_INJECTION_FAILED)
 
     private fun inject(
         manager: InputManager,

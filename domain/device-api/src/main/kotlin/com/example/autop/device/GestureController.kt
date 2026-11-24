@@ -3,6 +3,9 @@
  */
 package com.example.autop.device
 
+import com.example.autop.core.common.AppError
+import com.example.autop.core.common.Outcome
+
 /** 动作执行。 */
 public interface GestureController {
     /** 对目标节点执行无障碍动作（如 ACTION_CLICK）。 */
@@ -10,7 +13,7 @@ public interface GestureController {
         target: ResolvedNode,
         actionId: Int,
         args: Map<String, Any?> = emptyMap(),
-    ): Boolean
+    ): Outcome<Boolean>
 
     /**
      * 对快照里选中的节点执行无障碍动作：按 [windowId] 与根到节点的子序号路径 [path] 在实时树里定位，
@@ -21,7 +24,7 @@ public interface GestureController {
         path: List<Int>,
         expectedBounds: Rect,
         actionId: Int,
-    ): NodeActionOutcome
+    ): Outcome<NodeActionOutcome>
 
     /** 点击（或长按）坐标点；落点抖动由工具计算后传入（§5.2）。 */
     public suspend fun tap(
@@ -43,7 +46,7 @@ public interface GestureController {
     ): InjectionResult
 
     /** 当前焦点输入框（docs/design/observation-modes-coordinate-actions §5.3）；没有返回 null。 */
-    public suspend fun focusedInput(): ResolvedNode?
+    public suspend fun focusedInput(): Outcome<ResolvedNode?>
 
     /** 全局动作。 */
     public suspend fun globalAction(action: GlobalAction): InjectionResult
@@ -52,10 +55,10 @@ public interface GestureController {
      * shell 注入按键（粘贴/回车等输入管道按键）：同手势通道做盾放行＋自身动作标记；
      * shell 通道未连接返回 false。
      */
-    public suspend fun shellKeyEvent(code: Int): Boolean
+    public suspend fun shellKeyEvent(code: Int): Outcome<Boolean>
 
     /** shell 注入组合键（如 Ctrl+A）；shell 通道未连接返回 false。 */
-    public suspend fun shellKeyCombination(codes: List<Int>): Boolean
+    public suspend fun shellKeyCombination(codes: List<Int>): Outcome<Boolean>
 }
 
 /** [GestureController.performAtPath] 的结果。 */
@@ -103,10 +106,16 @@ public data class InjectionResult(
     val channel: InjectionChannel,
     /** channel=ACCESSIBILITY 时，没走 shell 的原因；首选就是无障碍的动作为 null。 */
     val shellSkip: ShellSkip? = null,
+    /** 执行链路失败时保留原始错误；成功为 null。 */
+    val error: AppError? = null,
 ) {
     public companion object {
         /** 注入失败（没有任何通道送达）。 */
         public val FAILED: InjectionResult = InjectionResult(ok = false, channel = InjectionChannel.NONE)
+
+        /** 带原因的注入失败。 */
+        public fun failed(error: AppError): InjectionResult =
+            InjectionResult(ok = false, channel = InjectionChannel.NONE, error = error)
 
         /** shell 通道结果。 */
         public fun shell(ok: Boolean): InjectionResult =
@@ -148,5 +157,5 @@ public interface ResolvedNode {
     public fun performAction(
         actionId: Int,
         args: Map<String, Any?> = emptyMap(),
-    ): Boolean
+    ): Outcome<Boolean>
 }

@@ -288,7 +288,7 @@ internal class FakeResolvedNode(
     override fun performAction(
         actionId: Int,
         args: Map<String, Any?>,
-    ): Boolean = true
+    ): Outcome<Boolean> = Outcome.Ok(true)
 }
 
 /** shell 通道替身：记录 forceStop，可脚本化连接状态。 */
@@ -356,6 +356,12 @@ internal class FakeGestures : GestureController {
     var tapOk = true
     var nodeActionOk = true
     var shellKeysOk = true
+    var tapError: AppError? = null
+    var nodeActionError: AppError? = null
+    var pathError: AppError? = null
+    var focusedError: AppError? = null
+    var shellKeyError: AppError? = null
+    var globalActionError: AppError? = null
 
     /** focusedInput() 返回的焦点节点（null = 没有焦点）。 */
     var focused: ResolvedNode? = null
@@ -365,10 +371,10 @@ internal class FakeGestures : GestureController {
         target: ResolvedNode,
         actionId: Int,
         args: Map<String, Any?>,
-    ): Boolean {
+    ): Outcome<Boolean> {
         nodeActions += actionId
         nodeActionCalls += actionId to args
-        return nodeActionOk
+        return nodeActionError?.let { Outcome.Err(it) } ?: Outcome.Ok(nodeActionOk)
     }
 
     override suspend fun performAtPath(
@@ -376,9 +382,9 @@ internal class FakeGestures : GestureController {
         path: List<Int>,
         expectedBounds: Rect,
         actionId: Int,
-    ): NodeActionOutcome {
+    ): Outcome<NodeActionOutcome> {
         nodeActions += actionId
-        return pathOutcome
+        return pathError?.let { Outcome.Err(it) } ?: Outcome.Ok(pathOutcome)
     }
 
     override suspend fun tap(
@@ -387,7 +393,8 @@ internal class FakeGestures : GestureController {
         durationMs: Long,
     ): InjectionResult {
         taps += x to y
-        return InjectionResult.accessibility(tapOk, ShellSkip.NOT_CONNECTED)
+        return tapError?.let { InjectionResult.failed(it) }
+            ?: InjectionResult.accessibility(tapOk, ShellSkip.NOT_CONNECTED)
     }
 
     override suspend fun swipe(
@@ -402,19 +409,21 @@ internal class FakeGestures : GestureController {
         return InjectionResult.accessibility(true, ShellSkip.NOT_CONNECTED)
     }
 
-    override suspend fun focusedInput(): ResolvedNode? = focused
+    override suspend fun focusedInput(): Outcome<ResolvedNode?> =
+        focusedError?.let { Outcome.Err(it) } ?: Outcome.Ok(focused)
 
     override suspend fun globalAction(action: GlobalAction): InjectionResult =
-        InjectionResult.accessibility(true, ShellSkip.NOT_CONNECTED)
+        globalActionError?.let { InjectionResult.failed(it) }
+            ?: InjectionResult.accessibility(true, ShellSkip.NOT_CONNECTED)
 
-    override suspend fun shellKeyEvent(code: Int): Boolean {
+    override suspend fun shellKeyEvent(code: Int): Outcome<Boolean> {
         shellKeys += code
-        return shellKeysOk
+        return shellKeyError?.let { Outcome.Err(it) } ?: Outcome.Ok(shellKeysOk)
     }
 
-    override suspend fun shellKeyCombination(codes: List<Int>): Boolean {
+    override suspend fun shellKeyCombination(codes: List<Int>): Outcome<Boolean> {
         shellKeys += codes
-        return shellKeysOk
+        return shellKeyError?.let { Outcome.Err(it) } ?: Outcome.Ok(shellKeysOk)
     }
 }
 
