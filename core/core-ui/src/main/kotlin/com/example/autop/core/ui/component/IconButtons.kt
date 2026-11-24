@@ -63,7 +63,7 @@ public fun AutopIconButton(
     selected: Boolean = false,
     compact: Boolean = false,
 ) {
-    val size = Modifier.size(if (compact) CompactButtonSize else AutopDimens.iconButtonSize)
+    val size = Modifier.size(if (compact) AutopDimens.compactIconButtonSize else AutopDimens.iconButtonSize)
     val iconSize = if (compact) IconSize.Sm.scaled() else IconSize.Md.scaled()
     val iconTint = LocalContentColor.current
     if (selected) {
@@ -100,8 +100,6 @@ public fun AutopIconButton(
         }
     }
 }
-
-private val CompactButtonSize = 36.dp
 
 /** 图标在上、文字在下的动作块；底 surfaceVariant α0.55，选中 primaryContainer。 */
 @Composable
@@ -183,7 +181,7 @@ internal fun ListeningMicButton(
     Box(
         modifier =
             Modifier
-                .size(CompactButtonSize)
+                .size(AutopDimens.compactIconButtonSize)
                 .semantics { this.contentDescription = contentDescription }
                 .voiceHalo(primary)
                 .clip(CircleShape)

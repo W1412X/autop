@@ -1,6 +1,6 @@
 /**
  * 统一输入区（对话、AI 创建任务、AI 创建流程共用）：可选的顶部行（模型选择、开关等）+ 输入栏。
- * 输入栏左侧可放附件入口（[leading]），右侧只有一个按钮：发送、停止、语音，或没有（[ComposerTrailing]）。
+ * 输入栏左侧可放附件入口（[leading]），右侧可放 [trailingPrefix]，其后是发送、停止、语音或空。
  * 高度、间距、按钮尺寸都由这里统一（见 [AutopDimens] 与紧凑图标按钮），各页面不再自行调整。
  */
 package com.example.autop.core.ui.component
@@ -77,6 +77,7 @@ public fun AutopComposer(
     top: (@Composable RowScope.() -> Unit)? = null,
     leading: (@Composable RowScope.() -> Unit)? = null,
     trailing: ComposerTrailing = ComposerTrailing.SEND,
+    trailingPrefix: (@Composable RowScope.() -> Unit)? = null,
     sendEnabled: Boolean = true,
     listening: Boolean = false,
     voiceLevel: Float = 0f,
@@ -107,6 +108,7 @@ public fun AutopComposer(
             modifier = inputModifier,
             leading = leading,
             trailing = {
+                trailingPrefix?.invoke(this)
                 ComposerTrailingButton(
                     mode = trailing,
                     sendEnabled = sendEnabled,

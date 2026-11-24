@@ -14,6 +14,8 @@ public object AutopDimens {
     public val buttonPaddingH: Dp = 16.dp
     public val buttonIconGap: Dp = 6.dp
     public val iconButtonSize: Dp = 44.dp
+    public val compactIconButtonSize: Dp = 36.dp
+    public val backgroundRunIndicatorSize: Dp = 6.dp
     public val chipHeight: Dp = 34.dp
 
     /** 扁平小号 Chip（[AutopFlatChip]，步骤链接等次要入口）高度。 */

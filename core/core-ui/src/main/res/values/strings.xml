@@ -49,6 +49,8 @@
     <string name="core_ui_background_run_locked">任务运行中，无法切换</string>
     <string name="core_ui_background_run_unsupported">需要 Android 14 或更高版本</string>
     <string name="core_ui_background_run_disconnected">请先连接无线调试通道</string>
+    <string name="core_ui_background_run_state_on">已开启</string>
+    <string name="core_ui_background_run_state_off">已关闭</string>
     <string name="core_ui_composer_send">发送</string>
     <string name="core_ui_composer_stop">停止</string>
     <string name="core_ui_composer_voice">语音输入</string>

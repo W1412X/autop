@@ -1,12 +1,13 @@
 /**
  * 对话输入区（docs/tech/08 §4.2 InputArea）：基于共用的 [AutopComposer]。
- * 顶部：模型选择 + 「只聊天」开关；输入框左侧「＋」附件菜单（图片、拍照）；
- * 右侧：没有输入时是语音（系统语音识别），有输入或图片时是发送，运行中是停止。
+ * 顶部：模型选择 + 运行模式；输入框左侧「＋」附件菜单（图片、拍照）；
+ * 右侧：后台运行图标，其后是没有输入时语音、有输入时发送、运行中停止。
  * `ui.chat.backgroundOnSend` 的让屏行为由 ViewModel 经 navEvents 交给 app。
  */
 package com.example.autop.feature.chat.thread
 
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -28,7 +29,7 @@ import com.example.autop.core.thread.ui.PendingImageStrip
 import com.example.autop.core.ui.component.AutopComposer
 import com.example.autop.core.ui.component.AutopFlatChip
 import com.example.autop.core.ui.component.AutopModelSelector
-import com.example.autop.core.ui.component.BackgroundRunRow
+import com.example.autop.core.ui.component.BackgroundRunIconButton
 import com.example.autop.core.ui.component.ComposerTrailing
 import com.example.autop.core.ui.component.InputBarSpec
 import com.example.autop.core.ui.component.OptionIcon
@@ -68,7 +69,6 @@ internal fun InputArea(
                 .padding(horizontal = LocalSpacing.current.screenEdge),
     ) {
         PendingImageStrip(images = state.images, onRemove = { onAction(ChatThreadAction.RemoveImage(it)) })
-        BackgroundRunToggle(state, onAction)
         VoiceErrorToast(code = state.voiceError)
         AutopComposer(
             value = state.input,
@@ -85,18 +85,7 @@ internal fun InputArea(
                         ),
                     maxLines = state.inputMaxLines,
                 ),
-            top = {
-                AutopModelSelector(
-                    selectedId = state.modelProfileId,
-                    profiles = state.modelOptions,
-                    enabled = !state.running,
-                    onSelect = { onAction(ChatThreadAction.SetModel(it)) },
-                    defaultProfileId = state.defaultModelId,
-                )
-                Spacer(modifier = Modifier.weight(1f))
-                // ADR-0040：运行模式三档；完全模式受总闸与无线注入约束，运行中不切换（下一轮生效）。
-                RunModeSelector(runMode = state.runMode, running = state.running, onAction = onAction)
-            },
+            top = { ComposerTopRow(state, onAction) },
             leading =
                 if (!state.running && state.images.size < state.maxImages) {
                     { ChatAttachButton(onAction) }
@@ -104,6 +93,13 @@ internal fun InputArea(
                     null
                 },
             trailing = composerTrailingOf(state),
+            trailingPrefix = {
+                BackgroundRunIconButton(
+                    checked = state.backgroundScreen,
+                    onCheckedChange = { onAction(ChatThreadAction.SetBackgroundScreen(it)) },
+                    enabled = state.backgroundRunBlock == null,
+                )
+            },
             sendEnabled = enabled && (state.input.isNotBlank() || state.images.isNotEmpty()),
             listening = state.listening,
             voiceLevel = state.voiceLevel,
@@ -112,19 +108,41 @@ internal fun InputArea(
             onVoice = { if (state.listening) onAction(ChatThreadAction.StopVoice) else startVoice() },
             focusRequester = focusRequester,
         )
+        BackgroundRunStatus(state)
     }
 }
 
 @Composable
-private fun BackgroundRunToggle(
+private fun ComposerTopRow(
     state: ChatThreadUiState,
     onAction: (ChatThreadAction) -> Unit,
 ) {
-    BackgroundRunRow(
-        checked = state.backgroundScreen,
-        onCheckedChange = { onAction(ChatThreadAction.SetBackgroundScreen(it)) },
-        enabled = state.backgroundRunBlock == null,
-        unavailableReason = state.backgroundRunBlock?.let { stringResource(it.messageRes()) },
+    Row {
+        AutopModelSelector(
+            selectedId = state.modelProfileId,
+            profiles = state.modelOptions,
+            enabled = !state.running,
+            onSelect = { onAction(ChatThreadAction.SetModel(it)) },
+            defaultProfileId = state.defaultModelId,
+        )
+        Spacer(modifier = Modifier.weight(1f))
+        // ADR-0040：运行模式三档；完全模式受总闸与无线注入约束，运行中不切换（下一轮生效）。
+        RunModeSelector(runMode = state.runMode, running = state.running, onAction = onAction)
+    }
+}
+
+@Composable
+private fun BackgroundRunStatus(state: ChatThreadUiState) {
+    val blocked = state.backgroundRunBlock != null
+    val text =
+        state.backgroundRunBlock?.let { stringResource(it.messageRes()) }
+            ?: if (state.backgroundScreen) stringResource(CoreUiR.string.core_ui_background_run_desc) else return
+    val spacing = LocalSpacing.current
+    Text(
+        text = text,
+        style = MaterialTheme.typography.bodySmall,
+        color = if (blocked) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary,
+        modifier = Modifier.padding(start = spacing.xs, end = spacing.xs, top = spacing.xs),
     )
 }
 
