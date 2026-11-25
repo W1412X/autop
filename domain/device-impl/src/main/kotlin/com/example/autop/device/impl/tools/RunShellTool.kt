@@ -109,7 +109,7 @@ public class RunShellTool
             args: JsonObject,
             ctx: ToolContext,
         ): ToolOutput? {
-            rejectBackgroundScreen(args)?.let { return it }
+            rejectBackgroundShell()?.let { return it }
             val command = args.shellStr(ARG_COMMAND) ?: return null
             val match = dangerRules.get().match(command, context.packageName) ?: return null
             val allow = context.getString(R.string.run_shell_option_allow)
@@ -148,7 +148,7 @@ public class RunShellTool
                 return output(RunShellResults.ofNotDispatched(ShellExecErrorCodes.INVALID_ARGUMENT), problem)
             }
             val screen = args.shellBool(ARG_SCREEN) == true
-            rejectBackgroundScreen(args)?.let { return it }
+            rejectBackgroundShell()?.let { return it }
             return when (val outcome = shellExec.exec(ctx.runId, command, timeoutOf(args))) {
                 is Outcome.Err -> output(RunShellResults.ofNotDispatched(outcome.error.code), outcome.error.message)
                 is Outcome.Ok -> output(RunShellResults.ofResult(outcome.value, screen))
@@ -182,11 +182,11 @@ public class RunShellTool
             )
         }
 
-        private suspend fun rejectBackgroundScreen(args: JsonObject): ToolOutput? =
-            if (args.shellBool(ARG_SCREEN) == true && currentDisplayTarget() is DisplayTarget.Background) {
+        private suspend fun rejectBackgroundShell(): ToolOutput? =
+            if (currentDisplayTarget() is DisplayTarget.Background) {
                 toolError(
                     DeviceErrorCodes.BG_ACTION_UNSUPPORTED,
-                    "后台 Run 不支持 screen=true 的 shell 命令；请使用后台屏幕工具",
+                    "原始 Shell 无法绑定到虚拟屏，请使用虚拟屏工具",
                 )
             } else {
                 null

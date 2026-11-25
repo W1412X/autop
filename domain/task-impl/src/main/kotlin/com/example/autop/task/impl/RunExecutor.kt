@@ -101,8 +101,24 @@ public class RunExecutor(
     ): Outcome<RunRecord> {
         val input = text?.let { listOf<Block>(Block.Text(it)) } ?: emptyList()
         val title = text?.let { placeholderTitle(it) }
+        val sourceRun =
+            threadStore
+                .events(threadId)
+                .lastOrNull { it.seq <= atSeq }
+                ?.runId
+                ?.let { runStore.get(it) }
+        val backgroundScreen = sourceRun?.backgroundScreen ?: threadStore.backgroundScreenOf(threadId)
         return agentSession.fork(threadId, atSeq, title = title).flatMap { forked ->
-            enqueue(RunOrigin.FORK, forked, input, if (text == null) null else UserMessageKind.INPUT, emptyMap(), null)
+            threadStore.setBackgroundScreen(forked, backgroundScreen)
+            enqueue(
+                RunOrigin.FORK,
+                forked,
+                input,
+                if (text == null) null else UserMessageKind.INPUT,
+                emptyMap(),
+                null,
+                backgroundScreen = backgroundScreen,
+            )
         }
     }
 
@@ -117,8 +133,9 @@ public class RunExecutor(
             return Outcome.Err(AppError(code = TaskErrorCodes.FLOW_DISABLED, message = "flow feature disabled"))
         }
         val thread = threadStore.createTaskRunThread(task.name)
+        threadStore.setBackgroundScreen(thread, task.backgroundScreen)
         pruneRunHistory()
-        return enqueue(origin, thread, emptyList(), null, vars, task)
+        return enqueue(origin, thread, emptyList(), null, vars, task, backgroundScreen = task.backgroundScreen)
     }
 
     /** 独立流程运行入队（流程页「运行」与调试，docs/design/flows.md §9.2）。 */
@@ -146,7 +163,7 @@ public class RunExecutor(
             UserMessageKind.INJECTED,
             mapOf(RESUMED_FROM_KEY to source.id.value),
             null,
-            backgroundScreen = threadStore.backgroundScreenOf(source.threadId),
+            backgroundScreen = source.backgroundScreen ?: threadStore.backgroundScreenOf(source.threadId),
         )
 
     /**
@@ -194,6 +211,7 @@ public class RunExecutor(
                 errorCode = null,
                 pauseReason = null,
                 waitingQuestion = null,
+                backgroundScreen = backgroundScreen,
             )
         RunDisplayTargetRegistry.bindOpening(record.id)
         runStore.save(record)
@@ -201,7 +219,7 @@ public class RunExecutor(
         if (input.isNotEmpty() && inputKind != null) {
             threadStore.append(threadId, record.id, UserMessage(blocks = input, kind = inputKind))
         }
-        pending.put(record.id, PendingEntry(vars = vars, task = task, flow = flow, backgroundScreen = backgroundScreen))
+        pending.put(record.id, PendingEntry(vars = vars, task = task, flow = flow))
         scheduler.enqueue(record)
         scheduler.trySchedule()
         return Outcome.Ok(record)

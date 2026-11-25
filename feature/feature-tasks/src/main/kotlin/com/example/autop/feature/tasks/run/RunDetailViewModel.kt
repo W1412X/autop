@@ -121,6 +121,8 @@ public class RunDetailViewModel
                 statusName = run?.status?.name.orEmpty(),
                 originName = run?.origin?.name.orEmpty(),
                 summary = run?.summary.orEmpty(),
+                backgroundScreen = run?.backgroundScreen,
+                errorCode = run?.errorCode,
                 triggerContext = run?.triggerContext?.map { "${it.key}=${it.value}" }.orEmpty(),
                 startedText = run?.let { formatTime(it.startedAt ?: it.createdAt) }.orEmpty(),
                 endedText = run?.endedAt?.let(::formatTime).orEmpty(),

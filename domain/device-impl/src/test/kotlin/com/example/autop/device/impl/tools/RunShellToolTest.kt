@@ -69,7 +69,7 @@ class RunShellToolTest {
         }
 
     @Test
-    fun `background non-screen command still executes`() =
+    fun `background commands cannot use screen false to reach physical shell`() =
         runTest {
             val exec = RecordingExec()
             val tool = tool(exec)
@@ -77,11 +77,11 @@ class RunShellToolTest {
 
             val output =
                 withContext(display) {
-                    tool.invoke(args("echo ok", screen = false), ToolTestEnv().ctx())
+                    tool.invoke(args("input tap 100 200", screen = false), ToolTestEnv().ctx())
                 }
 
-            assertThat(output.ok).isTrue()
-            assertThat(exec.calls).containsExactly("echo ok")
+            assertThat(output.error?.code).isEqualTo(DeviceErrorCodes.BG_ACTION_UNSUPPORTED)
+            assertThat(exec.calls).isEmpty()
         }
 
     private fun tool(exec: ShellExec): RunShellTool {

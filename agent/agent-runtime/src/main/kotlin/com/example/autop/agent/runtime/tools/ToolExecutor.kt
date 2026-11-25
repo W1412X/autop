@@ -182,7 +182,10 @@ internal class ToolExecutor(
         } else {
             when (val prepared = tool.prepare(args, ctx)) {
                 is Outcome.Ok -> performScreenAction(tool, prepared.value, ctx)
-                is Outcome.Err -> errors.errorOutput(prepared.error.code, prepared.error.message, prepared.error.hint)
+                is Outcome.Err ->
+                    errors
+                        .errorOutput(prepared.error.code, prepared.error.message, prepared.error.hint)
+                        .copy(error = prepared.error)
             }
         }
 

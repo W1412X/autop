@@ -24,6 +24,7 @@ import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.testing.FakeClock
 import com.example.autop.core.testing.FakeConfigProvider
 import com.example.autop.core.testing.FakePromptRepository
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.NodeFlags
 import com.example.autop.device.NodeSnapshot
 import com.example.autop.device.ObserveMode
@@ -57,6 +58,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.test.currentTime
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
@@ -201,6 +203,21 @@ class ActionEpilogueTest {
 
             assertThat(monitor.windows).hasSize(2)
             assertThat(monitor.windows[0].first).isEqualTo(0L)
+        }
+
+    @Test
+    fun `virtual action waits leave physical user activity observable`() =
+        runTest {
+            val monitor = RecordingMonitor()
+            val epilogue = epilogue(RecordingProbe(Outcome.Ok(sample())), monitor)
+            val display = DisplayTarget.Background(RunId("test"), 8, 720, 1600, 320)
+
+            withContext(display) {
+                epilogue.pause(ctx(), 100)
+                epilogue.pause(ctx(quiet = true), 100)
+            }
+
+            assertThat(monitor.windows).isEmpty()
         }
 
     private fun epilogue(

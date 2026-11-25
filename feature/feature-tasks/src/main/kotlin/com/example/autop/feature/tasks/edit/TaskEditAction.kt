@@ -8,6 +8,11 @@ import java.time.LocalDate
 
 /** 编辑页意图。 */
 public sealed interface TaskEditAction {
+    /** 选择真实屏或虚拟屏。 */
+    public data class SetBackgroundScreen(
+        val enabled: Boolean,
+    ) : TaskEditAction
+
     /** 名称。 */
     public data class SetName(
         val value: String,

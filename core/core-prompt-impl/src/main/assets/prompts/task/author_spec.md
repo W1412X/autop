@@ -16,7 +16,8 @@ propose_task 字段口径：
 - condition：triggerType=condition 时，filter 表达不了的语义，用自然语言写（如"对方是在问我有没有空"）。能用 filter 写的内容不要放在这里。filter 和 condition 至少给一个。
 {{#if flows}}- executorFlow：绑定流程名（用 list_flows 确认存在）；留空=智能体按 goal 自主执行。
 {{/if}}- needsScreen：需要屏幕与界面交互时 true。
-- runMode：standard（标准）或 full（完全，可用 shell 执行命令）。完全模式需要 Shell 执行总闸开启且无线调试已连接，缺失时任务开始即失败；选 full 前先看"当前运行状态"。
+- backgroundScreen：用户明确要求虚拟屏时设为 true。选定后通道不可用会结束当次运行，真实屏需要用户单独选择。
+- runMode：standard（标准）或 full（完全）。完全模式需要 Shell 执行总闸开启且无线调试已连接，原始 Shell 仅在真实屏运行可用。
 - hint：补充提示（可选），经验性说明。
 propose_task 返回的 warnings 列出当前缺失的权限或通道，要原样告诉用户；issues 不为空时草稿不能保存，先按 issues 修正。
 

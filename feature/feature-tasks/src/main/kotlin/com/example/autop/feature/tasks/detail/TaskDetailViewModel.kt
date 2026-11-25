@@ -68,6 +68,7 @@ public class TaskDetailViewModel
                     triggerText = task?.let(::triggerText).orEmpty(),
                     triggerLabelRes = task?.let(::triggerLabelRes) ?: 0,
                     needsScreen = task?.needsScreen ?: true,
+                    backgroundScreen = task?.backgroundScreen ?: false,
                     lockedRemind = task?.lockedBehavior == com.example.autop.task.LockedBehavior.REMIND,
                     priority = task?.priority ?: 0,
                     enabled = task?.enabled ?: true,
@@ -88,6 +89,7 @@ public class TaskDetailViewModel
         ) {
             when (action) {
                 TaskDetailAction.RunNow -> runNow()
+                TaskDetailAction.RunOnceOnMain -> runNow(onMain = true)
                 TaskDetailAction.OpenEdit -> navigator.openEdit(taskId)
                 is TaskDetailAction.OpenRun -> navigator.openRun(action.runId)
                 is TaskDetailAction.StopRun -> runService.cancel(RunId(action.runId))
@@ -95,7 +97,7 @@ public class TaskDetailViewModel
             }
         }
 
-        private fun runNow() {
+        private fun runNow(onMain: Boolean = false) {
             viewModelScope.launch {
                 val task = taskRepository.get(TaskId(taskId))
                 if (task == null) {
@@ -104,7 +106,15 @@ public class TaskDetailViewModel
                 }
                 // 流程功能关闭时流程任务失效：不调用 runService，也不产生运行记录（ADR-0030）。
                 if (isFlowDisabled(task, configProvider.current().flowsEnabled())) return@launch
-                feedback.value = startNow(task)
+                val execution =
+                    if (onMain &&
+                        task.backgroundScreen
+                    ) {
+                        task.copy(backgroundScreen = false, replayScript = null)
+                    } else {
+                        task
+                    }
+                feedback.value = startNow(execution)
             }
         }
 

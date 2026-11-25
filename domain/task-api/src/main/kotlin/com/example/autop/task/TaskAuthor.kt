@@ -41,6 +41,7 @@ public data class TaskDraft(
     val runMode: RunMode = RunMode.STANDARD,
     /** 补充提示（经验性说明，随 goal 一起交付）。 */
     val hint: String = "",
+    val backgroundScreen: Boolean = false,
 )
 
 /** 任务创作会话状态。 */

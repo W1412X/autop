@@ -110,7 +110,7 @@ public class RunExecutorTest {
 
             val record = (result as Outcome.Ok).value
             assertTrue(fixture.threads.backgroundScreenOf(record.threadId))
-            assertTrue(fixture.pending.backgroundScreenOf(record.id))
+            assertEquals(true, fixture.runStore.get(record.id)?.backgroundScreen)
             val shield = FakeTouchShield()
             try {
                 RunDisplayTargetRegistry.forceRelease(record.id, shield)
@@ -149,14 +149,15 @@ public class RunExecutorTest {
                     errorCode = null,
                     pauseReason = null,
                     waitingQuestion = null,
+                    backgroundScreen = true,
                 )
 
-            fixture.threads.setBackgroundScreen(ThreadId("thread-src"), true)
+            fixture.threads.setBackgroundScreen(ThreadId("thread-src"), false)
             val result = fixture.executor.launchResume(source, "继续做完")
 
             val resumed = (result as Outcome.Ok).value
-            assertTrue(fixture.pending.backgroundScreenOf(resumed.id))
-            assertTrue(fixture.threads.backgroundScreenOf(resumed.threadId))
+            assertEquals(true, resumed.backgroundScreen)
+            assertFalse(fixture.threads.backgroundScreenOf(resumed.threadId))
 
             val message =
                 fixture.threads
@@ -180,7 +181,7 @@ private class ExecutorFixture(
     private val config = FakeConfigProvider(overrides)
     private val db: TasksDb =
         Room.inMemoryDatabaseBuilder(context, TasksDb::class.java).allowMainThreadQueries().build()
-    private val runStore = RunStore(db)
+    val runStore = RunStore(db)
     val threads = FakeThreadStore()
     val pending = PendingRuns()
     val session = FakeAgentSession()

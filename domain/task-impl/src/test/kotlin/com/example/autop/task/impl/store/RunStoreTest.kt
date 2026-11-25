@@ -90,6 +90,21 @@ public class RunStoreTest {
 
     /** 记录不存在时 mutate 静默跳过（与旧 get?.let 语义一致）。 */
     @Test
+    public fun `display preference survives storage independently of trigger variables`() =
+        runTest {
+            val vars = mapOf("trigger.package" to "sample.app")
+            for (background in listOf(null, false, true)) {
+                val record = recordOf("run-$background").copy(triggerContext = vars, backgroundScreen = background)
+                runStore.save(record)
+                runStore.mutate(record.id) { it.copy(status = RunStatus.INTERRUPTED) }
+
+                val saved = runStore.get(record.id)
+                assertEquals(background, saved?.backgroundScreen)
+                assertEquals(vars, saved?.triggerContext)
+            }
+        }
+
+    @Test
     public fun `mutate on missing record is a no-op`() =
         runTest {
             runStore.mutate(RunId("missing")) { it.copy(status = RunStatus.FAILED) }

@@ -247,7 +247,6 @@ public class ChatThreadViewModel
                             supported = platformCapabilities.has(Capability.BACKGROUND_VIRTUAL_DISPLAY),
                             channelConnected = shellState == ShellState.Connected,
                             running = state.running,
-                            enabled = state.backgroundScreen,
                         ),
                 )
             }.stateIn(
@@ -392,12 +391,8 @@ public class ChatThreadViewModel
         }
 
         private fun setBackgroundScreen(enabled: Boolean) {
-            if (
-                backgroundRunBlockNow(
-                    openRun.value != null || meta.value.starting,
-                    meta.value.backgroundScreen,
-                ) != null
-            ) {
+            val block = backgroundRunBlockNow(openRun.value != null || meta.value.starting)
+            if (block == BackgroundRunBlock.RUNNING || enabled && block != null) {
                 return
             }
             meta.update { it.copy(backgroundScreen = enabled) }
@@ -406,15 +401,11 @@ public class ChatThreadViewModel
             }
         }
 
-        private fun backgroundRunBlockNow(
-            running: Boolean,
-            enabled: Boolean,
-        ): BackgroundRunBlock? =
+        private fun backgroundRunBlockNow(running: Boolean): BackgroundRunBlock? =
             BackgroundRunBlock.of(
                 supported = platformCapabilities.has(Capability.BACKGROUND_VIRTUAL_DISPLAY),
                 channelConnected = shellInput.state.value == ShellState.Connected,
                 running = running,
-                enabled = enabled,
             )
 
         /** 完全模式的前置条件：总闸开启，且无线注入已连接。 */
@@ -507,7 +498,9 @@ public class ChatThreadViewModel
                 viewModelScope.launch {
                     if (runService.steer(open.id, text) is Outcome.Ok) {
                         meta.update { it.copy(input = "", notice = null) }
-                        if (background) navChannel.send(ChatNavEvent.Background)
+                        if (background && !(open.backgroundScreen ?: snapshot.backgroundScreen)) {
+                            navChannel.send(ChatNavEvent.Background)
+                        }
                     } else {
                         meta.update { it.copy(notice = ThreadNotice.STEER_FAILED) }
                     }
@@ -555,7 +548,7 @@ public class ChatThreadViewModel
                 startCollecting(record.threadId.value)
                 navChannel.send(ChatNavEvent.ReplaceThread(record.threadId.value))
             }
-            if (background) navChannel.send(ChatNavEvent.Background)
+            if (background && !snapshot.backgroundScreen) navChannel.send(ChatNavEvent.Background)
             combine(runService.observeRun(record.id), openRun) { latest, open ->
                 open?.id == record.id || latest.status !in RunStatus.OPEN
             }.first { visible -> visible }

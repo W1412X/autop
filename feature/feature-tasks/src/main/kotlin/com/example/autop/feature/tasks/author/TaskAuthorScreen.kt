@@ -483,6 +483,13 @@ private fun DraftCard(
                 ),
             style = MaterialTheme.typography.bodySmall,
         )
+        Text(
+            text =
+                stringResource(
+                    if (draft.backgroundScreen) R.string.task_display_virtual else R.string.task_display_main,
+                ),
+            style = MaterialTheme.typography.bodySmall,
+        )
         if (draft.hint.isNotBlank()) {
             Text(
                 text = stringResource(R.string.task_author_hint, draft.hint),

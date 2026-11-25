@@ -142,6 +142,7 @@ public class CreateTaskTool
                     goal = goal,
                     trigger = trigger,
                     needsScreen = args.bool("needs_screen") ?: true,
+                    backgroundScreen = args.bool("background_screen") ?: false,
                     enabled = args.bool("enabled") ?: true,
                     executor = if (flow != null) TaskExecutor.FLOW else TaskExecutor.AGENT,
                     flow = flow,
@@ -235,6 +236,11 @@ public class UpdateTaskTool
                     goal = args.text("goal")?.trim()?.takeIf { it.isNotEmpty() } ?: current.goal,
                     trigger = trigger,
                     needsScreen = args.bool("needs_screen") ?: current.needsScreen,
+                    backgroundScreen = args.bool("background_screen") ?: current.backgroundScreen,
+                    replayScript =
+                        current.replayScript.takeIf {
+                            (args.bool("background_screen") ?: current.backgroundScreen) == current.backgroundScreen
+                        },
                     enabled = args.bool("enabled") ?: current.enabled,
                     executor = if (flow != null) TaskExecutor.FLOW else TaskExecutor.AGENT,
                     flow = flow,

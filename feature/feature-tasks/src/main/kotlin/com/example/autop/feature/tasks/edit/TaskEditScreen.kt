@@ -3,6 +3,7 @@
  */
 package com.example.autop.feature.tasks.edit
 
+import android.os.Build
 import androidx.annotation.StringRes
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -224,6 +225,7 @@ private fun ExecSection(
     onAction: (TaskEditAction) -> Unit,
 ) {
     SectionTitle(text = stringResource(R.string.task_edit_section_exec))
+    DisplayTargetRow(state, onAction)
     OptionRow(
         title = stringResource(R.string.task_edit_locked_behavior),
         subtitle = stringResource(R.string.task_edit_locked_note),
@@ -239,6 +241,41 @@ private fun ExecSection(
         onChange = { onAction(TaskEditAction.SetPriority(it)) },
         subtitle = stringResource(R.string.task_edit_priority_hint),
     )
+}
+
+@Composable
+private fun DisplayTargetRow(
+    state: TaskEditUiState,
+    onAction: (TaskEditAction) -> Unit,
+) {
+    val spacing = LocalSpacing.current
+    Column {
+        Text(
+            text = stringResource(R.string.task_execution_display),
+            style = MaterialTheme.typography.titleSmall,
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(spacing.xs)) {
+            FilterChip(
+                selected = !state.backgroundScreen,
+                onClick = { onAction(TaskEditAction.SetBackgroundScreen(false)) },
+                label = { Text(stringResource(R.string.task_display_main)) },
+            )
+            FilterChip(
+                selected = state.backgroundScreen,
+                onClick = { onAction(TaskEditAction.SetBackgroundScreen(true)) },
+                label = { Text(stringResource(R.string.task_display_virtual)) },
+            )
+        }
+        if (state.backgroundScreen) {
+            val hint =
+                when {
+                    Build.VERSION.SDK_INT < Build.VERSION_CODES.UPSIDE_DOWN_CAKE -> R.string.task_display_needs_android
+                    !state.backgroundChannelConnected -> R.string.task_display_needs_channel
+                    else -> R.string.task_display_virtual_hint
+                }
+            Text(stringResource(hint), style = MaterialTheme.typography.bodySmall)
+        }
+    }
 }
 
 @Composable

@@ -149,6 +149,18 @@ public class RunRunnerDisplayTest {
         }
 
     @Test
+    public fun `background request rejects a physical target returned by the controller`() =
+        runTest {
+            val fixture = backgroundFixture(displays = FakeRunDisplayController())
+
+            fixture.run()
+
+            assertEquals(DeviceErrorCodes.BG_TARGET_CHANGED, fixture.record().errorCode)
+            assertTrue(fixture.agent.requests.isEmpty())
+            assertEquals(0, fixture.shield.resetCount)
+        }
+
+    @Test
     public fun `unsupported sdk open error is preserved`() =
         runTest {
             val code = DeviceErrorCodes.BG_UNSUPPORTED_SDK
@@ -376,11 +388,12 @@ private class DisplayFixture(
                 errorCode = null,
                 pauseReason = null,
                 waitingQuestion = null,
+                backgroundScreen = backgroundScreen,
             )
         runStore.save(record)
         pending.put(
             record.id,
-            PendingEntry(vars = emptyMap(), task = task, flow = flow, backgroundScreen = backgroundScreen),
+            PendingEntry(vars = emptyMap(), task = task, flow = flow),
         )
         runner.execute(record, task)
     }

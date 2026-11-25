@@ -17,6 +17,7 @@ public data class TaskDraftDto(
     val trigger: Trigger,
     val needsScreen: Boolean = true,
     val allowedTools: Set<String>? = null,
+    val backgroundScreen: Boolean = false,
 )
 
 /** 草稿转待保存的 [Task]（07 §6：永远需要用户在编辑器里确认保存）。 */
@@ -31,6 +32,7 @@ public fun TaskDraftDto.toTask(
         trigger = trigger,
         needsScreen = needsScreen,
         allowedTools = allowedTools,
+        backgroundScreen = backgroundScreen,
         createdAt = nowMillis,
         updatedAt = nowMillis,
     )

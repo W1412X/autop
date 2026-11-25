@@ -83,7 +83,6 @@ public class PanelController
                     supported = platformCapabilities.has(Capability.BACKGROUND_VIRTUAL_DISPLAY),
                     channelConnected = shellState == ShellState.Connected,
                     running = false,
-                    enabled = false,
                 )
             val modelOptions by remember(this) {
                 modelProfiles.profiles.map { list -> list.map { OptionItem(id = it.id, label = it.displayName) } }

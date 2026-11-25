@@ -8,6 +8,9 @@ public sealed interface TaskDetailAction {
     /** 立即运行。 */
     public data object RunNow : TaskDetailAction
 
+    /** 经用户确认后，仅本次使用真实屏。 */
+    public data object RunOnceOnMain : TaskDetailAction
+
     /** 打开编辑页。 */
     public data object OpenEdit : TaskDetailAction
 

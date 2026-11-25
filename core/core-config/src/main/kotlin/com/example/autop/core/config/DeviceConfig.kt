@@ -574,7 +574,7 @@ public data class DeviceBackgroundSection(
             ) {
                 add("background viewport must be positive and within 8MP")
             }
-            if (dpi !in 1..MAX_DPI) add("background dpi must be within 1..640")
+            if (dpi !in MIN_DPI..MAX_DPI) add("background dpi must be within 72..640")
             if (launchTimeoutMs !in 1..MAX_LAUNCH_TIMEOUT_MS) add("background launchTimeoutMs must be within 1..30000")
             if (requestTimeoutMs !in
                 1..MAX_REQUEST_TIMEOUT_MS
@@ -590,6 +590,7 @@ public data class DeviceBackgroundSection(
     public companion object {
         public const val MAX_DISPLAY_DIMENSION: Int = 4096
         public const val MAX_DISPLAY_PIXELS: Long = 8_388_608L
+        public const val MIN_DPI: Int = 72
         public const val MAX_DPI: Int = 640
         public const val MAX_LAUNCH_TIMEOUT_MS: Long = 30_000L
         public const val MAX_REQUEST_TIMEOUT_MS: Long = 120_000L

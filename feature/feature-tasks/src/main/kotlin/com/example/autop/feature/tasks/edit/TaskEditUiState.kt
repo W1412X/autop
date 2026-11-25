@@ -29,6 +29,8 @@ public data class TaskEditUiState(
     val name: String = "",
     val goal: String = "",
     val needsScreen: Boolean = true,
+    val backgroundScreen: Boolean = false,
+    val backgroundChannelConnected: Boolean = false,
     /** 运行模式三档（ADR-0040 §2.6）：仅标准与完全可选，仅聊天不适用于任务。 */
     val runMode: RunMode = RunMode.STANDARD,
     /** Shell 执行总闸是否开启；关闭时不能选择完全模式。 */
@@ -133,6 +135,7 @@ internal fun TaskEditUiState.from(task: Task): TaskEditUiState {
         name = task.name,
         goal = task.goal,
         needsScreen = task.needsScreen,
+        backgroundScreen = task.backgroundScreen,
         runMode = task.runMode,
         executorFlow = task.executor == TaskExecutor.FLOW,
         flowId =

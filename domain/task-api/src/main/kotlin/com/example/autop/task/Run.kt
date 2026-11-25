@@ -28,6 +28,8 @@ public data class RunRecord(
     val waitingQuestion: String?,
     /** ask_user 的选项（对话页 AskCard 的选项 Chip；docs/tech/08 §4.2）。 */
     val waitingOptions: List<String> = emptyList(),
+    /** 入队时固定的执行目标；旧记录缺少该字段。 */
+    val backgroundScreen: Boolean? = null,
 )
 
 /** Run 的来源。 */

@@ -108,6 +108,18 @@ public object DeviceErrorCodes {
     /** 后台屏输入被系统拒绝。 */
     public const val BG_INPUT_REJECTED: String = "device.bg_input_rejected"
 
+    /** Android 任务出现在其他显示，或其显示归属无法继续确认。 */
+    public const val BG_TARGET_CHANGED: String = "device.bg_target_changed"
+
+    /** 启动会复用或影响其他显示上的任务，操作在发送前被拦截。 */
+    public const val BG_APP_ON_OTHER_DISPLAY: String = "device.bg_app_on_other_display"
+
+    public const val BG_LOCKED: String = "device.bg_locked"
+
+    /** Errors that invalidate further operations for the current background run. */
+    public fun isBackgroundRunFatal(code: String?): Boolean =
+        code == BG_TARGET_CHANGED || code == BG_RELEASED || code == BG_LOCKED
+
     /** 更新检测失败（网络不可达、GitHub 限流或响应异常）。 */
     public const val UPDATE_CHECK_FAILED: String = "device.update_check_failed"
 

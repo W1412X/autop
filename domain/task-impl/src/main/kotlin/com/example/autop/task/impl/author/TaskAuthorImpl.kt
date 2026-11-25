@@ -202,6 +202,7 @@ internal class TaskAuthorImpl(
                     null
                 },
             needsScreen = task.needsScreen,
+            backgroundScreen = task.backgroundScreen,
             runMode = task.runMode,
         )
     }
@@ -577,7 +578,12 @@ internal class TaskAuthorSessionImpl(
         val sourcePermission =
             if (draft.triggerType.trim() == "condition") sourcePermissions[draft.source?.trim().orEmpty()] else null
         val missing =
-            TaskRequirements.missing(draft.needsScreen, draft.runMode, sourcePermission, d.environment.current())
+            TaskRequirements.missing(
+                draft.needsScreen && !draft.backgroundScreen,
+                draft.runMode,
+                sourcePermission,
+                d.environment.current(),
+            )
         if (missing.isEmpty()) return emptyList()
         val vars =
             mapOf(
@@ -669,6 +675,8 @@ internal class TaskAuthorSessionImpl(
                 goal = goalOf(draft),
                 trigger = trigger,
                 needsScreen = draft.needsScreen,
+                backgroundScreen = draft.backgroundScreen,
+                replayScript = base.replayScript.takeIf { base.backgroundScreen == draft.backgroundScreen },
                 runMode = draft.runMode,
                 executor = binding.executor,
                 flow = binding.flow,
@@ -681,6 +689,7 @@ internal class TaskAuthorSessionImpl(
                 goal = goalOf(draft),
                 trigger = trigger,
                 needsScreen = draft.needsScreen,
+                backgroundScreen = draft.backgroundScreen,
                 runMode = draft.runMode,
                 executor = binding.executor,
                 flow = binding.flow,

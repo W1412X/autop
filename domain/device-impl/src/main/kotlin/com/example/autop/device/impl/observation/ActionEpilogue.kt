@@ -13,10 +13,12 @@ import com.example.autop.core.common.Clock
 import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.DeviceConfig
 import com.example.autop.core.prompt.PromptRepository
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.ObserveMode
 import com.example.autop.device.StableWait
 import com.example.autop.device.UiStabilizer
 import com.example.autop.device.UserActivityMonitor
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.device.impl.deviceHistory
 import com.example.autop.device.impl.tools.text
 import com.example.autop.llm.Block
@@ -136,6 +138,9 @@ public class ActionEpilogue
                 } else {
                     { frameMotion.capture()?.hash?.toString() }
                 }
+            if (currentDisplayTarget() is DisplayTarget.Background) {
+                return stabilizer.awaitStable(cfg.quietMs, waitMs ?: cfg.maxWaitMs, cfg.firstEventTimeoutMs, sample)
+            }
             val waitStart = clock.nowMillis()
             activityMonitor.markSelfActionWindow(waitStart, waitStart + touch.selfActionMaxMs)
             val wait = stabilizer.awaitStable(cfg.quietMs, waitMs ?: cfg.maxWaitMs, cfg.firstEventTimeoutMs, sample)
@@ -148,6 +153,10 @@ public class ActionEpilogue
             ctx: ToolContext,
             ms: Long,
         ) {
+            if (currentDisplayTarget() is DisplayTarget.Background) {
+                delay(ms)
+                return
+            }
             val touch = ctx.config[DeviceConfig.TOUCH]
             val start = clock.nowMillis()
             activityMonitor.markSelfActionWindow(start, start + touch.selfActionMaxMs)

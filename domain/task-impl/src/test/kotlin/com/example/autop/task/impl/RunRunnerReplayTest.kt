@@ -187,6 +187,8 @@ private class ReplayFixture(
         origin: RunOrigin,
         task: Task,
     ) {
+        tasks.save(task)
+        tasks.saved.clear()
         val record =
             RunRecord(
                 id = RunId(id),

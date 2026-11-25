@@ -90,39 +90,26 @@ public class RoutedScreenReader
                 AutopJson.default.decodeFromString<T>(value.toString())
             }
 
-        private suspend fun Outcome<ScreenSnapshot>.recoverDegraded(): Outcome<ScreenSnapshot> =
-            if (this is Outcome.Ok) {
-                this
-            } else {
-                when (val target = currentDisplayTarget()) {
-                    is DisplayTarget.Background ->
-                        when (val found = manager.session(target)) {
-                            is Outcome.Err -> found
-                            is Outcome.Ok ->
-                                found.value
-                                    .request(JSONObject().put("op", BackgroundDisplayWire.OP_FOREGROUND))
-                                    .map { reply ->
-                                        ScreenSnapshot(
-                                            capturedAt = System.currentTimeMillis(),
-                                            windows = emptyList(),
-                                            nodes = emptyList(),
-                                            foregroundPackage =
-                                                reply
-                                                    .optString(
-                                                        "packageName",
-                                                    ).takeIf { it.isNotBlank() },
-                                            screenWidth = target.width,
-                                            screenHeight = target.height,
-                                            rotation = 0,
-                                            keyguardLocked = false,
-                                            contentArea = Rect(0, 0, target.width, target.height),
-                                            truncated = false,
-                                        )
-                                    }
-                        }
-                    else -> this
+        private suspend fun Outcome<ScreenSnapshot>.recoverDegraded(): Outcome<ScreenSnapshot> {
+            if (this !is Outcome.Err || error.code != DeviceErrorCodes.APP_TREE_EMPTY) return this
+            val target = currentDisplayTarget() as? DisplayTarget.Background ?: return this
+            return manager.session(target).flatMap { session ->
+                session.request(JSONObject().put("op", BackgroundDisplayWire.OP_FOREGROUND)).map { reply ->
+                    ScreenSnapshot(
+                        capturedAt = System.currentTimeMillis(),
+                        windows = emptyList(),
+                        nodes = emptyList(),
+                        foregroundPackage = reply.optString("packageName").takeIf { it.isNotBlank() },
+                        screenWidth = target.width,
+                        screenHeight = target.height,
+                        rotation = 0,
+                        keyguardLocked = false,
+                        contentArea = Rect(0, 0, target.width, target.height),
+                        truncated = false,
+                    )
                 }
             }
+        }
     }
 
 /** 后台节点/坐标手势只走当前显示 Host。 */
@@ -198,7 +185,7 @@ public class RoutedGestureController
             y: Int,
             durationMs: Long,
         ): InjectionResult =
-            gesture(currentDisplayTarget() ?: DisplayTarget.Main, { main.tap(x, y, durationMs) }) {
+            gesture(BackgroundDisplayWire.OP_TAP, { main.tap(x, y, durationMs) }) {
                 JSONObject().put("x", x).put("y", y).put("durationMs", durationMs)
             }
 
@@ -211,7 +198,7 @@ public class RoutedGestureController
             jitterPx: Int,
         ): InjectionResult =
             gesture(
-                currentDisplayTarget() ?: DisplayTarget.Main,
+                BackgroundDisplayWire.OP_SWIPE,
                 { main.swipe(fromX, fromY, toX, toY, durationMs, jitterPx) },
             ) {
                 JSONObject()
@@ -275,14 +262,14 @@ public class RoutedGestureController
             }
 
         private suspend fun gesture(
-            display: DisplayTarget,
+            op: String,
             mainCall: suspend () -> InjectionResult,
             request: () -> JSONObject,
         ): InjectionResult =
-            when (display) {
+            when (val display = currentDisplayTarget()) {
                 is DisplayTarget.Background ->
-                    when (val result = withSession<Boolean>(display) { it.request(request()).map { _ -> true } }) {
-                        is Outcome.Ok -> InjectionResult(result.value, InjectionChannel.BACKGROUND)
+                    when (val result = withSession(display) { it.request(request().put("op", op)) }) {
+                        is Outcome.Ok -> InjectionResult(true, InjectionChannel.BACKGROUND)
                         is Outcome.Err -> InjectionResult.failed(result.error)
                     }
                 else -> mainCall()

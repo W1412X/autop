@@ -38,7 +38,7 @@ public class InputStateSource
                     KEY_ACCESSIBILITY,
                     render(PROMPT_ACCESSIBILITY, mapOf(VAR_ON to flag(connected), VAR_OFF to flag(!connected))),
                 )
-            entries += StateEntry(KEY_SHELL, render(PROMPT_SHELL, shellVars()))
+            if (!background) entries += StateEntry(KEY_SHELL, render(PROMPT_SHELL, shellVars()))
             val shieldOn = !background && req.config[DeviceConfig.TOUCH].shieldEnabled
             entries +=
                 StateEntry(

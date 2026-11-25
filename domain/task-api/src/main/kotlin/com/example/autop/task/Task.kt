@@ -43,6 +43,8 @@ public data class Task(
     val createdAt: Long,
     val updatedAt: Long,
     val schemaVersion: Int = 2,
+    /** 启用时固定使用虚拟屏，初始化失败即结束本次运行。 */
+    val backgroundScreen: Boolean = false,
 )
 
 /** 任务的执行方式。 */

@@ -153,14 +153,22 @@ public class RunRunner(
         entry: PendingEntry?,
         needsScreen: Boolean,
     ): RunExecution? {
+        val backgroundScreen = record.backgroundScreen == true
         val target =
-            when (val opened = openDisplay(record.id, entry?.backgroundScreen == true)) {
+            when (val opened = openDisplay(record.id, backgroundScreen)) {
                 is Outcome.Ok -> opened.value
                 is Outcome.Err -> {
                     failDisplay(record, opened.error)
                     return null
                 }
             }
+        if (!target.matchesRun(record.id, backgroundScreen)) {
+            failDisplay(
+                record,
+                AppError(DeviceErrorCodes.BG_TARGET_CHANGED, "display controller returned the wrong target"),
+            )
+            return null
+        }
         // open 成功后立即登记，堵住取消入口在 Agent 句柄登记前误放真实屏触摸盾的窗口。
         RunDisplayTargetRegistry.bind(record.id, target)
         val displayScope =
@@ -194,6 +202,15 @@ public class RunRunner(
             observer.clear(record.id)
         }
     }
+
+    private fun DisplayTarget.matchesRun(
+        owner: RunId,
+        backgroundScreen: Boolean,
+    ): Boolean =
+        when (this) {
+            DisplayTarget.Main -> !backgroundScreen
+            is DisplayTarget.Background -> backgroundScreen && this.owner == owner && displayId > 0
+        }
 
     /** 显示打开异常按未知内部错误收口；取消继续上抛，由 finally 释放资源。 */
     @Suppress("TooGenericExceptionCaught") // 控制器契约外异常的兜底，避免 Run 停留在 RUNNING
@@ -483,7 +500,9 @@ public class RunRunner(
             config = config,
             toolFilter = task?.allowedTools,
             // 任务运行不能再创建或修改任务（否则会把目标当成新请求，建出重复任务）。
-            deniedTools = if (task != null) TASK_RUN_DENIED_TOOLS else emptySet(),
+            deniedTools =
+                (if (task != null) TASK_RUN_DENIED_TOOLS else emptySet()) +
+                    (if (record.backgroundScreen == true) BACKGROUND_RUN_DENIED_TOOLS else emptySet()),
             modelProfileId = threadStore.modelProfileOf(record.threadId),
             replay = replayPlan(record, task),
             runMode = tier,
@@ -622,8 +641,10 @@ public class RunRunner(
         if (task == null || finished.status != RunOutcome.SUCCEEDED) return
         val config = configProvider.current()[TaskConfig.REPLAY]
         if (!config.enabled) return
+        val saved = taskStore.get(task.id) ?: return
+        if (saved.updatedAt != task.updatedAt || saved.backgroundScreen != task.backgroundScreen) return
         val script = ReplayRecorder.build(events, config.maxSteps) ?: return
-        taskStore.save(task.copy(replayScript = script, updatedAt = clock.nowMillis()))
+        taskStore.save(saved.copy(replayScript = script, updatedAt = clock.nowMillis()))
         logger.i(TAG, "replay_script_recorded", "runId" to record.id.value, "steps" to script.steps.size)
     }
 
@@ -656,6 +677,8 @@ public class RunRunner(
 
         /** 任务运行禁用的工具：任务不能再创建或修改任务。 */
         val TASK_RUN_DENIED_TOOLS: Set<String> = setOf("tool.create_task", "tool.update_task")
+        val BACKGROUND_RUN_DENIED_TOOLS: Set<String> =
+            setOf("tool.run_shell", "tool.intent", "tool.restart_app", "tool.clipboard_get", "tool.clipboard_set")
         const val RUN_ORIGIN_FOREGROUND = "foreground"
         const val RUN_ORIGIN_BACKGROUND = "background"
         const val KEY_POLICY = "policy"

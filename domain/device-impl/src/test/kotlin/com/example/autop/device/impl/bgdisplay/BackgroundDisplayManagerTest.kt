@@ -31,7 +31,7 @@ import org.robolectric.annotation.ConscryptMode
 @ConscryptMode(ConscryptMode.Mode.OFF)
 class BackgroundDisplayManagerTest {
     @Test
-    fun `create request failure keeps shared host alive`() =
+    fun `uncertain create request retires its host`() =
         runTest {
             val client = ShellHostClient(StandardTestDispatcher(testScheduler), 1_000L, NoopLogger)
             val owner = RunId("background-run")
@@ -46,7 +46,7 @@ class BackgroundDisplayManagerTest {
 
             assertThat(result).isInstanceOf(Outcome.Err::class.java)
             assertThat((result as Outcome.Err).error.code).isEqualTo(DeviceErrorCodes.BG_CHANNEL_UNAVAILABLE)
-            assertThat(client.isAlive).isTrue()
+            assertThat(client.isAlive).isFalse()
         }
 
     @Test

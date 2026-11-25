@@ -40,68 +40,105 @@ internal class BackgroundDisplaySession(
     var released = false
         private set
 
-    suspend fun request(op: JSONObject): Outcome<JSONObject> {
-        if (released || !client.isAlive) return unavailable()
-        return try {
-            mutex.withLock {
-                if (released || !client.isAlive) return unavailable()
+    private var terminalError: AppError? = null
+
+    suspend fun request(op: JSONObject): Outcome<JSONObject> =
+        mutex.withLock {
+            terminalError?.let { return@withLock Outcome.Err(it) }
+            if (released || !client.isAlive) return@withLock unavailable()
+            try {
                 val reply =
                     client.request(
                         JSONObject(op.toString()).apply { put("sessionId", sessionId) },
-                        config.requestTimeoutMs,
+                        if (op.optString("op") == BackgroundDisplayWire.OP_LAUNCH) {
+                            maxOf(config.requestTimeoutMs, config.launchTimeoutMs + RPC_GRACE_MS)
+                        } else {
+                            config.requestTimeoutMs
+                        },
                     )
-                if (reply.optBoolean("ok")) Outcome.Ok(reply) else Outcome.Err(hostError(reply.optString("error")))
+                if (reply.optBoolean("ok")) {
+                    Outcome.Ok(reply)
+                } else {
+                    val error = hostError(reply.optString("error"))
+                    if (error.abortRun) terminalError = error
+                    Outcome.Err(error)
+                }
+            } catch (e: CancellationException) {
+                terminalError = AppError(DeviceErrorCodes.BG_RELEASED, "background request cancelled", abortRun = true)
+                throw e
+            } catch (e: IOException) {
+                // An RPC timeout cannot establish whether the helper already performed the operation.
+                val error =
+                    AppError(DeviceErrorCodes.BG_RELEASED, "background host disconnected", cause = e, abortRun = true)
+                terminalError = error
+                Outcome.Err(error)
             }
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: IOException) {
-            Outcome.Err(
-                AppError(code = DeviceErrorCodes.BG_RELEASED, message = "background host disconnected", cause = e),
-            )
         }
-    }
 
     suspend fun release() {
         if (released) return
         released = true
         try {
             if (client.isAlive) {
-                client.request(
-                    JSONObject()
-                        .put("op", BackgroundDisplayWire.OP_RELEASE)
-                        .put("sessionId", sessionId),
-                    config.launchTimeoutMs,
-                )
+                val reply =
+                    client.request(
+                        JSONObject()
+                            .put("op", BackgroundDisplayWire.OP_RELEASE)
+                            .put("sessionId", sessionId),
+                        config.launchTimeoutMs,
+                    )
+                if (!reply.optBoolean("ok")) client.close()
             }
         } catch (_: IOException) {
+            // The display may still exist. Closing the owner transport forces resource retirement.
+            client.close()
         }
     }
 
     private fun unavailable(): Outcome<JSONObject> =
-        Outcome.Err(AppError(DeviceErrorCodes.BG_RELEASED, "background display session released"))
+        Outcome.Err(AppError(DeviceErrorCodes.BG_RELEASED, "background display session released", abortRun = true))
 
     private fun hostError(code: String): AppError =
         AppError(
-            code =
-                when (code) {
-                    BackgroundDisplayWire.ERR_INJECTION_FAILED,
-                    BackgroundDisplayWire.ERR_INPUT_NOT_FOUND,
-                    BackgroundDisplayWire.ERR_SET_TEXT_FAILED,
-                    -> DeviceErrorCodes.BG_INPUT_REJECTED
-                    BackgroundDisplayWire.ERR_STALE_NODE -> DeviceErrorCodes.NODE_STALE
-                    BackgroundDisplayWire.ERR_DISPLAY_UNAVAILABLE,
-                    BackgroundDisplayWire.ERR_AUTOMATION_UNAVAILABLE,
-                    -> DeviceErrorCodes.BG_RELEASED
-                    BackgroundDisplayWire.ERR_CAPTURE_FAILED -> DeviceErrorCodes.SCREENSHOT_FAILED
-                    BackgroundDisplayWire.ERR_TREE_UNAVAILABLE -> DeviceErrorCodes.APP_TREE_EMPTY
-                    BackgroundDisplayWire.ERR_LAUNCH_FAILED -> DeviceErrorCodes.LAUNCH_FAILED
-                    BackgroundDisplayWire.ERR_TIMEOUT -> DeviceErrorCodes.TIMEOUT
-                    BackgroundDisplayWire.ERR_DISPLAY_CREATE_FAILED -> DeviceErrorCodes.BG_DISPLAY_CREATE_FAILED
-                    else -> DeviceErrorCodes.ACTION_FAILED
-                },
+            code = deviceErrorCode(code),
             message = code,
             retryable = code == BackgroundDisplayWire.ERR_STALE_NODE || code == BackgroundDisplayWire.ERR_TIMEOUT,
+            abortRun = code in TERMINAL_HOST_ERRORS,
         )
+
+    private fun deviceErrorCode(code: String): String =
+        when (code) {
+            BackgroundDisplayWire.ERR_INJECTION_FAILED,
+            BackgroundDisplayWire.ERR_INPUT_NOT_FOUND,
+            BackgroundDisplayWire.ERR_SET_TEXT_FAILED,
+            -> DeviceErrorCodes.BG_INPUT_REJECTED
+            BackgroundDisplayWire.ERR_STALE_NODE -> DeviceErrorCodes.NODE_STALE
+            BackgroundDisplayWire.ERR_DISPLAY_UNAVAILABLE,
+            BackgroundDisplayWire.ERR_AUTOMATION_UNAVAILABLE,
+            -> DeviceErrorCodes.BG_RELEASED
+            BackgroundDisplayWire.ERR_CAPTURE_FAILED -> DeviceErrorCodes.SCREENSHOT_FAILED
+            BackgroundDisplayWire.ERR_TREE_UNAVAILABLE -> DeviceErrorCodes.APP_TREE_EMPTY
+            BackgroundDisplayWire.ERR_LAUNCH_FAILED -> DeviceErrorCodes.LAUNCH_FAILED
+            BackgroundDisplayWire.ERR_APP_ON_OTHER_DISPLAY -> DeviceErrorCodes.BG_APP_ON_OTHER_DISPLAY
+            BackgroundDisplayWire.ERR_TARGET_CHANGED,
+            BackgroundDisplayWire.ERR_FOREGROUND_UNAVAILABLE,
+            -> DeviceErrorCodes.BG_TARGET_CHANGED
+            BackgroundDisplayWire.ERR_LOCKED -> DeviceErrorCodes.BG_LOCKED
+            BackgroundDisplayWire.ERR_ACTION_UNSUPPORTED -> DeviceErrorCodes.BG_ACTION_UNSUPPORTED
+            BackgroundDisplayWire.ERR_TIMEOUT -> DeviceErrorCodes.TIMEOUT
+            BackgroundDisplayWire.ERR_DISPLAY_CREATE_FAILED -> DeviceErrorCodes.BG_DISPLAY_CREATE_FAILED
+            else -> DeviceErrorCodes.ACTION_FAILED
+        }
+
+    private companion object {
+        val TERMINAL_HOST_ERRORS =
+            setOf(
+                BackgroundDisplayWire.ERR_TARGET_CHANGED,
+                BackgroundDisplayWire.ERR_FOREGROUND_UNAVAILABLE,
+                BackgroundDisplayWire.ERR_DISPLAY_UNAVAILABLE,
+                BackgroundDisplayWire.ERR_LOCKED,
+            )
+    }
 }
 
 /** Run 级后台显示会话；默认关闭，任何后台失败均不返回真实屏目标。 */
@@ -168,7 +205,9 @@ public class BackgroundDisplayManagerImpl
             return session
                 ?.takeIf { !it.released && it.target.displayId == target.displayId }
                 ?.let { Outcome.Ok(it) }
-                ?: Outcome.Err(AppError(DeviceErrorCodes.BG_RELEASED, "background display session unavailable"))
+                ?: Outcome.Err(
+                    AppError(DeviceErrorCodes.BG_RELEASED, "background display session unavailable", abortRun = true),
+                )
         }
 
         override suspend fun release(owner: RunId) {
@@ -268,7 +307,7 @@ public class BackgroundDisplayManagerImpl
                                     )
                                 }
                             mutex.withLock {
-                                hostConnecting = null
+                                if (hostConnecting === deferred) hostConnecting = null
                                 if (generation != hostGeneration) {
                                     connected.getOrNull()?.close()
                                     deferred.completeExceptionally(IOException("background host closed during connect"))
@@ -290,6 +329,7 @@ public class BackgroundDisplayManagerImpl
     }
 
 private const val SHUTDOWN_TIMEOUT_MS = 1_000L
+private const val RPC_GRACE_MS = 1_000L
 
 @Suppress("TooGenericExceptionCaught") // 协议响应解析及隐藏 API 失败统一收口为稳定设备错误
 internal suspend fun openBackgroundDisplaySession(
@@ -307,7 +347,8 @@ internal suspend fun openBackgroundDisplaySession(
                     .put("width", config.width)
                     .put("height", config.height)
                     .put("dpi", config.dpi)
-                    .put("jpegQuality", config.jpegQuality),
+                    .put("jpegQuality", config.jpegQuality)
+                    .put("maxPayloadBytes", config.maxPayloadBytes),
                 config.launchTimeoutMs,
             )
         if (!reply.optBoolean("ok")) {
@@ -318,7 +359,7 @@ internal suspend fun openBackgroundDisplaySession(
                     BackgroundDisplaySession(
                         DisplayTarget.Background(
                             owner,
-                            reply.getInt("displayId"),
+                            reply.getInt("displayId").also { require(it > 0) },
                             reply.getInt("width"),
                             reply.getInt("height"),
                             reply.getInt("dpi"),
@@ -331,6 +372,7 @@ internal suspend fun openBackgroundDisplaySession(
     } catch (e: CancellationException) {
         throw e
     } catch (e: IOException) {
+        client.close()
         logger.w("BackgroundDisplay", "host_unavailable", "runId" to owner.value, error = e)
         Outcome.Err(
             AppError(
@@ -340,6 +382,7 @@ internal suspend fun openBackgroundDisplaySession(
             ),
         )
     } catch (e: Exception) {
+        client.close()
         logger.w("BackgroundDisplay", "create_failed", "runId" to owner.value, error = e)
         Outcome.Err(
             AppError(

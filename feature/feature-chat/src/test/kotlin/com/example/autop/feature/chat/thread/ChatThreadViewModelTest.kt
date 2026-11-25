@@ -292,8 +292,9 @@ public class ChatThreadViewModelTest {
             shellInput.state.value = ShellState.Disconnected
             runCurrent()
 
-            assertThat(viewModel.uiState.value.backgroundRunBlock).isNull()
+            assertThat(viewModel.uiState.value.backgroundRunBlock).isEqualTo(BackgroundRunBlock.CHANNEL_DISCONNECTED)
             viewModel.onAction(ChatThreadAction.SetBackgroundScreen(false))
+            runCurrent()
             assertThat(viewModel.uiState.value.backgroundScreen).isFalse()
             assertThat(viewModel.uiState.value.backgroundRunBlock).isEqualTo(BackgroundRunBlock.CHANNEL_DISCONNECTED)
             assertThat(threads.backgroundScreenOf(ThreadId("t1"))).isFalse()

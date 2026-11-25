@@ -44,7 +44,7 @@
         <item>本应用按现状提供，不作任何明示或暗示的保证，包括对准确性、可用性和适用性的保证。开发者不对使用本应用造成的直接或间接损失承担责任。</item>
         <item>继续使用即表示你已阅读并同意本协议。如果你不同意，请退出应用并停止使用。</item>
     </string-array>
-    <string name="core_ui_background_run_title">后台运行</string>
+    <string name="core_ui_background_run_title">虚拟屏运行</string>
     <string name="core_ui_background_run_desc">在独立虚拟屏运行，不占用当前屏幕</string>
     <string name="core_ui_background_run_locked">任务运行中，无法切换</string>
     <string name="core_ui_background_run_unsupported">需要 Android 14 或更高版本</string>

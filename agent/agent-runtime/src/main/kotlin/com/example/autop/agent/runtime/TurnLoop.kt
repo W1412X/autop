@@ -336,6 +336,7 @@ internal class TurnLoop(
                 controller.emit(AgentEvent.ToolCallStreaming(index, call.name, callId = call.id))
             }
             val outputs = phase.execute(calls)
+            outputs.firstNotNullOfOrNull { it.error?.takeIf(AppError::abortRun) }?.let { return fail(it) }
             val control = handleControl(outputs)
             if (control != null) return control
             applyBreaker(guards.breakerVerdict(calls, outputs))

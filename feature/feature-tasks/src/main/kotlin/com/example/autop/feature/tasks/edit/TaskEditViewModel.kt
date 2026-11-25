@@ -75,6 +75,7 @@ public class TaskEditViewModel
                     isNew = taskId == null,
                     flowsEnabled = configProvider.current().flowsEnabled(),
                     shellExecEnabled = configProvider.current()[FeaturesConfig.FEATURES].shellExec,
+                    backgroundChannelConnected = shellInput.state.value == ShellState.Connected,
                 ),
             )
 
@@ -102,7 +103,7 @@ public class TaskEditViewModel
         private fun requirementInputOf(state: TaskEditUiState): RequirementInput =
             RequirementInput(
                 flow = state.executorFlow,
-                needsScreen = state.needsScreen,
+                needsScreen = state.needsScreen && !state.backgroundScreen,
                 runMode = state.runMode,
                 sourcePermission =
                     if (state.triggerKind == EditTriggerKind.CONDITION) {
@@ -120,6 +121,7 @@ public class TaskEditViewModel
         )
 
         private var simEvents: List<TriggerEvent> = emptyList()
+        private var originalTask: Task? = null
 
         init {
             // 运行环境变化（无障碍、shell 通道、总闸）时刷新快照。
@@ -130,7 +132,10 @@ public class TaskEditViewModel
                     configProvider.observe(),
                 ) { accessible, shell, snapshot ->
                     currentEnvironment(accessible, shell, snapshot)
-                }.collect { env -> envState.value = env }
+                }.collect { env ->
+                    envState.value = env
+                    _uiState.update { it.copy(backgroundChannelConnected = env.shellConnected) }
+                }
             }
             // 表单字段或环境变化时重新算缺失项；只在结果变化时写回，避免循环刷新。
             viewModelScope.launch {
@@ -167,6 +172,8 @@ public class TaskEditViewModel
                 is TaskEditAction.SetGoal -> _uiState.update { it.copy(goal = action.value) }
                 is TaskEditAction.SetRunMode -> _uiState.update { it.copy(runMode = action.mode) }
                 is TaskEditAction.SetNeedsScreen -> _uiState.update { it.copy(needsScreen = action.value) }
+                is TaskEditAction.SetBackgroundScreen ->
+                    _uiState.update { it.copy(backgroundScreen = action.enabled) }
                 is TaskEditAction.SetExecutorFlow -> _uiState.update { it.copy(executorFlow = action.flow) }
                 is TaskEditAction.SetFlow ->
                     _uiState.update {
@@ -253,6 +260,7 @@ public class TaskEditViewModel
                     _uiState.update { it.copy(error = TaskEditError.NOT_FOUND.name) }
                     return@launch
                 }
+                originalTask = task
                 _uiState.update { state -> state.from(task) }
             }
         }
@@ -342,12 +350,27 @@ public class TaskEditViewModel
         }
 
         /** 当前表单 → Task（装配细节在 [buildTask] 扩展）。 */
-        private fun buildTask(): Task =
-            _uiState.value.buildTask(
-                existingId = taskId?.let { TaskId(it) },
-                newId = ids.newId(),
-                now = clock.nowMillis(),
+        private fun buildTask(): Task {
+            val edited =
+                _uiState.value.buildTask(
+                    existingId = taskId?.let { TaskId(it) },
+                    newId = ids.newId(),
+                    now = clock.nowMillis(),
+                )
+            val original = originalTask ?: return edited
+            return edited.copy(
+                createdAt = original.createdAt,
+                enabled = original.enabled,
+                allowedTools = original.allowedTools,
+                policyOverrides = original.policyOverrides,
+                configOverrides = original.configOverrides,
+                outputSchema = original.outputSchema,
+                replayScript =
+                    original.replayScript.takeIf {
+                        original.backgroundScreen == edited.backgroundScreen && original.goal == edited.goal
+                    },
             )
+        }
 
         private fun describe(event: TriggerEvent): String =
             event.fields.entries

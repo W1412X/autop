@@ -44,10 +44,23 @@ import com.example.autop.core.ui.component.SubPageTopBar
 import com.example.autop.core.ui.component.ballface.AutopBallFace
 import com.example.autop.core.ui.theme.LocalSpacing
 import com.example.autop.core.ui.theme.StatusTone
+import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.feature.tasks.R
 import com.example.autop.feature.tasks.runStatusFaceOf
 import com.example.autop.feature.tasks.runStatusTextRes
 import com.example.autop.feature.tasks.runStatusTone
+
+private fun displayFailureRes(code: String): Int? =
+    when (code) {
+        DeviceErrorCodes.BG_UNSUPPORTED_SDK -> R.string.task_display_needs_android
+        DeviceErrorCodes.BG_CHANNEL_UNAVAILABLE -> R.string.task_display_needs_channel
+        DeviceErrorCodes.BG_DISPLAY_CREATE_FAILED -> R.string.task_display_create_failed
+        DeviceErrorCodes.BG_RELEASED -> R.string.task_display_lost
+        DeviceErrorCodes.BG_TARGET_CHANGED -> R.string.task_display_target_changed
+        DeviceErrorCodes.BG_APP_ON_OTHER_DISPLAY -> R.string.task_display_app_conflict
+        DeviceErrorCodes.BG_LOCKED -> R.string.task_display_locked
+        else -> null
+    }
 
 /** Run 详情页。 */
 @Composable
@@ -172,6 +185,7 @@ private fun StatusSection(
         subtitle = state.summary.ifBlank { stringResource(R.string.run_detail_no_summary) },
         modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
     )
+    DisplayDetails(state)
     ListRow(
         title = stringResource(R.string.run_detail_origin),
         subtitle = state.originName,
@@ -186,6 +200,26 @@ private fun StatusSection(
         ListRow(
             title = stringResource(R.string.run_detail_finished_at),
             subtitle = state.endedText,
+            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
+        )
+    }
+}
+
+@Composable
+private fun DisplayDetails(state: RunDetailUiState) {
+    val spacing = LocalSpacing.current
+    state.backgroundScreen?.let { background ->
+        ListRow(
+            title = stringResource(R.string.task_execution_display),
+            subtitle = stringResource(if (background) R.string.task_display_virtual else R.string.task_display_main),
+            modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
+        )
+    }
+    state.errorCode?.let { code ->
+        val resource = displayFailureRes(code)
+        ListRow(
+            title = stringResource(R.string.task_run_failure_reason),
+            subtitle = if (resource == null) code else stringResource(resource),
             modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
         )
     }

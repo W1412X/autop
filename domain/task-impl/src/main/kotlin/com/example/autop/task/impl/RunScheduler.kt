@@ -66,48 +66,69 @@ public class RunScheduler(
         scope.launch { deviceState.changes.collect { if (!it.keyguardLocked) trySchedule() } }
     }
 
-    /** 单协程串行，避免调度竞态（docs/tech/07 §4.3）。 */
-    @Suppress("ReturnCount") // 门条件逐条早退是调度逻辑的自然结构（07 §4.3 伪代码同构）
+    /** 单协程串行，虚拟屏可以越过因真实屏资源而等待的运行。 */
     public fun trySchedule() {
         scope.launch {
-            scheduleMutex.withLock {
-                val next = queue.peek() ?: return@withLock
-                val record = runStore.get(next.runId)
-                if (record == null) {
-                    queue.remove(next)
-                    return@withLock
-                }
-                // 流程功能关闭（ADR-0030）：最早拦截，不等屏幕、不提醒锁屏、不取租约。
-                if (pending.isFlowRun(record.id) && !configProvider.current().flowsEnabled()) {
-                    failFlowDisabled(record)
-                    trySchedule()
-                    return@withLock
-                }
-                val task = pending.taskOf(record.id)
-                if (startBlockedByPermission(record, task)) {
-                    trySchedule()
-                    return@withLock
-                }
-                val needsScreen = pending.flowNeedsScreen(record.id) ?: task?.needsScreen ?: true
-                val backgroundDisplay = pending.backgroundScreenOf(record.id)
-                if (waitingForScreen(record, task, needsScreen, backgroundDisplay)) return@withLock
-                val idle = idleDelayMs(record, needsScreen, backgroundDisplay)
-                if (idle > 0) {
-                    scope.launch {
-                        delay(idle)
-                        trySchedule()
-                    }
-                    return@withLock
-                }
+            scheduleMutex.withLock { scheduleNext() }
+        }
+    }
+
+    @Suppress("LoopWithTooManyJumpStatements") // 各项启动门独立收口，继续检查下一条队列记录
+    private suspend fun scheduleNext() {
+        var mainWaiting = false
+        for (next in queue.snapshot()) {
+            val record = runStore.get(next.runId)
+            if (record == null) {
                 queue.remove(next)
-                val finalRecord = record
-                val finalTask = task
-                scope.launch {
-                    runner.execute(finalRecord, finalTask)
+                continue
+            }
+            val backgroundDisplay = record.backgroundScreen == true
+            if (mainWaiting && !backgroundDisplay) continue
+            val task = pending.taskOf(record.id)
+            if (isStartBlocked(record, task)) continue
+
+            if (mustWait(record, task, backgroundDisplay)) {
+                if (!backgroundDisplay) mainWaiting = true
+                continue
+            }
+
+            queue.remove(next)
+            scope.launch {
+                try {
+                    runner.execute(record, task)
+                } finally {
                     trySchedule()
                 }
             }
+            return
         }
+    }
+
+    private suspend fun isStartBlocked(
+        record: RunRecord,
+        task: Task?,
+    ): Boolean {
+        if (pending.isFlowRun(record.id) && !configProvider.current().flowsEnabled()) {
+            failFlowDisabled(record)
+            return true
+        }
+        return startBlockedByPermission(record, task)
+    }
+
+    private suspend fun mustWait(
+        record: RunRecord,
+        task: Task?,
+        backgroundDisplay: Boolean,
+    ): Boolean {
+        val needsScreen = pending.flowNeedsScreen(record.id) ?: task?.needsScreen ?: true
+        if (waitingForScreen(record, task, needsScreen, backgroundDisplay)) return true
+        val idle = idleDelayMs(record, needsScreen, backgroundDisplay)
+        if (idle <= 0) return false
+        scope.launch {
+            delay(idle)
+            trySchedule()
+        }
+        return true
     }
 
     /** RunControl：重新入队并立即调度（解锁后执行）；仅等待中的 Run 可重排（取消幂等，不复活已收口 Run）。 */
@@ -254,7 +275,7 @@ public class RunScheduler(
         needsScreen: Boolean,
         backgroundDisplay: Boolean,
     ): Boolean {
-        if (!needsScreen) return false
+        if (!needsScreen && !backgroundDisplay) return false
         if (!backgroundDisplay && !accessibilityStatus.connected.value) {
             notifier.notifyAccessibilityNeeded(ACCESSIBILITY_HINT)
             markWaiting(record, RunStatus.WAITING_SCREEN)

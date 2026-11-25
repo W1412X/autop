@@ -11,7 +11,6 @@ import com.example.autop.agent.ToolOutput
 import com.example.autop.core.common.AppError
 import com.example.autop.core.common.CommonErrorCodes
 import com.example.autop.core.common.Outcome
-import com.example.autop.core.common.getOrNull
 import com.example.autop.core.config.ConfigSnapshot
 import com.example.autop.core.prompt.PromptRepository
 import com.example.autop.device.AppInfo
@@ -60,18 +59,16 @@ public class OpenAppTool
             args: JsonObject,
             ctx: ToolContext,
         ): Outcome<PreparedAction> =
-            when (val display = currentDisplayTarget()) {
-                is DisplayTarget.Background ->
-                    prepareWith(
-                        screenReader.snapshotOrDegraded().getOrNull() ?: emptyScreen(display),
-                        args,
-                        ctx.config,
-                    )
-                else ->
-                    when (val got = screenReader.snapshotOrDegraded()) {
-                        is Outcome.Err -> got
-                        is Outcome.Ok -> prepareWith(got.value, args, ctx.config)
+            when (val got = screenReader.snapshotOrDegraded()) {
+                is Outcome.Ok -> prepareWith(got.value, args, ctx.config)
+                is Outcome.Err -> {
+                    val target = currentDisplayTarget()
+                    if (target is DisplayTarget.Background && !got.error.abortRun) {
+                        prepareWith(emptyScreen(target), args, ctx.config)
+                    } else {
+                        got
                     }
+                }
             }
 
         private fun emptyScreen(display: DisplayTarget.Background): ScreenSnapshot =

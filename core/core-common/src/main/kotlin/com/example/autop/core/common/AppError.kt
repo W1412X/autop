@@ -9,6 +9,7 @@ package com.example.autop.core.common
  * @property hint 给模型的修正建议（工具错误时使用，代码规范 §7）
  * @property details 结构化上下文（值一律是脱敏后的字符串）
  * @property cause 原始异常（仅进程内使用，不参与序列化）
+ * @property abortRun 当前执行环境已失效，结束本次运行并保留此错误码
  */
 public data class AppError(
     val code: String,
@@ -17,6 +18,7 @@ public data class AppError(
     val hint: String? = null,
     val details: Map<String, String> = emptyMap(),
     val cause: Throwable? = null,
+    val abortRun: Boolean = false,
 )
 
 /** 公共错误码（docs/tech/02 §1.1）。各领域错误码定义在所属模块的 `*ErrorCodes` 对象中。 */

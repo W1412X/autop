@@ -1,11 +1,9 @@
 package com.example.autop.core.ui.component
 
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -48,7 +46,6 @@ public fun BackgroundRunIconButton(
         stringResource(
             if (checked) R.string.core_ui_background_run_state_on else R.string.core_ui_background_run_state_off,
         )
-    val spacing = LocalSpacing.current
     val containerColor = if (checked) MaterialTheme.colorScheme.primaryContainer else Color.Transparent
     val contentColor =
         if (checked) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant
@@ -65,26 +62,21 @@ public fun BackgroundRunIconButton(
                     contentDescription = title
                     stateDescription = stateText
                 },
+        contentAlignment = Alignment.Center,
     ) {
         Surface(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.size(AutopDimens.virtualDisplayBadgeSize),
             shape = CircleShape,
             color = containerColor,
             contentColor = contentColor,
         ) {
             Box(contentAlignment = Alignment.Center) {
-                Icon(imageVector = AutopIcons.Screenshot, contentDescription = null)
+                Icon(
+                    imageVector = AutopIcons.VirtualDisplay,
+                    contentDescription = null,
+                    modifier = Modifier.size(IconSize.Sm.scaled()),
+                )
             }
-        }
-        if (checked) {
-            Box(
-                modifier =
-                    Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(spacing.xs)
-                        .size(AutopDimens.backgroundRunIndicatorSize)
-                        .background(MaterialTheme.colorScheme.onPrimaryContainer, CircleShape),
-            )
         }
     }
 }
@@ -97,7 +89,7 @@ public fun BackgroundRunRow(
     enabled: Boolean,
     unavailableReason: String?,
     modifier: Modifier = Modifier,
-    icon: ImageVector = AutopIcons.Screenshot,
+    icon: ImageVector = AutopIcons.VirtualDisplay,
 ) {
     val spacing = LocalSpacing.current
     Row(

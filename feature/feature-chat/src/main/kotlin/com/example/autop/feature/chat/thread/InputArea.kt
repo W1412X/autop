@@ -97,7 +97,7 @@ internal fun InputArea(
                 BackgroundRunIconButton(
                     checked = state.backgroundScreen,
                     onCheckedChange = { onAction(ChatThreadAction.SetBackgroundScreen(it)) },
-                    enabled = state.backgroundRunBlock == null,
+                    enabled = BackgroundRunBlock.canToggle(state.backgroundRunBlock, state.backgroundScreen),
                 )
             },
             sendEnabled = enabled && (state.input.isNotBlank() || state.images.isNotEmpty()),

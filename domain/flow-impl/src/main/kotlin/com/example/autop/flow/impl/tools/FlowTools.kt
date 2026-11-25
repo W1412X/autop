@@ -20,6 +20,7 @@ import com.example.autop.core.common.IdGenerator
 import com.example.autop.core.common.RunId
 import com.example.autop.core.config.AgentConfig
 import com.example.autop.core.config.BetaFeature
+import com.example.autop.device.DeviceErrorCodes
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.FlowProgressFeed
 import com.example.autop.flow.FlowRunOptions
@@ -226,6 +227,7 @@ public class RunFlowTool
                         AppError(
                             code = finished.errorCode ?: FlowErrorCodes.AGENT_FAILED,
                             message = finished.summary.orEmpty(),
+                            abortRun = DeviceErrorCodes.isBackgroundRunFatal(finished.errorCode),
                         )
                     },
             )

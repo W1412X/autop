@@ -5,6 +5,7 @@ package com.example.autop.device.impl.bgdisplay.helper
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.annotation.SuppressLint
 import android.annotation.TargetApi
+import android.app.ActivityManager
 import android.app.ActivityOptions
 import android.app.KeyguardManager
 import android.app.PendingIntent
@@ -50,6 +51,8 @@ import com.example.autop.device.WindowSnapshot
 import com.example.autop.device.WindowType
 import com.example.autop.device.core.ContentArea
 import com.example.autop.device.impl.NodeSnapshotReader
+import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_ACTION_UNSUPPORTED
+import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_APP_ON_OTHER_DISPLAY
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_AUTOMATION_UNAVAILABLE
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_BAD_REQUEST
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_CAPTURE_FAILED
@@ -58,9 +61,10 @@ import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_FOREGROUND_UNAVAILABLE
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_INJECTION_FAILED
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_LAUNCH_FAILED
+import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_LOCKED
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_SET_TEXT_FAILED
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_STALE_NODE
-import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_TIMEOUT
+import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_TARGET_CHANGED
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_TREE_UNAVAILABLE
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_UID_MISMATCH
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_UNKNOWN_OP
@@ -74,8 +78,11 @@ import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.MAX_
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.MAX_LAUNCH_TIMEOUT_MS
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.MAX_NODE_JSON_BYTES
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.MAX_OP_BYTES
+import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.MAX_REPLY_BYTES
+import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.MAX_REPLY_OVERHEAD_BYTES
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.MAX_REQUEST_CHARS
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.MAX_TEXT_BYTES
+import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.MIN_REPLY_BYTES
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.OP_CAPTURE
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.OP_CREATE
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.OP_FOCUSED_INPUT
@@ -94,7 +101,6 @@ import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.PROT
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.failure
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.int
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.intArray
-import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.keyCodes
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.long
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.packageName
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ready
@@ -114,6 +120,7 @@ import java.io.PrintStream
 import java.lang.reflect.Constructor
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
+import java.nio.ByteOrder
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -195,22 +202,39 @@ private const val FOCUS_RETRY_COUNT = 10
 private const val FOCUS_RETRY_MS = 100L
 private const val CAPTURE_RETRY_COUNT = 40
 private const val CAPTURE_RETRY_MS = 50L
+private const val IMAGE_READER_MAX_IMAGES = 3
 private const val LAUNCH_POLL_MS = 50L
+private const val LAUNCH_SETTLE_MS = 250L
+private const val INPUT_SETTLE_MS = 120L
 private const val AUTOMATION_TIMEOUT_MS = 3000L
 private const val AUTOMATION_OPERATION_TIMEOUT_MS = 30_000L
 private const val HOST_CLOSE_TIMEOUT_SECONDS = 10L
 private const val SWIPE_STEP_PX = 48.0
 private const val SWIPE_MAX_STEPS = 40
+private val DISPLAY_NODE_ACTIONS =
+    setOf(
+        AccessibilityNodeInfo.ACTION_CLICK,
+        AccessibilityNodeInfo.ACTION_LONG_CLICK,
+        AccessibilityNodeInfo.ACTION_SCROLL_FORWARD,
+        AccessibilityNodeInfo.ACTION_SCROLL_BACKWARD,
+        AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_UP.id,
+        AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_DOWN.id,
+        AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_LEFT.id,
+        AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_RIGHT.id,
+    )
 
-private data class DisplaySession(
+private class DisplaySession(
     val id: String,
     val display: Display,
     val virtualDisplay: VirtualDisplay,
-    val reader: ImageReader,
+    val frames: BackgroundFrames,
     val width: Int,
     val height: Int,
     val jpegQuality: Int,
-)
+    val maxPayloadBytes: Int,
+) {
+    val placement = BackgroundDisplayPlacement()
+}
 
 @TargetApi(Build.VERSION_CODES.UPSIDE_DOWN_CAKE)
 internal class BackgroundDisplayServer(
@@ -219,6 +243,7 @@ internal class BackgroundDisplayServer(
     private val out = PrintStream(FileOutputStream(FileDescriptor.out), true, Charsets.UTF_8.name())
     private val sessions = ConcurrentHashMap<String, DisplaySession>()
     private val launchLock = Any()
+    private val frameThread = HandlerThread("autop-bg-frames").apply { start() }
     private val executor =
         Executors.newCachedThreadPool { runnable ->
             Thread(runnable, "autop-bg-request").apply { isDaemon = true }
@@ -227,6 +252,8 @@ internal class BackgroundDisplayServer(
 
     @Volatile
     private var closing = false
+
+    @Volatile
     var shutdown = false
         private set
 
@@ -268,22 +295,26 @@ internal class BackgroundDisplayServer(
     fun close() {
         closing = true
         executor.shutdown()
-        runCatching { executor.awaitTermination(HOST_CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
+        val drained = runCatching { executor.awaitTermination(HOST_CLOSE_TIMEOUT_SECONDS, TimeUnit.SECONDS) }
+        if (drained.getOrDefault(false).not()) {
+            executor.shutdownNow()
+            return // Process exit revokes the display binder leases even if a framework call is stuck.
+        }
         val active = sessions.values.toList()
         sessions.clear()
-        active.forEach(::releaseSession)
+        active.forEach { runCatching { releaseSession(it) } }
         runCatching { automationSession?.close() }
         automationSession = null
+        frameThread.quitSafely()
     }
 
     private val requestHandlers =
         mapOf<String, (JSONObject) -> JSONObject>(
-            OP_CREATE to ::create,
             OP_LAUNCH to ::launch,
             OP_TAP to ::tap,
             OP_SWIPE to ::swipe,
             OP_KEY to ::key,
-            OP_KEY_COMBO to ::keyCombo,
+            OP_KEY_COMBO to { hostFailure(ERR_ACTION_UNSUPPORTED) },
             OP_SET_TEXT to { request -> automation().withAutomation { setText(request) } },
             OP_NODE_ACTION to { request -> automation().withAutomation { nodeAction(request) } },
         )
@@ -302,17 +333,89 @@ internal class BackgroundDisplayServer(
     private fun route(
         op: String,
         request: JSONObject,
-    ): JSONObject {
-        requestHandlers[op]?.let { return it(request) }
-        readHandlers[op]?.let { return it(request) }
-        return when (op) {
+    ): JSONObject =
+        when (op) {
+            OP_CREATE -> create(request)
             OP_RELEASE -> release(request)
             OP_SHUTDOWN -> {
+                closing = true
                 shutdown = true
                 JSONObject().put("exit", true)
             }
-            else -> hostFailure(ERR_UNKNOWN_OP)
+            else -> displayOperation(op, request)
         }
+
+    private fun displayOperation(
+        op: String,
+        request: JSONObject,
+    ): JSONObject {
+        val action = requestHandlers[op]
+        val handler = action ?: readHandlers[op] ?: hostFailure(ERR_UNKNOWN_OP)
+        val session = requireSession(request)
+        return synchronized(session) {
+            requireSession(request)
+            val before = verifyPlacement(session)
+            if (action != null && op != OP_LAUNCH && before.virtual == null) hostFailure(ERR_INJECTION_FAILED)
+            try {
+                val result = handler(request)
+                requirePayloadSize(op, result, session.maxPayloadBytes)
+                if (action != null && op != OP_LAUNCH) SystemClock.sleep(INPUT_SETTLE_MS)
+                result
+            } finally {
+                if (action != null && op != OP_LAUNCH) verifyPlacement(session, before)
+            }
+        }
+    }
+
+    private fun requirePayloadSize(
+        op: String,
+        result: JSONObject,
+        limit: Int,
+    ) {
+        val error =
+            when (op) {
+                OP_SNAPSHOT, OP_FOCUSED_INPUT -> ERR_TREE_UNAVAILABLE
+                OP_CAPTURE -> ERR_CAPTURE_FAILED
+                else -> return
+            }
+        // Leave room for the request ID and outer response fields.
+        if (result.toString().toByteArray(Charsets.UTF_8).size > limit - MAX_REPLY_OVERHEAD_BYTES) {
+            hostFailure(error)
+        }
+    }
+
+    private data class Foreground(
+        val virtual: BackgroundDisplayPlacement.Task?,
+        val primary: BackgroundDisplayPlacement.Task?,
+    )
+
+    private fun verifyPlacement(
+        session: DisplaySession,
+        before: Foreground? = null,
+    ): Foreground {
+        if (session.placement.failed) hostFailure(ERR_TARGET_CHANGED)
+        ensureUnlocked()
+        val (virtual, other) = allRootTasks().partition { it.displayId == session.display.displayId }
+        val foreground =
+            Foreground(
+                virtual.firstOrNull { it.visible && it.topActivity != null },
+                other.firstOrNull { it.displayId == Display.DEFAULT_DISPLAY && it.visible && it.topActivity != null },
+            )
+        val safe =
+            session.placement.observe(
+                virtual,
+                other,
+                before?.primary,
+                foreground.primary,
+                afterWrite = before != null,
+                now = SystemClock.uptimeMillis(),
+            )
+        if (!safe) hostFailure(ERR_TARGET_CHANGED)
+        return foreground
+    }
+
+    private fun ensureUnlocked() {
+        if (context.getSystemService(KeyguardManager::class.java)?.isKeyguardLocked != false) hostFailure(ERR_LOCKED)
     }
 
     private fun create(request: JSONObject): JSONObject {
@@ -322,54 +425,89 @@ internal class BackgroundDisplayServer(
         val newHeight = int(request, "height", min = 1, max = MAX_DISPLAY_DIMENSION)
         val newDpi = int(request, "dpi", min = 72, max = 640)
         val jpegQuality = int(request, "jpegQuality", min = 1, max = 100)
+        val maxPayloadBytes = int(request, "maxPayloadBytes", min = MIN_REPLY_BYTES, max = MAX_REPLY_BYTES)
         require(newWidth.toLong() * newHeight <= MAX_DISPLAY_PIXELS) { "display size" }
-        releaseSession(id)
-        var reader: ImageReader? = null
+        if (sessions.containsKey(id)) hostFailure(ERR_DISPLAY_CREATE_FAILED)
+        var frames: BackgroundFrames? = null
         var display: VirtualDisplay? = null
         try {
-            val createdReader = ImageReader.newInstance(newWidth, newHeight, android.graphics.PixelFormat.RGBA_8888, 2)
-            reader = createdReader
-            val displays = checkNotNull(context.getSystemService(DisplayManager::class.java)) { "display manager" }
-            val createdDisplay =
-                checkNotNull(
-                    displays.createVirtualDisplay(
-                        "autop-bg-${Process.myPid()}-$id",
-                        newWidth,
-                        newHeight,
-                        newDpi,
-                        createdReader.surface,
-                        virtualDisplayFlags(),
-                        null,
-                        null,
-                    ),
-                ) { "virtual display" }
+            val createdFrames = openFrames(newWidth, newHeight)
+            frames = createdFrames
+            val createdDisplay = openVirtualDisplay(id, newWidth, newHeight, newDpi, createdFrames)
             display = createdDisplay
             val target = checkNotNull(createdDisplay.display) { "display id" }
+            check(target.displayId > Display.DEFAULT_DISPLAY && target.isValid) { "virtual display id" }
             setImePolicyHide(target.displayId)
             automation()
-            sessions[id] =
+            val session =
                 DisplaySession(
                     id = id,
                     display = target,
                     virtualDisplay = createdDisplay,
-                    reader = createdReader,
+                    frames = createdFrames,
                     width = newWidth,
                     height = newHeight,
                     jpegQuality = jpegQuality,
+                    maxPayloadBytes = maxPayloadBytes,
                 )
-            return JSONObject()
-                .put("displayId", target.displayId)
-                .put("width", newWidth)
-                .put("height", newHeight)
-                .put("dpi", newDpi)
+            check(!closing && sessions.putIfAbsent(id, session) == null) { "display session already closed or created" }
+            return JSONObject(
+                mapOf(
+                    "displayId" to target.displayId,
+                    "width" to newWidth,
+                    "height" to newHeight,
+                    "dpi" to newDpi,
+                ),
+            )
         } catch (error: Throwable) {
             Log.e("BackgroundDisplayHost", "display creation failed", error)
             runCatching { display?.release() }
-            runCatching { reader?.close() }
+            runCatching { frames?.close() }
             when (error) {
                 is HostFailure -> raise(error)
                 else -> hostFailure(ERR_DISPLAY_CREATE_FAILED, error)
             }
+        }
+    }
+
+    private fun openVirtualDisplay(
+        id: String,
+        width: Int,
+        height: Int,
+        dpi: Int,
+        frames: BackgroundFrames,
+    ): VirtualDisplay {
+        val displays = checkNotNull(context.getSystemService(DisplayManager::class.java)) { "display manager" }
+        return checkNotNull(
+            displays.createVirtualDisplay(
+                "autop-bg-${Process.myPid()}-$id",
+                width,
+                height,
+                dpi,
+                frames.surface,
+                virtualDisplayFlags(),
+                null,
+                null,
+            ),
+        ) { "virtual display" }
+    }
+
+    private fun openFrames(
+        width: Int,
+        height: Int,
+    ): BackgroundFrames {
+        val reader =
+            ImageReader.newInstance(
+                width,
+                height,
+                android.graphics.PixelFormat.RGBA_8888,
+                IMAGE_READER_MAX_IMAGES,
+            )
+        return try {
+            BackgroundFrames(reader, Handler(frameThread.looper))
+        } catch (error: Throwable) {
+            reader.close()
+            throw error
         }
     }
 
@@ -433,6 +571,20 @@ internal class BackgroundDisplayServer(
         val intent =
             displayContext.packageManager.getLaunchIntentForPackage(packageName)
                 ?: hostFailure(ERR_LAUNCH_FAILED)
+        if (intent.component?.packageName != packageName) hostFailure(ERR_LAUNCH_FAILED)
+        if (allRootTasks().any {
+                it.displayId != display.displayId &&
+                    it.topActivity != null &&
+                    packageName in it.packages
+            }
+        ) {
+            hostFailure(ERR_APP_ON_OTHER_DISPLAY)
+        }
+        if (foregroundPackage(display.displayId) == packageName) return JSONObject()
+        val activityManager = context.getSystemService(ActivityManager::class.java)
+        if (activityManager?.isActivityStartAllowedOnDisplay(displayContext, display.displayId, intent) != true) {
+            hostFailure(ERR_LAUNCH_FAILED)
+        }
         intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_MULTIPLE_TASK)
         val options = ActivityOptions.makeBasic().apply { setLaunchDisplayId(display.displayId) }
         val pending =
@@ -441,20 +593,41 @@ internal class BackgroundDisplayServer(
                 display.displayId,
                 intent,
                 PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE,
-                options.toBundle(),
             )
         try {
             pending.send(displayContext, 0, null, null, null, null, options.toBundle())
         } catch (error: Throwable) {
+            session.placement.invalidate()
             hostFailure(ERR_LAUNCH_FAILED, error)
         } finally {
             runCatching { pending.cancel() }
         }
+        session.placement.watchPackage(packageName)
+        try {
+            awaitLaunch(request, session, packageName, timeoutMs)
+        } catch (error: Throwable) {
+            session.placement.invalidate()
+            throw error
+        }
+        return JSONObject()
+    }
+
+    private fun awaitLaunch(
+        request: JSONObject,
+        session: DisplaySession,
+        packageName: String,
+        timeoutMs: Long,
+    ) {
         val deadline = SystemClock.uptimeMillis() + timeoutMs
+        var arrivedAt: Long? = null
         while (true) {
-            if (foregroundPackage(session.display.displayId) == packageName) return JSONObject()
-            val remaining = deadline - SystemClock.uptimeMillis()
-            if (remaining <= 0L) hostFailure(ERR_TIMEOUT)
+            requireSession(request)
+            val foreground = verifyPlacement(session)
+            val now = SystemClock.uptimeMillis()
+            arrivedAt = if (foreground.virtual?.topPackage == packageName) arrivedAt ?: now else null
+            if (arrivedAt != null && now - arrivedAt >= LAUNCH_SETTLE_MS) return
+            val remaining = deadline - now
+            if (remaining <= 0L) hostFailure(ERR_TARGET_CHANGED)
             SystemClock.sleep(minOf(LAUNCH_POLL_MS, remaining))
         }
     }
@@ -559,7 +732,9 @@ internal class BackgroundDisplayServer(
                 repeat(WINDOW_RETRY_COUNT) {
                     val all = UiAutomation::class.java.getMethod("getWindowsOnAllDisplays").invoke(automation)
                     val target = (all as? SparseArray<*>)?.get(displayId)
+                    if (all !is SparseArray<*>) hostFailure(ERR_TREE_UNAVAILABLE)
                     val windows = (target as? List<*>)?.filterIsInstance<AccessibilityWindowInfo>().orEmpty()
+                    if (windows.any { it.displayId != displayId }) hostFailure(ERR_TREE_UNAVAILABLE)
                     if (windows.isNotEmpty()) return@withAutomation windows.sortedByDescending { it.layer }
                     SystemClock.sleep(WINDOW_RETRY_MS)
                 }
@@ -574,29 +749,29 @@ internal class BackgroundDisplayServer(
 
     private fun capture(request: JSONObject): JSONObject {
         val session = requireSession(request)
-        val reader = session.reader
-        var image: Image? = null
         try {
             repeat(CAPTURE_RETRY_COUNT) {
-                if (image == null) image = reader.acquireLatestImage()
-                if (image == null) SystemClock.sleep(CAPTURE_RETRY_MS)
+                requireSession(request)
+                val capture =
+                    session.frames.withLatest { image ->
+                        val bytes = encodeJpeg(image, session.jpegQuality)
+                        JSONObject()
+                            .put("jpeg", Base64.encodeToString(bytes, Base64.NO_WRAP))
+                            .put("width", image.width)
+                            .put("height", image.height)
+                    }
+                if (capture != null) return capture
+                SystemClock.sleep(CAPTURE_RETRY_MS)
             }
-            if (image == null && foregroundPackage(session.display.displayId) == null) {
+            if (foregroundPackage(session.display.displayId) == null) {
                 return blankCapture(session.width, session.height, session.jpegQuality)
             }
-            val captured = image ?: hostFailure(ERR_CAPTURE_FAILED)
-            val bytes = encodeJpeg(captured, session.jpegQuality)
-            return JSONObject()
-                .put("jpeg", Base64.encodeToString(bytes, Base64.NO_WRAP))
-                .put("width", captured.width)
-                .put("height", captured.height)
+            hostFailure(ERR_CAPTURE_FAILED)
         } catch (error: Throwable) {
             when (error) {
                 is HostFailure -> raise(error)
                 else -> hostFailure(ERR_CAPTURE_FAILED, error)
             }
-        } finally {
-            runCatching { image?.close() }
         }
     }
 
@@ -629,12 +804,15 @@ internal class BackgroundDisplayServer(
         quality: Int,
     ): ByteArray {
         val plane = image.planes[0]
-        val buffer = plane.buffer
+        check(plane.pixelStride == Int.SIZE_BYTES) { "RGBA pixel stride" }
+        val buffer = plane.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
         val pixels = IntArray(image.width * image.height)
         for (y in 0 until image.height) {
             buffer.position(y * plane.rowStride)
             buffer.asIntBuffer().get(pixels, y * image.width, image.width)
         }
+        // ImageReader provides RGBA bytes. Bitmap.createBitmap interprets integers as ARGB.
+        for (index in pixels.indices) pixels[index] = Integer.rotateRight(pixels[index], Byte.SIZE_BITS)
         val bitmap = Bitmap.createBitmap(pixels, image.width, image.height, Bitmap.Config.ARGB_8888)
         return try {
             ByteArrayOutputStream().use { output ->
@@ -649,33 +827,7 @@ internal class BackgroundDisplayServer(
     private fun tap(request: JSONObject): JSONObject {
         val x = int(request, "x")
         val y = int(request, "y")
-        val duration = long(request, "durationMs", min = 0L, max = MAX_GESTURE_MS)
-        val session = requireSession(request)
-        validatePoint(session, x, y)
-        val displayId = session.display.displayId
-        val manager = inputManager()
-        val now = SystemClock.uptimeMillis()
-        val down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, x.toFloat(), y.toFloat(), 0)
-        val up = MotionEvent.obtain(now, now + duration, MotionEvent.ACTION_UP, x.toFloat(), y.toFloat(), 0)
-        var acceptedDown = false
-        var acceptedUp = false
-        var failure: Throwable? = null
-        try {
-            down.setSource(InputDevice.SOURCE_TOUCHSCREEN)
-            up.setSource(InputDevice.SOURCE_TOUCHSCREEN)
-            setDisplayId(down, displayId)
-            setDisplayId(up, displayId)
-            acceptedDown = inject(manager, down)
-            if (acceptedDown) SystemClock.sleep(duration)
-        } catch (error: Throwable) {
-            failure = error
-        }
-        if (acceptedDown) acceptedUp = runCatching { inject(manager, up) }.isSuccess
-        down.recycle()
-        up.recycle()
-        failure?.let(::raise)
-        if (!acceptedDown || !acceptedUp) hostFailure(ERR_INJECTION_FAILED)
-        return JSONObject()
+        return touch(request, x, y, x, y, steps = 1)
     }
 
     private fun swipe(request: JSONObject): JSONObject {
@@ -683,158 +835,113 @@ internal class BackgroundDisplayServer(
         val fromY = int(request, "fromY")
         val toX = int(request, "toX")
         val toY = int(request, "toY")
+        val distance = maxOf(kotlin.math.abs(fromX.toLong() - toX), kotlin.math.abs(fromY.toLong() - toY))
+        val steps =
+            kotlin.math
+                .ceil(distance / SWIPE_STEP_PX)
+                .toInt()
+                .coerceIn(1, SWIPE_MAX_STEPS)
+        return touch(request, fromX, fromY, toX, toY, steps)
+    }
+
+    private fun touch(
+        request: JSONObject,
+        fromX: Int,
+        fromY: Int,
+        toX: Int,
+        toY: Int,
+        steps: Int,
+    ): JSONObject {
         val duration = long(request, "durationMs", min = 0L, max = MAX_GESTURE_MS)
         val session = requireSession(request)
         validatePoint(session, fromX, fromY)
         validatePoint(session, toX, toY)
-        val displayId = session.display.displayId
         val manager = inputManager()
-        val now = SystemClock.uptimeMillis()
-        val delta = maxOf(kotlin.math.abs(fromX - toX), kotlin.math.abs(fromY - toY))
-        val steps = maxOf(1, minOf(SWIPE_MAX_STEPS, kotlin.math.ceil(delta / SWIPE_STEP_PX).toInt()))
-        val down = MotionEvent.obtain(now, now, MotionEvent.ACTION_DOWN, fromX.toFloat(), fromY.toFloat(), 0)
-        val up = MotionEvent.obtain(now, now + duration, MotionEvent.ACTION_UP, toX.toFloat(), toY.toFloat(), 0)
-        var acceptedDown = false
-        var acceptedUp = false
-        var failure: Throwable? = null
-        try {
-            down.setSource(InputDevice.SOURCE_TOUCHSCREEN)
-            up.setSource(InputDevice.SOURCE_TOUCHSCREEN)
-            setDisplayId(down, displayId)
-            setDisplayId(up, displayId)
-            acceptedDown = inject(manager, down)
-            if (acceptedDown) {
-                injectSwipeMoves(manager, displayId, SwipePath(fromX, fromY, toX, toY, duration, steps, now))
+        val downTime = SystemClock.uptimeMillis()
+        var x = fromX
+        var y = fromY
+
+        fun send(action: Int) {
+            val event =
+                MotionEvent.obtain(downTime, SystemClock.uptimeMillis(), action, x.toFloat(), y.toFloat(), 0)
+            try {
+                event.source = InputDevice.SOURCE_TOUCHSCREEN
+                setDisplayId(event, session.display.displayId)
+                if (!inject(manager, event)) hostFailure(ERR_INJECTION_FAILED)
+            } finally {
+                event.recycle()
             }
-        } catch (error: Throwable) {
-            failure = error
         }
-        if (acceptedDown) acceptedUp = runCatching { inject(manager, up) }.isSuccess
-        down.recycle()
-        up.recycle()
-        failure?.let(::raise)
-        if (!acceptedDown || !acceptedUp) hostFailure(ERR_INJECTION_FAILED)
+
+        try {
+            send(MotionEvent.ACTION_DOWN)
+            for (step in 1..steps) {
+                waitForGestureStep(request, downTime + duration * step / steps)
+                x = fromX + (toX - fromX) * step / steps
+                y = fromY + (toY - fromY) * step / steps
+                if (step < steps) send(MotionEvent.ACTION_MOVE)
+            }
+            requireSession(request)
+            ensureUnlocked()
+            send(MotionEvent.ACTION_UP)
+        } catch (error: Throwable) {
+            // A timed-out dispatch may have reached the receiver. Cancel instead of replaying or clicking on release.
+            if (session.display.isValid) runCatching { send(MotionEvent.ACTION_CANCEL) }
+            throw error
+        }
         return JSONObject()
     }
 
-    private fun injectSwipeMoves(
-        manager: InputManager,
-        displayId: Int,
-        path: SwipePath,
+    private fun waitForGestureStep(
+        request: JSONObject,
+        deadline: Long,
     ) {
-        for (step in 1..path.steps) {
-            val eventTime = path.now + path.duration * step / path.steps
-            SystemClock.sleep((eventTime - SystemClock.uptimeMillis()).coerceAtLeast(0L))
-            val x = path.fromX + (path.toX - path.fromX) * step / path.steps
-            val y = path.fromY + (path.toY - path.fromY) * step / path.steps
-            val move = MotionEvent.obtain(path.now, eventTime, MotionEvent.ACTION_MOVE, x.toFloat(), y.toFloat(), 0)
-            try {
-                move.setSource(InputDevice.SOURCE_TOUCHSCREEN)
-                setDisplayId(move, displayId)
-                if (!inject(manager, move)) hostFailure(ERR_INJECTION_FAILED)
-            } finally {
-                move.recycle()
-            }
+        while (true) {
+            requireSession(request)
+            val remaining = deadline - SystemClock.uptimeMillis()
+            if (remaining <= 0L) return
+            SystemClock.sleep(minOf(LAUNCH_POLL_MS, remaining))
         }
     }
 
     private fun key(request: JSONObject): JSONObject {
         val code = int(request, "code", min = 1, max = MAX_KEY_CODE)
-        injectKeys(requireSession(request).display.displayId, listOf(code))
-        return JSONObject()
-    }
-
-    private fun keyCombo(request: JSONObject): JSONObject {
-        injectKeys(requireSession(request).display.displayId, keyCodes(request))
-        return JSONObject()
-    }
-
-    private fun injectKeys(
-        displayId: Int,
-        codes: List<Int>,
-    ) {
+        if (code != KeyEvent.KEYCODE_BACK && code != KeyEvent.KEYCODE_ENTER) hostFailure(ERR_ACTION_UNSUPPORTED)
+        val session = requireSession(request)
         val manager = inputManager()
-        val now = SystemClock.uptimeMillis()
-        val pressed = mutableListOf<Int>()
-        var metaState = 0
-        var failure: Throwable? = null
+        val downTime = SystemClock.uptimeMillis()
+
+        fun send(
+            action: Int,
+            flags: Int = 0,
+        ) {
+            val event =
+                KeyEvent(
+                    downTime,
+                    SystemClock.uptimeMillis(),
+                    action,
+                    code,
+                    0,
+                    0,
+                    KeyCharacterMap.VIRTUAL_KEYBOARD,
+                    0,
+                    flags,
+                    InputDevice.SOURCE_KEYBOARD,
+                )
+            setDisplayId(event, session.display.displayId)
+            if (!inject(manager, event)) hostFailure(ERR_INJECTION_FAILED)
+        }
         try {
-            for (code in codes) {
-                val event = keyEvent(now, KeyEvent.ACTION_DOWN, code, metaState)
-                setDisplayId(event, displayId)
-                if (!inject(manager, event)) hostFailure(ERR_INJECTION_FAILED)
-                pressed += code
-                metaState = metaAfterDown(metaState, code)
-            }
+            send(KeyEvent.ACTION_DOWN)
+            requireSession(request)
+            ensureUnlocked()
+            send(KeyEvent.ACTION_UP)
         } catch (error: Throwable) {
-            failure = error
+            if (session.display.isValid) runCatching { send(KeyEvent.ACTION_UP, KeyEvent.FLAG_CANCELED) }
+            throw error
         }
-        var allReleased = true
-        for (code in pressed.asReversed()) {
-            val event = keyEvent(now, KeyEvent.ACTION_UP, code, metaState)
-            try {
-                setDisplayId(event, displayId)
-                if (!inject(manager, event)) allReleased = false
-            } catch (_: Throwable) {
-                allReleased = false
-            } finally {
-                metaState = metaAfterUp(metaState, code)
-            }
-        }
-        failure?.let(::raise)
-        if (!allReleased) hostFailure(ERR_INJECTION_FAILED)
+        return JSONObject()
     }
-
-    private fun keyEvent(
-        downTime: Long,
-        action: Int,
-        code: Int,
-        metaState: Int,
-    ): KeyEvent =
-        KeyEvent(
-            downTime,
-            downTime,
-            action,
-            code,
-            0,
-            metaState,
-            KeyCharacterMap.VIRTUAL_KEYBOARD,
-            0,
-            0,
-            InputDevice.SOURCE_KEYBOARD,
-        )
-
-    private fun metaAfterDown(
-        meta: Int,
-        code: Int,
-    ): Int =
-        when (code) {
-            KeyEvent.KEYCODE_CTRL_LEFT -> meta or KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON
-            KeyEvent.KEYCODE_CTRL_RIGHT -> meta or KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_RIGHT_ON
-            KeyEvent.KEYCODE_SHIFT_LEFT -> meta or KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON
-            KeyEvent.KEYCODE_SHIFT_RIGHT -> meta or KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_RIGHT_ON
-            KeyEvent.KEYCODE_ALT_LEFT -> meta or KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON
-            KeyEvent.KEYCODE_ALT_RIGHT -> meta or KeyEvent.META_ALT_ON or KeyEvent.META_ALT_RIGHT_ON
-            KeyEvent.KEYCODE_META_LEFT -> meta or KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON
-            KeyEvent.KEYCODE_META_RIGHT -> meta or KeyEvent.META_META_ON or KeyEvent.META_META_RIGHT_ON
-            else -> meta
-        }
-
-    private fun metaAfterUp(
-        meta: Int,
-        code: Int,
-    ): Int =
-        when (code) {
-            KeyEvent.KEYCODE_CTRL_LEFT -> meta and (KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_LEFT_ON).inv()
-            KeyEvent.KEYCODE_CTRL_RIGHT -> meta and (KeyEvent.META_CTRL_ON or KeyEvent.META_CTRL_RIGHT_ON).inv()
-            KeyEvent.KEYCODE_SHIFT_LEFT -> meta and (KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_LEFT_ON).inv()
-            KeyEvent.KEYCODE_SHIFT_RIGHT -> meta and (KeyEvent.META_SHIFT_ON or KeyEvent.META_SHIFT_RIGHT_ON).inv()
-            KeyEvent.KEYCODE_ALT_LEFT -> meta and (KeyEvent.META_ALT_ON or KeyEvent.META_ALT_LEFT_ON).inv()
-            KeyEvent.KEYCODE_ALT_RIGHT -> meta and (KeyEvent.META_ALT_ON or KeyEvent.META_ALT_RIGHT_ON).inv()
-            KeyEvent.KEYCODE_META_LEFT -> meta and (KeyEvent.META_META_ON or KeyEvent.META_META_LEFT_ON).inv()
-            KeyEvent.KEYCODE_META_RIGHT -> meta and (KeyEvent.META_META_ON or KeyEvent.META_META_RIGHT_ON).inv()
-            else -> meta
-        }
 
     private fun focusedInput(request: JSONObject): JSONObject {
         val displayId = requireSession(request).display.displayId
@@ -858,6 +965,7 @@ internal class BackgroundDisplayServer(
             focused?.takeIf { it.isEditable && it.isVisibleToUser }
                 ?: findFocusedEditable(root, 0, IntArray(1))
                 ?: return null
+        if (node.windowId != window.id || node.window?.displayId != window.displayId) return null
         return NodeSnapshotReader.read(node, 0, null, 0) to window.id
     }
 
@@ -882,6 +990,7 @@ internal class BackgroundDisplayServer(
         val path = intArray(request, "path", maxSize = MAX_TREE_DEPTH, min = 0)
         require(path.all { it < MAX_NODE_CHILDREN }) { "path" }
         val actionId = int(request, "actionId", min = 1)
+        if (actionId !in DISPLAY_NODE_ACTIONS) hostFailure(ERR_ACTION_UNSUPPORTED)
         val expected =
             request.opt("expectedBounds") as? JSONObject
                 ?: throw IllegalArgumentException("expectedBounds")
@@ -897,6 +1006,7 @@ internal class BackgroundDisplayServer(
             val child = node.getChild(childIndex) ?: hostFailure(ERR_STALE_NODE)
             node = child
         }
+        requireLiveNode(request, node, displayId, windowId)
         val bounds = AndroidRect()
         node.getBoundsInScreen(bounds)
         if (bounds != AndroidRect(left, top, right, bottom)) hostFailure(ERR_STALE_NODE)
@@ -912,22 +1022,33 @@ internal class BackgroundDisplayServer(
         val target =
             runCatching { AutopJson.default.decodeFromString(NodeSnapshot.serializer(), nodeText) }.getOrNull()
                 ?: throw IllegalArgumentException("nodeJson")
-        if (target.flags and NodeFlags.EDITABLE == 0) hostFailure(ERR_STALE_NODE)
-        val windows = targetWindows(displayId)
-        if (windows.none { it.id == windowId }) hostFailure(ERR_STALE_NODE)
-        val matches = mutableListOf<AccessibilityNodeInfo>()
-        val visited = IntArray(1)
-        for (window in windows) {
-            val root = window.root ?: continue
-            findEditableMatches(root, target, windowId, 0, visited, matches)
+        if (target.flags and NodeFlags.EDITABLE == 0 || target.flags and NodeFlags.PASSWORD != 0) {
+            hostFailure(ERR_STALE_NODE)
         }
+        val root = targetWindows(displayId).firstOrNull { it.id == windowId }?.root ?: hostFailure(ERR_STALE_NODE)
+        val matches = mutableListOf<AccessibilityNodeInfo>()
+        findEditableMatches(root, target, windowId, 0, IntArray(1), matches)
         val node = matches.singleOrNull() ?: hostFailure(ERR_STALE_NODE)
+        requireLiveNode(request, node, displayId, windowId)
+        if (node.isPassword || !node.isEditable || !matchesTarget(node, target, windowId)) hostFailure(ERR_STALE_NODE)
         val arguments =
             Bundle().apply { putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text) }
         if (!node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)) {
             hostFailure(ERR_SET_TEXT_FAILED)
         }
         return JSONObject()
+    }
+
+    private fun requireLiveNode(
+        request: JSONObject,
+        node: AccessibilityNodeInfo,
+        displayId: Int,
+        windowId: Int,
+    ) {
+        requireSession(request)
+        ensureUnlocked()
+        if (!node.refresh() || !node.isVisibleToUser) hostFailure(ERR_STALE_NODE)
+        if (node.windowId != windowId || node.window?.displayId != displayId) hostFailure(ERR_STALE_NODE)
     }
 
     private fun findEditableMatches(
@@ -970,7 +1091,10 @@ internal class BackgroundDisplayServer(
         return JSONObject().put("packageName", packageName.orEmpty())
     }
 
-    private fun foregroundPackage(displayId: Int): String? {
+    private fun foregroundPackage(displayId: Int): String? =
+        allRootTasks().firstOrNull { it.displayId == displayId && it.visible && it.topActivity != null }?.topPackage
+
+    private fun allRootTasks(): List<BackgroundDisplayPlacement.Task> {
         try {
             val service =
                 Class.forName("android.app.ActivityTaskManager").getMethod("getService").invoke(null)
@@ -978,28 +1102,34 @@ internal class BackgroundDisplayServer(
             val tasks =
                 Class
                     .forName("android.app.IActivityTaskManager")
-                    .getMethod("getAllRootTaskInfosOnDisplay", Int::class.javaPrimitiveType)
-                    .invoke(service, displayId) as? List<*>
+                    .getMethod("getAllRootTaskInfos")
+                    .invoke(service) as? List<*>
                     ?: hostFailure(ERR_FOREGROUND_UNAVAILABLE)
-            for (task in tasks) {
-                val component = componentName(task, "topActivity") ?: componentName(task, "resumedActivity")
-                if (component != null) return component.packageName
+            return tasks.map { entry ->
+                val task = requireNotNull(entry)
+                val type = task.javaClass
+                val top = type.getField("topActivity").get(task) as? ComponentName
+                val base = type.getField("baseActivity").get(task) as? ComponentName
+                val childTasks = (type.getField("childTaskNames").get(task) as? Array<*>).orEmpty()
+                BackgroundDisplayPlacement.Task(
+                    displayId = type.getField("displayId").getInt(task),
+                    id = type.getField("taskId").getInt(task),
+                    topActivity = top?.flattenToString(),
+                    topPackage = top?.packageName,
+                    packages =
+                        setOfNotNull(top?.packageName, base?.packageName) +
+                            childTasks.mapNotNull { child ->
+                                (child as? String)?.let { ComponentName.unflattenFromString(it)?.packageName ?: it }
+                            },
+                    visible = type.getField("visible").getBoolean(task),
+                )
             }
-            return null
         } catch (error: Throwable) {
             when (error) {
                 is HostFailure -> raise(error)
                 else -> hostFailure(ERR_FOREGROUND_UNAVAILABLE, error)
             }
         }
-    }
-
-    private fun componentName(
-        task: Any?,
-        field: String,
-    ): ComponentName? {
-        val value = runCatching { requireNotNull(task).javaClass.getField(field).get(task) }.getOrNull()
-        return value as? ComponentName
     }
 
     private fun release(request: JSONObject): JSONObject {
@@ -1012,12 +1142,18 @@ internal class BackgroundDisplayServer(
     }
 
     private fun releaseSession(session: DisplaySession) {
-        runCatching { session.virtualDisplay.release() }
-        runCatching { session.reader.close() }
+        synchronized(session) {
+            try {
+                session.virtualDisplay.release()
+            } finally {
+                session.frames.close()
+            }
+        }
     }
 
     private fun requireSession(request: JSONObject): DisplaySession =
-        sessions[sessionId(request)]?.takeUnless { closing } ?: hostFailure(ERR_DISPLAY_UNAVAILABLE)
+        sessions[sessionId(request)]?.takeIf { !closing && it.display.isValid && it.display.displayId > 0 }
+            ?: hostFailure(ERR_DISPLAY_UNAVAILABLE)
 
     private fun validatePoint(
         session: DisplaySession,
@@ -1033,10 +1169,14 @@ internal class BackgroundDisplayServer(
         event: InputEvent,
         displayId: Int,
     ) {
+        if (displayId <= Display.DEFAULT_DISPLAY) hostFailure(ERR_INJECTION_FAILED)
         runCatching {
             InputEvent::class.java
                 .getDeclaredMethod("setDisplayId", Int::class.javaPrimitiveType)
                 .invoke(event, displayId)
+            check(
+                InputEvent::class.java.getMethod("getDisplayId").invoke(event) == displayId,
+            ) { "input display mismatch" }
         }.onFailure { hostFailure(ERR_INJECTION_FAILED, it) }
     }
 
@@ -1073,16 +1213,6 @@ internal class BackgroundDisplayServer(
         val nodes = mutableListOf<NodeSnapshot>()
         var truncated = false
     }
-
-    private data class SwipePath(
-        val fromX: Int,
-        val fromY: Int,
-        val toX: Int,
-        val toY: Int,
-        val duration: Long,
-        val steps: Int,
-        val now: Long,
-    )
 }
 
 private class AutomationSession(

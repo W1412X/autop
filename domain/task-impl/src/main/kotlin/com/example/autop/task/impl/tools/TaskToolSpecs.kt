@@ -50,6 +50,7 @@ public object TaskToolSpecs {
             string("condition")
             if (flowsEnabled) string("flow")
             boolean("needs_screen")
+            boolean("background_screen")
             boolean("enabled")
         }
 
@@ -68,6 +69,7 @@ public object TaskToolSpecs {
             string("condition")
             if (flowsEnabled) string("flow")
             boolean("needs_screen")
+            boolean("background_screen")
             boolean("enabled")
         }
 }

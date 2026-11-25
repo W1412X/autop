@@ -13,6 +13,7 @@ public data class TaskDetailUiState(
     /** 定时模式文案（0 = 非定时/自定义 cron）。 */
     val triggerLabelRes: Int = 0,
     val needsScreen: Boolean = true,
+    val backgroundScreen: Boolean = false,
     val lockedRemind: Boolean = true,
     val priority: Int = 0,
     val enabled: Boolean = true,

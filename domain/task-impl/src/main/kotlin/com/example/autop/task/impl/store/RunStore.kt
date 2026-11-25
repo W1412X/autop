@@ -93,7 +93,14 @@ public class RunStore(
             threadId = threadId.value,
             origin = origin.name,
             status = status.name,
-            triggerContextJson = json.encodeToString(contextSerializer, triggerContext),
+            triggerContextJson =
+                json.encodeToString(
+                    contextSerializer,
+                    triggerContext - DISPLAY_KEY +
+                        listOfNotNull(
+                            backgroundScreen?.let { DISPLAY_KEY to it.toString() },
+                        ),
+                ),
             createdAt = createdAt,
             startedAt = startedAt,
             endedAt = endedAt,
@@ -109,8 +116,9 @@ public class RunStore(
                 },
         )
 
-    private fun RunEntity.toRecord(): RunRecord =
-        RunRecord(
+    private fun RunEntity.toRecord(): RunRecord {
+        val context = json.decodeFromString(contextSerializer, triggerContextJson)
+        return RunRecord(
             id = RunId(id),
             taskId =
                 taskId?.let {
@@ -120,7 +128,7 @@ public class RunStore(
             threadId = ThreadId(threadId),
             origin = RunOrigin.valueOf(origin),
             status = RunStatus.valueOf(status),
-            triggerContext = json.decodeFromString(contextSerializer, triggerContextJson),
+            triggerContext = context - DISPLAY_KEY,
             createdAt = createdAt,
             startedAt = startedAt,
             endedAt = endedAt,
@@ -129,5 +137,12 @@ public class RunStore(
             pauseReason = pauseReason?.let { PauseReason.valueOf(it) },
             waitingQuestion = waitingQuestion,
             waitingOptions = waitingOptionsJson?.let { json.decodeFromString(optionsSerializer, it) } ?: emptyList(),
+            backgroundScreen = context[DISPLAY_KEY]?.toBooleanStrictOrNull(),
         )
+    }
+
+    private companion object {
+        // Stored alongside the legacy context map, outside the trigger.* namespace and never exposed as a variable.
+        const val DISPLAY_KEY = "@run.backgroundScreen"
+    }
 }

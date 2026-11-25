@@ -80,6 +80,12 @@ public data class FlowRunResult(
     val failedNodeName: String? = null,
 )
 
+/** 执行环境失效时结束整个流程，绕过节点级恢复。 */
+public class FlowRunAborted(
+    public val code: String,
+    message: String,
+) : RuntimeException(message)
+
 /** 节点之间传播的控制信号（不用异常做控制流）。 */
 internal sealed interface Signal {
     data object Next : Signal
@@ -237,6 +243,8 @@ public class FlowInterpreter(
             input.options.overrides.forEach { (k, v) -> frame.vars[k] = v }
             val signal = start(frame)
             toResult(signal)
+        } catch (e: FlowRunAborted) {
+            FlowRunResult(RunOutcome.FAILED, e.code, e.message, null, executed)
         } catch (e: FlowException) {
             FlowRunResult(RunOutcome.FAILED, e.code, e.message, null, executed)
         }

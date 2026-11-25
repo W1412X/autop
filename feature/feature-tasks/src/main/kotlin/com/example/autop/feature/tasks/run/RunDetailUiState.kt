@@ -12,6 +12,8 @@ public data class RunDetailUiState(
     val statusName: String = "",
     val originName: String = "",
     val summary: String = "",
+    val backgroundScreen: Boolean? = null,
+    val errorCode: String? = null,
     val triggerContext: List<String> = emptyList(),
     val startedText: String = "",
     val endedText: String = "",

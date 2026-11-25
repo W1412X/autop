@@ -12,13 +12,18 @@ public enum class BackgroundRunBlock {
             supported: Boolean,
             channelConnected: Boolean,
             running: Boolean,
-            enabled: Boolean,
         ): BackgroundRunBlock? =
             when {
                 running -> RUNNING
                 !supported -> UNSUPPORTED
-                !channelConnected && !enabled -> CHANNEL_DISCONNECTED
+                !channelConnected -> CHANNEL_DISCONNECTED
                 else -> null
             }
+
+        /** An unavailable selection must remain removable. Running still locks both directions. */
+        public fun canToggle(
+            block: BackgroundRunBlock?,
+            checked: Boolean,
+        ): Boolean = block == null || (checked && block != RUNNING)
     }
 }

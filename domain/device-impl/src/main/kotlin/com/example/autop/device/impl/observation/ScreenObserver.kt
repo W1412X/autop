@@ -114,7 +114,10 @@ public class ScreenObserver
             var fallback: Prepared? = null
             for (mode in candidates) {
                 when (val got = preparer.prepare(ctx, mode, effective)) {
-                    is Outcome.Err -> skipped += Skipped(mode, got.error.message)
+                    is Outcome.Err -> {
+                        if (got.error.abortRun) return got
+                        skipped += Skipped(mode, got.error.message)
+                    }
                     is Outcome.Ok -> {
                         val reason = got.value.serialized.model.quality.insufficient
                         if (reason == null) {
@@ -125,17 +128,18 @@ public class ScreenObserver
                     }
                 }
             }
-            fallback?.let {
-                return Outcome.Ok(Selected(it, skipped.dropLast(1), allInsufficient = true))
+            return if (fallback != null) {
+                Outcome.Ok(Selected(fallback, skipped.dropLast(1), allInsufficient = true))
+            } else {
+                Outcome.Err(
+                    AppError(
+                        code = DeviceErrorCodes.NO_OBSERVATION,
+                        message = skippedText(skipped),
+                        retryable = true,
+                        hint = render(ctx, PROMPT_ALL_FAILED),
+                    ),
+                )
             }
-            return Outcome.Err(
-                AppError(
-                    code = DeviceErrorCodes.NO_OBSERVATION,
-                    message = skippedText(skipped),
-                    retryable = true,
-                    hint = render(ctx, PROMPT_ALL_FAILED),
-                ),
-            )
         }
 
         private fun record(

@@ -112,6 +112,7 @@ internal class TaskAuthorTools(
                         string("condition")
                         if (flows) string("executorFlow")
                         boolean("needsScreen")
+                        boolean("backgroundScreen")
                         string("runMode", enum = listOf("standard", "full"))
                         string("hint")
                     },
@@ -183,6 +184,7 @@ internal class TaskAuthorTools(
                     null
                 },
             needsScreen = args.textOf("needsScreen")?.toBooleanStrictOrNull() ?: base.needsScreen,
+            backgroundScreen = args.textOf("backgroundScreen")?.toBooleanStrictOrNull() ?: base.backgroundScreen,
             runMode = args.textOf("runMode")?.let { RunMode.fromId(it) } ?: base.runMode,
             hint = args.requiredOr("hint", base.hint),
         )

@@ -132,6 +132,22 @@ public class RunSchedulerTest {
         }
 
     @Test
+    public fun `background display bypasses a waiting physical run`() =
+        runTest {
+            val fixture = Fixture(backgroundScope, backgroundDisplay = true)
+            fixture.screenLease.setHolder("real-run")
+            val physical = fixture.enqueueRun("run-main", RunOrigin.CHAT, taskOf("t1"))
+            val virtual = fixture.enqueueRun("run-bg", RunOrigin.SCHEDULE, taskOf("t2"), backgroundScreen = true)
+
+            fixture.scheduler.trySchedule()
+            pump(fixture)
+
+            assertEquals(RunStatus.WAITING_SCREEN, fixture.runStore.get(physical.id)?.status)
+            assertEquals(listOf(virtual.id), fixture.session.requests.map { it.runId })
+            assertEquals("real-run", fixture.screenLease.holder.value)
+        }
+
+    @Test
     public fun `background display retains lock screen gate`() =
         runTest {
             val fixture = Fixture(backgroundScope, backgroundDisplay = true)
@@ -384,9 +400,10 @@ private class Fixture(
                 errorCode = null,
                 pauseReason = null,
                 waitingQuestion = null,
+                backgroundScreen = backgroundScreen,
             )
         runStore.save(record)
-        pending.put(record.id, PendingEntry(vars = emptyMap(), task = task, backgroundScreen = backgroundScreen))
+        pending.put(record.id, PendingEntry(vars = emptyMap(), task = task))
         scheduler.enqueue(record)
         return record
     }

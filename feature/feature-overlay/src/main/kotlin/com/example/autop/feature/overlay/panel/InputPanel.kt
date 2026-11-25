@@ -54,8 +54,6 @@ internal fun InputPanel(
     var backgroundScreen by remember { mutableStateOf(false) }
     val picker = rememberAutopModelPickerState()
     val spacing = LocalSpacing.current
-    val effectiveBlock =
-        backgroundRunBlock.takeUnless { backgroundScreen && it == BackgroundRunBlock.CHANNEL_DISCONNECTED }
     AutopInputBar(
         value = text,
         onValueChange = { text = it },
@@ -69,8 +67,8 @@ internal fun InputPanel(
     BackgroundRunRow(
         checked = backgroundScreen,
         onCheckedChange = { backgroundScreen = it },
-        enabled = effectiveBlock == null,
-        unavailableReason = effectiveBlock.messageRes()?.let { stringResource(it) },
+        enabled = BackgroundRunBlock.canToggle(backgroundRunBlock, backgroundScreen),
+        unavailableReason = backgroundRunBlock.messageRes()?.let { stringResource(it) },
         modifier = modifier,
     )
     Row(

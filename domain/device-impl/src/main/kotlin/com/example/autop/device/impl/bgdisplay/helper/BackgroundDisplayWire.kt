@@ -5,7 +5,7 @@ import org.json.JSONException
 import org.json.JSONObject
 
 internal object BackgroundDisplayWire {
-    const val PROTOCOL_VERSION: Int = 2
+    const val PROTOCOL_VERSION: Int = 3
     const val EXPECTED_UID: Int = 2000
 
     const val OP_CREATE: String = "create"
@@ -35,6 +35,10 @@ internal object BackgroundDisplayWire {
     const val ERR_CAPTURE_FAILED: String = "capture_failed"
     const val ERR_LAUNCH_FAILED: String = "launch_failed"
     const val ERR_FOREGROUND_UNAVAILABLE: String = "foreground_unavailable"
+    const val ERR_TARGET_CHANGED: String = "target_changed"
+    const val ERR_APP_ON_OTHER_DISPLAY: String = "app_on_other_display"
+    const val ERR_LOCKED: String = "screen_locked"
+    const val ERR_ACTION_UNSUPPORTED: String = "action_unsupported"
     const val ERR_INJECTION_FAILED: String = "injection_failed"
     const val ERR_INPUT_NOT_FOUND: String = "input_not_found"
     const val ERR_STALE_NODE: String = "stale_node"
@@ -44,6 +48,9 @@ internal object BackgroundDisplayWire {
     const val ERR_INTERNAL: String = "internal_error"
 
     const val MAX_REQUEST_CHARS: Int = 262_144
+    const val MIN_REPLY_BYTES: Int = 262_144
+    const val MAX_REPLY_BYTES: Int = 33_554_432
+    const val MAX_REPLY_OVERHEAD_BYTES: Int = 256
     const val MAX_ID_CHARS: Int = 128
     const val MAX_OP_BYTES: Int = 32
     const val MAX_PACKAGE_BYTES: Int = 256

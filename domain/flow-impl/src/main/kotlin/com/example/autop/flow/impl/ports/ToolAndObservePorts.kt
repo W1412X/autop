@@ -84,6 +84,12 @@ internal class FlowToolContext(
     override fun emitProgress(text: String) = progress(text)
 }
 
+private fun ToolOutput.checkRunActive() {
+    val failure = error?.takeIf(AppError::abortRun) ?: return
+    throw com.example.autop.flow.core
+        .FlowRunAborted(failure.code, failure.message)
+}
+
 /** 工具端口：经 `ToolInvoker` 执行，并在 Thread 里留下合成的 ToolCall / ToolResult 事件供时间线展示。 */
 internal class ToolPortImpl(
     private val invoker: ToolInvoker,
@@ -103,6 +109,7 @@ internal class ToolPortImpl(
         val started = clock.nowMillis()
         val out = invoker.invoke(tool, args, ctx)
         record(tool, args, out, clock.nowMillis() - started)
+        out.checkRunActive()
         return toResult(out)
     }
 
@@ -175,6 +182,7 @@ internal class ObservePortImpl(
                 if (wanted != AUTO_MODE) put("mode", wanted)
             }
         val out = invoker.invoke(OBSERVE_TOOL, args, ctx)
+        out.checkRunActive()
         val text = out.content.filterIsInstance<Block.Text>().joinToString("\n") { it.text }
         if (!out.ok) {
             throw FlowException(out.error?.code ?: FlowErrorCodes.INVALID, out.error?.message ?: text)
@@ -199,6 +207,7 @@ internal class ObservePortImpl(
                 }
             }
         val out = invoker.invoke(SCREENSHOT_TOOL, args, ctx)
+        out.checkRunActive()
         if (!out.ok) throw FlowException(out.error?.code ?: FlowErrorCodes.INVALID, out.error?.message.orEmpty())
         val image =
             out.content.filterIsInstance<Block.Image>().firstOrNull()

@@ -69,6 +69,7 @@ import androidx.compose.material.icons.outlined.PermDeviceInformation
 import androidx.compose.material.icons.outlined.Person
 import androidx.compose.material.icons.outlined.PhoneAndroid
 import androidx.compose.material.icons.outlined.PhotoCamera
+import androidx.compose.material.icons.outlined.PictureInPictureAlt
 import androidx.compose.material.icons.outlined.PlayArrow
 import androidx.compose.material.icons.outlined.PlayCircle
 import androidx.compose.material.icons.outlined.PostAdd
@@ -176,6 +177,7 @@ public object AutopIcons {
     public val Link: ImageVector = Icons.Outlined.Link
     public val PhotoCamera: ImageVector = Icons.Outlined.PhotoCamera
     public val Screenshot: ImageVector = Icons.Outlined.Screenshot
+    public val VirtualDisplay: ImageVector = Icons.Outlined.PictureInPictureAlt
     public val Visibility: ImageVector = Icons.Outlined.Visibility
     public val VisibilityOff: ImageVector = Icons.Outlined.VisibilityOff
     public val HourglassEmpty: ImageVector = Icons.Outlined.HourglassEmpty

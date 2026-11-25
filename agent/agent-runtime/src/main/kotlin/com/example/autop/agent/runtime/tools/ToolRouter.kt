@@ -153,7 +153,7 @@ internal class ToolRouter(
         tool: Tool?,
     ): SkipReason? =
         when {
-            output.control != null -> SkipReason.AFTER_CONTROL
+            output.control != null || output.error?.abortRun == true -> SkipReason.AFTER_CONTROL
             // ADR-0041：确定未派发的失败不影响后续写操作；可能已派发的失败才跳过。
             !output.ok && output.effectMayHaveHappened && isWrite(tool) -> SkipReason.PREVIOUS_FAILED
             else -> null

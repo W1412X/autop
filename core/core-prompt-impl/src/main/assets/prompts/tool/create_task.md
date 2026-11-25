@@ -14,6 +14,7 @@ meta:
   param.condition: trigger_type=condition 时，filter 表达不了的语义，用自然语言写，如"对方是在问我有没有空"。能用 filter 写的内容不要放在这里
   param.flow: 绑定流程名称（先用 list_flows 确认存在）；留空=智能体按 goal 自主执行
   param.needs_screen: 是否需要屏幕与界面交互，默认 true
+  param.background_screen: 是否固定使用虚拟屏，默认 false。虚拟屏不可用时，本次运行会失败。
   param.enabled: 是否启用，默认 true
 ---
 直接创建一个任务，保存后按触发器生效。用户明确要做某件事时使用；只是讨论方案时先不要创建。

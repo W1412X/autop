@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import com.example.autop.core.ui.component.AutopButton
+import com.example.autop.core.ui.component.AutopOutlinedButton
 import com.example.autop.core.ui.component.AutopTag
 import com.example.autop.core.ui.component.AutopTextButton
 import com.example.autop.core.ui.component.AutopTonalButton
@@ -85,6 +86,9 @@ public fun TaskDetailScreen(
                             .padding(LocalSpacing.current.screenEdge),
                 )
             }
+            if (state.backgroundScreen && !state.flowDisabled) {
+                item { RunOnceOnMainButton(onAction) }
+            }
             item { FeedbackBanner(feedback = state.feedback) }
             item { SectionTitle(text = stringResource(R.string.task_detail_runs)) }
             runItems(runs = state.runs, onAction = onAction, onStop = { stopTarget = it })
@@ -97,6 +101,27 @@ public fun TaskDetailScreen(
                 stopTarget = null
             },
             onDismiss = { stopTarget = null },
+        )
+    }
+}
+
+@Composable
+private fun RunOnceOnMainButton(onAction: (TaskDetailAction) -> Unit) {
+    var confirm by remember { mutableStateOf(false) }
+    AutopOutlinedButton(
+        text = stringResource(R.string.task_display_run_once_on_main),
+        onClick = { confirm = true },
+        modifier = Modifier.fillMaxWidth().padding(LocalSpacing.current.screenEdge),
+    )
+    if (confirm) {
+        ConfirmDialog(
+            title = stringResource(R.string.task_display_run_once_on_main),
+            text = stringResource(R.string.task_display_run_once_confirm),
+            onConfirm = {
+                confirm = false
+                onAction(TaskDetailAction.RunOnceOnMain)
+            },
+            onDismiss = { confirm = false },
         )
     }
 }
@@ -156,6 +181,14 @@ private fun SummarySection(state: TaskDetailUiState) {
     ListRow(
         title = stringResource(R.string.task_edit_needs_screen),
         subtitle = stringResource(if (state.needsScreen) R.string.task_edit_yes else R.string.task_edit_no),
+        modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
+    )
+    ListRow(
+        title = stringResource(R.string.task_execution_display),
+        subtitle =
+            stringResource(
+                if (state.backgroundScreen) R.string.task_display_virtual else R.string.task_display_main,
+            ),
         modifier = Modifier.fillMaxWidth().padding(horizontal = spacing.screenEdge),
     )
     ListRow(

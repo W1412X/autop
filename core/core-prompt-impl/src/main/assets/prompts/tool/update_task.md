@@ -15,6 +15,7 @@ meta:
   param.condition: trigger_type=condition 时，filter 表达不了的语义，用自然语言写
   param.flow: 绑定流程名称；留空=解除流程绑定改由智能体执行
   param.needs_screen: 是否需要屏幕与界面交互
+  param.background_screen: true 使用虚拟屏，false 使用真实屏。省略时沿用原设置。
   param.enabled: 是否启用
 ---
 修改已有任务，只传需要变更的字段，其余保持原值。任务只能修改、不能通过工具删除（删除由用户在任务页操作）。
