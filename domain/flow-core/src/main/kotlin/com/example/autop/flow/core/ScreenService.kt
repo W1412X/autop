@@ -3,7 +3,9 @@
 package com.example.autop.flow.core
 
 import com.example.autop.core.config.FlowRunSection
+import com.example.autop.device.DisplayTarget
 import com.example.autop.device.ScreenModel
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.flow.FlowErrorCodes
 import com.example.autop.flow.Target
 import com.example.autop.flow.core.expr.FlowException
@@ -128,6 +130,18 @@ internal class ScreenService(
 
     /** 前台应用：窗口按 Z 序，取第一个 active 窗口的应用标识。 */
     fun foregroundApp(screen: ScreenModel): String? = screen.windows.firstOrNull { it.active }?.app
+
+    /** 应用条件只读取当前显示目标；真实屏降级快照才回退到真实屏前台。 */
+    suspend fun observedForegroundApp(screen: ScreenModel): String? {
+        val fromWindows =
+            screen.windows.firstOrNull { it.active && it.app.isNotBlank() }?.app
+                ?: screen.windows.firstOrNull { it.app.isNotBlank() }?.app
+        if (fromWindows != null || screen.windows.isNotEmpty()) return fromWindows
+        return ports.device
+            .state()
+            .foregroundPackage
+            .takeUnless { currentDisplayTarget() is DisplayTarget.Background }
+    }
 
     companion object {
         const val A11Y: String = "a11y"

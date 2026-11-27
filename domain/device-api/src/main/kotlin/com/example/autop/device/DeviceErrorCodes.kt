@@ -99,6 +99,9 @@ public object DeviceErrorCodes {
     /** 后台虚拟屏创建失败。 */
     public const val BG_DISPLAY_CREATE_FAILED: String = "device.bg_display_create_failed"
 
+    /** 后台虚拟屏尚未产出可用的新鲜画面。 */
+    public const val BG_FRAME_NOT_READY: String = "device.bg_frame_not_ready"
+
     /** 后台显示会话已释放或宿主失活。 */
     public const val BG_RELEASED: String = "device.bg_released"
 

@@ -5,8 +5,13 @@
  */
 package com.example.autop.flow.core
 
+import com.example.autop.core.common.RunId
+import com.example.autop.device.DisplayTarget
+import com.example.autop.device.currentDisplayTarget
 import com.example.autop.flow.Condition
 import com.example.autop.flow.TextOp
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -91,6 +96,30 @@ class ConditionDetailTest {
         assertEquals("前台 com.demo", detail.actual)
         assertTrue(detail.label.contains("前台应用"))
     }
+
+    @Test
+    fun `app condition ignores physical foreground when observed display differs`() {
+        h.foregroundPackage = "com.physical"
+        h.screenWindowApp = "com.background"
+        val detail = h.detail(Condition.App(value = "com.physical"))
+        assertFalse(detail.ok)
+        assertEquals("前台 com.background", detail.actual)
+    }
+
+    @Test
+    fun `empty background snapshot never falls back to physical foreground`() =
+        runBlocking {
+            h.foregroundPackage = "com.physical"
+            h.hideScreenWindows = true
+            val target = DisplayTarget.Background(RunId("r1"), 7, 720, 1280, 320)
+            val detail =
+                withContext(target) {
+                    assertTrue("display target lost", currentDisplayTarget() is DisplayTarget.Background)
+                    h.detailInContext(Condition.App(value = "com.physical"))
+                }
+            assertFalse(detail.actual.orEmpty(), detail.ok)
+            assertEquals("前台 null", detail.actual)
+        }
 
     @Test
     fun `normal conditions carry no error`() {

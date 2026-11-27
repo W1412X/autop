@@ -51,8 +51,14 @@ internal class FlowTestHarness {
     /** 屏幕上的文字（条件求值与页面摘要都用它）。 */
     var screenText: String = "发布页"
 
-    /** 前台应用包名。 */
+    /** 真实屏前台应用包名。 */
     var foregroundPackage: String = "com.demo"
+
+    /** 当前显示观测到的应用窗口；用于隔离真实屏与后台屏。 */
+    var screenWindowApp: String? = null
+
+    /** 模拟后台显示尚未产出窗口的降级快照。 */
+    var hideScreenWindows: Boolean = false
 
     /** 观测次数（断言"重新求值了几次"）。 */
     var observeCount: Int = 0
@@ -253,14 +259,18 @@ internal class FlowTestHarness {
         ScreenModel(
             mode = ObserveMode.A11Y,
             windows =
-                listOf(
-                    ScreenWindow(
-                        app = foregroundPackage,
-                        page = "首页",
-                        active = true,
-                        kids = listOf(ScreenNode(tag = "text", text = screenText, bounds = Rect(0, 0, 100, 100))),
-                    ),
-                ),
+                if (hideScreenWindows) {
+                    emptyList()
+                } else {
+                    listOf(
+                        ScreenWindow(
+                            app = screenWindowApp ?: foregroundPackage,
+                            page = "首页",
+                            active = true,
+                            kids = listOf(ScreenNode(tag = "text", text = screenText, bounds = Rect(0, 0, 100, 100))),
+                        ),
+                    )
+                },
             quality = ScreenQuality(nodes = 1, interactive = 0),
         )
 
@@ -307,7 +317,9 @@ internal class FlowTestHarness {
     )
 
     /** 单独求值一个条件，取明细。 */
-    fun detail(cond: Condition): CondDetail {
+    fun detail(cond: Condition): CondDetail = runBlocking { detailInContext(cond) }
+
+    suspend fun detailInContext(cond: Condition): CondDetail {
         val screens = ScreenService(ports, FlowRunSection())
         val evaluator = ConditionEvaluator(ports, screens, emptyMap()) { }
         val flow = FlowDefinition(id = "f1", name = "t", steps = emptyList())
@@ -322,6 +334,6 @@ internal class FlowTestHarness {
                 0,
                 65536,
             )
-        return runBlocking { evaluator.detail(cond, frame) }
+        return evaluator.detail(cond, frame)
     }
 }

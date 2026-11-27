@@ -14,7 +14,6 @@ import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.hardware.input.InputManager
@@ -59,6 +58,7 @@ import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_DISPLAY_CREATE_FAILED
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_DISPLAY_UNAVAILABLE
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_FOREGROUND_UNAVAILABLE
+import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_FRAME_NOT_READY
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_INJECTION_FAILED
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_LAUNCH_FAILED
 import com.example.autop.device.impl.bgdisplay.helper.BackgroundDisplayWire.ERR_LOCKED
@@ -120,7 +120,7 @@ import java.io.PrintStream
 import java.lang.reflect.Constructor
 import java.lang.reflect.InvocationHandler
 import java.lang.reflect.Proxy
-import java.nio.ByteOrder
+import java.nio.ByteBuffer
 import java.util.concurrent.CompletableFuture
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.Executors
@@ -200,11 +200,9 @@ private const val WINDOW_RETRY_COUNT = 20
 private const val WINDOW_RETRY_MS = 100L
 private const val FOCUS_RETRY_COUNT = 10
 private const val FOCUS_RETRY_MS = 100L
-private const val CAPTURE_RETRY_COUNT = 40
-private const val CAPTURE_RETRY_MS = 50L
-private const val IMAGE_READER_MAX_IMAGES = 3
-private const val LAUNCH_POLL_MS = 50L
-private const val LAUNCH_SETTLE_MS = 250L
+private const val IMAGE_READER_MAX_IMAGES = 2
+private const val CAPTURE_POLL_MS = 40L
+private const val LAUNCH_POLL_MS = 120L
 private const val INPUT_SETTLE_MS = 120L
 private const val AUTOMATION_TIMEOUT_MS = 3000L
 private const val AUTOMATION_OPERATION_TIMEOUT_MS = 30_000L
@@ -222,6 +220,15 @@ private val DISPLAY_NODE_ACTIONS =
         AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_LEFT.id,
         AccessibilityNodeInfo.AccessibilityAction.ACTION_SCROLL_RIGHT.id,
     )
+
+private data class DisplaySpec(
+    val id: String,
+    val width: Int,
+    val height: Int,
+    val dpi: Int,
+    val jpegQuality: Int,
+    val maxPayloadBytes: Int,
+)
 
 private class DisplaySession(
     val id: String,
@@ -243,7 +250,6 @@ internal class BackgroundDisplayServer(
     private val out = PrintStream(FileOutputStream(FileDescriptor.out), true, Charsets.UTF_8.name())
     private val sessions = ConcurrentHashMap<String, DisplaySession>()
     private val launchLock = Any()
-    private val frameThread = HandlerThread("autop-bg-frames").apply { start() }
     private val executor =
         Executors.newCachedThreadPool { runnable ->
             Thread(runnable, "autop-bg-request").apply { isDaemon = true }
@@ -305,7 +311,6 @@ internal class BackgroundDisplayServer(
         active.forEach { runCatching { releaseSession(it) } }
         runCatching { automationSession?.close() }
         automationSession = null
-        frameThread.quitSafely()
     }
 
     private val requestHandlers =
@@ -420,49 +425,56 @@ internal class BackgroundDisplayServer(
 
     private fun create(request: JSONObject): JSONObject {
         if (closing) hostFailure(ERR_DISPLAY_CREATE_FAILED)
-        val id = sessionId(request)
-        val newWidth = int(request, "width", min = 1, max = MAX_DISPLAY_DIMENSION)
-        val newHeight = int(request, "height", min = 1, max = MAX_DISPLAY_DIMENSION)
-        val newDpi = int(request, "dpi", min = 72, max = 640)
-        val jpegQuality = int(request, "jpegQuality", min = 1, max = 100)
-        val maxPayloadBytes = int(request, "maxPayloadBytes", min = MIN_REPLY_BYTES, max = MAX_REPLY_BYTES)
-        require(newWidth.toLong() * newHeight <= MAX_DISPLAY_PIXELS) { "display size" }
-        if (sessions.containsKey(id)) hostFailure(ERR_DISPLAY_CREATE_FAILED)
+        val spec = displaySpec(request)
+        if (sessions.containsKey(spec.id)) hostFailure(ERR_DISPLAY_CREATE_FAILED)
         var frames: BackgroundFrames? = null
+        var reader: ImageReader? = null
         var display: VirtualDisplay? = null
         try {
-            val createdFrames = openFrames(newWidth, newHeight)
-            frames = createdFrames
-            val createdDisplay = openVirtualDisplay(id, newWidth, newHeight, newDpi, createdFrames)
+            val initialReader =
+                ImageReader.newInstance(
+                    spec.width,
+                    spec.height,
+                    android.graphics.PixelFormat.RGBA_8888,
+                    IMAGE_READER_MAX_IMAGES,
+                )
+            reader = initialReader
+            val createdDisplay = openVirtualDisplay(spec.id, spec.width, spec.height, spec.dpi, initialReader)
             display = createdDisplay
+            val createdFrames = BackgroundFrames(createdDisplay, spec.width, spec.height, initialReader)
+            frames = createdFrames
             val target = checkNotNull(createdDisplay.display) { "display id" }
             check(target.displayId > Display.DEFAULT_DISPLAY && target.isValid) { "virtual display id" }
             setImePolicyHide(target.displayId)
             automation()
             val session =
                 DisplaySession(
-                    id = id,
+                    id = spec.id,
                     display = target,
                     virtualDisplay = createdDisplay,
                     frames = createdFrames,
-                    width = newWidth,
-                    height = newHeight,
-                    jpegQuality = jpegQuality,
-                    maxPayloadBytes = maxPayloadBytes,
+                    width = spec.width,
+                    height = spec.height,
+                    jpegQuality = spec.jpegQuality,
+                    maxPayloadBytes = spec.maxPayloadBytes,
                 )
-            check(!closing && sessions.putIfAbsent(id, session) == null) { "display session already closed or created" }
+            check(
+                !closing && sessions.putIfAbsent(spec.id, session) == null,
+            ) { "display session already closed or created" }
+            reader = null
             return JSONObject(
                 mapOf(
                     "displayId" to target.displayId,
-                    "width" to newWidth,
-                    "height" to newHeight,
-                    "dpi" to newDpi,
+                    "width" to spec.width,
+                    "height" to spec.height,
+                    "dpi" to spec.dpi,
                 ),
             )
         } catch (error: Throwable) {
             Log.e("BackgroundDisplayHost", "display creation failed", error)
             runCatching { display?.release() }
             runCatching { frames?.close() }
+            runCatching { reader?.close() }
             when (error) {
                 is HostFailure -> raise(error)
                 else -> hostFailure(ERR_DISPLAY_CREATE_FAILED, error)
@@ -470,12 +482,26 @@ internal class BackgroundDisplayServer(
         }
     }
 
+    private fun displaySpec(request: JSONObject): DisplaySpec {
+        val spec =
+            DisplaySpec(
+                id = sessionId(request),
+                width = int(request, "width", min = 1, max = MAX_DISPLAY_DIMENSION),
+                height = int(request, "height", min = 1, max = MAX_DISPLAY_DIMENSION),
+                dpi = int(request, "dpi", min = 72, max = 640),
+                jpegQuality = int(request, "jpegQuality", min = 1, max = 100),
+                maxPayloadBytes = int(request, "maxPayloadBytes", min = MIN_REPLY_BYTES, max = MAX_REPLY_BYTES),
+            )
+        require(spec.width.toLong() * spec.height <= MAX_DISPLAY_PIXELS) { "display size" }
+        return spec
+    }
+
     private fun openVirtualDisplay(
         id: String,
         width: Int,
         height: Int,
         dpi: Int,
-        frames: BackgroundFrames,
+        reader: ImageReader,
     ): VirtualDisplay {
         val displays = checkNotNull(context.getSystemService(DisplayManager::class.java)) { "display manager" }
         return checkNotNull(
@@ -484,31 +510,12 @@ internal class BackgroundDisplayServer(
                 width,
                 height,
                 dpi,
-                frames.surface,
+                reader.surface,
                 virtualDisplayFlags(),
                 null,
                 null,
             ),
         ) { "virtual display" }
-    }
-
-    private fun openFrames(
-        width: Int,
-        height: Int,
-    ): BackgroundFrames {
-        val reader =
-            ImageReader.newInstance(
-                width,
-                height,
-                android.graphics.PixelFormat.RGBA_8888,
-                IMAGE_READER_MAX_IMAGES,
-            )
-        return try {
-            BackgroundFrames(reader, Handler(frameThread.looper))
-        } catch (error: Throwable) {
-            reader.close()
-            throw error
-        }
     }
 
     @Synchronized
@@ -619,14 +626,11 @@ internal class BackgroundDisplayServer(
         timeoutMs: Long,
     ) {
         val deadline = SystemClock.uptimeMillis() + timeoutMs
-        var arrivedAt: Long? = null
         while (true) {
             requireSession(request)
             val foreground = verifyPlacement(session)
-            val now = SystemClock.uptimeMillis()
-            arrivedAt = if (foreground.virtual?.topPackage == packageName) arrivedAt ?: now else null
-            if (arrivedAt != null && now - arrivedAt >= LAUNCH_SETTLE_MS) return
-            val remaining = deadline - now
+            if (foreground.virtual?.topPackage == packageName) return
+            val remaining = deadline - SystemClock.uptimeMillis()
             if (remaining <= 0L) hostFailure(ERR_TARGET_CHANGED)
             SystemClock.sleep(minOf(LAUNCH_POLL_MS, remaining))
         }
@@ -744,29 +748,21 @@ internal class BackgroundDisplayServer(
                     else -> hostFailure(ERR_TREE_UNAVAILABLE, error)
                 }
             }
-            emptyList()
+            hostFailure(ERR_TREE_UNAVAILABLE)
         }
 
     private fun capture(request: JSONObject): JSONObject {
         val session = requireSession(request)
         try {
-            repeat(CAPTURE_RETRY_COUNT) {
+            val reader = session.frames.rotateForCapture()
+            val deadline = SystemClock.uptimeMillis() + BackgroundFrameReadiness.CAPTURE_TIMEOUT_MS
+            for (attempt in 0..1) {
                 requireSession(request)
-                val capture =
-                    session.frames.withLatest { image ->
-                        val bytes = encodeJpeg(image, session.jpegQuality)
-                        JSONObject()
-                            .put("jpeg", Base64.encodeToString(bytes, Base64.NO_WRAP))
-                            .put("width", image.width)
-                            .put("height", image.height)
-                    }
-                if (capture != null) return capture
-                SystemClock.sleep(CAPTURE_RETRY_MS)
+                val captured = captureFrame(request, reader, session, attempt, deadline)
+                if (captured != null) return captured
+                SystemClock.sleep(BackgroundFrameReadiness.retryWaitMs(deadline - SystemClock.uptimeMillis()))
             }
-            if (foregroundPackage(session.display.displayId) == null) {
-                return blankCapture(session.width, session.height, session.jpegQuality)
-            }
-            hostFailure(ERR_CAPTURE_FAILED)
+            hostFailure(ERR_FRAME_NOT_READY)
         } catch (error: Throwable) {
             when (error) {
                 is HostFailure -> raise(error)
@@ -775,54 +771,87 @@ internal class BackgroundDisplayServer(
         }
     }
 
-    private fun blankCapture(
+    private fun captureFrame(
+        request: JSONObject,
+        reader: ImageReader,
+        session: DisplaySession,
+        attempt: Int,
+        deadline: Long,
+    ): JSONObject? {
+        if (Thread.currentThread().isInterrupted) hostFailure(ERR_CAPTURE_FAILED)
+        if (attempt > 0 && SystemClock.uptimeMillis() >= deadline) hostFailure(ERR_FRAME_NOT_READY)
+        val image = acquireFrame(request, reader, deadline)
+        var bitmap: Bitmap? = null
+        try {
+            bitmap = bitmapOf(image, session.width, session.height)
+            val next =
+                BackgroundFrameReadiness.next(
+                    bitmap.isMostlyBlack(),
+                    attempt,
+                    deadline - SystemClock.uptimeMillis(),
+                )
+            if (next == BackgroundFrameReadiness.Next.NOT_READY) hostFailure(ERR_FRAME_NOT_READY)
+            if (next != BackgroundFrameReadiness.Next.READY) return null
+            return JSONObject()
+                .put(
+                    "jpeg",
+                    Base64.encodeToString(encodeJpeg(bitmap, session.jpegQuality), Base64.NO_WRAP),
+                ).put("width", session.width)
+                .put("height", session.height)
+        } finally {
+            image.close()
+            bitmap?.recycle()
+        }
+    }
+
+    private fun acquireFrame(
+        request: JSONObject,
+        reader: ImageReader,
+        deadline: Long,
+    ): Image {
+        var image = reader.acquireLatestImage()
+        while (image == null) {
+            requireSession(request)
+            val remaining = deadline - SystemClock.uptimeMillis()
+            if (remaining <= 0) hostFailure(ERR_FRAME_NOT_READY)
+            SystemClock.sleep(minOf(CAPTURE_POLL_MS, remaining))
+            image = reader.acquireLatestImage()
+        }
+        return image
+    }
+
+    private fun bitmapOf(
+        image: Image,
         width: Int,
         height: Int,
-        quality: Int,
-    ): JSONObject {
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        return try {
-            bitmap.eraseColor(Color.BLACK)
-            val bytes =
-                ByteArrayOutputStream().use { output ->
-                    if (!bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)) {
-                        hostFailure(ERR_CAPTURE_FAILED)
-                    }
-                    output.toByteArray()
-                }
-            JSONObject()
-                .put("jpeg", Base64.encodeToString(bytes, Base64.NO_WRAP))
-                .put("width", width)
-                .put("height", height)
-        } finally {
-            bitmap.recycle()
+    ): Bitmap {
+        require(image.width == width && image.height == height) { "capture dimensions changed" }
+        val plane = image.planes.singleOrNull() ?: hostFailure(ERR_CAPTURE_FAILED)
+        if (plane.pixelStride != Int.SIZE_BYTES || plane.rowStride < width * Int.SIZE_BYTES) {
+            hostFailure(ERR_CAPTURE_FAILED)
+        }
+        val pixels = ByteBuffer.allocate(width * height * Int.SIZE_BYTES)
+        val source = plane.buffer.duplicate()
+        for (row in 0 until height) {
+            val start = row * plane.rowStride
+            source.limit(start + width * Int.SIZE_BYTES)
+            source.position(start)
+            pixels.put(source)
+        }
+        pixels.flip()
+        return Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888).also { bitmap ->
+            bitmap.copyPixelsFromBuffer(pixels)
         }
     }
 
     private fun encodeJpeg(
-        image: Image,
+        bitmap: Bitmap,
         quality: Int,
-    ): ByteArray {
-        val plane = image.planes[0]
-        check(plane.pixelStride == Int.SIZE_BYTES) { "RGBA pixel stride" }
-        val buffer = plane.buffer.duplicate().order(ByteOrder.BIG_ENDIAN)
-        val pixels = IntArray(image.width * image.height)
-        for (y in 0 until image.height) {
-            buffer.position(y * plane.rowStride)
-            buffer.asIntBuffer().get(pixels, y * image.width, image.width)
+    ): ByteArray =
+        ByteArrayOutputStream().use { output ->
+            check(bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)) { "jpeg encode" }
+            output.toByteArray()
         }
-        // ImageReader provides RGBA bytes. Bitmap.createBitmap interprets integers as ARGB.
-        for (index in pixels.indices) pixels[index] = Integer.rotateRight(pixels[index], Byte.SIZE_BITS)
-        val bitmap = Bitmap.createBitmap(pixels, image.width, image.height, Bitmap.Config.ARGB_8888)
-        return try {
-            ByteArrayOutputStream().use { output ->
-                check(bitmap.compress(Bitmap.CompressFormat.JPEG, quality, output)) { "jpeg encode" }
-                output.toByteArray()
-            }
-        } finally {
-            bitmap.recycle()
-        }
-    }
 
     private fun tap(request: JSONObject): JSONObject {
         val x = int(request, "x")

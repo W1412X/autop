@@ -5,7 +5,7 @@ import org.json.JSONException
 import org.json.JSONObject
 
 internal object BackgroundDisplayWire {
-    const val PROTOCOL_VERSION: Int = 3
+    const val PROTOCOL_VERSION: Int = 4
     const val EXPECTED_UID: Int = 2000
 
     const val OP_CREATE: String = "create"
@@ -33,6 +33,7 @@ internal object BackgroundDisplayWire {
     const val ERR_AUTOMATION_UNAVAILABLE: String = "automation_unavailable"
     const val ERR_TREE_UNAVAILABLE: String = "tree_unavailable"
     const val ERR_CAPTURE_FAILED: String = "capture_failed"
+    const val ERR_FRAME_NOT_READY: String = "frame_not_ready"
     const val ERR_LAUNCH_FAILED: String = "launch_failed"
     const val ERR_FOREGROUND_UNAVAILABLE: String = "foreground_unavailable"
     const val ERR_TARGET_CHANGED: String = "target_changed"

@@ -162,8 +162,8 @@ internal class ConditionEvaluator(
             } catch (e: FlowException) {
                 return CondDetail(label, false, error = "${e.code}: ${e.message.orEmpty()}")
             }
-        val fg = ports.device.state().foregroundPackage
         val screen = screens.screen(null, frame.flow.settings.observeMode).screen
+        val fg = screens.observedForegroundApp(screen)
         val appMatches =
             fg == value || screen.windows.any { it.active && it.app == value } || screen.windows.any { it.app == value }
         val page = cond.page?.let { frame.templates.renderString(it) }

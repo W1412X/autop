@@ -18,10 +18,12 @@ import com.example.autop.device.impl.shell.ShellHostConnector
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.IOException
 import javax.inject.Inject
@@ -87,7 +89,7 @@ internal class BackgroundDisplaySession(
                             .put("sessionId", sessionId),
                         config.launchTimeoutMs,
                     )
-                if (!reply.optBoolean("ok")) client.close()
+                if (!reply.optBoolean("ok")) return
             }
         } catch (_: IOException) {
             // The display may still exist. Closing the owner transport forces resource retirement.
@@ -102,21 +104,33 @@ internal class BackgroundDisplaySession(
         AppError(
             code = deviceErrorCode(code),
             message = code,
-            retryable = code == BackgroundDisplayWire.ERR_STALE_NODE || code == BackgroundDisplayWire.ERR_TIMEOUT,
+            retryable =
+                code == BackgroundDisplayWire.ERR_STALE_NODE ||
+                    code == BackgroundDisplayWire.ERR_TIMEOUT ||
+                    code == BackgroundDisplayWire.ERR_FRAME_NOT_READY,
             abortRun = code in TERMINAL_HOST_ERRORS,
         )
 
-    private fun deviceErrorCode(code: String): String =
+    private fun deviceErrorCode(code: String): String = inputErrorCode(code) ?: displayErrorCode(code)
+
+    private fun inputErrorCode(code: String): String? =
         when (code) {
             BackgroundDisplayWire.ERR_INJECTION_FAILED,
             BackgroundDisplayWire.ERR_INPUT_NOT_FOUND,
             BackgroundDisplayWire.ERR_SET_TEXT_FAILED,
             -> DeviceErrorCodes.BG_INPUT_REJECTED
             BackgroundDisplayWire.ERR_STALE_NODE -> DeviceErrorCodes.NODE_STALE
+            BackgroundDisplayWire.ERR_ACTION_UNSUPPORTED -> DeviceErrorCodes.BG_ACTION_UNSUPPORTED
+            else -> null
+        }
+
+    private fun displayErrorCode(code: String): String =
+        when (code) {
             BackgroundDisplayWire.ERR_DISPLAY_UNAVAILABLE,
             BackgroundDisplayWire.ERR_AUTOMATION_UNAVAILABLE,
             -> DeviceErrorCodes.BG_RELEASED
             BackgroundDisplayWire.ERR_CAPTURE_FAILED -> DeviceErrorCodes.SCREENSHOT_FAILED
+            BackgroundDisplayWire.ERR_FRAME_NOT_READY -> DeviceErrorCodes.BG_FRAME_NOT_READY
             BackgroundDisplayWire.ERR_TREE_UNAVAILABLE -> DeviceErrorCodes.APP_TREE_EMPTY
             BackgroundDisplayWire.ERR_LAUNCH_FAILED -> DeviceErrorCodes.LAUNCH_FAILED
             BackgroundDisplayWire.ERR_APP_ON_OTHER_DISPLAY -> DeviceErrorCodes.BG_APP_ON_OTHER_DISPLAY
@@ -124,7 +138,6 @@ internal class BackgroundDisplaySession(
             BackgroundDisplayWire.ERR_FOREGROUND_UNAVAILABLE,
             -> DeviceErrorCodes.BG_TARGET_CHANGED
             BackgroundDisplayWire.ERR_LOCKED -> DeviceErrorCodes.BG_LOCKED
-            BackgroundDisplayWire.ERR_ACTION_UNSUPPORTED -> DeviceErrorCodes.BG_ACTION_UNSUPPORTED
             BackgroundDisplayWire.ERR_TIMEOUT -> DeviceErrorCodes.TIMEOUT
             BackgroundDisplayWire.ERR_DISPLAY_CREATE_FAILED -> DeviceErrorCodes.BG_DISPLAY_CREATE_FAILED
             else -> DeviceErrorCodes.ACTION_FAILED
@@ -173,10 +186,16 @@ public class BackgroundDisplayManagerImpl
                     AppError(DeviceErrorCodes.BG_UNSUPPORTED_SDK, "background screen requires Android 14"),
                 )
             }
-            val pending = sessionOrCreate(owner, snapshot[DeviceConfig.BACKGROUND])
-            return when (val result = pending.await()) {
-                is Outcome.Ok -> Outcome.Ok(result.value.target)
-                is Outcome.Err -> result
+            return try {
+                val pending = sessionOrCreate(owner, snapshot[DeviceConfig.BACKGROUND])
+                when (val result = pending.await()) {
+                    is Outcome.Ok -> Outcome.Ok(result.value.target)
+                    is Outcome.Err -> result
+                }
+            } catch (e: CancellationException) {
+                // 创建在 manager 作用域中继续到确定结果，避免取消调用方后留下无人回收的显示。
+                withContext(NonCancellable) { release(owner) }
+                throw e
             }
         }
 
@@ -241,33 +260,58 @@ public class BackgroundDisplayManagerImpl
             }
         }
 
+        @Suppress("TooGenericExceptionCaught") // 最后兜底必须完成创建 deferred，避免等待方永久挂起。
         private suspend fun create(
             owner: RunId,
             config: com.example.autop.core.config.DeviceBackgroundSection,
             result: CompletableDeferred<Outcome<BackgroundDisplaySession>>,
         ) {
-            val outcome = openHost(owner, config)
-            val (cancelled, lateSession) =
-                mutex.withLock {
-                    creating.remove(owner)
-                    val cancelled = released.remove(owner)
-                    val lateSession =
-                        if (cancelled) {
-                            (outcome as? Outcome.Ok)?.value
-                        } else {
-                            (outcome as? Outcome.Ok)?.let { sessions[owner] = it.value }
-                            null
-                        }
-                    cancelled to lateSession
-                }
-            lateSession?.release()
-            if (cancelled) {
+            try {
+                val outcome = openHost(owner, config)
+                val (cancelled, lateSession) =
+                    mutex.withLock {
+                        creating.remove(owner)
+                        val cancelled = released.remove(owner)
+                        val lateSession =
+                            if (cancelled) {
+                                (outcome as? Outcome.Ok)?.value
+                            } else {
+                                (outcome as? Outcome.Ok)?.let { sessions[owner] = it.value }
+                                null
+                            }
+                        cancelled to lateSession
+                    }
+                lateSession?.release()
                 result.complete(
-                    Outcome.Err(AppError(DeviceErrorCodes.BG_RELEASED, "run released during display creation")),
+                    if (cancelled) {
+                        Outcome.Err(AppError(DeviceErrorCodes.BG_RELEASED, "run released during display creation"))
+                    } else {
+                        outcome
+                    },
                 )
-                return
+            } catch (e: CancellationException) {
+                withContext(NonCancellable) {
+                    mutex.withLock {
+                        creating.remove(owner)
+                        released.remove(owner)
+                    }
+                }
+                result.complete(
+                    Outcome.Err(AppError(DeviceErrorCodes.BG_RELEASED, "display creation cancelled", cause = e)),
+                )
+                throw e
+            } catch (e: Exception) {
+                mutex.withLock { creating.remove(owner) }
+                result.complete(
+                    Outcome.Err(
+                        AppError(
+                            DeviceErrorCodes.BG_DISPLAY_CREATE_FAILED,
+                            "background display creation failed",
+                            cause = e,
+                        ),
+                    ),
+                )
             }
-            result.complete(outcome)
         }
 
         private suspend fun openHost(

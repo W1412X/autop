@@ -8,6 +8,7 @@ import android.accessibilityservice.AccessibilityService
 import android.content.ComponentName
 import android.content.pm.PackageManager
 import android.os.Build
+import android.view.Display
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
 import android.view.accessibility.AccessibilityWindowInfo
@@ -15,6 +16,9 @@ import com.example.autop.core.platform.DataSchemaState
 import com.example.autop.device.impl.record.RecordingGate
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+
+/** 真实屏事件总线不接收虚拟屏事件，避免后台动作污染前台跟踪、录制与用户触摸判断。 */
+internal fun isMainDisplayEvent(displayId: Int): Boolean = displayId == Display.DEFAULT_DISPLAY
 
 /** AutoP 无障碍服务：连接管理与事件转发。 */
 @AndroidEntryPoint
@@ -42,6 +46,7 @@ public class AutopAccessibilityService : AccessibilityService() {
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (!DataSchemaState.isReady()) return
         val source = event ?: return
+        if (!isMainDisplayEvent(source.displayId)) return
         val pkg = source.packageName?.toString()
         val cls = source.className?.toString()
         val captured = if (recordingGate.active) captureSource(source) else null

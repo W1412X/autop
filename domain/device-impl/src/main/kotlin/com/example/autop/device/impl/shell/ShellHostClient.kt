@@ -96,6 +96,7 @@ internal class ShellHostClient(
             withContext(io) { write(line) }
             return withTimeout(timeoutMs) { reply.await() }
         } catch (e: TimeoutCancellationException) {
+            retire(ShellHostTransportException("shell host rpc timed out", e))
             throw ShellHostTransportException("shell host rpc timed out", e)
         } finally {
             pending.remove(id)
@@ -104,8 +105,13 @@ internal class ShellHostClient(
 
     /** 关闭底层流（宿主读到 EOF 后清理全部 job 并退出）。幂等。 */
     fun close() {
+        retire(ShellHostTransportException("shell host closed"))
+    }
+
+    private fun retire(cause: Throwable) {
         alive = false
-        stream?.close()
+        runCatching { stream?.close() }
+        failAll(cause)
     }
 
     /** 读线程回调：处理一个 shell v2 帧。 */

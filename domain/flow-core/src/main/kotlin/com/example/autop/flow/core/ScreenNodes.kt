@@ -237,11 +237,8 @@ internal class ScreenNodes(
         frame: Frame,
         value: String?,
     ): Boolean {
-        val fg =
-            env.ports.device
-                .state()
-                .foregroundPackage
         val screen = env.screens.screen(null, frame.flow.settings.observeMode).screen
+        val fg = env.screens.observedForegroundApp(screen)
         val appOk = value == null || fg == value || screen.windows.any { it.app == value }
         val page = node.page?.let { frame.templates.renderString(it) } ?: return appOk
         return appOk && screen.windows.any { it.page?.contains(page) == true }
